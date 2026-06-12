@@ -1,0 +1,142 @@
+from __future__ import annotations
+
+from typing import Any
+
+
+HOW_TO_USE_MARKERS = ["我该怎么用", "怎么使用", "这个平台怎么用", "怎么开始", "使用流程是什么"]
+HELP_MARKERS = ["参数示例", "样例参数", "给我一个参数", "怎么填写", "怎么填参数", "璇风粰鎴戜釜鍙傛暟绀轰緥", "缁欐垜涓€涓弬鏁扮ず渚"]
+REQUIRED_MARKERS = [
+    "我需要提供哪些参数",
+    "需要哪些参数",
+    "要填什么参数",
+    "我要准备什么数据",
+    "这个模型要填啥",
+    "缺哪些参数",
+    "参数清单",
+    "闇€瑕佸摢浜涘弬鏁",
+    "缂轰粈涔堝弬鏁",
+]
+SWITCH_MARKERS = ["切换到", "换成", "改成", "鍒囨崲鍒", "鏀规垚", "鎹㈡垚"]
+CONFIRM_DEFAULT_MARKERS = ["确认使用默认值", "使用默认值", "默认值确认", "纭浣跨敤榛樿鍊", "浣跨敤榛樿鍊"]
+CONFIRM_INVOKE_MARKERS = ["确认调用", "开始求解", "执行优化", "开始优化", "运行模型", "纭璋冪敤", "寮€濮嬫眰瑙", "鎵ц浼樺寲"]
+RESULT_MARKERS = ["解释结果", "结果解释", "总结结果", "分析结果", "上一次结果", "上一次优化结果", "瑙ｉ噴缁撴灉", "缁撴灉瑙ｉ噴"]
+CONFIRM_SWITCH_CLEAR_MARKERS = ["确认清空", "清空后切换", "确认切换", "清空参数", "纭娓呯┖"]
+CONFIRM_SWITCH_MIGRATE_MARKERS = ["迁移参数", "保留兼容参数", "迁移后切换", "杩佺Щ鍙傛暟"]
+CANCEL_SWITCH_MARKERS = ["取消切换", "不切换", "保持当前", "鍙栨秷鍒囨崲"]
+AVAILABILITY_MARKERS = ["有没有", "支持", "能不能做", "平台有", "是否支持", "有模型", "没有", "鏈夋病鏈", "鏀寔", "鑳戒笉鑳藉仛"]
+OPTIMIZATION_MARKERS = ["帮我", "运行", "求解", "优化", "调度", "分配", "dispatch", "optimize", "调用", "甯垜", "杩愯", "姹傝В", "浼樺寲", "璋冨害"]
+
+
+class AgentSkillRouter:
+    def route(self, message: str, conversation_state: dict[str, Any] | None = None, available_agent_skills: list[dict[str, Any]] | None = None) -> dict[str, Any]:
+        state = conversation_state or {}
+        skills = available_agent_skills or []
+        text = str(message or "")
+        compact = "".join(text.lower().split())
+        current_agent_skill = state.get("agent_skill_name")
+        current_api_skill = state.get("resolved_skill_name") or state.get("selected_skill")
+        mentioned = self._match_skill(text, skills)
+
+        if state.get("pending_switch"):
+            pending = state.get("pending_switch") or {}
+            if any(marker in compact for marker in CANCEL_SWITCH_MARKERS):
+                return self._result("cancel_switch", current_agent_skill, skills, 0.95, False, "用户取消 Skill 切换")
+            if any(marker in compact for marker in CONFIRM_SWITCH_MIGRATE_MARKERS):
+                return self._result("confirm_switch_migrate", pending.get("to_agent_skill") or pending.get("target_agent_skill"), skills, 0.95, False, "用户确认迁移兼容参数后切换")
+            if any(marker in compact for marker in CONFIRM_SWITCH_CLEAR_MARKERS):
+                return self._result("confirm_switch_clear", pending.get("to_agent_skill") or pending.get("target_agent_skill"), skills, 0.95, False, "用户确认清空参数后切换")
+        if any(marker in compact for marker in HOW_TO_USE_MARKERS):
+            return self._result("how_to_use", current_agent_skill or mentioned, skills, 0.95, False, "用户询问平台使用流程")
+        if any(marker in compact for marker in CONFIRM_DEFAULT_MARKERS):
+            return self._result("confirm_defaults", current_agent_skill or mentioned, skills, 0.9, False, "用户确认默认值")
+        if any(marker in compact for marker in CONFIRM_INVOKE_MARKERS):
+            return self._result("confirm_invoke", current_agent_skill or mentioned, skills, 0.9, True, "用户确认调用")
+        if any(marker in compact for marker in RESULT_MARKERS):
+            return self._result("result_explanation", current_agent_skill or mentioned, skills, 0.85, False, "用户要求解释已有结果")
+        if any(marker in compact for marker in REQUIRED_MARKERS):
+            chosen = mentioned or current_agent_skill or self._agent_skill_from_api(current_api_skill, skills)
+            return self._result("explain_required_parameters", chosen, skills, 0.94, False, "用户请求参数清单，不应调用模型")
+        if any(marker in compact for marker in HELP_MARKERS):
+            chosen = mentioned or current_agent_skill or self._agent_skill_from_api(current_api_skill, skills)
+            return self._result("parameter_example", chosen, skills, 0.92, False, "用户请求参数示例，不应调用模型")
+        if any(marker in compact for marker in AVAILABILITY_MARKERS):
+            return self._result("skill_availability_query", mentioned, skills, 0.9 if mentioned else 0.62, False, "用户询问平台是否支持某场景")
+
+        explicit_switch = any(marker in compact for marker in SWITCH_MARKERS)
+        if mentioned and current_agent_skill and mentioned != current_agent_skill:
+            return self._result("switch_skill", mentioned, skills, 0.88, False, f"检测到场景切换：{current_agent_skill} -> {mentioned}")
+        if current_agent_skill and not explicit_switch and not mentioned and any(ch.isdigit() for ch in compact):
+            return self._result("parameter_supplement", current_agent_skill, skills, 0.78, False, "沿用当前 Agent Skill 收集参数")
+        if mentioned:
+            if self._optimization_intent(compact):
+                return self._result("optimization_request", mentioned, skills, 0.86, False, "识别到优化请求和场景")
+            return self._result("casual_chat", mentioned, skills, 0.45, False, "提到场景但未明确要求执行")
+        if self._optimization_intent(compact):
+            return {"intent": "skill_selection_required", "agent_skill_name": None, "api_skill_name": None, "confidence": 0.4, "should_invoke": False, "reason": "识别到优化意图但无法确定 Agent Skill"}
+        return {"intent": "casual_chat", "agent_skill_name": current_agent_skill, "api_skill_name": current_api_skill, "confidence": 0.5, "should_invoke": False, "reason": "未识别到优化调用意图"}
+
+    def _result(self, intent: str, agent_skill_name: str | None, skills: list[dict[str, Any]], confidence: float, should_invoke: bool, reason: str) -> dict[str, Any]:
+        skill = next((item for item in skills if item.get("name") == agent_skill_name), {})
+        return {
+            "intent": intent,
+            "agent_skill_name": agent_skill_name,
+            "api_skill_name": skill.get("canonical_api_skill_name"),
+            "confidence": confidence,
+            "should_invoke": should_invoke,
+            "reason": reason,
+        }
+
+    def _match_skill(self, message: str, skills: list[dict[str, Any]]) -> str | None:
+        text = message.lower()
+        for skill in skills:
+            names = [skill.get("name", ""), skill.get("display_name", "")]
+            names += list(skill.get("scenario_tags") or [])
+            names += list(skill.get("trigger_intents") or [])
+            if any(str(item).lower() and str(item).lower() in text for item in names):
+                return skill.get("name")
+        aliases = [
+            ("unit_commitment_day_ahead", ["日前机组组合", "机组组合", "机组", "日前", "启停", "备用", "unit commitment", "鏃ュ墠", "鏈虹粍"]),
+            ("storage_dispatch", ["储能调度", "储能", "峰谷", "soc", "storage", "鍌ㄨ兘"]),
+            ("renewable_storage_dispatch", ["风光储", "新能源", "可再生", "renewable", "椋庡厜鍌"]),
+            ("chp_dispatch", ["电热协同", "热电", "chp", "鐢电儹"]),
+            (
+                "cascade_hydro_dispatch",
+                [
+                    "梯级水电",
+                    "梯级水电调度",
+                    "梯级电站",
+                    "梯级电站调度",
+                    "水电调度",
+                    "水库调度",
+                    "水库群调度",
+                    "流域梯级",
+                    "来水调度",
+                    "水电日前",
+                    "帮我做梯级电站调度",
+                    "帮我做梯级水电调度计划",
+                    "cascade hydro",
+                    "hydro dispatch",
+                    "姊骇",
+                    "姘寸數",
+                    "姘村簱",
+                ],
+            ),
+            ("economic_dispatch", ["经济调度", "经济负荷分配", "出力分配", "负荷分配", "economic dispatch", "缁忔祹"]),
+        ]
+        available = {item.get("name") for item in skills}
+        for name, markers in aliases:
+            if name in available and any(marker in text for marker in markers):
+                return name
+        return None
+
+    def _agent_skill_from_api(self, api_skill_name: str | None, skills: list[dict[str, Any]]) -> str | None:
+        for skill in skills:
+            if api_skill_name and skill.get("canonical_api_skill_name") == api_skill_name:
+                return skill.get("name")
+        return None
+
+    def _optimization_intent(self, compact: str) -> bool:
+        return any(marker in compact for marker in OPTIMIZATION_MARKERS)
+
+
+agent_skill_router = AgentSkillRouter()

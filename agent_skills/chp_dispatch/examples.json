@@ -1,0 +1,6 @@
+{
+  "positive_examples": [{"user": "帮我跑电热协同调度", "intent": "optimization_request", "expected_skill": "chp_dispatch"}],
+  "help_examples": [{"user": "电热协同参数示例", "intent": "parameter_example", "should_invoke": false}],
+  "negative_examples": [{"user": "帮我跑储能调度", "expected_skill": "storage_dispatch"}],
+  "sample_parameters": {"electric_load": [80, 90, 85, 75], "heat_load": [100, 110, 105, 95], "fuel_cost": {"CHP1": 240, "CHP2": 300}, "electric_max": {"CHP1": 90, "CHP2": 70}, "heat_max": {"CHP1": 120, "CHP2": 90}}
+}

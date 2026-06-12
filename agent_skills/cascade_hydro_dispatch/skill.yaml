@@ -1,0 +1,66 @@
+name: cascade_hydro_dispatch
+display_name: 梯级水电调度
+description: 基于组件化自定义 Builder，根据梯级电站拓扑、来水预测、负荷曲线、机组检修、库容边界和下泄约束，生成水电调度优化计划。
+canonical_api_skill_name: run_cascade_hydro_dispatch
+model_code: cascade_hydro_dispatch
+build_mode: component_based
+version: v1.0
+status: enabled
+domain: safety_production_optimization
+tags: ["power", "hydro", "cascade", "component_based", "dispatch"]
+scenario_tags:
+  - 梯级水电
+  - 梯级水电调度
+  - 梯级电站
+  - 梯级电站调度
+  - 水电调度
+  - 水库调度
+  - 水库群调度
+  - 流域梯级
+  - 来水调度
+  - 水电日前
+trigger_intents:
+  - 梯级水电调度
+  - 梯级电站调度
+  - 梯级电站
+  - 水电日前计划
+  - 水库调度
+  - 水库群调度
+  - 流域梯级调度
+  - 来水调度
+  - 水电调度
+  - cascade hydro dispatch
+  - 帮我做梯级电站调度
+  - 帮我做梯级水电调度计划
+  - 有没有梯级电站调度模型
+  - 有没有梯级水电模型
+non_trigger_intents:
+  - 只看参数示例
+  - 解释组件含义
+required_parameters:
+  - station
+  - units
+  - unit_pmax
+  - availability
+  - power_conversion
+  - local_inflow
+  - load_forecast
+  - volume_min
+  - volume_max
+  - initial_volume
+  - target_terminal_volume
+  - outflow_min
+  - outflow_max
+  - spill_max
+  - edges
+  - initial_upstream_outflow
+optional_parameters:
+  - horizon
+  - time
+  - time_volume
+  - time_step_seconds
+  - weights
+confirmation_required: {"default_values": true, "before_invoke": true}
+execution_policy: {"mode": "advisory_only", "allow_auto_invoke": false}
+result_explanation: {"template": "prompts/result_explanation.md"}
+error_handling: {"template": "prompts/error_handling.md"}

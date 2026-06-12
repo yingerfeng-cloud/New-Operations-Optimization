@@ -1,0 +1,159 @@
+[
+  {
+    "key": "renewable_forecast",
+    "name": "新能源预测",
+    "dimension": [
+      "site",
+      "time"
+    ],
+    "type": "dict",
+    "unit": "MW",
+    "required": true,
+    "description": "",
+    "default_value": null,
+    "sample_value": {
+      "PV1": [
+        20,
+        80,
+        50,
+        5
+      ],
+      "W1": [
+        35,
+        30,
+        40,
+        50
+      ]
+    },
+    "default_policy": "user_required",
+    "sets": {
+      "site": [
+        "PV1",
+        "W1"
+      ],
+      "time": [
+        0,
+        1,
+        2,
+        3
+      ]
+    },
+    "validation": {
+      "type": "dict"
+    }
+  },
+  {
+    "key": "load_forecast",
+    "name": "负荷预测",
+    "dimension": [
+      "time"
+    ],
+    "type": "array",
+    "unit": "MW",
+    "required": true,
+    "description": "",
+    "default_value": null,
+    "sample_value": [
+      60,
+      90,
+      85,
+      70
+    ],
+    "default_policy": "user_required",
+    "sets": {
+      "time": [
+        0,
+        1,
+        2,
+        3
+      ]
+    },
+    "validation": {
+      "type": "array"
+    }
+  },
+  {
+    "key": "electricity_price",
+    "name": "电价",
+    "dimension": [
+      "time"
+    ],
+    "type": "array",
+    "unit": "元/MWh",
+    "required": true,
+    "description": "",
+    "default_value": null,
+    "sample_value": [
+      260,
+      300,
+      520,
+      460
+    ],
+    "default_policy": "user_required",
+    "sets": {
+      "time": [
+        0,
+        1,
+        2,
+        3
+      ]
+    },
+    "validation": {
+      "type": "array"
+    }
+  },
+  {
+    "key": "storage_capacity",
+    "name": "储能容量",
+    "dimension": [
+      "storage"
+    ],
+    "type": "dict",
+    "unit": "MWh",
+    "required": true,
+    "description": "",
+    "default_value": null,
+    "sample_value": {
+      "B1": 80
+    },
+    "default_policy": "user_required",
+    "sets": {
+      "storage": [
+        "B1"
+      ]
+    },
+    "validation": {
+      "type": "dict"
+    }
+  },
+  {
+    "key": "grid_export_limit",
+    "name": "并网容量",
+    "dimension": [
+      "time"
+    ],
+    "type": "array",
+    "unit": "MW",
+    "required": true,
+    "description": "",
+    "default_value": null,
+    "sample_value": [
+      90,
+      110,
+      110,
+      90
+    ],
+    "default_policy": "sample_only",
+    "sets": {
+      "time": [
+        0,
+        1,
+        2,
+        3
+      ]
+    },
+    "validation": {
+      "type": "array"
+    }
+  }
+]

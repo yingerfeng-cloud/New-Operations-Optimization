@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <title>电力优化演示报告</title>
+  <style>
+    body { font-family: "Microsoft YaHei", Arial, sans-serif; margin: 32px; color: #172033; }
+    h1 { font-size: 24px; }
+    h2 { margin-top: 24px; font-size: 18px; border-bottom: 1px solid #d6dde8; padding-bottom: 6px; }
+    pre { background: #f6f8fb; padding: 12px; border-radius: 6px; white-space: pre-wrap; }
+    .metric { display: inline-block; margin: 6px 12px 6px 0; padding: 8px 10px; background: #eef5ff; border-radius: 6px; }
+  </style>
+</head>
+<body>
+  <h1>电力优化演示报告</h1>
+  <h2>场景说明</h2>
+  <p>storage_dispatch</p>
+  <h2>输入参数</h2>
+  <pre>{
+  &quot;storage&quot;: [
+    &quot;B1&quot;
+  ],
+  &quot;horizon&quot;: 4,
+  &quot;electricity_price&quot;: [
+    220,
+    180,
+    520,
+    610
+  ],
+  &quot;load_forecast&quot;: [
+    86,
+    78,
+    118,
+    132
+  ],
+  &quot;renewable_forecast&quot;: [
+    28,
+    35,
+    22,
+    12
+  ],
+  &quot;storage_capacity&quot;: {
+    &quot;B1&quot;: 120
+  },
+  &quot;soc_min&quot;: {
+    &quot;B1&quot;: 10
+  },
+  &quot;charge_power_max&quot;: {
+    &quot;B1&quot;: 40
+  },
+  &quot;discharge_power_max&quot;: {
+    &quot;B1&quot;: 40
+  },
+  &quot;charge_efficiency&quot;: {
+    &quot;B1&quot;: 0.94
+  },
+  &quot;discharge_efficiency&quot;: {
+    &quot;B1&quot;: 0.92
+  },
+  &quot;initial_soc&quot;: {
+    &quot;B1&quot;: 50
+  }
+}</pre>
+  <h2>求解状态</h2>
+  <p>状态：SUCCESS；求解器：HiGHS；任务ID：OPT-3D1D5812EA</p>
+  <h2>成本/收益测算</h2>
+  <span class="metric">objective_value: 35810.176</span><span class="metric">total_cost: -35810.176</span><span class="metric">profit: 35810.176</span><span class="metric">gap: 0.00%</span><span class="metric">risk: low</span>
+  <h2>优化结果</h2>
+  <pre>{
+  &quot;charge_discharge_plan&quot;: [
+    {
+      &quot;time&quot;: 0,
+      &quot;storage&quot;: &quot;B1&quot;,
+      &quot;charge&quot;: 9.954,
+      &quot;discharge&quot;: 0.0,
+      &quot;soc&quot;: 59.357,
+      &quot;price&quot;: 220.0
+    },
+    {
+      &quot;time&quot;: 1,
+      &quot;storage&quot;: &quot;B1&quot;,
+      &quot;charge&quot;: 40.0,
+      &quot;discharge&quot;: 0.0,
+      &quot;soc&quot;: 96.957,
+      &quot;price&quot;: 180.0
+    },
+    {
+      &quot;time&quot;: 2,
+      &quot;storage&quot;: &quot;B1&quot;,
+      &quot;charge&quot;: 0.0,
+      &quot;discharge&quot;: 40.0,
+      &quot;soc&quot;: 53.478,
+      &quot;price&quot;: 520.0
+    },
+    {
+      &quot;time&quot;: 3,
+      &quot;storage&quot;: &quot;B1&quot;,
+      &quot;charge&quot;: 0.0,
+      &quot;discharge&quot;: 40.0,
+      &quot;soc&quot;: 10.0,
+      &quot;price&quot;: 610.0
+    }
+  ],
+  &quot;soc_curve&quot;: [
+    {
+      &quot;time&quot;: 0,
+      &quot;storage&quot;: &quot;B1&quot;,
+      &quot;charge&quot;: 9.954,
+      &quot;discharge&quot;: 0.0,
+      &quot;soc&quot;: 59.357,
+      &quot;price&quot;: 220.0
+    },
+    {
+      &quot;time&quot;: 1,
+      &quot;storage&quot;: &quot;B1&quot;,
+      &quot;charge&quot;: 40.0,
+      &quot;discharge&quot;: 0.0,
+      &quot;soc&quot;: 96.957,
+      &quot;price&quot;: 180.0
+    },
+    {
+      &quot;time&quot;: 2,
+      &quot;storage&quot;: &quot;B1&quot;,
+      &quot;charge&quot;: 0.0,
+      &quot;discharge&quot;: 40.0,
+      &quot;soc&quot;: 53.478,
+      &quot;price&quot;: 520.0
+    },
+    {
+      &quot;time&quot;: 3,
+      &quot;storage&quot;: &quot;B1&quot;,
+      &quot;charge&quot;: 0.0,
+      &quot;discharge&quot;: 40.0,
+      &quot;soc&quot;: 10.0,
+      &quot;price&quot;: 610.0
+    }
+  ],
+  &quot;revenue_assessment&quot;: {
+    &quot;arbitrage_profit&quot;: 35810.18,
+    &quot;charge_discharge_count&quot;: 4
+  },
+  &quot;arbitrage_profit&quot;: 35810.18,
+  &quot;charge_discharge_count&quot;: 4,
+  &quot;constraint_check&quot;: {
+    &quot;soc_within_bounds&quot;: true,
+    &quot;soc_hits_lower_bound&quot;: true,
+    &quot;soc_hits_upper_bound&quot;: false,
+    &quot;charge_discharge_exclusive&quot;: true,
+    &quot;charge_discharge_conflict&quot;: false
+  }
+}</pre>
+  <h2>约束校核</h2>
+  <pre>{
+  &quot;soc_within_bounds&quot;: true,
+  &quot;soc_hits_lower_bound&quot;: true,
+  &quot;soc_hits_upper_bound&quot;: false,
+  &quot;charge_discharge_exclusive&quot;: true,
+  &quot;charge_discharge_conflict&quot;: false
+}</pre>
+  <h2>中文业务解释</h2>
+  <p>储能在低价时段充电、高价时段放电，在满足SOC和功率约束下实现峰谷套利收益最大。</p>
+  <h2>风险提示</h2>
+  <pre>[
+  &quot;SOC触及下限，需避免连续高价放电后可用电量不足。&quot;
+]</pre>
+</body>
+</html>

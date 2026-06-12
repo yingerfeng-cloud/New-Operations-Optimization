@@ -1,0 +1,30 @@
+name: chp_dispatch
+display_name: 电热协同 Agent Skill
+description: 调用电热协同 API Skill，生成热电联产机组电负荷和热负荷协同出力建议。
+canonical_api_skill_name: run_chp_dispatch
+version: 1.0.0
+domain: safety_production_optimization
+scenario_tags:
+  - 电热协同
+  - 热电联产
+  - CHP
+trigger_intents:
+  - 电热协同
+  - 热电联产
+  - chp dispatch
+non_trigger_intents:
+  - 参数示例
+  - 需要哪些参数
+required_parameters:
+  - electric_load
+  - heat_load
+  - fuel_cost
+  - electric_max
+  - heat_max
+optional_parameters:
+  - electric_min
+  - heat_min
+confirmation_required: {"default_values": true, "before_invoke": true}
+execution_policy: {"mode": "advisory_only", "allow_auto_invoke": false}
+result_explanation: {"template": "prompts/result_explanation.md"}
+error_handling: {"template": "prompts/error_handling.md"}

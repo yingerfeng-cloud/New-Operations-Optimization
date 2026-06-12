@@ -1,0 +1,190 @@
+[
+  {
+    "key": "load_forecast",
+    "name": "负荷预测",
+    "dimension": [
+      "time"
+    ],
+    "type": "array",
+    "unit": "MW",
+    "required": true,
+    "description": "",
+    "default_value": null,
+    "sample_value": [
+      160,
+      190,
+      175,
+      150
+    ],
+    "default_policy": "user_required",
+    "sets": {
+      "time": [
+        0,
+        1,
+        2,
+        3
+      ]
+    },
+    "validation": {
+      "type": "array",
+      "min": 0
+    }
+  },
+  {
+    "key": "unit_min_output",
+    "name": "机组最小出力",
+    "dimension": [
+      "unit"
+    ],
+    "type": "dict",
+    "unit": "MW",
+    "required": true,
+    "description": "",
+    "default_value": {
+      "U1": 30,
+      "U2": 20,
+      "U3": 10
+    },
+    "sample_value": {
+      "U1": 30,
+      "U2": 20,
+      "U3": 10
+    },
+    "default_policy": "default_allowed",
+    "sets": {
+      "unit": [
+        "U1",
+        "U2",
+        "U3"
+      ]
+    },
+    "validation": {
+      "type": "dict",
+      "min": 0
+    }
+  },
+  {
+    "key": "unit_max_output",
+    "name": "机组最大出力",
+    "dimension": [
+      "unit"
+    ],
+    "type": "dict",
+    "unit": "MW",
+    "required": true,
+    "description": "",
+    "default_value": null,
+    "sample_value": {
+      "U1": 120,
+      "U2": 90,
+      "U3": 70
+    },
+    "default_policy": "user_required",
+    "sets": {
+      "unit": [
+        "U1",
+        "U2",
+        "U3"
+      ]
+    },
+    "validation": {
+      "type": "dict",
+      "min": 0
+    }
+  },
+  {
+    "key": "fuel_cost",
+    "name": "燃料成本",
+    "dimension": [
+      "unit"
+    ],
+    "type": "dict",
+    "unit": "元/MWh",
+    "required": true,
+    "description": "",
+    "default_value": null,
+    "sample_value": {
+      "U1": 220,
+      "U2": 260,
+      "U3": 360
+    },
+    "default_policy": "user_required",
+    "sets": {
+      "unit": [
+        "U1",
+        "U2",
+        "U3"
+      ]
+    },
+    "validation": {
+      "type": "dict",
+      "min": 0
+    }
+  },
+  {
+    "key": "ramp_up_limit",
+    "name": "上爬坡限制",
+    "dimension": [
+      "unit"
+    ],
+    "type": "dict",
+    "unit": "MW/h",
+    "required": true,
+    "description": "",
+    "default_value": {
+      "U1": 80,
+      "U2": 60,
+      "U3": 50
+    },
+    "sample_value": {
+      "U1": 80,
+      "U2": 60,
+      "U3": 50
+    },
+    "default_policy": "default_allowed",
+    "sets": {
+      "unit": [
+        "U1",
+        "U2",
+        "U3"
+      ]
+    },
+    "validation": {
+      "type": "dict",
+      "min": 0
+    }
+  },
+  {
+    "key": "ramp_down_limit",
+    "name": "下爬坡限制",
+    "dimension": [
+      "unit"
+    ],
+    "type": "dict",
+    "unit": "MW/h",
+    "required": true,
+    "description": "",
+    "default_value": {
+      "U1": 80,
+      "U2": 60,
+      "U3": 50
+    },
+    "sample_value": {
+      "U1": 80,
+      "U2": 60,
+      "U3": 50
+    },
+    "default_policy": "default_allowed",
+    "sets": {
+      "unit": [
+        "U1",
+        "U2",
+        "U3"
+      ]
+    },
+    "validation": {
+      "type": "dict",
+      "min": 0
+    }
+  }
+]

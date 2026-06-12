@@ -1,0 +1,271 @@
+[
+  {
+    "key": "load_forecast",
+    "name": "负荷预测",
+    "dimension": [
+      "time"
+    ],
+    "type": "array",
+    "unit": "MW",
+    "required": true,
+    "description": "",
+    "default_value": null,
+    "sample_value": null,
+    "default_policy": "user_required",
+    "sets": {
+      "time": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+        20,
+        21,
+        22,
+        23
+      ]
+    },
+    "validation": {
+      "type": "array",
+      "length_ref": "horizon",
+      "min": 0
+    }
+  },
+  {
+    "key": "renewable_forecast",
+    "name": "新能源预测",
+    "dimension": [
+      "time"
+    ],
+    "type": "array",
+    "unit": "MW",
+    "required": true,
+    "description": "",
+    "default_value": null,
+    "sample_value": null,
+    "default_policy": "user_required",
+    "sets": {
+      "time": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+        20,
+        21,
+        22,
+        23
+      ]
+    },
+    "validation": {
+      "type": "array",
+      "length_ref": "horizon",
+      "min": 0
+    }
+  },
+  {
+    "key": "unit_min_output",
+    "name": "机组最小出力",
+    "dimension": [
+      "unit"
+    ],
+    "type": "dict",
+    "unit": "MW",
+    "required": true,
+    "description": "",
+    "default_value": null,
+    "sample_value": null,
+    "default_policy": "default_allowed",
+    "sets": {
+      "unit": [
+        "U1",
+        "U2",
+        "U3"
+      ]
+    },
+    "validation": {
+      "type": "dict",
+      "min": 0
+    }
+  },
+  {
+    "key": "unit_max_output",
+    "name": "机组最大出力",
+    "dimension": [
+      "unit"
+    ],
+    "type": "dict",
+    "unit": "MW",
+    "required": true,
+    "description": "",
+    "default_value": null,
+    "sample_value": null,
+    "default_policy": "user_required",
+    "sets": {
+      "unit": [
+        "U1",
+        "U2",
+        "U3"
+      ]
+    },
+    "validation": {
+      "type": "dict",
+      "min": 0
+    }
+  },
+  {
+    "key": "ramp_up_limit",
+    "name": "上爬坡限制",
+    "dimension": [
+      "unit"
+    ],
+    "type": "dict",
+    "unit": "MW/h",
+    "required": true,
+    "description": "",
+    "default_value": null,
+    "sample_value": null,
+    "default_policy": "default_allowed",
+    "sets": {
+      "unit": [
+        "U1",
+        "U2",
+        "U3"
+      ]
+    },
+    "validation": {
+      "type": "dict",
+      "min": 0
+    }
+  },
+  {
+    "key": "ramp_down_limit",
+    "name": "下爬坡限制",
+    "dimension": [
+      "unit"
+    ],
+    "type": "dict",
+    "unit": "MW/h",
+    "required": true,
+    "description": "",
+    "default_value": null,
+    "sample_value": null,
+    "default_policy": "default_allowed",
+    "sets": {
+      "unit": [
+        "U1",
+        "U2",
+        "U3"
+      ]
+    },
+    "validation": {
+      "type": "dict",
+      "min": 0
+    }
+  },
+  {
+    "key": "fuel_cost",
+    "name": "燃料成本",
+    "dimension": [
+      "unit"
+    ],
+    "type": "dict",
+    "unit": "元/MWh",
+    "required": true,
+    "description": "",
+    "default_value": null,
+    "sample_value": null,
+    "default_policy": "user_required",
+    "sets": {
+      "unit": [
+        "U1",
+        "U2",
+        "U3"
+      ]
+    },
+    "validation": {
+      "type": "dict",
+      "min": 0
+    }
+  },
+  {
+    "key": "startup_cost",
+    "name": "启停成本",
+    "dimension": [
+      "unit"
+    ],
+    "type": "dict",
+    "unit": "元/次",
+    "required": true,
+    "description": "",
+    "default_value": null,
+    "sample_value": null,
+    "default_policy": "sample_only",
+    "sets": {
+      "unit": [
+        "U1",
+        "U2",
+        "U3"
+      ]
+    },
+    "validation": {
+      "type": "dict",
+      "min": 0
+    }
+  },
+  {
+    "key": "initial_unit_status",
+    "name": "初始启停状态",
+    "dimension": [
+      "unit"
+    ],
+    "type": "dict",
+    "unit": "0/1",
+    "required": true,
+    "description": "",
+    "default_value": null,
+    "sample_value": null,
+    "default_policy": "default_allowed",
+    "sets": {
+      "unit": [
+        "U1",
+        "U2",
+        "U3"
+      ]
+    },
+    "validation": {
+      "type": "dict",
+      "binary": true
+    }
+  }
+]

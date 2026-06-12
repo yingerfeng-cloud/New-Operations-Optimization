@@ -1,0 +1,1 @@
+{"electric_load":[80,90,85,75],"heat_load":[100,110,105,95],"fuel_cost":{"CHP1":240,"CHP2":300},"electric_max":{"CHP1":90,"CHP2":70},"heat_max":{"CHP1":120,"CHP2":90},"electric_min":{"CHP1":20,"CHP2":10},"heat_min":{"CHP1":30,"CHP2":20}}

@@ -1,0 +1,6 @@
+{
+  "positive_examples": [{"user": "帮我做风光储协同优化", "intent": "optimization_request", "expected_skill": "renewable_storage_dispatch"}],
+  "help_examples": [{"user": "风光储参数示例", "intent": "parameter_example", "should_invoke": false}],
+  "negative_examples": [{"user": "帮我跑经济调度", "expected_skill": "economic_dispatch"}],
+  "sample_parameters": {"renewable_forecast": {"PV1": [20, 80, 50, 5]}, "load_forecast": [60, 90, 85, 70], "electricity_price": [260, 300, 520, 460], "storage_capacity": {"B1": 80}, "grid_export_limit": [90, 110, 110, 90]}
+}

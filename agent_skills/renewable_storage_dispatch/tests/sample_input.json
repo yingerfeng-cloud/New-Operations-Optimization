@@ -1,0 +1,1 @@
+{"renewable_forecast":{"PV1":[20,80,50,5],"W1":[35,30,40,50]},"load_forecast":[60,90,85,70],"electricity_price":[260,300,520,460],"storage_capacity":{"B1":80},"grid_export_limit":[90,110,110,90],"charge_power_max":{"B1":30},"discharge_power_max":{"B1":30},"initial_soc":{"B1":30}}

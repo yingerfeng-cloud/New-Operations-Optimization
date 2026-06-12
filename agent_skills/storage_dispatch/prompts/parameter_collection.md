@@ -1,0 +1,1 @@
+收集 electricity_price、storage_capacity、charge_power_max、discharge_power_max。不要用示例电价或容量替代用户输入。

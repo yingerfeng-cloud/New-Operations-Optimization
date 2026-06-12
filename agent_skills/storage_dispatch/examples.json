@@ -1,0 +1,6 @@
+{
+  "positive_examples": [{"user": "帮我跑储能调度", "intent": "optimization_request", "expected_skill": "storage_dispatch"}],
+  "help_examples": [{"user": "储能调度参数示例", "intent": "parameter_example", "should_invoke": false}],
+  "negative_examples": [{"user": "帮我做日前机组组合", "expected_skill": "unit_commitment_day_ahead"}],
+  "sample_parameters": {"electricity_price": [220, 180, 520, 610], "storage_capacity": {"B1": 120}, "charge_power_max": {"B1": 40}, "discharge_power_max": {"B1": 40}}
+}

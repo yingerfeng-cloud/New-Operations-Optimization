@@ -1,0 +1,15 @@
+{
+  "objective_value": "number",
+  "variables": [
+    {
+      "key": "unit_output",
+      "name": "机组出力",
+      "dimension": [
+        "unit",
+        "time"
+      ],
+      "unit": "MW"
+    }
+  ],
+  "explanation": "string"
+}

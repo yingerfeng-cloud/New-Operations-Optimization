@@ -1,0 +1,1 @@
+{"electricity_price":[220,180,520,610],"storage_capacity":{"B1":120},"charge_power_max":{"B1":40},"discharge_power_max":{"B1":40},"charge_efficiency":{"B1":0.94},"discharge_efficiency":{"B1":0.92},"initial_soc":{"B1":50}}

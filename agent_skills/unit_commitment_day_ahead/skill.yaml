@@ -1,0 +1,27 @@
+name: unit_commitment_day_ahead
+display_name: 日前机组组合 Agent Skill
+description: 调用日前机组组合 API Skill，形成机组启停、备用和出力计划建议。
+canonical_api_skill_name: run_unit_commitment_day_ahead
+version: 1.0.0
+domain: safety_production_optimization
+scenario_tags:
+  - 日前机组组合
+  - 机组启停
+  - 备用约束
+trigger_intents:
+  - 日前机组组合
+  - 机组启停
+  - unit commitment
+non_trigger_intents:
+  - 参数示例
+  - 需要哪些参数
+required_parameters:
+  - load_forecast
+  - renewable_forecast
+optional_parameters:
+  - initial_unit_status
+  - initial_unit_output
+confirmation_required: {"default_values": true, "before_invoke": true}
+execution_policy: {"mode": "advisory_only", "allow_auto_invoke": false}
+result_explanation: {"template": "prompts/result_explanation.md"}
+error_handling: {"template": "prompts/error_handling.md"}

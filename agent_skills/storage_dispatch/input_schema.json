@@ -1,0 +1,190 @@
+[
+  {
+    "key": "electricity_price",
+    "name": "电价",
+    "dimension": [
+      "time"
+    ],
+    "type": "array",
+    "unit": "元/MWh",
+    "required": true,
+    "description": "",
+    "default_value": null,
+    "sample_value": [
+      220,
+      180,
+      520,
+      610
+    ],
+    "default_policy": "user_required",
+    "sets": {
+      "time": [
+        0,
+        1,
+        2,
+        3
+      ]
+    },
+    "validation": {
+      "type": "array"
+    }
+  },
+  {
+    "key": "storage_capacity",
+    "name": "储能容量",
+    "dimension": [
+      "storage"
+    ],
+    "type": "dict",
+    "unit": "MWh",
+    "required": true,
+    "description": "",
+    "default_value": null,
+    "sample_value": {
+      "B1": 120
+    },
+    "default_policy": "user_required",
+    "sets": {
+      "storage": [
+        "B1"
+      ]
+    },
+    "validation": {
+      "type": "dict",
+      "min": 0
+    }
+  },
+  {
+    "key": "charge_power_max",
+    "name": "最大充电功率",
+    "dimension": [
+      "storage"
+    ],
+    "type": "dict",
+    "unit": "MW",
+    "required": true,
+    "description": "",
+    "default_value": null,
+    "sample_value": {
+      "B1": 40
+    },
+    "default_policy": "user_required",
+    "sets": {
+      "storage": [
+        "B1"
+      ]
+    },
+    "validation": {
+      "type": "dict",
+      "min": 0
+    }
+  },
+  {
+    "key": "discharge_power_max",
+    "name": "最大放电功率",
+    "dimension": [
+      "storage"
+    ],
+    "type": "dict",
+    "unit": "MW",
+    "required": true,
+    "description": "",
+    "default_value": null,
+    "sample_value": {
+      "B1": 40
+    },
+    "default_policy": "user_required",
+    "sets": {
+      "storage": [
+        "B1"
+      ]
+    },
+    "validation": {
+      "type": "dict",
+      "min": 0
+    }
+  },
+  {
+    "key": "charge_efficiency",
+    "name": "充电效率",
+    "dimension": [
+      "storage"
+    ],
+    "type": "dict",
+    "unit": "p.u.",
+    "required": true,
+    "description": "",
+    "default_value": {
+      "B1": 0.94
+    },
+    "sample_value": {
+      "B1": 0.94
+    },
+    "default_policy": "default_allowed",
+    "sets": {
+      "storage": [
+        "B1"
+      ]
+    },
+    "validation": {
+      "type": "dict",
+      "min": 0,
+      "max": 1
+    }
+  },
+  {
+    "key": "discharge_efficiency",
+    "name": "放电效率",
+    "dimension": [
+      "storage"
+    ],
+    "type": "dict",
+    "unit": "p.u.",
+    "required": true,
+    "description": "",
+    "default_value": {
+      "B1": 0.92
+    },
+    "sample_value": {
+      "B1": 0.92
+    },
+    "default_policy": "default_allowed",
+    "sets": {
+      "storage": [
+        "B1"
+      ]
+    },
+    "validation": {
+      "type": "dict",
+      "min": 0,
+      "max": 1
+    }
+  },
+  {
+    "key": "initial_soc",
+    "name": "初始SOC",
+    "dimension": [
+      "storage"
+    ],
+    "type": "dict",
+    "unit": "MWh",
+    "required": true,
+    "description": "",
+    "default_value": {
+      "B1": 50
+    },
+    "sample_value": {
+      "B1": 50
+    },
+    "default_policy": "default_allowed",
+    "sets": {
+      "storage": [
+        "B1"
+      ]
+    },
+    "validation": {
+      "type": "dict",
+      "min": 0
+    }
+  }
+]

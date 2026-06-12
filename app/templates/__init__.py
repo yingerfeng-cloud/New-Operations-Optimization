@@ -1,0 +1,1 @@
+"""Power model template library."""

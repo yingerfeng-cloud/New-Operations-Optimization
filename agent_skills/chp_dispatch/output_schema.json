@@ -1,0 +1,24 @@
+{
+  "objective_value": "number",
+  "variables": [
+    {
+      "key": "electric_output",
+      "name": "电出力",
+      "dimension": [
+        "unit",
+        "time"
+      ],
+      "unit": "MW"
+    },
+    {
+      "key": "heat_output",
+      "name": "热出力",
+      "dimension": [
+        "unit",
+        "time"
+      ],
+      "unit": "MWth"
+    }
+  ],
+  "explanation": "string"
+}

@@ -1,0 +1,31 @@
+name: renewable_storage_dispatch
+display_name: 风光储协同 Agent Skill
+description: 调用风光储协同 API Skill，生成新能源消纳、储能配合和弃电控制建议。
+canonical_api_skill_name: run_renewable_storage_dispatch
+version: 1.0.0
+domain: safety_production_optimization
+scenario_tags:
+  - 风光储
+  - 新能源消纳
+  - 储能协同
+trigger_intents:
+  - 风光储协同
+  - 新能源消纳
+  - renewable storage
+non_trigger_intents:
+  - 参数示例
+  - 需要哪些参数
+required_parameters:
+  - renewable_forecast
+  - load_forecast
+  - electricity_price
+  - storage_capacity
+  - grid_export_limit
+optional_parameters:
+  - charge_power_max
+  - discharge_power_max
+  - initial_soc
+confirmation_required: {"default_values": true, "before_invoke": true}
+execution_policy: {"mode": "advisory_only", "allow_auto_invoke": false}
+result_explanation: {"template": "prompts/result_explanation.md"}
+error_handling: {"template": "prompts/error_handling.md"}

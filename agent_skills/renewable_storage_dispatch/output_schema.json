@@ -1,0 +1,51 @@
+{
+  "objective_value": "number",
+  "variables": [
+    {
+      "key": "renewable_used",
+      "name": "新能源利用量",
+      "dimension": [
+        "site",
+        "time"
+      ],
+      "unit": "MW"
+    },
+    {
+      "key": "renewable_curtailment",
+      "name": "弃风弃光量",
+      "dimension": [
+        "site",
+        "time"
+      ],
+      "unit": "MW"
+    },
+    {
+      "key": "storage_charge",
+      "name": "储能充电",
+      "dimension": [
+        "storage",
+        "time"
+      ],
+      "unit": "MW"
+    },
+    {
+      "key": "storage_discharge",
+      "name": "储能放电",
+      "dimension": [
+        "storage",
+        "time"
+      ],
+      "unit": "MW"
+    },
+    {
+      "key": "storage_soc",
+      "name": "储能SOC",
+      "dimension": [
+        "storage",
+        "time"
+      ],
+      "unit": "MWh"
+    }
+  ],
+  "explanation": "string"
+}

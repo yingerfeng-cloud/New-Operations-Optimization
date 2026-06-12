@@ -1,0 +1,92 @@
+{
+  "objective_value": "number",
+  "variables": [
+    {
+      "key": "station_power",
+      "name": "电站出力",
+      "dimension": [
+        "station",
+        "time"
+      ],
+      "unit": "MW"
+    },
+    {
+      "key": "q_gen",
+      "name": "发电流量",
+      "dimension": [
+        "station",
+        "time"
+      ],
+      "unit": "m3/s"
+    },
+    {
+      "key": "q_spill",
+      "name": "弃水流量",
+      "dimension": [
+        "station",
+        "time"
+      ],
+      "unit": "m3/s"
+    },
+    {
+      "key": "q_out",
+      "name": "下泄流量",
+      "dimension": [
+        "station",
+        "time"
+      ],
+      "unit": "m3/s"
+    },
+    {
+      "key": "volume",
+      "name": "库容",
+      "dimension": [
+        "station",
+        "time_volume"
+      ],
+      "unit": "million m3"
+    },
+    {
+      "key": "load_dev_pos",
+      "name": "负荷正偏差",
+      "dimension": [
+        "time"
+      ],
+      "unit": "MW"
+    },
+    {
+      "key": "load_dev_neg",
+      "name": "负荷负偏差",
+      "dimension": [
+        "time"
+      ],
+      "unit": "MW"
+    },
+    {
+      "key": "terminal_dev_pos",
+      "name": "期末库容正偏差",
+      "dimension": [
+        "station"
+      ],
+      "unit": "million m3"
+    },
+    {
+      "key": "terminal_dev_neg",
+      "name": "期末库容负偏差",
+      "dimension": [
+        "station"
+      ],
+      "unit": "million m3"
+    },
+    {
+      "key": "ramp_abs",
+      "name": "出力爬坡绝对值",
+      "dimension": [
+        "station",
+        "time"
+      ],
+      "unit": "MW"
+    }
+  ],
+  "explanation": "string"
+}

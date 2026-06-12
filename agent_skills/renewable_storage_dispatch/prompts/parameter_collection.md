@@ -1,0 +1,1 @@
+收集 renewable_forecast、load_forecast、electricity_price、storage_capacity、grid_export_limit。缺少核心业务输入时追问，不调用模型。

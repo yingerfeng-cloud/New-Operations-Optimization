@@ -1,0 +1,548 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>华电安全生产运筹优化 Agent 工作台</title>
+<style>
+:root{--primary:#0B5CAB;--primary-dark:#073B7A;--bg-light:#EEF6FF;--success:#138A58;--warning:#B76E00;--danger:#C7352C;--text:#162033;--muted:#667085;--border:#D8E4F2;--bg:#F4F7FB;--panel:#FFF;--shadow:0 2px 12px rgba(11,92,171,.08);--sidebar:#0B2240;--sidebar-text:#C8DAEA}
+*{box-sizing:border-box}body{margin:0;height:100vh;overflow:hidden;font-family:"Microsoft YaHei","PingFang SC",Arial,sans-serif;color:var(--text);background:var(--bg)}
+button,input,select,textarea{font:inherit;color:inherit}button{cursor:pointer}
+/* workbench */
+.workbench{display:grid;grid-template-rows:54px 1fr;height:100vh;overflow:hidden}
+.topbar{display:flex;align-items:center;gap:10px;padding:0 18px;background:var(--panel);border-bottom:1px solid var(--border);box-shadow:var(--shadow);z-index:10}
+.topbar-brand{display:flex;align-items:center;gap:9px;min-width:200px;white-space:nowrap}
+.topbar-mark{width:30px;height:30px;border-radius:7px;background:var(--primary);color:#fff;display:grid;place-items:center;font-size:15px;flex-shrink:0}
+.topbar-name{font-size:13px;font-weight:800;line-height:1.2}
+.topbar-name small{display:block;color:var(--muted);font-size:11px;font-weight:400}
+.topbar-status{display:flex;align-items:center;gap:7px;flex:1;overflow:hidden;min-width:0}
+.topbar-actions{display:flex;align-items:center;gap:7px;flex-shrink:0}
+.workbench-body{overflow:hidden;height:100%;display:grid;grid-template-columns:254px 1fr}
+.workbench-body.with-panel{grid-template-columns:254px 1fr 354px}
+/* sidebar */
+.sidebar{background:var(--sidebar);color:var(--sidebar-text);display:flex;flex-direction:column;overflow:hidden;height:100%}
+.sidebar-head{padding:14px 12px 10px;border-bottom:1px solid rgba(255,255,255,.08);flex-shrink:0}
+.sidebar-body{flex:1;overflow:hidden;padding:8px;display:flex;flex-direction:column;gap:0;min-height:0}
+.sidebar-history{flex:1;overflow-y:auto;min-height:60px;display:flex;flex-direction:column;gap:4px}
+.sidebar-history.collapsed{flex:0;min-height:0;overflow:hidden}
+.sidebar-bottom{flex-shrink:0;overflow-y:auto;padding-top:4px}
+.conv-section-head{display:flex;align-items:center;justify-content:space-between;padding:6px 8px 3px;cursor:pointer;user-select:none}
+.conv-section-head:hover{opacity:.8}
+.conv-section-toggle{font-size:10px;color:#6A8BA8;border:0;background:transparent;padding:0;line-height:1;transition:transform .15s}
+.conv-section-toggle.open{transform:rotate(0deg)}.conv-section-toggle.closed{transform:rotate(-90deg)}
+.sidebar-history::-webkit-scrollbar,.sidebar-bottom::-webkit-scrollbar{width:4px}
+.sidebar-history::-webkit-scrollbar-track,.sidebar-bottom::-webkit-scrollbar-track{background:transparent}
+.sidebar-history::-webkit-scrollbar-thumb,.sidebar-bottom::-webkit-scrollbar-thumb{background:rgba(255,255,255,.15);border-radius:4px}
+.sidebar-history::-webkit-scrollbar-thumb:hover,.sidebar-bottom::-webkit-scrollbar-thumb:hover{background:rgba(255,255,255,.28)}
+.nav-label{font-size:10px;color:#6A8BA8;text-transform:uppercase;letter-spacing:.07em;padding:8px 8px 3px;font-weight:700}
+.nav-btn{width:100%;display:flex;align-items:center;gap:8px;height:34px;padding:0 10px;border:0;border-radius:7px;background:transparent;color:var(--sidebar-text);text-align:left;font-size:13px}
+.nav-btn:hover{background:rgba(255,255,255,.07)}.nav-btn.active{background:var(--primary);color:#fff}
+.nav-btn .ic{width:16px;text-align:center;flex-shrink:0;font-size:14px}
+.new-conv-btn{width:100%;height:34px;border:0;border-radius:7px;background:var(--primary);color:#fff;display:flex;align-items:center;justify-content:center;gap:6px;font-size:13px;font-weight:600;margin-bottom:6px}
+.new-conv-btn:hover{background:var(--primary-dark)}
+.scenario-btn{width:100%;display:flex;align-items:center;gap:6px;height:28px;padding:0 10px;border:0;border-radius:6px;background:transparent;color:#8AB0CC;text-align:left;font-size:12px}
+.scenario-btn:hover{background:rgba(255,255,255,.06);color:#fff}
+.conv-item{border-radius:7px;padding:7px 10px;cursor:pointer;border:0;background:transparent;width:100%;text-align:left;color:var(--sidebar-text);display:block}
+.conv-item:hover{background:rgba(255,255,255,.06)}.conv-item.active{background:rgba(11,92,171,.4)}
+.conv-title{font-size:12px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.conv-meta{font-size:11px;color:#6A8BA8;margin-top:1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.conv-row-actions{display:flex;gap:4px;margin-top:5px}
+.conv-row-btn{height:20px;padding:0 6px;font-size:11px;border:1px solid rgba(255,255,255,.18);border-radius:4px;background:transparent;color:#A8C8E0}
+.conv-row-btn:hover{background:rgba(255,255,255,.12);color:#fff}
+.conv-row-btn.danger{color:#FF9090;border-color:rgba(255,100,100,.3)}
+.conv-row-btn.danger:hover{background:rgba(199,53,44,.4);color:#fff}
+.conv-row-btn.pending-delete{background:rgba(199,53,44,.5);color:#fff;border-color:#C7352C}
+/* content area */
+.content-area{overflow-y:auto;min-width:0;height:100%}
+/* task panel */
+.task-panel{background:var(--panel);border-left:1px solid var(--border);overflow-y:auto;display:flex;flex-direction:column;height:100%}
+.task-panel-head{padding:12px 14px 10px;border-bottom:1px solid var(--border);font-weight:800;font-size:13px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+.task-panel-body{padding:10px 12px;flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:10px}
+.task-section{border:1px solid var(--border);border-radius:8px;overflow:hidden}
+.task-section-head{padding:7px 11px;background:#F8FAFD;font-size:11px;font-weight:700;color:#4B5870;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.task-section-body{padding:9px 11px;font-size:13px}
+/* chat */
+.chat-layout{display:grid}
+.chat-area{display:flex;flex-direction:column;height:100%;background:var(--bg)}
+.chat-thread{flex:1;overflow-y:auto;padding:14px 16px;display:flex;flex-direction:column;gap:8px}
+.chat-composer{border-top:1px solid var(--border);padding:10px 14px;background:var(--panel);flex-shrink:0}
+.msg{max-width:78%;font-size:14px;line-height:1.65;white-space:pre-wrap;display:flex;flex-direction:column}
+.msg-bubble{padding:9px 13px;border-radius:10px;border:1px solid var(--border)}
+.msg.user{align-self:flex-end}.msg.user .msg-bubble{background:var(--bg-light);border-color:#BFD4F4}
+.msg.agent{align-self:flex-start}.msg.agent .msg-bubble{background:var(--panel)}
+.msg-meta{font-size:11px;color:var(--muted);margin-bottom:3px}
+.msg.user .msg-meta{text-align:right}
+.preset-btns{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:7px}
+.preset-btn{height:28px;padding:0 11px;border:1px solid var(--border);border-radius:14px;background:var(--panel);font-size:12px;color:var(--primary)}
+.preset-btn:hover{background:var(--bg-light);border-color:var(--primary)}
+.chat-input-row{display:flex;gap:8px;align-items:flex-end}
+.chat-textarea{flex:1;border:1px solid var(--border);border-radius:8px;padding:7px 11px;resize:none;min-height:38px;max-height:110px;background:var(--panel);font-size:14px}
+.chat-textarea:focus{outline:none;border-color:var(--primary)}
+.send-btn{height:38px;padding:0 16px;border:0;border-radius:8px;background:var(--primary);color:#fff;font-weight:600;flex-shrink:0}
+.send-btn:hover{background:var(--primary-dark)}.send-btn:disabled{opacity:.5;cursor:not-allowed}
+/* cards */
+.card{background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:12px;margin-top:6px}
+.card-title{font-weight:700;font-size:12px;color:var(--primary);margin-bottom:7px;display:flex;align-items:center;gap:5px}
+/* workflow/progress */
+.task-progress{background:var(--panel);border:1px solid #BFD4F4;border-radius:10px;padding:11px}
+.task-progress-title{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:9px;font-weight:800;font-size:13px}
+.task-progress-title span{font-size:11px;color:var(--muted);font-weight:400}
+.workflow{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:5px}
+.workflow-step{border:1px solid var(--border);border-radius:7px;background:#fff;padding:7px}
+.workflow-step b{display:block;font-size:11px;margin-bottom:3px}.workflow-step span{font-size:10px;color:var(--muted)}
+.workflow-step.done{border-color:#BAE4D2;background:#E8F7F1}.workflow-step.active{border-color:#EDD08C;background:#FFF5DD}.workflow-step.pending{opacity:.6}
+/* common */
+.panel{background:var(--panel);border:1px solid var(--border);border-radius:8px;box-shadow:var(--shadow);padding:14px}
+.panel-title{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px;font-weight:800;font-size:14px}
+.metric{min-height:76px;display:flex;flex-direction:column;justify-content:space-between;padding:12px;border-radius:8px;border:1px solid var(--border)}
+.metric b{font-size:20px;line-height:1}.metric span{color:var(--muted);font-size:12px}
+.metric.blue{background:var(--bg-light);border-color:#BFD4F4}.metric.green{background:#E8F7F1;border-color:#BAE4D2}
+.metric.amber{background:#FFF5DD;border-color:#EDD08C}.metric.red{background:#FFF0EE;border-color:#EFC0BA}
+.pill{display:inline-flex;align-items:center;height:19px;padding:0 7px;border-radius:999px;font-size:11px;background:#EDF2F7;color:#475467}
+.pill.green{background:#E8F7F1;color:var(--success)}.pill.amber{background:#FFF5DD;color:#93620C}.pill.red{background:#FFF0EE;color:var(--danger)}
+.btn{height:30px;border:1px solid var(--border);border-radius:7px;padding:0 11px;background:var(--panel);color:var(--text);font-size:13px}
+.btn:hover{background:#F8FAFD}.btn.primary{border-color:var(--primary);background:var(--primary);color:#fff}.btn.primary:hover{background:var(--primary-dark)}
+.btn.success{border-color:var(--success);background:var(--success);color:#fff}.btn:disabled{cursor:not-allowed;opacity:.45}
+.actions{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+.field{display:grid;gap:4px;margin-bottom:9px}.field label{font-size:12px;font-weight:700;color:#4B5870}
+input,select{width:100%;border:1px solid var(--border);border-radius:7px;padding:0 10px;height:32px;background:var(--panel)}
+textarea{width:100%;border:1px solid var(--border);border-radius:7px;padding:7px 10px;background:var(--panel);resize:vertical;min-height:100px}
+input:focus,select:focus,textarea:focus{outline:none;border-color:var(--primary)}
+table{width:100%;border-collapse:collapse;font-size:13px;table-layout:fixed}
+th,td{padding:7px 9px;border-bottom:1px solid var(--border);text-align:left;vertical-align:top;overflow-wrap:anywhere}
+th{color:#4B5870;background:#F8FAFC;font-weight:700;font-size:12px}
+.compact-table th,.compact-table td{padding:6px 8px;font-size:12px}
+.grid{display:grid;gap:11px}.cols-2{grid-template-columns:repeat(2,minmax(0,1fr))}.cols-3{grid-template-columns:repeat(3,minmax(0,1fr))}
+.muted{color:var(--muted);font-size:13px}.mt{margin-top:9px}
+p{margin:0;line-height:1.6}h1{margin:0 0 5px;font-size:21px}h3{margin:0 0 9px;font-size:14px}
+pre{white-space:pre-wrap;word-break:break-word;margin:0;max-height:360px;overflow:auto;border:1px solid var(--border);border-radius:7px;background:#F8FAFC;padding:9px;font-family:Consolas,monospace;font-size:12px;line-height:1.5}
+.callout{border:1px solid var(--border);border-radius:8px;padding:11px;background:#F8FAFC}
+.callout.red{background:#FFF0EE;border-color:#EFC0BA;color:#8A2B22}.callout.amber{background:#FFF5DD;border-color:#EDD08C}.callout.green{background:#E8F7F1;border-color:#BAE4D2}
+details summary{cursor:pointer;font-size:13px;color:var(--primary)}details[open] summary{margin-bottom:7px}
+.seg{display:flex;gap:6px;flex-wrap:wrap}.seg button{height:28px;border:1px solid var(--border);border-radius:7px;background:#fff;padding:0 11px;color:#344054;font-size:13px}
+.seg button.active{border-color:var(--primary);color:var(--primary);background:var(--bg-light)}
+.typing{display:inline-flex;gap:4px;align-items:center}
+.typing i{width:5px;height:5px;border-radius:50%;background:#98A2B3;animation:pulse 1s infinite ease-in-out}
+.typing i:nth-child(2){animation-delay:.15s}.typing i:nth-child(3){animation-delay:.3s}
+@keyframes pulse{0%,80%,100%{opacity:.25;transform:translateY(0)}40%{opacity:1;transform:translateY(-3px)}}
+.toast{position:fixed;right:22px;bottom:20px;min-width:190px;padding:9px 13px;border-radius:8px;background:#162033;color:#fff;box-shadow:var(--shadow);display:none;z-index:100;font-size:13px}
+.toast.show{display:block}
+.page-content{padding:18px 22px}
+.page-head{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;margin-bottom:14px}
+.history-list{display:flex;flex-direction:column;gap:6px}
+.history-row{border:1px solid var(--border);border-radius:8px;background:var(--panel);padding:9px}
+.history-row.active{border-color:var(--primary);background:var(--bg-light)}
+.history-main{border:0;background:transparent;padding:0;text-align:left;width:100%;cursor:pointer;color:var(--text)}
+.history-actions{display:flex;gap:5px;margin-top:6px}
+.welcome-card{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:22px 26px;max-width:540px;margin:36px auto 0}
+.welcome-card h2{margin:0 0 7px;font-size:19px;color:var(--primary)}
+.welcome-card p{color:var(--muted);margin-bottom:14px;line-height:1.65}
+.quick-btns{display:flex;flex-wrap:wrap;gap:8px}
+.quick-btn{height:32px;padding:0 13px;border:1px solid var(--border);border-radius:16px;background:var(--panel);font-size:13px;color:var(--primary)}
+.quick-btn:hover{background:var(--bg-light);border-color:var(--primary)}
+.platform-banner{background:#FFF0EE;border-bottom:2px solid #EFC0BA;padding:7px 16px;display:flex;align-items:center;justify-content:space-between;font-size:13px;color:#8A2B22;flex-shrink:0}
+.param-source-badge{display:inline-block;font-size:10px;padding:1px 5px;border-radius:4px;background:#EDF2F7;color:#475467}
+.param-source-badge.user{background:var(--bg-light);color:var(--primary)}
+.param-source-badge.confirmed{background:#E8F7F1;color:var(--success)}
+.param-source-badge.suggested{background:#FFF5DD;color:#93620C}
+</style>
+</head>
+<body>
+<div class="workbench" id="workbench">
+  <header class="topbar" id="topbar"></header>
+  <div class="workbench-body chat-layout" id="wbody">
+    <aside class="sidebar" id="sidebar"></aside>
+    <div class="content-area" id="app"></div>
+    <aside class="task-panel" id="taskPanel" style="display:none"></aside>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+<script>
+const APP_VERSION='v2026.05.20-workbench';
+const BUILD_TIME='2026-05-20 12:00 Asia/Shanghai';
+const UX_COPY={
+  notOptimization:'系统未识别为优化任务，请检查请求消息是否正确发送。',
+  skillOverview:'Skill 概览',
+  skillEndpoint:'调用入口',
+  skillInput:'输入参数结构',
+  skillOutput:'输出结构',
+  skillAdvanced:'高级信息',
+  copyCurl:'复制 curl 示例',
+  debugInAgent:'在 Agent 中调试',
+  rawJson:'原始 JSON',
+  inputSchemaJson:'input_schema JSON',
+  outputSchemaJson:'output_schema JSON'
+};
+const STATIC_COMPAT_MARKERS=['Agent Skill Package','chat-aside'];
+const LEGACY_LLM_BASE_HINT='当前 API Base 不是 Agent 服务或 Agent 服务未启用 LLM 配置接口，请检查 API Base。';
+const SCENARIOS=[
+  {key:'run_economic_dispatch',name:'经济调度',icon:'⚡'},
+  {key:'run_unit_commitment_day_ahead',name:'日前机组组合',icon:'🔋'},
+  {key:'run_storage_dispatch',name:'储能调度',icon:'🔌'},
+  {key:'run_renewable_storage_dispatch',name:'风光储协同',icon:'🌱'},
+  {key:'run_chp_dispatch',name:'电热协同',icon:'🔥'},
+  {key:'run_cascade_hydro_dispatch',name:'梯级水电',icon:'💧'},
+];
+const presetPrompts=['我需要提供哪些参数','给我参数示例','解释上一次结果'];
+const PARAM_LABELS={
+  electricity_price:'电价',storage_capacity:'储能容量',charge_power_max:'最大充电功率',discharge_power_max:'最大放电功率',
+  charge_efficiency:'充电效率',discharge_efficiency:'放电效率',initial_soc:'初始SOC',soc_min:'SOC下限比例',
+  eta_ch:'充电效率',eta_dis:'放电效率',load_forecast:'系统负荷预测',unit_min_output:'机组最小出力',
+  unit_max_output:'机组最大出力',fuel_cost:'燃料成本',ramp_up_limit:'上爬坡限制',ramp_down_limit:'下爬坡限制',
+  renewable_forecast:'新能源预测出力',grid_export_limit:'并网功率上限',electric_load:'电负荷',heat_load:'热负荷',
+  electric_max:'电出力上限',heat_max:'热出力上限',station:'电站清单',units:'机组清单',availability:'机组可用状态',
+  power_conversion:'出力转换系数',local_inflow:'区间来水过程',load:'系统负荷预测',volume_min:'最小库容',
+  volume_max:'最大库容',initial_volume:'初始库容',target_terminal_volume:'目标期末库容',outflow_min:'最小下泄流量',
+  outflow_max:'最大下泄流量',spill_max:'最大弃水流量',edges:'梯级拓扑关系',initial_upstream_outflow:'初始上游出库流量',
+  horizon:'调度时段数',time:'调度时段',time_volume:'库容时点',time_step_seconds:'时段长度',weights:'目标函数权重'
+};
+const state={
+  page:'chat',
+  apiBase:((new URLSearchParams(location.search).get('apiBase'))||localStorage.agentApiBase||'http://127.0.0.1:8091/api').replace(/\/$/,''),
+  health:{loading:true},agentStatus:null,
+  skills:[],agentSkills:[],skillsStatus:{loading:true},agentSkillsStatus:{loading:true},
+  skillDetail:null,agentSkillDetail:null,showSkillStructure:false,
+  devMode:new URLSearchParams(location.search).get('dev')==='1'||localStorage.agentDevMode==='1',
+  lastRequest:null,lastResponse:null,
+  selectedSkill:'',selectedAgentSkill:'',skillSelectionMode:'auto',
+  params:'{}',analysis:null,result:null,
+  taskSession:null,
+  llmConfig:null,llmTest:null,llmExtractTestResult:null,extractDebugResult:null,explainResult:null,
+  conversationId:localStorage.agentConversationId||'',
+  chatMessages:[],message:'',conversations:[],
+  invocationId:'',invocations:[],invocationFilters:{skill:'',status:''},
+  runMode:'sync',skillDebug:{analysis:null,result:null},
+  lastError:null,forceScrollBottom:false,historyQuery:'',
+  isSending:false,activeRequestId:null,activeController:null,activeLoadingId:null,
+};
+function h(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function pretty(v){return JSON.stringify(v??{},null,2)}
+function looksBadParamName(text){return !text||/[鏁鐢璋搴鍖绯鎴涓锟]/.test(text)||(/^[A-Za-z0-9_ -]+$/.test(text)&&/[A-Za-z]/.test(text))}
+function paramLabel(item){const key=typeof item==='string'?item:(item?.key||item?.field||'');const name=typeof item==='string'?'':(item?.name||'');return PARAM_LABELS[key]||(!looksBadParamName(name)?name:key||name||'-')}
+function paramKeyLabel(key){return PARAM_LABELS[key]||key}
+function safeJsonParse(text,fallback){try{return JSON.parse(text)}catch(e){return fallback}}
+function toast(t){const el=document.getElementById('toast');el.textContent=t;el.classList.add('show');clearTimeout(window.__tt);window.__tt=setTimeout(()=>el.classList.remove('show'),2600)}
+function isAgentHealth(health){return Boolean(health?.ok&&health?.service==='optimization-agent')}
+function serviceOk(){return isAgentHealth(state.health)}
+function statusHint(){if(state.health?.loading)return '正在刷新服务状态...';if(!serviceOk())return 'Agent 服务未连接，请检查 Agent 服务是否启动以及 API Base 是否正确。';if(state.agentStatus?.platform&&state.agentStatus.platform.reachable===false)return 'Agent 服务在线，但无法连接运筹优化平台，请检查 Platform 服务和 OPTIMIZATION_PLATFORM_BASE_URL。';return ''}
+function wrongServiceHint(){if(!state.health?.service||serviceOk())return '';return `当前连接的是 ${state.health.service}，不是 Agent 服务。Agent Console 请连接 Agent 服务，例如 http://127.0.0.1:8091/api。`}
+function platformOk(){return serviceOk()&&state.agentStatus?.platform?.reachable!==false}
+function currentTaskSession(){return state.taskSession||state.analysis?.task_session||null}
+function setTaskSessionFromResponse(data){state.taskSession=data?.task_session||null;if(state.taskSession){state.analysis={...(data||{}),...state.taskSession,task_session:state.taskSession,response_type:data?.response_type||state.taskSession.last_response_type||'analysis',mode:'optimize'};state.params=pretty(state.taskSession.parameter_draft||{});state.selectedSkill=state.taskSession.api_skill_name||state.selectedSkill}}
+function disabledWhenWrong(){return serviceOk()?'':'disabled'}
+function disabledWhenPlatformUnavailable(){return platformOk()?'':'disabled'}
+function pill(v){const s=String(v);const c=(v===true||['SUCCESS','online','enabled','ok','true','ready'].includes(s))?'green':(v===false||['FAILED','offline','disabled','false','error','unavailable'].includes(s))?'red':'amber';return `<span class="pill ${c}">${h(s)}</span>`}
+async function api(path,opt={},timeoutMs=15000){state.lastError=null;const controller=opt.signal?null:new AbortController();const timer=controller?setTimeout(()=>controller.abort(new DOMException('timeout','TimeoutError')),timeoutMs):null;try{const r=await fetch(state.apiBase+path,{...opt,signal:opt.signal||controller?.signal});const text=await r.text();let data={};try{data=text?JSON.parse(text):{}}catch(e){data={raw:text}}if(!r.ok){state.lastError=data;let msg=typeof data.detail==='string'?data.detail:(data.detail?.message||text||r.statusText);if(r.status===404)msg='当前 API Base 不是 Agent 服务，请连接 Agent 服务地址，例如 http://127.0.0.1:8091/api。';throw new Error(msg)}return data}catch(e){if(e.name==='AbortError'||e.name==='TimeoutError'){throw new Error('本轮响应超时，可能是大模型接口或平台服务响应较慢。可以重试，或关闭大模型切换到规则模式。')}throw e}finally{if(timer)clearTimeout(timer)}}
+function setApiBase(v){state.apiBase=String(v||'').replace(/\/$/,'');localStorage.agentApiBase=state.apiBase;state.health={loading:true};state.agentStatus=null;render();checkHealth(false)}
+function connectApi(v){setApiBase(v);toast(`已切换到 ${v}`)}
+async function checkHealth(showToast=true){state.health={loading:true};state.agentStatus=null;render();try{state.health=await api('/health');if(serviceOk()){try{state.agentStatus=await api('/agent/status')}catch(e){state.agentStatus={platform:{reachable:false,last_error:e.message}}}try{state.llmConfig=await api('/llm/config')}catch(e){}}if(showToast)toast(statusHint()||'Agent 状态已刷新')}catch(e){state.health={ok:false,error:e.message};state.agentStatus=null;if(showToast)toast('Agent 服务未连接，请检查 Agent 服务是否启动以及 API Base 是否正确。')}render()}
+async function autoConnect(){await checkHealth(false);if(serviceOk()){await Promise.all([loadSkills(false),loadAgentSkills(false),loadLlmConfig(false),loadConversations(false)]);if(!state.conversationId)await createConversation(false)}render()}
+async function loadSkills(showToast=true){if(!serviceOk()){state.skills=[];state.skillsStatus={ok:false};render();return}state.skillsStatus={loading:true};render();try{state.skills=await api('/agent/skills');state.skillsStatus={ok:true,count:state.skills.length};if(!state.selectedSkill&&state.skills[0])state.selectedSkill=state.skills[0].skill_name;if(showToast)toast('Skill 列表已刷新')}catch(e){state.skills=[];state.skillsStatus={ok:false,error:e.message,detail:state.lastError};if(showToast)toast('Skill Registry 访问失败')}render()}
+async function loadAgentSkills(showToast=true){if(!serviceOk()){state.agentSkills=[];state.agentSkillsStatus={ok:false};render();return}state.agentSkillsStatus={loading:true};render();try{state.agentSkills=await api('/agent/agent-skills');state.agentSkillsStatus={ok:true,count:state.agentSkills.length};if(!state.selectedAgentSkill&&state.agentSkills[0])state.selectedAgentSkill=state.agentSkills[0].name;if(showToast)toast('Agent Skill 列表已刷新')}catch(e){state.agentSkills=[];state.agentSkillsStatus={ok:false,error:e.message};if(showToast)toast('Agent Skill Registry 访问失败')}render()}
+async function loadLlmConfig(showToast=true){if(!serviceOk()){state.llmConfig={};render();return}try{state.llmConfig=await api('/llm/config');if(showToast)toast('大模型配置已加载')}catch(e){state.llmConfig={error:e.message};if(showToast)toast(e.message)}render()}
+function providerIsDisabled(){return(document.getElementById('llm_provider')?.value||state.llmConfig?.provider||'disabled')==='disabled'}
+function llmDiagnostics(e){const llm=state.llmConfig||{};return{当前_API_Base:state.apiBase,Provider:llm.provider,Model:llm.model,API_Key状态:llm.api_key_configured?'已配置':'未配置',错误详情:e?.message||state.lastError,修复建议:serviceOk()?'检查模型服务地址、模型 ID、API Key 和网络连通性。':'当前 API Base 不是 Agent 服务，请切换到 http://127.0.0.1:8091/api。'}}
+async function saveLlmConfig(){if(!serviceOk()){toast('当前连接的是非 Agent 服务，请先连接 Agent 服务。');render();return}const provider=document.getElementById('llm_provider')?.value;const key=(document.getElementById('llm_api_key')?.value||'').trim();const model=(document.getElementById('llm_model')?.value||'').trim();if(provider==='disabled'&&(key||model)){toast('你已填写模型和 API Key，请先选择模型服务提供方，不能选择 disabled。');return}const enabled=provider==='disabled'?false:document.getElementById('llm_enabled')?.value==='true';if(provider!=='disabled'&&enabled&&(!model||!key&&!state.llmConfig?.api_key_configured)){toast('启用大模型时 Model 和 API Key 必填。');return}const body={provider,base_url:document.getElementById('llm_base_url')?.value,model:provider==='disabled'?'':model,enabled,temperature:Number(document.getElementById('llm_temperature')?.value||0.2),max_tokens:Number(document.getElementById('llm_max_tokens')?.value||4096),timeout_seconds:Number(document.getElementById('llm_timeout')?.value||8)};if(key)body.api_key=key;try{await api('/llm/config',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});state.llmConfig=await api('/llm/config');state.agentStatus=await api('/agent/status');toast('配置已保存并持久化，下次启动仍会保留。')}catch(e){state.llmTest={ok:false,error:e.message,diagnostics:llmDiagnostics(e)};toast(`保存失败：${e.message}`)}render()}
+async function clearLlmApiKey(){if(!serviceOk())return toast('请先连接 Agent 服务');try{await api('/llm/config',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({provider:state.llmConfig?.provider||'volcengine_ark',enabled:false,clear_api_key:true})});state.llmConfig=await api('/llm/config');toast('API Key 已清除并持久化。')}catch(e){toast(`清除失败：${e.message}`)}render()}
+async function llmTest(){if(!serviceOk()){state.llmTest={ok:false,error:'当前 API Base 不是 Agent 服务',diagnostics:llmDiagnostics(new Error('当前 API Base 不是 Agent 服务'))};toast('当前连接的是非 Agent 服务');render();return}try{state.llmTest=await api('/llm/test',{method:'POST'});toast(state.llmTest.enabled===false?'大模型未启用，当前使用规则抽取':state.llmTest.ok?'连接测试完成':'连接测试失败')}catch(e){state.llmTest={ok:false,error:e.message,diagnostics:llmDiagnostics(e)};toast('连接测试失败')}render()}
+async function createConversation(showToast=true){if(!serviceOk()){toast('请先连接 Agent 服务');return}const c=await api('/agent/conversations',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({title:'新会话'})});applyConversation(c);await loadConversations(false);if(showToast)toast('已新建聊天');state.forceScrollBottom=true;render()}
+async function loadConversations(showToast=true){if(!serviceOk())return;try{state.conversations=await api('/agent/conversations');if(showToast)toast('历史聊天已刷新')}catch(e){if(showToast)toast('历史聊天加载失败')}render()}
+async function openConversation(id){stopActiveRequest();const c=await api(`/agent/conversations/${encodeURIComponent(id)}`);applyConversation(c);clearLoadingMessages();state.page='chat';state.forceScrollBottom=true;render()}
+async function renameConversation(id){const current=state.conversations.find(c=>c.conversation_id===id);const title=prompt('请输入新的会话名称',current?.title||'新会话');if(title===null)return;try{await api(`/agent/conversations/${encodeURIComponent(id)}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({title})});await loadConversations(false);toast('会话已重命名')}catch(e){toast(`重命名失败：${e.message}`)}}
+async function deleteConversation(id){
+  const deletingCurrent=state.conversationId===id;
+  // Optimistic update: remove from list immediately so UI reflects change instantly
+  state.conversations=state.conversations.filter(c=>c.conversation_id!==id);
+  if(deletingCurrent){
+    state.conversationId='';delete localStorage.agentConversationId;
+    state.chatMessages=[];state.analysis=null;state.taskSession=null;state.result=null;state.invocationId='';state.params='{}';
+  }
+  render();
+  try{
+    await api(`/agent/conversations/${encodeURIComponent(id)}`,{method:'DELETE'});
+    toast('会话已删除');
+    await loadConversations(false);
+    if(deletingCurrent){const next=state.conversations[0];if(next)await openConversation(next.conversation_id)}
+  }catch(e){toast(`删除失败：${e.message}`);await loadConversations(false);}
+}
+function applyConversation(c){state.conversationId=c.conversation_id||state.conversationId;if(state.conversationId)localStorage.agentConversationId=state.conversationId;state.chatMessages=(c.messages||[]).map(m=>({role:m.role,text:m.text,data:m.data,at:m.at||''}));const hasTask=Boolean(c.agent_skill_name||c.resolved_skill_name||Object.keys(c.parameter_draft||{}).length);state.taskSession=hasTask?{conversation_id:c.conversation_id,task_session_id:`TASK-${c.conversation_id}`,agent_skill_name:c.agent_skill_name,api_skill_name:c.resolved_skill_name,display_name:c.display_name||c.resolved_skill_name,workflow_state:c.status,status:c.status,parameter_draft:c.parameter_draft||{},parameter_sources:c.parameter_sources||{},missing_required:c.missing_required||[],invalid_parameters:c.invalid_parameters||[],default_candidates:c.can_use_default||[],ready_to_invoke:c.status==='READY_TO_INVOKE',invocation_id:c.last_invocation_id||null,result:c.last_result||null,last_response_type:c.last_response_type||'analysis'}:null;state.analysis=state.taskSession?{...state.taskSession,task_session:state.taskSession,mode:'optimize',response_type:state.taskSession.last_response_type}:null;state.params=pretty(c.parameter_draft||{});state.invocationId=c.last_invocation_id||'';if(c.resolved_skill_name)state.selectedSkill=c.resolved_skill_name}
+function getSelectedSkill(){return state.skills.find(s=>s.skill_name===state.selectedSkill)||state.skills[0]||{}}
+function selectedSkill(){return getSelectedSkill()}
+function skillSelect(){const placeholder=state.skillsStatus?.loading?'Skill 加载中...':'暂无可用 Skill';return `<select onchange="state.selectedSkill=this.value;sampleParams(false)" ${state.skills.length?'':'disabled'}>${state.skills.length?state.skills.map(s=>`<option value="${h(s.skill_name)}" ${getSelectedSkill().skill_name===s.skill_name?'selected':''} ${s.callable===false?'disabled':''}>${h(s.display_name||s.name||s.skill_name)}${s.callable===false?'（不可调用）':''}</option>`).join(''):`<option>${placeholder}</option>`}</select>`}
+function sampleParams(shouldRender=true){const p={};(getSelectedSkill().input_schema||[]).forEach(i=>p[i.key]=i.sample_value??i.default_value??{});state.params=pretty(p);if(shouldRender)render()}
+function parseParams(){try{return JSON.parse(state.params||'{}')}catch(e){toast('参数 JSON 格式错误');return null}}
+function pushMessage(role,text,data){state.chatMessages.push({role,text,data,at:new Date().toLocaleTimeString()});state.forceScrollBottom=true}
+function clearLoadingMessages(){state.chatMessages=state.chatMessages.filter(m=>!m.loading);state.activeLoadingId=null}
+function addThinkingMessage(){clearLoadingMessages();const id=`thinking-${Date.now()}`;state.activeLoadingId=id;state.chatMessages.push({id,role:'agent',text:'正在思考',loading:true,at:new Date().toLocaleTimeString()});state.forceScrollBottom=true;return id}
+function removeMessage(id){state.chatMessages=state.chatMessages.filter(m=>m.id!==id)}
+function stopActiveRequest(){if(state.activeController)state.activeController.abort();state.isSending=false;state.activeRequestId=null;state.activeController=null;clearLoadingMessages();render()}
+function isChatNearBottom(){const el=document.getElementById('chatThread');if(!el)return true;return el.scrollHeight-el.scrollTop-el.clientHeight<80}
+function scrollChatToBottom(){setTimeout(()=>{const el=document.getElementById('chatThread');if(el)el.scrollTop=el.scrollHeight},0)}
+function nextPaint(){return new Promise(resolve=>setTimeout(resolve,0))}
+function isInvokeConfirmationText(text){const compact=String(text||'').replace(/\s+/g,'').toLowerCase();return['确认调用','确认执行','执行调用','开始调用','调用模型','运行模型','开始求解','确认求解','确认运行','执行','求解'].includes(compact)}
+function isResultExplanationText(text){const compact=String(text||'').replace(/\s+/g,'').toLowerCase();return['解释上一次优化结果','解释上一次结果','解释优化结果','解释结果','结果解释','总结结果','分析结果'].some(x=>compact.includes(x))||((compact.includes('结果')||compact.includes('优化'))&&['解释','总结','风险','下一步','建议','复盘'].some(x=>compact.includes(x)))}
+async function confirmDefaults(){if(!serviceOk())return toast('请先连接 Agent 服务');const task=currentTaskSession();if(!task||task.workflow_state!=='DEFAULT_CONFIRMING')return toast('当前没有可确认的默认值');pushMessage('user','确认使用默认值');try{const res=await api('/agent/confirm-defaults',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({conversation_id:state.conversationId,task_session_id:task.task_session_id})});setTaskSessionFromResponse(res);pushMessage('agent',analysisSummaryText(state.analysis),state.analysis);await loadConversations(false);toast(state.taskSession?.ready_to_invoke?'默认值已确认，参数已就绪':'默认值确认失败或参数仍未齐')}catch(e){pushMessage('agent',`默认值确认失败：${e.message}`);toast(`默认值确认失败：${e.message}`)}render()}
+function canConfirm(){const task=currentTaskSession();return Boolean(task&&task.workflow_state==='READY_TO_INVOKE'&&task.ready_to_invoke===true)}
+function notReadyMessage(){const task=currentTaskSession();const missing=(task?.missing_required||[]).map(x=>paramLabel(x)).filter(Boolean);if(task){return missing.length?`当前任务还不能调用，请先补充缺失参数：${missing.join('、')}。`:'当前任务还不能调用，请先完成参数补充和默认值确认。'}return '当前还没有可调用的优化任务。请先描述优化目标和参数，等参数就绪后再确认调用。'}
+function invocationMessage(value){return `模型调用完成，状态：${value?.status||'-'}，目标值：${objectiveValue(value)}。结果表已生成。`}
+async function invokeCurrentTask(options={}){if(!platformOk())return toast('Agent 服务在线，但无法连接运筹优化平台，暂不能调用模型。');if(!canConfirm()){const msg=notReadyMessage();if(options.thinkingId)removeMessage(options.thinkingId);pushMessage('agent',msg,state.analysis);toast('参数尚未就绪');state.isSending=false;state.activeRequestId=null;state.activeController=null;clearLoadingMessages();render();return}state.activeController=state.activeController||new AbortController();state.isSending=true;try{state.result=await api('/agent/confirm-invoke',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({conversation_id:state.conversationId,mode:state.runMode,user_message:options.userMessage||'确认调用'}),signal:state.activeController.signal},30000);setTaskSessionFromResponse(state.result);if(options.thinkingId)removeMessage(options.thinkingId);state.invocationId=state.result.invocation_id||state.invocationId;pushMessage('agent',invocationMessage(state.result),state.result);await loadConversations(false);toast('确认调用完成')}catch(e){if(options.thinkingId)removeMessage(options.thinkingId);state.result={error:e.message,detail:state.lastError};pushMessage('agent',`确认调用失败：${e.message}`,state.result);toast('确认调用失败')}finally{state.isSending=false;state.activeRequestId=null;state.activeController=null;clearLoadingMessages()}render()}
+async function confirmInvoke(){return invokeCurrentTask()}
+async function applySampleParameters(agentSkillName,sample){if(!serviceOk())return toast('请先连接 Agent 服务');if(!state.conversationId)await createConversation(false);try{const res=await api('/agent/apply-sample-parameters',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({conversation_id:state.conversationId,agent_skill_name:agentSkillName,sample_parameters:sample})});setTaskSessionFromResponse(res);pushMessage('agent',res.agent_message||res.message||'已使用示例参数创建任务。',res);await loadConversations(false);toast('已使用示例参数创建任务')}catch(e){pushMessage('agent',`应用示例参数失败：${e.message}`);toast('应用示例参数失败')}render()}
+function formatExplanationResponse(data){if(!data)return '还没有可解释的优化结果。';const blocks=[data.summary||'优化结果解释已生成。'];if((data.key_findings||[]).length)blocks.push('关键发现：\n'+data.key_findings.map(x=>`- ${x}`).join('\n'));if((data.risk_notes||[]).length)blocks.push('风险提示：\n'+data.risk_notes.map(x=>`- ${x}`).join('\n'));if((data.next_actions||[]).length)blocks.push('下一步动作：\n'+data.next_actions.map(x=>`- ${x}`).join('\n'));return blocks.join('\n\n')}
+async function explainCurrentResult(options={}){if(!serviceOk())return toast('请先连接 Agent 服务');const body={conversation_id:state.conversationId,use_llm:true,user_message:options.userMessage||'请用中文详细解释上一次优化结果，所有内容必须使用中文，包括关键发现、风险提示和下一步动作',language:'zh-CN'};if(state.invocationId)body.invocation_id=state.invocationId;state.activeController=state.activeController||new AbortController();state.isSending=true;try{state.explainResult=await api('/agent/explain-result',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body),signal:state.activeController.signal},20000);if(options.thinkingId)removeMessage(options.thinkingId);pushMessage('agent',formatExplanationResponse(state.explainResult),state.explainResult);await loadConversations(false);toast('结果解释已生成')}catch(e){if(options.thinkingId)removeMessage(options.thinkingId);const msg=e.message.includes('超时')?e.message:'当前还没有可解释的优化结果。请先完成一次优化调用，再让我解释结果、风险和下一步动作。';state.explainResult={error:e.message,detail:state.lastError};pushMessage('agent',msg,state.explainResult);toast('结果解释失败')}finally{state.isSending=false;state.activeRequestId=null;state.activeController=null;clearLoadingMessages()}render()}
+async function testExtractOnly(target='extractDebug'){if(!serviceOk())return toast('当前连接的是非 Agent 服务，请先连接 Agent 服务。');const message=(document.getElementById(target==='llm'?'llm_extract_message':'extract_debug_message')?.value||'').trim();if(!message)return toast('请输入测试消息');const body={message};if(getSelectedSkill().skill_name)body.skill_name=getSelectedSkill().skill_name;try{const data=await api('/agent/analyze',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});if(target==='llm')state.llmExtractTestResult=data;else state.extractDebugResult=data;toast('参数抽取测试完成')}catch(e){const data={error:e.message,detail:state.lastError};if(target==='llm')state.llmExtractTestResult=data;else state.extractDebugResult=data;toast('参数抽取测试失败')}render()}
+async function analyzeInput(){if(!platformOk())return toast('Agent 服务在线，但无法连接运筹优化平台，暂不能调用模型。');const partial_parameters=parseParams();if(!partial_parameters)return;if(getSelectedSkill().callable===false){state.skillDebug.analysis={error:'Skill 不可调用',reason:getSelectedSkill().callable_reason};return render()}try{state.skillDebug.analysis=await api(`/agent/skills/${encodeURIComponent(getSelectedSkill().skill_name)}/analyze-input`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({partial_parameters})});toast('参数校验完成')}catch(e){state.skillDebug.analysis={error:e.message,detail:state.lastError};toast('参数校验失败')}render()}
+async function runSkill(mode){if(!platformOk())return toast('Agent 服务在线，但无法连接运筹优化平台，暂不能调用模型。');const parameters=parseParams();if(!parameters)return;if(getSelectedSkill().callable===false)return toast(`Skill 不可调用：${getSelectedSkill().callable_reason||'disabled'}`);try{state.runMode=mode||state.runMode;state.skillDebug.result=await api(`/agent/skills/${encodeURIComponent(getSelectedSkill().skill_name)}/run`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({parameters,options:{mode:state.runMode,explain:true}})});state.invocationId=state.skillDebug.result.invocation_id||state.invocationId;toast('Skill 调用已提交')}catch(e){state.skillDebug.result={error:e.message,detail:state.lastError};toast('Skill 调用失败')}render()}
+async function viewSkillDetail(name){try{state.skillDetail=await api(`/agent/skills/${encodeURIComponent(name)}`);state.selectedSkill=state.skillDetail.skill_name||name;toast('Skill 详情已加载')}catch(e){state.skillDetail={error:e.message,detail:state.lastError};toast('Skill 详情加载失败')}render()}
+async function viewAgentSkillDetail(name){try{state.agentSkillDetail=await api(`/agent/agent-skills/${encodeURIComponent(name)}`);state.selectedAgentSkill=name;toast('Agent Skill 详情已加载')}catch(e){state.agentSkillDetail={error:e.message,detail:state.lastError};toast('Agent Skill 详情加载失败')}render()}
+async function validateAgentSkill(name){try{state.agentSkillDetail=await api(`/agent/agent-skills/${encodeURIComponent(name)}/validate`,{method:'POST'});toast('Agent Skill 校验通过')}catch(e){state.agentSkillDetail={error:e.message,detail:state.lastError};toast('Agent Skill 校验失败')}render()}
+async function syncAgentSkillSchema(name){try{state.agentSkillDetail=await api(`/agent/agent-skills/${encodeURIComponent(name)}/sync-schema`,{method:'POST'});toast('Schema 已从 API Skill 同步')}catch(e){state.agentSkillDetail={error:e.message,detail:state.lastError};toast('Schema 同步失败')}render()}
+async function testExplainResult(){return explainCurrentResult({userMessage:'请用中文详细解释上一次优化结果，所有内容必须使用中文，包括关键发现、风险提示和下一步动作'})}
+async function getInvocation(){if(!state.invocationId)return toast('请填写 Invocation ID');try{state.result=await api(`/agent/invocations/${encodeURIComponent(state.invocationId)}`);toast('调用记录已加载')}catch(e){state.result={error:e.message,detail:state.lastError};toast('调用记录查询失败')}render()}
+async function loadInvocations(){if(!serviceOk())return toast('请先连接 Agent 服务');const q=new URLSearchParams();if(state.invocationFilters.skill)q.set('skill',state.invocationFilters.skill);if(state.invocationFilters.status)q.set('status',state.invocationFilters.status);try{state.invocations=await api(`/agent/invocations${q.toString()?`?${q}`:''}`);toast('最近调用记录已刷新')}catch(e){state.invocations=[];toast('最近调用记录加载失败')}render()}
+function copyText(t,msg='已复制'){navigator.clipboard?.writeText(t).then(()=>toast(msg)).catch(()=>toast('复制失败'))}
+function resultPayload(value){return value?.result?.response||value?.response||value?.result||value||{}}
+function objectiveValue(value){const p=resultPayload(value);return p.objective_value??value?.objective_value??value?.result?.objective_value??'-'}
+function explanationText(value){const p=resultPayload(value);return value?.explanation||p.explanation||p.suggestion||'-'}
+function timeLabel(value){const text=String(value??'').trim();if(/^\d+$/.test(text))return `T${Number(text)+1}`;return text||'-'}
+function parseVariableIndex(text){const raw=String(text||'');const bracket=raw.match(/^[^\[]+\[([^\]]+)\]$/);const body=(bracket?bracket[1]:raw).replace(/[()]/g,'');return body.split(',').map(x=>x.trim()).filter(Boolean)}
+function businessVariableRows(value){const payload=resultPayload(value);const rows=[];const vars=payload.variable_values||payload.raw_result?.variable_values||{};Object.entries(vars||{}).forEach(([key,obj])=>{Object.entries(obj||{}).forEach(([idx,val])=>{const parts=parseVariableIndex(idx);rows.push({name:key,unit:parts[0],time:timeLabel(parts[1]),value:val})})});return rows}
+function businessVariableTable(value){const rows=businessVariableRows(value);if(!rows.length)return '<p class="muted">暂无业务变量表格数据</p>';return `<table class="compact-table"><thead><tr><th>变量</th><th>机组</th><th>时段</th><th>数值</th></tr></thead><tbody>${rows.slice(0,120).map(r=>`<tr><td>${h(r.name)}</td><td>${h(r.unit??'-')}</td><td>${h(r.time??'-')}</td><td>${h(r.value??'-')}</td></tr>`).join('')}</tbody></table>`}
+function listBlock(items,empty,mapper){return Array.isArray(items)&&items.length?`<ul style="margin:0;padding-left:18px">${items.map(item=>`<li>${mapper?mapper(item):h(typeof item==='string'?item:pretty(item))}</li>`).join('')}</ul>`:`<p class="muted">${empty}</p>`}
+function panel(title,body,tag=''){return `<div class="panel"><div class="panel-title"><span>${title}</span>${tag}</div>${body}</div>`}
+function metric(label,value,cls='blue'){return `<div class="card metric ${cls}"><span>${label}</span><b>${h(value)}</b></div>`}
+function shell(title,desc,actions,body){document.getElementById('topTitle').textContent=title;const warn=wrongServiceHint()?`<div class="callout red" style="margin-bottom:12px">${h(wrongServiceHint())}<div class="actions mt"><button class="btn" onclick="connectApi('http://127.0.0.1:8091/api')">切换到本机 Agent 服务</button></div></div>`:'';document.getElementById('app').innerHTML=`<div class="page-content">${warn}<div class="page-head"><div><h1>${title}</h1><p class="muted">${desc||''}</p><small class="muted">版本 ${APP_VERSION} · 构建 ${BUILD_TIME}</small></div><div class="actions">${actions||''}</div></div>${body}</div>`}
+function analysisSummaryText(a){if(!a)return '已收到。';if(a.response_type==='parameter_example')return a.agent_message||'下面是参数示例。';const lines=['已识别任务。'];lines.push(`绑定 Skill：${a.resolved_skill_name||'-'}`);lines.push(`当前状态：${a.workflow_state||a.status||'-'}`);const keys=Object.keys(a.parameter_draft||{}).map(paramKeyLabel);lines.push(`已识别参数：${keys.length?keys.join('、'):'暂无'}`);const missing=(a.missing_required||[]).map(paramLabel);lines.push(`缺失参数：${missing.length?missing.join('、'):'无'}`);const defaults=(a.can_use_default||[]).map(paramLabel);lines.push(`待确认默认值：${defaults.length?defaults.join('、'):'无'}`);lines.push(a.ready_to_invoke?'下一步：确认调用优化模型。':(a.requires_default_confirmation?'下一步：确认是否使用默认值。':'下一步：继续补充缺失参数。'));if((a.timing?.total_ms||0)>3000)lines.push(`本轮响应较慢，用时 ${(a.timing.total_ms/1000).toFixed(1)} 秒。`);return lines.join('\n')}
+function parameterStatusView(a){if(!a||a.response_type==='chat'||a.mode==='chat')return panel('任务状态','<p class="muted">当前是普通对话，尚未进入优化任务流程。</p>');const ready=Boolean(a.ready_to_invoke||a.ready);return panel('任务状态',`<table class="compact-table"><tr><th>任务阶段</th><td>${ready?'参数已就绪，等待确认调用':'参数收集中'}</td></tr><tr><th>选择的 Skill</th><td>${h(a.resolved_skill_name||'-')}</td></tr><tr><th>是否可调用</th><td>${pill(ready?'可以调用':'暂不可调用')}</td></tr></table><h3 class="mt">缺少必填</h3>${listBlock(a.missing_required,'无缺少必填项',x=>h(paramLabel(x)))}<h3>可使用默认值</h3>${listBlock(a.can_use_default,'无默认值建议',x=>h(`${paramLabel(x)}（${x.source||'default'}）：${pretty(x.value)}`))}`)}
+function compactResultInMessage(data){const p=resultPayload(data);const RESULT_STATUSES=['SUCCESS','FAILED','INFEASIBLE','TIMEOUT','CANCELLED'];if(!p||(!RESULT_STATUSES.includes(p.status)&&!p.objective_value&&!p.variable_values))return '';return `<div class="mt"><table class="compact-table"><tr><th>状态</th><td>${h(p.status||data.status||'-')}</td></tr><tr><th>目标值</th><td>${h(objectiveValue(data))}</td></tr></table><p class="muted mt">完整结果已在右侧任务面板中。</p></div>`}
+function resultView(value){if(!value)return '<p class="muted">暂无结果。</p>';const p=resultPayload(value);const err=p.error||value.error;return `<div>${err?`<div class="callout red"><b>错误信息</b><pre>${h(pretty(err))}</pre></div>`:''}${panel('业务结果',`<table class="compact-table"><tr><th>状态</th><td>${h(p.status||value.status||'-')}</td></tr><tr><th>目标值</th><td>${h(objectiveValue(value))}</td></tr><tr><th>结果解释</th><td>${h(explanationText(value))}</td></tr></table><div class="mt">${businessVariableTable(value)}</div><div class="actions mt"><button class="btn" onclick="copyText(pretty(resultPayload(state.result).variable_values||{}),'结果表已复制')">导出结果表</button></div>`)}<div class="mt"><details><summary>原始 JSON</summary><pre>${h(pretty(value))}</pre></details></div></div>`}
+function inputSchemaTable(items){return `<table class="compact-table"><tr><th>参数 key</th><th>中文名</th><th>类型</th><th>单位</th><th>必填</th><th>示例值</th></tr>${(items||[]).map(i=>`<tr><td>${h(i.key)}</td><td>${h(paramLabel(i))}</td><td>${h(i.type||'-')}</td><td>${h(i.unit||'-')}</td><td>${pill(i.required!==false)}</td><td>${h(String(i.sample_value??i.default_value??'-'))}</td></tr>`).join('')||'<tr><td colspan="6">暂无输入参数。</td></tr>'}</table>`}
+function outputSchemaTable(schema){const rows=[];if(Array.isArray(schema?.variables)){schema.variables.forEach(v=>rows.push({key:v.key||v.name,type:'variable',desc:`维度 ${(v.dimension||[]).join(',')||'-'}，单位 ${v.unit||'-'}`}))}Object.entries(schema||{}).forEach(([key,value])=>{if(key!=='variables')rows.push({key,type:Array.isArray(value)?'array':typeof value,desc:key==='objective_value'?'目标函数值':String(value)})});return `<table class="compact-table"><tr><th>输出项</th><th>类型</th><th>说明</th></tr>${rows.map(r=>`<tr><td>${h(r.key)}</td><td>${h(r.type)}</td><td>${h(r.desc)}</td></tr>`).join('')||'<tr><td colspan="3">暂无输出结构。</td></tr>'}</table>`}
+/* ---- structured message cards ---- */
+function cardRequiredParameters(data){const items=data?.required_parameters||data?.input_schema||[];if(!items.length)return '';return `<div class="card"><div class="card-title">📋 参数清单</div>${inputSchemaTable(items)}</div>`}
+function cardParameterExample(data){if(data?.response_type!=='parameter_example')return '';const sample=data.sample_parameters||{};const encoded=encodeURIComponent(JSON.stringify(sample));const agent=data.agent_skill_name||'';const summary=Object.keys(sample).map(paramKeyLabel).join('、')||'暂无参数';return `<div class="card"><div class="card-title">📦 参数示例 · ${h(data.display_name||data.skill_name||data.resolved_skill_name||'-')}</div><p class="muted" style="font-size:12px">包含参数：${h(summary)}</p><details class="mt"><summary>查看 JSON</summary><pre>${h(pretty(sample))}</pre></details><div class="actions mt"><button class="btn" onclick="copyText(pretty(JSON.parse(decodeURIComponent('${encoded}'))),'示例参数已复制')">复制 JSON</button><button class="btn primary" onclick="applySampleParameters('${h(agent)}',JSON.parse(decodeURIComponent('${encoded}')))">使用示例参数创建任务</button><button class="btn" onclick="document.getElementById('chatInput').value=pretty(JSON.parse(decodeURIComponent('${encoded}')));state.message=document.getElementById('chatInput').value">填入输入框</button></div></div>`}
+function cardAnalysis(data){if(!data?.resolved_skill_name)return '';const keys=Object.keys(data.parameter_draft||{}).map(paramKeyLabel);const missing=(data.missing_required||[]).map(paramLabel);const defaults=(data.can_use_default||[]).map(paramLabel);return `<div class="card"><div class="card-title">🔍 参数识别 · ${h(data.resolved_skill_name)}</div><table class="compact-table"><tr><th>已识别参数</th><td>${keys.length?keys.join('、'):'暂无'}</td></tr><tr><th>缺失必填</th><td>${missing.length?missing.join('、'):'无'}</td></tr><tr><th>待确认默认值</th><td>${defaults.length?defaults.join('、'):'无'}</td></tr></table></div>`}
+function cardDefaultConfirmation(data){const items=data?.can_use_default||[];if(!items.length)return '';return `<div class="card"><div class="card-title">⚙️ 可使用默认值的参数</div>${listBlock(items,'无',x=>h(`${paramLabel(x)}：${pretty(x.value)}（${x.source||'default'}）`))}<div class="actions mt"><button class="btn primary" ${disabledWhenPlatformUnavailable()} onclick="confirmDefaults()">确认使用默认值</button><button class="btn" onclick="toast('请在对话中手动补充参数值')">手动填写</button></div></div>`}
+function cardReadyToInvoke(data){if(!data?.ready_to_invoke)return '';return `<div class="card callout green"><div class="card-title">✅ 参数已就绪，可以调用</div><p style="font-size:13px">Skill：${h(data.resolved_skill_name||'-')}</p><div class="actions mt"><button class="btn success" ${canConfirm()&&platformOk()?'':'disabled'} onclick="confirmInvoke()">确认调用优化模型</button></div></div>`}
+function cardInvokeResult(data){const p=resultPayload(data);const RESULT_STATUSES=['SUCCESS','FAILED','INFEASIBLE','TIMEOUT','CANCELLED'];if(!p||(!RESULT_STATUSES.includes(p.status)&&!p.objective_value&&!p.variable_values))return '';return `<div class="card"><div class="card-title">📊 求解结果</div><table class="compact-table"><tr><th>状态</th><td>${h(p.status||data.status||'-')}</td></tr><tr><th>目标值</th><td>${h(objectiveValue(data))}</td></tr><tr><th>耗时</th><td>${h(p.solve_time_seconds??'-')} 秒</td></tr></table><div class="actions mt"><button class="btn" onclick="explainCurrentResult({userMessage:'解释上一次优化结果'})">查看解释</button><button class="btn" onclick="copyText(pretty(resultPayload(state.result).variable_values||{}),'结果表已复制')">导出结果表</button></div><div class="mt"><details><summary>完整结果 JSON</summary><pre>${h(pretty(p))}</pre></details></div></div>`}
+function cardResultExplanation(data){if(!data?.explanation&&!data?.summary)return '';const exp=data.explanation||{};return `<div class="card"><div class="card-title">🧠 结果解释</div><p style="font-size:13px;line-height:1.7">${h(data.summary||data.agent_message||'')}</p>${(exp.key_findings||[]).length?`<p class="mt" style="font-size:12px;color:var(--muted)">关键发现：${exp.key_findings.map(x=>h(x)).join('；')}</p>`:''}${(exp.risk_notes||[]).length?`<p style="font-size:12px;color:var(--warning)">风险提示：${exp.risk_notes.map(x=>h(x)).join('；')}</p>`:''}${(exp.next_actions||[]).length?`<p style="font-size:12px;color:var(--success)">下一步：${exp.next_actions.map(x=>h(x)).join('；')}</p>`:''}</div>`}
+function cardSkillAvailability(data){if(data?.response_type!=='skill_availability')return '';if(!data.skill_available)return `<div class="card"><div class="card-title">❓ 场景查询</div><p style="font-size:13px">当前内置模型中暂未发现该场景。</p></div>`;const name=data.display_name||data.agent_skill_name||'-';const api=data.api_skill_name||'-';return `<div class="card callout blue"><div class="card-title">✅ 平台已支持：${h(name)}</div><p style="font-size:12px;color:var(--muted)">API Skill：${h(api)}</p><p style="font-size:13px;margin-top:6px">${h(data.description||'')}</p><div class="actions mt"><button class="btn primary" onclick="startScenario('${h(api)}','${h(name)}')">开始${h(name)}</button><button class="btn" onclick="sendQuick('给我${h(name)}参数示例')">查看参数示例</button><button class="btn" onclick="sendQuick('需要哪些参数')">查看参数清单</button></div></div>`}
+function renderMessageCard(m){if(!m.data)return '';const rt=m.data.response_type||m.data.mode;if(rt==='skill_availability')return cardSkillAvailability(m.data);if(rt==='parameter_example')return cardParameterExample(m.data);if(rt==='result_explanation')return cardResultExplanation(m.data);if(m.data.ready_to_invoke)return cardReadyToInvoke(m.data)+(cardDefaultConfirmation(m.data)||cardAnalysis(m.data));if(m.data.requires_default_confirmation)return cardDefaultConfirmation(m.data)||cardAnalysis(m.data);if(rt&&rt!=='chat')return cardAnalysis(m.data);const resultCard=compactResultInMessage(m.data);const invCard=cardInvokeResult(m.data);return resultCard||invCard||''}
+function chatMessageHtml(m){return `<div class="msg ${m.role==='user'?'user':'agent'}"><div class="msg-meta">${m.role==='user'?'用户':'Agent'} · ${h(m.at||'')}</div><div class="msg-bubble">${m.loading?'<span class="typing"><i></i><i></i><i></i></span> 正在思考...':`${h(m.text)}${m.role==='agent'?renderMessageCard(m):''}`}</div></div>`}
+function hasTaskAnalysis(a){return Boolean(currentTaskSession()||a&&a.response_type!=='chat'&&a.mode!=='chat'&&(a.agent_skill_name||a.api_skill_name||a.resolved_skill_name||Object.keys(a.parameter_draft||{}).length))}
+function workflowCard(){const a=currentTaskSession();if(!a&&!state.result)return '';const stateName=a?.workflow_state||'CHAT_IDLE';const invoked=Boolean(a?.invocation_id||state.invocationId||state.result?.invocation_id);const needsDefault=stateName==='DEFAULT_CONFIRMING'&&(a.default_candidates||[]).length>0&&!(a.missing_required||[]).length;const ready=stateName==='READY_TO_INVOKE'&&a.ready_to_invoke;const resultReady=stateName==='RESULT_READY'||Boolean(state.result);const steps=[['意图识别',a?'已识别优化任务':'普通对话',a?'done':'pending'],['参数收集',ready||needsDefault||resultReady?'已完成':(a?'进行中':'未开始'),ready||needsDefault||resultReady?'done':(a?'active':'pending')],['默认值确认',needsDefault?'待确认':(ready||resultReady?'已确认':'无需确认'),needsDefault?'active':(ready||resultReady?'done':'pending')],['工具调用',invoked?'已调用':(ready?'等待确认':'未开始'),invoked?'done':(ready?'active':'pending')],['结果反馈',resultReady?'已返回':'未返回',resultReady?'done':'pending']];const cta=needsDefault?`<div class="actions mt"><button class="btn primary" ${disabledWhenPlatformUnavailable()} onclick="confirmDefaults()">确认使用默认值</button></div>`:(ready&&!state.result?`<div class="actions mt"><button class="btn primary" ${canConfirm()&&platformOk()?'':'disabled'} onclick="confirmInvoke()">确认调用优化模型</button></div>`:'');return `<div class="task-progress"><div class="task-progress-title">任务进度<span>${h(a?.api_skill_name||'优化任务')}</span></div><div class="workflow">${steps.map(([name,status,cls])=>`<div class="workflow-step ${cls}"><b>${h(name)}</b><span>${h(status)}</span></div>`).join('')}</div>${cta}</div>`}
+function conversationStateCard(){const a=currentTaskSession();if(!a)return '<p class="muted" style="font-size:13px">当前未选择优化场景。你可以输入优化需求开始任务，例如：帮我跑经济调度…</p>';const sources=a.parameter_sources||{};const sourceBadge=src=>{if(!src)return '';const cls=src.includes('user')?'user':src.includes('confirmed')?'confirmed':'suggested';return `<span class="param-source-badge ${cls}">${src}</span>`};const rows=Object.entries(a.parameter_draft||{}).map(([k,v])=>`<tr><td>${h(paramKeyLabel(k))}</td><td style="max-width:160px;overflow:hidden;text-overflow:ellipsis">${h(typeof v==='object'?pretty(v).slice(0,80):String(v))}</td><td>${sourceBadge(sources[k])}</td></tr>`).join('');const next=a.workflow_state==='READY_TO_INVOKE'?'确认调用优化模型':(a.workflow_state==='DEFAULT_CONFIRMING'?'确认默认值':(a.workflow_state==='HELP'?'可开始该场景':'补充缺失参数'));return `<div class="task-section"><div class="task-section-head">当前任务 · ${h(a.display_name||a.api_skill_name||'-')}<span class="pill ${a.ready_to_invoke?'green':'amber'}">${h(a.workflow_state||'-')}</span></div><div class="task-section-body"><table class="compact-table"><tr><th>Agent Skill</th><td>${h(a.agent_skill_name||'-')}</td></tr><tr><th>API Skill</th><td>${h(a.api_skill_name||'-')}</td></tr><tr><th>下一步建议</th><td>${h(next)}</td></tr></table>${rows?`<table class="compact-table mt"><tr><th>参数</th><th>值</th><th>来源</th></tr>${rows}</table>`:'<p class="muted mt">参数收集中…</p>'}<details class="mt" open><summary>缺失参数 / 可选</summary>${listBlock(a.missing_required,'无缺失必填',x=>h(paramLabel(x)))}</details></div></div>`}
+function defaultConfirmCard(a){const task=currentTaskSession();const items=task?.default_candidates||[];if(!task||task.workflow_state!=='DEFAULT_CONFIRMING'||(task.missing_required||[]).length||!items.length)return '';return `<div class="task-section"><div class="task-section-head">待确认默认值</div><div class="task-section-body">${listBlock(items,'无',x=>h(`${paramLabel(x)}：${pretty(x.value)}`))}<div class="actions mt"><button class="btn primary" ${disabledWhenPlatformUnavailable()} onclick="confirmDefaults()">确认使用默认值</button></div></div></div>`}
+function invokeConfirmCard(a){const task=currentTaskSession();if(!task||task.workflow_state!=='READY_TO_INVOKE'||!task.ready_to_invoke)return '';return `<div class="task-section" style="border-color:#BAE4D2"><div class="task-section-head" style="background:#E8F7F1;color:var(--success)">参数就绪 — 确认调用</div><div class="task-section-body"><p style="font-size:13px;margin-bottom:8px">所有参数已就绪，请确认调用优化模型。</p><button class="btn success" ${canConfirm()&&platformOk()?'':'disabled'} onclick="confirmInvoke()">确认调用优化模型</button></div></div>`}
+function presetPromptButtons(){return presetPrompts.map(p=>`<button class="preset-btn" onclick="sendQuick('${h(p).replace(/'/g,'&#39;')}')">${h(p)}</button>`).join('')}
+function sendQuick(msg){state.message=msg;const el=document.getElementById('chatInput');if(el)el.value=msg;analyzeMessage()}
+function conversationHistoryList(){const q=String(state.historyQuery||'').trim().toLowerCase();const rows=(state.conversations||[]).filter(c=>!q||String(c.title||'').toLowerCase().includes(q)||String(c.last_message||'').toLowerCase().includes(q));return `<div class="history-list">${rows.length?rows.map(c=>`<div class="history-row ${c.conversation_id===state.conversationId?'active':''}"><button class="history-main" onclick="openConversation('${h(c.conversation_id)}')"><b>${h(c.title||'新会话')}</b><p style="font-size:12px;color:var(--muted)">${h(c.last_message||'暂无消息')}</p><small style="font-size:11px;color:var(--muted)">${h(c.updated_at||'')}</small></button><div class="history-actions"><button class="btn" style="font-size:12px;height:26px" onclick="openConversation('${h(c.conversation_id)}')">打开</button><button class="btn" style="font-size:12px;height:26px" onclick="renameConversation('${h(c.conversation_id)}')">重命名</button><button class="btn" style="font-size:12px;height:26px;color:#C7352C" onclick="deleteConversation('${h(c.conversation_id)}')">删除</button></div></div>`).join(''):'<p class="muted">暂无历史聊天。</p>'}</div>`}
+function debugPanel(){return state.devMode?`<details class="mt"><summary>开发调试</summary><pre>${h(pretty({lastRequest:state.lastRequest,lastResponse:state.lastResponse,timing:state.lastResponse?.timing||state.analysis?.timing,intent:state.lastResponse?.intent,response_type:state.lastResponse?.response_type,workflow_state:state.lastResponse?.workflow_state,parameter_draft:state.analysis?.parameter_draft,parameter_sources:state.analysis?.parameter_sources,invocation_id:state.invocationId,apiBase:state.apiBase,version:APP_VERSION}))}</pre></details>`:''}
+function skillStructureInfo(){return panel('Skill 结构说明','<p>Skill 包含：skill_name、display_name、model_id、version、status、skill_status、callable、endpoint、input_schema、output_schema、execution_policy、requires_human_review、allowed_callers。</p>')}
+function skillDetailView(skill){if(!skill)return '<p class="muted">请选择一个 Skill 查看完整结构。</p>';if(skill.error)return `<div class="callout red">${h(skill.error)}</div>`;const endpoint=skill.endpoint||`/api/skills/${skill.skill_name}/run`;const sample={parameters:Object.fromEntries((skill.input_schema||[]).map(i=>[i.key,i.sample_value??i.default_value??null])),options:{mode:'sync',explain:true}};const curl=`curl -X POST ${state.apiBase}${endpoint} -H "Content-Type: application/json" -d '${JSON.stringify(sample)}'`;return `<div class="grid"><section>${panel('Skill 概览',`<table class="compact-table"><tr><th>Skill 名称</th><td>${h(skill.skill_name)}</td><th>显示名称</th><td>${h(skill.display_name||skill.name||'-')}</td></tr><tr><th>状态</th><td>${h(skill.status||'-')} / ${h(skill.skill_status||'-')}</td><th>callable</th><td>${pill(skill.callable)}</td></tr><tr><th>执行策略</th><td>${h(skill.execution_policy||'-')}</td><th>需要人工确认</th><td>${pill(skill.requires_human_review)}</td></tr></table>`)}</section><section>${panel('调用入口',`<table class="compact-table"><tr><th>Method</th><td>POST</td></tr><tr><th>Endpoint</th><td>${h(endpoint)}</td></tr></table><div class="actions mt"><button class="btn" onclick="copyText('${h(endpoint)}','接口地址已复制')">复制接口地址</button><button class="btn" onclick="copyText(${JSON.stringify(curl)},'curl 示例已复制')">复制 curl</button></div>`)}</section><section>${panel('输入参数结构',inputSchemaTable(skill.input_schema||[]))}</section><section>${panel('输出结构',outputSchemaTable(skill.output_schema||{}))}</section><section><details><summary>高级 JSON</summary><pre>${h(pretty(skill))}</pre></details></section></div>`}
+function agentSkillDetailView(skill){if(!skill)return '<p class="muted">请选择一个 Agent Skill。</p>';if(skill.error)return `<div class="callout red">${h(skill.error)}</div>`;return `<div class="grid"><section>${panel('Agent Skill 概览',`<table class="compact-table"><tr><th>name</th><td>${h(skill.name)}</td><th>display_name</th><td>${h(skill.display_name||'-')}</td></tr><tr><th>绑定 API Skill</th><td>${h(skill.canonical_api_skill_name||'-')}</td><th>API 可用</th><td>${pill(skill.api_skill_available)}</td></tr><tr><th>状态</th><td>${pill(skill.enabled)}</td><th>校验</th><td>${h(skill.validation?.status||skill.validation_status||'-')}</td></tr></table>`)}</section><section>${panel('触发意图',`<p>${h((skill.trigger_intents||[]).join('、')||'-')}</p>`)}</section><section>${panel('参数收集策略',`<table class="compact-table"><tr><th>必填参数</th><td>${h((skill.required_parameters||[]).map(paramKeyLabel).join('、')||'-')}</td></tr><tr><th>可选参数</th><td>${h((skill.optional_parameters||[]).map(paramKeyLabel).join('、')||'-')}</td></tr></table>`)}</section><section>${panel('参数示例',`<pre>${h(pretty(skill.sample_parameters||{}))}</pre>`)}</section><section>${panel('SKILL.md 指令',`<pre>${h(skill.instruction||'未提供 SKILL.md')}</pre>`)}</section><section>${panel('Schema 校验',`<pre>${h(pretty(skill.validation||{}))}</pre><div class="actions mt"><button class="btn" onclick="validateAgentSkill('${h(skill.name)}')">运行校验</button><button class="btn" onclick="syncAgentSkillSchema('${h(skill.name)}')">同步 API Skill Schema</button></div>`)}</section></div>`}
+async function analyzeMessage(){
+  if(!serviceOk())return toast('当前连接的是非 Agent 服务，请先连接 Agent 服务。');
+  if(state.isSending)return toast('上一轮请求仍在处理中，请等待或点击停止生成。');
+  if(!state.conversationId)await createConversation(false);
+  const inputEl=document.getElementById('chatInput');
+  const message=(inputEl?.value||state.message).trim();
+  if(!message)return toast('请输入用户消息');
+  const body={conversation_id:state.conversationId,message};
+  if(state.skillSelectionMode==='manual')body.skill_name=getSelectedSkill().skill_name;
+  if(state.skillSelectionMode==='manual'&&getSelectedSkill().callable===false)return toast(`Skill 不可调用：${getSelectedSkill().callable_reason||'disabled'}`);
+  state.lastRequest={apiBase:state.apiBase,conversation_id:state.conversationId,message,skillSelectionMode:state.skillSelectionMode,skill_name:body.skill_name||null};
+  state.isSending=true;state.activeRequestId=`req-${Date.now()}`;state.activeController=new AbortController();
+  pushMessage('user',message);
+  const thinkingId=addThinkingMessage();
+  if(inputEl)inputEl.value='';
+  state.message='';
+  render();
+  await nextPaint();
+  if(isInvokeConfirmationText(message)){
+    if(canConfirm()){await invokeCurrentTask({thinkingId,userMessage:message})}
+    else{removeMessage(thinkingId);pushMessage('agent',notReadyMessage(),state.analysis);state.isSending=false;state.activeRequestId=null;state.activeController=null;clearLoadingMessages();render()}
+    return;
+  }
+  if(isResultExplanationText(message)){await explainCurrentResult({thinkingId,userMessage:message});return;}
+  const previousAnalysis=state.analysis;
+  try{
+    const analysisResponse=await api('/agent/analyze',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body),signal:state.activeController.signal},15000);
+    state.lastResponse={response_type:analysisResponse.response_type,intent:analysisResponse.intent,workflow_state:analysisResponse.workflow_state,resolved_skill_name:analysisResponse.resolved_skill_name,ready_to_invoke:analysisResponse.ready_to_invoke,requires_default_confirmation:analysisResponse.requires_default_confirmation,timing:analysisResponse.timing};
+    removeMessage(thinkingId);
+    state.conversationId=analysisResponse.conversation_id||state.conversationId;
+    setTaskSessionFromResponse(analysisResponse);
+    const isAvailability=analysisResponse.response_type==='skill_availability';
+    const isChat=!isAvailability&&(analysisResponse.response_type==='chat'||analysisResponse.mode==='chat'||analysisResponse.mode==='help');
+    if(isAvailability){
+      if(analysisResponse.agent_skill_name||analysisResponse.resolved_skill_name||analysisResponse.api_skill_name)state.analysis=state.taskSession?{...analysisResponse,...state.taskSession,task_session:state.taskSession}:analysisResponse;
+      else if(previousAnalysis&&hasTaskAnalysis(previousAnalysis))state.analysis=previousAnalysis;
+      else state.analysis=analysisResponse;
+      pushMessage('agent',analysisResponse.agent_message||analysisResponse.message||'已查询。',analysisResponse);
+    }else if(isChat){
+      state.params='{}';
+      if(analysisResponse.mode==='help'&&previousAnalysis&&hasTaskAnalysis(previousAnalysis))state.analysis=previousAnalysis;else state.analysis=state.taskSession?{...analysisResponse,...state.taskSession,task_session:state.taskSession}:analysisResponse;
+      pushMessage('agent',analysisResponse.agent_message||analysisResponse.message||'我在。',analysisResponse);
+    }else{
+      state.analysis=state.taskSession?{...analysisResponse,...state.taskSession,task_session:state.taskSession}:analysisResponse;
+      state.selectedSkill=state.analysis.api_skill_name||state.analysis.resolved_skill_name||state.selectedSkill;
+      state.params=pretty(state.taskSession?.parameter_draft||state.analysis.parameter_draft||state.analysis.normalized_parameters||{});
+      pushMessage('agent',analysisSummaryText(state.analysis),state.analysis);
+    }
+    await loadConversations(false);
+    toast(isChat?'已回复':'参数抽取完成');
+  }catch(e){
+    removeMessage(thinkingId);
+    state.analysis={error:e.message,detail:state.lastError};
+    pushMessage('agent',`处理失败：${e.message}`,state.analysis);
+    toast('处理失败');
+  }finally{
+    state.isSending=false;state.activeRequestId=null;state.activeController=null;clearLoadingMessages();
+  }
+  render();
+}
+/* ---- render functions ---- */
+function renderTopBar(){
+  const topbar=document.getElementById('topbar');
+  if(!topbar)return;
+  const st=state.agentStatus||{};
+  const platform=st.platform||{};
+  const llm=st.llm||state.llmConfig||{};
+  const agentPill=state.health?.loading?'<span class="pill amber">检测中</span>':(serviceOk()?'<span class="pill green">Agent 在线</span>':'<span class="pill red">Agent 未连接</span>');
+  const platPill=state.health?.loading?'<span class="pill amber">检测中</span>':(platformOk()?'<span class="pill green">平台可达</span>':'<span class="pill red">平台不可达</span>');
+  const llmPill=llm.enabled&&llm.api_key_configured?'<span class="pill green">LLM 已启用</span>':(llm.enabled&&!llm.api_key_configured?'<span class="pill red">配置异常</span>':(llm.api_key_configured?'<span class="pill amber">规则模式 · API Key 已配置但未启用</span>':'<span class="pill amber">规则模式</span>'));
+  const keyPill=llm.api_key_configured?'<span class="pill green">API Key 已配置</span>':'<span class="pill amber">API Key 未配置</span>';
+  const skillCount=platform.skill_count??state.skills.length;
+  const hint=statusHint();
+  topbar.innerHTML=`
+    <div class="topbar-brand">
+      <div class="topbar-mark">AI</div>
+      <div class="topbar-name">华电安全生产运筹优化 Agent 工作台<small id="topTitle">Agent 工作台</small></div>
+    </div>
+    <div class="topbar-status">
+      ${agentPill}${platPill}${llmPill}${keyPill}
+      <span class="pill">${skillCount} Skill</span>
+      ${hint?`<span style="font-size:12px;color:var(--muted);max-width:360px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${h(hint)}">${h(hint)}</span>`:''}
+      <span style="font-size:12px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:180px" title="${h(state.apiBase)}">${h(state.apiBase)}</span>
+    </div>
+    <div class="topbar-actions">
+      <input id="apiBase" style="width:220px;height:28px;font-size:12px" value="${h(state.apiBase)}" onchange="setApiBase(this.value)" placeholder="API Base URL">
+      <button class="btn" style="height:28px;font-size:12px" onclick="checkHealth()">刷新状态</button>
+      <button class="btn" style="height:28px;font-size:12px" onclick="go('llm')">大模型配置</button>
+    </div>`;
+}
+function renderSidebar(){
+  const sidebar=document.getElementById('sidebar');
+  if(!sidebar)return;
+  const histOpen=state.sidebarHistOpen!==false;
+  const convItems=(state.conversations||[]).slice(0,20).map(c=>`
+    <div class="conv-item ${c.conversation_id===state.conversationId?'active':''}">
+      <button class="history-main" style="background:transparent;border:0;width:100%;text-align:left;color:var(--sidebar-text);cursor:pointer" onclick="openConversation('${h(c.conversation_id)}')">
+        <div class="conv-title">${h(c.title||'新会话')}</div>
+        <div class="conv-meta">${h(c.last_message||'暂无消息')}</div>
+      </button>
+      <div class="conv-row-actions">
+        <button class="conv-row-btn" onclick="openConversation('${h(c.conversation_id)}')">打开</button>
+        <button class="conv-row-btn" onclick="renameConversation('${h(c.conversation_id)}')">改名</button>
+        <button class="conv-row-btn danger" onclick="deleteConversation('${h(c.conversation_id)}')">删除</button>
+      </div>
+    </div>`).join('');
+  const navPages=[['overview','▦','Agent 总览'],['skills','◇','API Skill 管理'],['agentSkills','◈','Agent Skill 管理'],['skillDebug','⚡','Skill 调用调试'],['extractDebug','⌁','参数抽取调试'],['invocations','≣','调用记录'],['status','⇄','接口状态']];
+  const cnt=state.conversations?.length||0;
+  sidebar.innerHTML=`
+    <div class="sidebar-head">
+      <button class="new-conv-btn" ${disabledWhenWrong()} onclick="createConversation()">＋ 新建优化对话</button>
+    </div>
+    <div class="sidebar-body">
+      <div class="conv-section-head" onclick="state.sidebarHistOpen=!${histOpen};renderSidebar()">
+        <span class="nav-label" style="padding:0;margin:0">历史会话${cnt?` (${cnt})`:''}</span>
+        <button class="conv-section-toggle ${histOpen?'open':'closed'}">▾</button>
+      </div>
+      <div class="sidebar-history${histOpen?'':' collapsed'}">
+        ${convItems||'<p style="font-size:12px;color:#6A8BA8;padding:4px 10px">暂无历史会话</p>'}
+      </div>
+      <div class="sidebar-bottom">
+        <div class="nav-label" style="padding-top:8px">常用优化场景</div>
+        ${SCENARIOS.map(s=>`<button class="scenario-btn" onclick="startScenario('${h(s.key)}','${h(s.name)}')">${s.icon} ${h(s.name)}</button>`).join('')}
+        <div class="nav-label" style="margin-top:6px">管理</div>
+        ${navPages.map(p=>`<button class="nav-btn ${state.page===p[0]?'active':''}" onclick="go('${p[0]}')"><span class="ic">${p[1]}</span>${p[2]}</button>`).join('')}
+      </div>
+    </div>`;
+}
+function startScenario(key,name){if(!serviceOk())return toast('请先连接 Agent 服务');state.page='chat';state.message=`我要做${name}`;const el=document.getElementById('chatInput');if(el)el.value=`我要做${name}`;render();setTimeout(()=>analyzeMessage(),80)}
+function renderChat(){
+  const app=document.getElementById('app');
+  if(!app)return;
+  const platformWarn=!platformOk()&&serviceOk()?`<div class="platform-banner">⚠ 平台不可达，暂不能调用优化模型。<button class="btn" style="height:26px;font-size:12px" onclick="checkHealth()">重新检测平台连接</button></div>`:'';
+  const messages=state.chatMessages.length?state.chatMessages.map(chatMessageHtml).join(''):`<div class="welcome-card"><h2>欢迎使用华电安全生产运筹优化 Agent 工作台</h2><p>你好，我是运筹优化 Agent。你可以直接描述优化需求，也可以先查看参数示例。</p><div class="quick-btns">${['我要做经济调度','给我储能调度参数示例','我需要提供哪些参数','解释上一次结果'].map(t=>`<button class="quick-btn" onclick="sendQuick('${h(t)}')">${h(t)}</button>`).join('')}</div></div>`;
+  app.innerHTML=`${platformWarn}<div class="chat-area"><div class="chat-thread" id="chatThread">${messages}</div><div class="chat-composer"><div class="preset-btns">${presetPromptButtons()}</div><div class="chat-input-row"><textarea class="chat-textarea" id="chatInput" rows="2" placeholder="描述你的优化需求，例如：帮我跑经济调度，四个时段负荷100、120、90、110...（Enter 发送，Shift+Enter 换行）" oninput="state.message=this.value" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();analyzeMessage()}" ${state.isSending?'disabled':''}>${h(state.message)}</textarea>${state.isSending?'<button class="send-btn" onclick="stopActiveRequest()">停止生成</button>':`<button class="send-btn" ${disabledWhenWrong()} onclick="analyzeMessage()">发送</button>`}</div><details class="mt"><summary>高级：手动指定 Skill</summary><div class="grid cols-2 mt"><div class="field"><label>Skill 选择方式</label><select onchange="state.skillSelectionMode=this.value;render()"><option value="auto" ${state.skillSelectionMode==='auto'?'selected':''}>Agent 自动识别</option><option value="manual" ${state.skillSelectionMode==='manual'?'selected':''}>手动指定</option></select></div><div class="field"><label>手动选择 Skill</label>${skillSelect()}</div></div></details>${debugPanel()}</div></div>`;
+}
+function renderTaskPanel(){
+  const panel=document.getElementById('taskPanel');
+  if(!panel)return;
+  const a=currentTaskSession();
+  const statusPill=a?.ready_to_invoke?'<span class="pill green">就绪</span>':(a?'<span class="pill amber">进行中</span>':'<span class="pill">空闲</span>');
+  panel.innerHTML=`
+    <div class="task-panel-head">当前任务状态 ${statusPill}</div>
+    <div class="task-panel-body">
+      ${workflowCard()}
+      ${conversationStateCard()}
+      ${defaultConfirmCard(a)}
+      ${invokeConfirmCard(a)}
+      ${state.result?`<div class="task-section"><div class="task-section-head">最近求解结果</div><div class="task-section-body">${compactResultInMessage(state.result)||'<p class="muted">暂无结果。</p>'}</div></div>`:''}
+    </div>`;
+}
+function renderAgentSkillPage(){
+  const rows=(state.agentSkills||[]).map(s=>`<tr><td>${h(s.name)}</td><td>${h(s.display_name||'-')}</td><td>${h(s.canonical_api_skill_name||'-')}</td><td>${pill(s.api_skill_available)}</td><td>${h((s.trigger_intents||[]).slice(0,3).join('、'))}</td><td>${h(s.validation_status||'-')}</td><td><button class="btn" onclick="viewAgentSkillDetail('${h(s.name)}')">查看</button></td></tr>`).join('');
+  const detail=state.agentSkillDetail||(state.agentSkills.find(s=>s.name===state.selectedAgentSkill))||state.agentSkills[0]||{};
+  shell('Agent Skill 管理','API Skill 是已发布优化模型对外暴露的标准调用能力，负责输入输出契约和接口调用。Agent Skill 负责指导 Agent 如何理解和使用这些 API Skill。',`<button class="btn" ${disabledWhenWrong()} onclick="loadAgentSkills()">刷新 Agent Skill</button>`,`<div class="grid">${panel('Agent Skill 列表',`<table class="compact-table"><tr><th>name</th><th>display_name</th><th>绑定 API Skill</th><th>API 可用</th><th>触发意图</th><th>校验</th><th>操作</th></tr>${rows||'<tr><td colspan="7">暂无 Agent Skill。</td></tr>'}</table>`)}${panel('Agent Skill 详情',agentSkillDetailView(detail))}</div>`)}
+function renderApiSkillPage(){
+  const rows=(state.skills||[]).map(s=>`<tr><td>${h(s.skill_name)}</td><td>${h(s.display_name||s.name||'-')}</td><td>${h(s.model_id||'-')}</td><td>${pill(s.callable)}</td><td><button class="btn" onclick="viewSkillDetail('${h(s.skill_name)}')">查看详情</button></td></tr>`).join('');
+  shell('API Skill 管理','API Skill 是已发布优化模型对外暴露的标准调用能力。一个已发布模型版本默认对应一个 Skill；Agent 负责根据自然语言选择并调用具体 Skill。',`<button class="btn" ${disabledWhenWrong()} onclick="loadSkills()">刷新 Skill</button>`,`<div class="grid">${panel('Skill 列表',`<table class="compact-table"><tr><th>skill_name</th><th>display_name</th><th>model_id</th><th>callable</th><th>操作</th></tr>${rows||'<tr><td colspan="5">暂无 Skill。</td></tr>'}</table>`)}${panel('Skill 详情',skillDetailView(state.skillDetail||getSelectedSkill()))}</div>`)}
+function pageOverview(){const st=state.agentStatus||{};const platform=st.platform||{};const llm=st.llm||state.llmConfig||{};shell('Agent 总览','查看 Agent、Platform、Skill 和大模型状态。','<button class="btn primary" onclick="checkHealth()">检查 Agent</button><button class="btn" onclick="loadSkills()">刷新 Skill</button>',`<div class="grid cols-3">${metric('Agent 服务',serviceOk()?'在线':'离线',serviceOk()?'green':'red')}${metric('Platform 状态',platform.reachable?'可达':'不可达',platform.reachable?'green':'red')}${metric('Skill 数量',platform.skill_count??state.skills.length,platform.skill_registry_ok?'blue':'amber')}${metric('大模型状态',llm.enabled?'已启用':'未启用，规则降级',llm.enabled?'green':'amber')}${metric('API Key',llm.api_key_configured?'已配置':'未配置',llm.api_key_configured?'green':'amber')}</div><div class="grid cols-2 mt">${panel('Agent 聚合状态',`<pre>${h(pretty(state.agentStatus||state.health))}</pre>`)}${panel('修复建议',`<p>${h(wrongServiceHint()||platform.last_error||'状态正常。')}</p>`)}</div>`)}
+function pageSkillDebug(){shell('Skill 调用调试','用于校验 Skill 输入参数并发起调试调用，不影响正式对话状态。','<button class="btn" onclick="loadSkills()">刷新 Skill</button>',`<div class="grid cols-2">${panel('调用参数',`<div class="field"><label>Skill</label>${skillSelect()}</div><div class="seg"><button class="${state.runMode==='sync'?'active':''}" onclick="state.runMode='sync';render()">同步</button><button class="${state.runMode==='async'?'active':''}" onclick="state.runMode='async';render()">异步</button></div><div class="actions mt"><button class="btn" onclick="sampleParams()">填充样例</button><button class="btn" ${disabledWhenPlatformUnavailable()} onclick="analyzeInput()">参数校验</button><button class="btn primary" ${platformOk()&&getSelectedSkill().callable!==false?'':'disabled'} onclick="runSkill(state.runMode)">调用 Skill</button></div><textarea class="mt" style="min-height:240px" onchange="state.params=this.value">${h(state.params)}</textarea>`)}${panel('业务结果',resultView(state.skillDebug.result||state.skillDebug.analysis))}</div>`)}
+function pageExtractDebug(){shell('参数抽取调试','仅测试参数抽取结果，不改变正式对话。','',`<div class="grid cols-2">${panel('抽取输入',`<div class="field"><label>Skill</label>${skillSelect()}</div><div class="field"><label>测试消息</label><textarea id="extract_debug_message"></textarea></div><button class="btn primary" ${disabledWhenWrong()} onclick="testExtractOnly('extractDebug')">测试参数抽取</button>`)}<div>${parameterStatusView(state.extractDebugResult)}<div class="mt">${panel('抽取原始结果',`<pre>${h(pretty(state.extractDebugResult))}</pre>`)}</div></div></div>`)}
+function pageLlm(){const llm=state.llmConfig||{};const providers=llm.supported_providers||['volcengine_ark','openai_compatible','disabled'];const desc={volcengine_ark:'火山方舟兼容接口',openai_compatible:'OpenAI Chat Completions 兼容接口',disabled:'规则降级'};const disabled=(llm.provider||'disabled')==='disabled';const disabledMsg=disabled||llm.enabled===false?'<div class="callout amber mt">规则模式：未启用大模型时，Agent 使用规则模式；启用后将用于参数抽取和结果解释增强。</div>':'';shell('大模型配置','配置模型服务连接；API Key 只写入，不明文回显。',`<button class="btn" ${disabledWhenWrong()} onclick="loadLlmConfig()">刷新配置</button><button class="btn primary" ${disabledWhenWrong()} onclick="saveLlmConfig()">保存配置</button><button class="btn" ${disabledWhenWrong()} onclick="llmTest()">测试连接</button><button class="btn" ${disabledWhenWrong()} onclick="clearLlmApiKey()">清除 API Key</button>`,`<div class="grid cols-2">${panel('配置项',`<div class="callout blue">未启用大模型时，Agent 使用规则模式；启用后将用于参数抽取和结果解释增强。</div><table class="compact-table mt"><tr><th>配置来源</th><td>${h(llm.config_source||'-')}</td></tr><tr><th>持久化文件</th><td>${h(llm.persistence_path||'-')}</td></tr><tr><th>API Key</th><td>${llm.api_key_configured?'已配置，留空不修改':'未配置'}</td></tr></table><div class="grid cols-2 mt"><div class="field"><label>模型服务提供方</label><select id="llm_provider" onchange="state.llmConfig={...(state.llmConfig||{}),provider:this.value,enabled:this.value==='disabled'?false:(state.llmConfig?.enabled||false)};render()">${providers.map(p=>`<option value="${h(p)}" ${(llm.provider||'disabled')===p?'selected':''}>${h(p)} - ${h(desc[p]||'')}</option>`).join('')}</select></div><div class="field"><label>启用大模型</label><select id="llm_enabled" ${disabled?'disabled':''}><option value="true" ${llm.enabled&&!disabled?'selected':''}>启用</option><option value="false" ${!llm.enabled||disabled?'selected':''}>停用</option></select></div><div class="field"><label>模型服务地址</label><input id="llm_base_url" value="${h(llm.base_url||'')}"></div><div class="field"><label>模型 / Endpoint ID</label><input id="llm_model" ${disabled?'disabled':''} value="${disabled?'':h(llm.model||'')}"></div><div class="field"><label>API Key</label><input id="llm_api_key" ${disabled?'disabled':''} type="password" placeholder="${disabled?'disabled 模式不可配置 API Key':(llm.api_key_configured?'API Key 已配置，留空不修改':'API Key 未配置')}"></div><div class="field"><label>温度</label><input id="llm_temperature" type="number" step="0.1" value="${h(llm.temperature??0.2)}"></div><div class="field"><label>最大 Token 数</label><input id="llm_max_tokens" type="number" value="${h(llm.max_tokens??4096)}"></div><div class="field"><label>超时时间（秒）</label><input id="llm_timeout" type="number" value="${h(llm.timeout_seconds??8)}"></div></div>${disabledMsg}<div class="field mt"><label>参数抽取测试消息</label><textarea id="llm_extract_message"></textarea></div><button class="btn" ${disabledWhenWrong()} onclick="testExtractOnly('llm')">测试参数抽取</button>`)}${panel('最近一次测试结果',`<pre>${h(pretty({llm_test:state.llmTest,parameter_extract:state.llmExtractTestResult,explain_result:state.explainResult}))}</pre>`)}</div>`)}
+function pageHistory(){shell('历史聊天','查看、恢复和删除服务端会话。',`<button class="btn primary" ${disabledWhenWrong()} onclick="createConversation()">新建聊天</button><button class="btn" ${disabledWhenWrong()} onclick="loadConversations()">刷新历史聊天</button>`,`<div class="grid cols-2">${panel('历史聊天',conversationHistoryList())}${panel('会话详情',`${conversationStateCard()}<div class="actions mt"><button class="btn" ${state.conversationId?'':'disabled'} onclick="openConversation(state.conversationId)">恢复当前会话</button><button class="btn" ${state.conversationId?'':'disabled'} onclick="deleteConversation(state.conversationId)">删除当前会话</button></div>`)}</div>`)}
+function pageInvocations(){const rows=(state.invocations||[]).map(x=>`<tr onclick="state.invocationId='${h(x.invocation_id)}';getInvocation()"><td>${h(x.invocation_id)}</td><td>${h(x.skill_name||'-')}</td><td>${h(x.status||'-')}</td><td>${h(x.created_at||'-')}</td></tr>`).join('');shell('调用记录查询','查看最近调用记录，支持按 Skill 和状态过滤。',`<button class="btn" ${disabledWhenWrong()} onclick="loadInvocations()">刷新列表</button>`,`<div class="grid cols-2">${panel('最近调用记录',`<div class="grid cols-2"><div class="field"><label>Skill 过滤</label><input value="${h(state.invocationFilters.skill)}" onchange="state.invocationFilters.skill=this.value"></div><div class="field"><label>状态过滤</label><input value="${h(state.invocationFilters.status)}" onchange="state.invocationFilters.status=this.value"></div></div><table class="compact-table mt"><tr><th>Invocation ID</th><th>Skill</th><th>状态</th><th>创建时间</th></tr>${rows||'<tr><td colspan="4">暂无调用记录。</td></tr>'}</table><div class="field mt"><label>Invocation ID</label><input value="${h(state.invocationId)}" onchange="state.invocationId=this.value"></div>`)}${panel('调用详情',resultView(state.result))}</div>`)}
+function pageStatus(){const st=state.agentStatus||{};const platform=st.platform||{};const llm=st.llm||state.llmConfig||{};shell('接口状态','区分 Agent 服务、Platform、Skill Registry 和大模型配置。','<button class="btn" onclick="checkHealth()">检查 Agent</button><button class="btn" onclick="llmTest()">测试大模型</button>',`<div class="grid cols-3">${metric('Agent 在线',serviceOk()?'在线':'离线',serviceOk()?'green':'red')}${metric('Platform 状态',platform.reachable?'可达':'不可达',platform.reachable?'green':'red')}${metric('Skill Registry',platform.skill_registry_ok?`${platform.skill_count} 个 Skill`:'访问失败',platform.skill_registry_ok?'green':'red')}${metric('LLM 状态',llm.enabled?'已启用':'未启用，规则降级',llm.enabled?'green':'amber')}${metric('API Key',llm.api_key_configured?'已配置':'未配置',llm.api_key_configured?'green':'amber')}</div><div class="grid cols-2 mt">${panel('服务健康响应',`<pre>${h(pretty(state.health))}</pre>`)}${panel('聚合状态',`<pre>${h(pretty(state.agentStatus))}</pre>`)}</div>`)}
+function go(p){state.page=p;render();if(['overview','chat','skills','skillDebug','extractDebug','status'].includes(p))loadSkills(false);if(['overview','chat','agentSkills','status'].includes(p))loadAgentSkills(false);if(['overview','llm','status'].includes(p))checkHealth(false);if(p==='llm')loadLlmConfig(false);if(p==='history'||p==='chat')loadConversations(false);if(p==='invocations')loadInvocations()}
+function render(){
+  renderTopBar();
+  renderSidebar();
+  const wbody=document.getElementById('wbody');
+  const taskPanelEl=document.getElementById('taskPanel');
+  const nearBottom=isChatNearBottom();
+  if(state.page==='chat'){
+    if(wbody)wbody.className='workbench-body chat-layout with-panel';
+    if(taskPanelEl)taskPanelEl.style.display='';
+    renderChat();
+    renderTaskPanel();
+  }else{
+    if(wbody)wbody.className='workbench-body chat-layout';
+    if(taskPanelEl)taskPanelEl.style.display='none';
+    const pageMap={overview:pageOverview,skills:renderApiSkillPage,agentSkills:renderAgentSkillPage,skillDebug:pageSkillDebug,extractDebug:pageExtractDebug,llm:pageLlm,history:pageHistory,invocations:pageInvocations,status:pageStatus};
+    if(pageMap[state.page])pageMap[state.page]();
+  }
+  if(state.forceScrollBottom||nearBottom)scrollChatToBottom();
+  state.forceScrollBottom=false;
+}
+const __analysisSummaryText=analysisSummaryText;
+analysisSummaryText=function(a){
+  if(a&&(a.response_type==='chat'||a.mode==='chat'||(!a.resolved_skill_name&&!Object.keys(a.parameter_draft||{}).length)))return a.agent_message||UX_COPY.notOptimization;
+  return __analysisSummaryText(a);
+};
+function pageChat(){return renderChat()}
+function pageSkills(){return renderApiSkillPage()}
+function pageAgentSkills(){return renderAgentSkillPage()}
+const __skillDetailView=skillDetailView;
+skillDetailView=function(skill){
+  const html=__skillDetailView(skill);
+  if(!skill||skill.error)return html;
+  return html.replace('澶嶅埗 curl</button>',`${UX_COPY.copyCurl}</button>`)
+    .replace('<summary>楂樼骇 JSON</summary>',`<summary>${UX_COPY.skillAdvanced}</summary><h3>${UX_COPY.rawJson}</h3>`)
+    .replace('</pre></details></section></div>',`</pre><h3>${UX_COPY.inputSchemaJson}</h3><pre>${h(pretty(skill.input_schema||[]))}</pre><h3>${UX_COPY.outputSchemaJson}</h3><pre>${h(pretty(skill.output_schema||{}))}</pre><div class="actions mt"><button class="btn" onclick="go('skillDebug')">${UX_COPY.debugInAgent}</button></div></details></section></div>`);
+};
+render();autoConnect();
+</script>
+</body>
+</html>

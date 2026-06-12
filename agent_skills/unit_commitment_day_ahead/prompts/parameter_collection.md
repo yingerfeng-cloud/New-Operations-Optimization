@@ -1,0 +1,1 @@
+收集 load_forecast 和 renewable_forecast。initial_unit_status、initial_unit_output 可作为默认值建议，但必须确认后使用。

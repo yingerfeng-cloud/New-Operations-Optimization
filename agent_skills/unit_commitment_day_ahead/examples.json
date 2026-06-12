@@ -1,0 +1,6 @@
+{
+  "positive_examples": [{"user": "帮我做日前机组组合", "intent": "optimization_request", "expected_skill": "unit_commitment_day_ahead"}],
+  "help_examples": [{"user": "日前机组组合参数示例", "intent": "parameter_example", "should_invoke": false}],
+  "negative_examples": [{"user": "帮我跑储能调度", "expected_skill": "storage_dispatch"}],
+  "sample_parameters": {"horizon": 4, "load_forecast": [120, 180, 210, 160], "renewable_forecast": [20, 30, 40, 20]}
+}

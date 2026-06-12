@@ -1,0 +1,37 @@
+{
+  "positive_examples": [
+    {
+      "user": "帮我跑经济调度，四个时段负荷100、120、90、110",
+      "intent": "optimization_request",
+      "expected_skill": "economic_dispatch"
+    },
+    {
+      "user": "把负荷分配到三台机组，要求发电成本最低",
+      "intent": "optimization_request",
+      "expected_skill": "economic_dispatch"
+    }
+  ],
+  "help_examples": [
+    {
+      "user": "请给我经济调度的参数示例",
+      "intent": "parameter_example",
+      "should_invoke": false
+    },
+    {
+      "user": "经济调度需要哪些参数",
+      "intent": "explain_required_parameters",
+      "should_invoke": false
+    }
+  ],
+  "negative_examples": [
+    {
+      "user": "帮我做日前机组组合",
+      "expected_skill": "unit_commitment_day_ahead"
+    }
+  ],
+  "sample_parameters": {
+    "load_forecast": [100, 120, 90, 110],
+    "unit_max_output": {"U1": 80, "U2": 100, "U3": 60},
+    "fuel_cost": {"U1": 10, "U2": 20, "U3": 30}
+  }
+}

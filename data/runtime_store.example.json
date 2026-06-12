@@ -1,0 +1,14 @@
+{
+  "invocations": {},
+  "skills": {},
+  "conversations": {},
+  "llm_config": {
+    "provider": "volcengine_ark",
+    "base_url": "https://ark.cn-beijing.volces.com/api/v3",
+    "model": "",
+    "enabled": false,
+    "temperature": 0.2,
+    "max_tokens": 4096,
+    "timeout_seconds": 8
+  }
+}

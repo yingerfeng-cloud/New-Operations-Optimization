@@ -1,0 +1,198 @@
+[
+  {
+    "key": "electric_load",
+    "name": "电负荷",
+    "dimension": [
+      "time"
+    ],
+    "type": "array",
+    "unit": "MW",
+    "required": true,
+    "description": "",
+    "default_value": null,
+    "sample_value": [
+      80,
+      90,
+      85,
+      75
+    ],
+    "default_policy": "user_required",
+    "sets": {
+      "time": [
+        0,
+        1,
+        2,
+        3
+      ]
+    },
+    "validation": {
+      "type": "array"
+    }
+  },
+  {
+    "key": "heat_load",
+    "name": "热负荷",
+    "dimension": [
+      "time"
+    ],
+    "type": "array",
+    "unit": "MWth",
+    "required": true,
+    "description": "",
+    "default_value": null,
+    "sample_value": [
+      100,
+      110,
+      105,
+      95
+    ],
+    "default_policy": "user_required",
+    "sets": {
+      "time": [
+        0,
+        1,
+        2,
+        3
+      ]
+    },
+    "validation": {
+      "type": "array"
+    }
+  },
+  {
+    "key": "fuel_cost",
+    "name": "燃料成本",
+    "dimension": [
+      "unit"
+    ],
+    "type": "dict",
+    "unit": "元/MWh",
+    "required": true,
+    "description": "",
+    "default_value": null,
+    "sample_value": {
+      "CHP1": 240,
+      "CHP2": 300
+    },
+    "default_policy": "user_required",
+    "sets": {
+      "unit": [
+        "CHP1",
+        "CHP2"
+      ]
+    },
+    "validation": {
+      "type": "dict"
+    }
+  },
+  {
+    "key": "electric_min",
+    "name": "最小电出力",
+    "dimension": [
+      "unit"
+    ],
+    "type": "dict",
+    "unit": "MW",
+    "required": true,
+    "description": "",
+    "default_value": {
+      "CHP1": 20,
+      "CHP2": 10
+    },
+    "sample_value": {
+      "CHP1": 20,
+      "CHP2": 10
+    },
+    "default_policy": "default_allowed",
+    "sets": {
+      "unit": [
+        "CHP1",
+        "CHP2"
+      ]
+    },
+    "validation": {
+      "type": "dict"
+    }
+  },
+  {
+    "key": "electric_max",
+    "name": "最大电出力",
+    "dimension": [
+      "unit"
+    ],
+    "type": "dict",
+    "unit": "MW",
+    "required": true,
+    "description": "",
+    "default_value": null,
+    "sample_value": {
+      "CHP1": 90,
+      "CHP2": 70
+    },
+    "default_policy": "user_required",
+    "sets": {
+      "unit": [
+        "CHP1",
+        "CHP2"
+      ]
+    },
+    "validation": {
+      "type": "dict"
+    }
+  },
+  {
+    "key": "heat_min",
+    "name": "最小热出力",
+    "dimension": [
+      "unit"
+    ],
+    "type": "dict",
+    "unit": "MWth",
+    "required": true,
+    "description": "",
+    "default_value": {
+      "CHP1": 30,
+      "CHP2": 20
+    },
+    "sample_value": {
+      "CHP1": 30,
+      "CHP2": 20
+    },
+    "default_policy": "default_allowed",
+    "sets": {
+      "unit": [
+        "CHP1",
+        "CHP2"
+      ]
+    },
+    "validation": {
+      "type": "dict"
+    }
+  },
+  {
+    "key": "heat_max",
+    "name": "最大热出力",
+    "dimension": [
+      "unit"
+    ],
+    "type": "dict",
+    "unit": "MWth",
+    "required": true,
+    "description": "",
+    "default_value": null,
+    "sample_value": {
+      "CHP1": 120,
+      "CHP2": 90
+    },
+    "default_policy": "user_required",
+    "sets": {
+      "unit": [
+        "CHP1",
+        "CHP2"
+      ]
+    },
+    "validation": {
+      "type": "dict"
+    }
+  }
+]

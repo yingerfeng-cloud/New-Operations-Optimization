@@ -1,0 +1,51 @@
+{
+  "objective_value": "number",
+  "variables": [
+    {
+      "key": "storage_charge",
+      "name": "储能充电",
+      "dimension": [
+        "storage",
+        "time"
+      ],
+      "unit": "MW"
+    },
+    {
+      "key": "storage_discharge",
+      "name": "储能放电",
+      "dimension": [
+        "storage",
+        "time"
+      ],
+      "unit": "MW"
+    },
+    {
+      "key": "storage_soc",
+      "name": "储能SOC",
+      "dimension": [
+        "storage",
+        "time"
+      ],
+      "unit": "MWh"
+    },
+    {
+      "key": "charge_status",
+      "name": "充电状态",
+      "dimension": [
+        "storage",
+        "time"
+      ],
+      "unit": "0/1"
+    },
+    {
+      "key": "discharge_status",
+      "name": "放电状态",
+      "dimension": [
+        "storage",
+        "time"
+      ],
+      "unit": "0/1"
+    }
+  ],
+  "explanation": "string"
+}

@@ -1,0 +1,30 @@
+name: storage_dispatch
+display_name: 储能调度 Agent Skill
+description: 调用储能调度 API Skill，生成充放电和 SOC 计划建议。
+canonical_api_skill_name: run_storage_dispatch
+version: 1.0.0
+domain: safety_production_optimization
+scenario_tags:
+  - 储能调度
+  - 充放电优化
+  - SOC
+trigger_intents:
+  - 储能调度
+  - 充放电计划
+  - storage dispatch
+non_trigger_intents:
+  - 参数示例
+  - 需要哪些参数
+required_parameters:
+  - electricity_price
+  - storage_capacity
+  - charge_power_max
+  - discharge_power_max
+optional_parameters:
+  - charge_efficiency
+  - discharge_efficiency
+  - initial_soc
+confirmation_required: {"default_values": true, "before_invoke": true}
+execution_policy: {"mode": "advisory_only", "allow_auto_invoke": false}
+result_explanation: {"template": "prompts/result_explanation.md"}
+error_handling: {"template": "prompts/error_handling.md"}

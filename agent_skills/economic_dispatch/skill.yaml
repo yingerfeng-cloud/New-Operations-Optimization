@@ -1,0 +1,34 @@
+name: economic_dispatch
+display_name: 经济调度优化 Agent Skill
+description: 根据负荷预测、机组出力上限和燃料成本，调用经济调度 API Skill 计算低成本出力方案。
+canonical_api_skill_name: run_economic_dispatch
+version: 1.0.0
+domain: safety_production_optimization
+scenario_tags:
+  - 经济调度
+  - 出力优化
+  - 成本优化
+  - 负荷分配
+trigger_intents:
+  - 经济调度
+  - 最小发电成本
+  - 机组出力分配
+  - 帮我跑经济调度
+  - 负荷怎么分配给机组
+non_trigger_intents:
+  - 参数示例
+  - 需要哪些参数
+  - 怎么填写参数
+  - 解释结果
+required_parameters:
+  - load_forecast
+  - unit_max_output
+  - fuel_cost
+optional_parameters:
+  - unit_min_output
+  - ramp_up_limit
+  - ramp_down_limit
+confirmation_required: {"default_values": true, "before_invoke": true}
+execution_policy: {"mode": "advisory_only", "allow_auto_invoke": false}
+result_explanation: {"template": "prompts/result_explanation.md"}
+error_handling: {"template": "prompts/error_handling.md"}

@@ -1,0 +1,564 @@
+[
+  {
+    "key": "station",
+    "name": "电站清单",
+    "dimension": [],
+    "type": "list",
+    "unit": "",
+    "required": true,
+    "description": "",
+    "default_value": null,
+    "sample_value": [
+      "S1",
+      "S2",
+      "S3"
+    ],
+    "default_policy": "sample_only",
+    "sets": {},
+    "validation": {
+      "type": "list"
+    }
+  },
+  {
+    "key": "horizon",
+    "name": "调度时段数",
+    "dimension": [],
+    "type": "integer",
+    "unit": "period",
+    "required": true,
+    "description": "",
+    "default_value": null,
+    "sample_value": 4,
+    "default_policy": "sample_only",
+    "sets": {},
+    "validation": {
+      "type": "integer",
+      "min": 1
+    }
+  },
+  {
+    "key": "time",
+    "name": "调度时段",
+    "dimension": [
+      "time"
+    ],
+    "type": "array",
+    "unit": "",
+    "required": true,
+    "description": "",
+    "default_value": null,
+    "sample_value": [
+      0,
+      1,
+      2,
+      3
+    ],
+    "default_policy": "sample_only",
+    "sets": {
+      "time": [
+        0,
+        1,
+        2,
+        3
+      ]
+    },
+    "validation": {
+      "type": "array"
+    }
+  },
+  {
+    "key": "time_volume",
+    "name": "库容时点",
+    "dimension": [
+      "time_volume"
+    ],
+    "type": "list",
+    "unit": "",
+    "required": true,
+    "description": "",
+    "default_value": null,
+    "sample_value": [
+      0,
+      1,
+      2,
+      3,
+      4
+    ],
+    "default_policy": "sample_only",
+    "sets": {
+      "time_volume": [
+        0,
+        1,
+        2,
+        3,
+        4
+      ]
+    },
+    "validation": {
+      "type": "list"
+    }
+  },
+  {
+    "key": "units",
+    "name": "电站机组清单",
+    "dimension": [],
+    "type": "dict",
+    "unit": "",
+    "required": true,
+    "description": "",
+    "default_value": null,
+    "sample_value": {
+      "S1": [
+        "S1_U1",
+        "S1_U2"
+      ],
+      "S2": [
+        "S2_U1"
+      ],
+      "S3": [
+        "S3_U1",
+        "S3_U2"
+      ]
+    },
+    "default_policy": "sample_only",
+    "sets": {},
+    "validation": {
+      "type": "dict"
+    }
+  },
+  {
+    "key": "unit_pmax",
+    "name": "机组最大出力",
+    "dimension": [],
+    "type": "dict",
+    "unit": "MW",
+    "required": true,
+    "description": "",
+    "default_value": null,
+    "sample_value": {
+      "S1_U1": 100,
+      "S1_U2": 80,
+      "S2_U1": 90,
+      "S3_U1": 70,
+      "S3_U2": 70
+    },
+    "default_policy": "sample_only",
+    "sets": {},
+    "validation": {
+      "type": "dict",
+      "min": 0
+    }
+  },
+  {
+    "key": "availability",
+    "name": "机组可用状态",
+    "dimension": [],
+    "type": "dict",
+    "unit": "0/1",
+    "required": true,
+    "description": "",
+    "default_value": {
+      "S1_U1": [
+        1,
+        1,
+        1,
+        1
+      ],
+      "S1_U2": [
+        1,
+        0,
+        0,
+        1
+      ],
+      "S2_U1": [
+        1,
+        1,
+        1,
+        1
+      ],
+      "S3_U1": [
+        1,
+        1,
+        1,
+        1
+      ],
+      "S3_U2": [
+        1,
+        1,
+        1,
+        1
+      ]
+    },
+    "sample_value": {
+      "S1_U1": [
+        1,
+        1,
+        1,
+        1
+      ],
+      "S1_U2": [
+        1,
+        0,
+        0,
+        1
+      ],
+      "S2_U1": [
+        1,
+        1,
+        1,
+        1
+      ],
+      "S3_U1": [
+        1,
+        1,
+        1,
+        1
+      ],
+      "S3_U2": [
+        1,
+        1,
+        1,
+        1
+      ]
+    },
+    "default_policy": "default_allowed",
+    "sets": {},
+    "validation": {
+      "type": "dict"
+    }
+  },
+  {
+    "key": "power_conversion",
+    "name": "出力转换系数",
+    "dimension": [],
+    "type": "dict",
+    "unit": "MW/(m3/s)",
+    "required": true,
+    "description": "",
+    "default_value": {
+      "S1": 0.38,
+      "S2": 0.34,
+      "S3": 0.3
+    },
+    "sample_value": {
+      "S1": 0.38,
+      "S2": 0.34,
+      "S3": 0.3
+    },
+    "default_policy": "default_allowed",
+    "sets": {},
+    "validation": {
+      "type": "dict",
+      "min": 0
+    }
+  },
+  {
+    "key": "local_inflow",
+    "name": "区间来水过程",
+    "dimension": [],
+    "type": "dict",
+    "unit": "m3/s",
+    "required": true,
+    "description": "",
+    "default_value": null,
+    "sample_value": {
+      "S1": [
+        420,
+        430,
+        425,
+        415
+      ],
+      "S2": [
+        80,
+        80,
+        85,
+        82
+      ],
+      "S3": [
+        60,
+        62,
+        61,
+        60
+      ]
+    },
+    "default_policy": "user_required",
+    "sets": {},
+    "validation": {
+      "type": "dict"
+    }
+  },
+  {
+    "key": "load_forecast",
+    "name": "系统负荷预测",
+    "dimension": [
+      "time"
+    ],
+    "type": "array",
+    "unit": "MW",
+    "required": true,
+    "description": "",
+    "default_value": null,
+    "sample_value": [
+      380,
+      420,
+      390,
+      360
+    ],
+    "default_policy": "user_required",
+    "sets": {
+      "time": [
+        0,
+        1,
+        2,
+        3
+      ]
+    },
+    "validation": {
+      "type": "array",
+      "min": 0
+    }
+  },
+  {
+    "key": "volume_min",
+    "name": "最小库容",
+    "dimension": [],
+    "type": "dict",
+    "unit": "million m3",
+    "required": true,
+    "description": "",
+    "default_value": {
+      "S1": 80,
+      "S2": 60,
+      "S3": 50
+    },
+    "sample_value": {
+      "S1": 80,
+      "S2": 60,
+      "S3": 50
+    },
+    "default_policy": "default_allowed",
+    "sets": {},
+    "validation": {
+      "type": "dict"
+    }
+  },
+  {
+    "key": "volume_max",
+    "name": "最大库容",
+    "dimension": [],
+    "type": "dict",
+    "unit": "million m3",
+    "required": true,
+    "description": "",
+    "default_value": {
+      "S1": 160,
+      "S2": 120,
+      "S3": 100
+    },
+    "sample_value": {
+      "S1": 160,
+      "S2": 120,
+      "S3": 100
+    },
+    "default_policy": "default_allowed",
+    "sets": {},
+    "validation": {
+      "type": "dict"
+    }
+  },
+  {
+    "key": "initial_volume",
+    "name": "初始库容",
+    "dimension": [],
+    "type": "dict",
+    "unit": "million m3",
+    "required": true,
+    "description": "",
+    "default_value": {
+      "S1": 120,
+      "S2": 90,
+      "S3": 75
+    },
+    "sample_value": {
+      "S1": 120,
+      "S2": 90,
+      "S3": 75
+    },
+    "default_policy": "default_allowed",
+    "sets": {},
+    "validation": {
+      "type": "dict"
+    }
+  },
+  {
+    "key": "target_terminal_volume",
+    "name": "目标期末库容",
+    "dimension": [],
+    "type": "dict",
+    "unit": "million m3",
+    "required": true,
+    "description": "",
+    "default_value": {
+      "S1": 118,
+      "S2": 88,
+      "S3": 74
+    },
+    "sample_value": {
+      "S1": 118,
+      "S2": 88,
+      "S3": 74
+    },
+    "default_policy": "default_allowed",
+    "sets": {},
+    "validation": {
+      "type": "dict"
+    }
+  },
+  {
+    "key": "outflow_min",
+    "name": "最小下泄流量",
+    "dimension": [],
+    "type": "dict",
+    "unit": "m3/s",
+    "required": true,
+    "description": "",
+    "default_value": null,
+    "sample_value": {
+      "S1": 80,
+      "S2": 70,
+      "S3": 60
+    },
+    "default_policy": "sample_only",
+    "sets": {},
+    "validation": {
+      "type": "dict"
+    }
+  },
+  {
+    "key": "outflow_max",
+    "name": "最大下泄流量",
+    "dimension": [],
+    "type": "dict",
+    "unit": "m3/s",
+    "required": true,
+    "description": "",
+    "default_value": null,
+    "sample_value": {
+      "S1": 900,
+      "S2": 850,
+      "S3": 800
+    },
+    "default_policy": "sample_only",
+    "sets": {},
+    "validation": {
+      "type": "dict"
+    }
+  },
+  {
+    "key": "spill_max",
+    "name": "弃水上限",
+    "dimension": [],
+    "type": "dict",
+    "unit": "m3/s",
+    "required": true,
+    "description": "",
+    "default_value": null,
+    "sample_value": {
+      "S1": 500,
+      "S2": 500,
+      "S3": 500
+    },
+    "default_policy": "sample_only",
+    "sets": {},
+    "validation": {
+      "type": "dict"
+    }
+  },
+  {
+    "key": "edges",
+    "name": "梯级拓扑及传播时滞",
+    "dimension": [],
+    "type": "list",
+    "unit": "",
+    "required": true,
+    "description": "",
+    "default_value": null,
+    "sample_value": [
+      {
+        "upstream": "S1",
+        "downstream": "S2",
+        "delay_periods": 1
+      },
+      {
+        "upstream": "S2",
+        "downstream": "S3",
+        "delay_periods": 1
+      }
+    ],
+    "default_policy": "sample_only",
+    "sets": {},
+    "validation": {
+      "type": "list"
+    }
+  },
+  {
+    "key": "initial_upstream_outflow",
+    "name": "初始上游下泄",
+    "dimension": [],
+    "type": "dict",
+    "unit": "m3/s",
+    "required": true,
+    "description": "",
+    "default_value": {
+      "S1->S2": 300,
+      "S2->S3": 260
+    },
+    "sample_value": {
+      "S1->S2": 300,
+      "S2->S3": 260
+    },
+    "default_policy": "default_allowed",
+    "sets": {},
+    "validation": {
+      "type": "dict"
+    }
+  },
+  {
+    "key": "time_step_seconds",
+    "name": "时段长度",
+    "dimension": [],
+    "type": "integer",
+    "unit": "s",
+    "required": true,
+    "description": "",
+    "default_value": null,
+    "sample_value": 900,
+    "default_policy": "sample_only",
+    "sets": {},
+    "validation": {
+      "type": "integer",
+      "min": 1
+    }
+  },
+  {
+    "key": "weights",
+    "name": "目标函数权重",
+    "dimension": [],
+    "type": "dict",
+    "unit": "",
+    "required": true,
+    "description": "",
+    "default_value": null,
+    "sample_value": {
+      "load_deviation": 1000,
+      "spill": 1,
+      "ramp": 0.1,
+      "terminal_volume": 500
+    },
+    "default_policy": "sample_only",
+    "sets": {},
+    "validation": {
+      "type": "dict"
+    }
+  }
+]
