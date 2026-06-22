@@ -1,0 +1,3 @@
+export type BuildMode = 'generic_linear' | 'component_based' | 'template_based' | 'domain_builder';
+export interface ModelAsset { id: string; name: string; template_id?: string; scene: string; version: string; status: string; solver: string; problem_type: string; model_problem_type?: string; build_mode: BuildMode; updated_at: string; semantic_spec?: Record<string, unknown>; generic_spec?: Record<string, unknown>; component_spec?: Record<string, unknown>; model_draft?: Record<string, unknown>; parameters?: Record<string, unknown>; parameter_schema?: Record<string, unknown>; validation_warnings?: unknown[]; dry_run_result?: Record<string, unknown>; [key: string]: unknown }
+export type ModelPayload = Partial<ModelAsset> & { name: string; scene: string };

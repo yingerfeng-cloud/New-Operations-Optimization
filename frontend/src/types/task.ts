@@ -1,0 +1,1 @@
+export interface SolveTask { id: string; model_id?: string; resolved_model_id?: string; scene: string; model: string; solver: string; status: string; progress: number; cost: number; created_at: string; started_at?: string; finished_at?: string; recent_logs?: string[]; error?: string; [key: string]: unknown }

@@ -1,0 +1,1 @@
+export interface SolveResult { id?: string; task_id?: string; status?: string; objective_value?: number; variables?: Record<string, unknown>; constraints?: Record<string, unknown>; metrics?: Record<string, unknown>; [key: string]: unknown }

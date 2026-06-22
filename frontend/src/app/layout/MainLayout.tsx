@@ -1,0 +1,2 @@
+import { Layout } from 'antd'; import { Outlet, useLocation } from 'react-router-dom'; import { Sidebar } from './Sidebar'; import { Header } from './Header';
+export function MainLayout(){ const {pathname}=useLocation(); return <Layout className="app-shell"><Layout.Sider width={232} breakpoint="lg" collapsedWidth={0}><Sidebar/></Layout.Sider><Layout><Header pathname={pathname}/><Layout.Content className="main-content"><Outlet/></Layout.Content></Layout></Layout>; }

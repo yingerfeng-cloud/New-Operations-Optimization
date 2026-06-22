@@ -4,6 +4,10 @@ data/runtime_store_test_*.json
 .venv/
 logs/
 node_modules/
+frontend/node_modules/
+frontend/dist/
+frontend/playwright-report/
+frontend/test-results/
 .claude/
 __pycache__/
 *.pyc

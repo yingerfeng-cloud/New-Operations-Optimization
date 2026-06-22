@@ -1,0 +1,1 @@
+export interface ModelTemplate { code: string; model_code?: string; name: string; scenario: string; build_mode?: string; description?: string; status?: string; model_draft?: Record<string, unknown>; [key: string]: unknown }

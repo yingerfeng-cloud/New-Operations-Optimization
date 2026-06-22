@@ -1,0 +1,10 @@
+import { apiClient, unwrap } from './client'; import type { ComponentDef } from '../types/component';
+export const getComponents = () => unwrap<ComponentDef[]>(apiClient.get('/api/components/catalog'));
+export const getComponent = (id: string) => unwrap<ComponentDef>(apiClient.get(`/api/components/${id}`));
+export const createComponent = (payload: Partial<ComponentDef>) => unwrap<ComponentDef>(apiClient.post('/api/components/catalog', payload));
+export const updateComponent = (id: string, payload: Partial<ComponentDef>) => unwrap<ComponentDef>(apiClient.put(`/api/components/${id}`, payload));
+export const validateComponent = (id: string) => unwrap<{valid:boolean;errors:unknown[]}>(apiClient.post(`/api/components/${id}/validate`));
+export const publishComponent = (id: string) => unwrap<ComponentDef>(apiClient.post(`/api/components/${id}/publish`));
+export const offlineComponent = (id: string) => unwrap<ComponentDef>(apiClient.post(`/api/components/${id}/offline`));
+export const copyComponentVersion = (id: string, payload: Record<string, unknown> = {}) => unwrap<ComponentDef>(apiClient.post(`/api/components/${id}/copy-version`, payload));
+export const validateComponentDependencies = (payload: Record<string, unknown>) => unwrap<{valid:boolean;errors:unknown[]}>(apiClient.post('/api/components/validate-dependencies', payload));
