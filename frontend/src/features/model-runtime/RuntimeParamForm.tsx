@@ -1,0 +1,1 @@
+import { Form, Input } from 'antd'; export function RuntimeParamForm(){return <Form.Item name="parameters" label="运行参数 JSON" rules={[{validator:(_,v)=>{try{if(v)JSON.parse(v);return Promise.resolve()}catch{return Promise.reject(new Error('请输入有效 JSON'))}}}]}><Input.TextArea rows={8} placeholder='{"horizon":24}'/></Form.Item>}

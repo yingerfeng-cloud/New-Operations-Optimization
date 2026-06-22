@@ -1,0 +1,1 @@
+import { Alert } from 'antd'; export function ComponentValidationPanel({result}:{result?:{valid:boolean;errors?:unknown[]}}){return <Alert showIcon type={result?.valid?'success':'warning'} message={result?.valid?'组件校验通过':'尚未通过组件校验'} description={result?.errors?.length?JSON.stringify(result.errors):undefined}/>}

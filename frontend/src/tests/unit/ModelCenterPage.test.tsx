@@ -1,0 +1,3 @@
+import { render,screen } from '@testing-library/react'; import { QueryClient,QueryClientProvider } from '@tanstack/react-query'; import { MemoryRouter } from 'react-router-dom'; import { vi } from 'vitest'; import { ModelCenterPage } from '../../pages/ModelCenter/ModelCenterPage';
+vi.mock('../../api/models',()=>({getModels:async()=>[],getModel:async()=>({}),publishModel:vi.fn(),testModel:vi.fn(),copyModel:vi.fn()}));vi.mock('../../api/templates',()=>({getTemplates:async()=>[],cloneTemplate:vi.fn()}));
+test('renders model center',()=>{render(<QueryClientProvider client={new QueryClient()}><MemoryRouter><ModelCenterPage/></MemoryRouter></QueryClientProvider>);expect(screen.getByText('模型资产中心')).toBeInTheDocument()});

@@ -1,0 +1,3 @@
+import { render,screen } from '@testing-library/react'; import { QueryClient,QueryClientProvider } from '@tanstack/react-query'; import { MemoryRouter } from 'react-router-dom'; import { vi } from 'vitest'; import { ComponentLibraryPage } from '../../pages/ComponentLibrary/ComponentLibraryPage';
+vi.mock('../../api/components',()=>({getComponents:async()=>[],getComponent:async()=>({}),createComponent:vi.fn(),updateComponent:vi.fn(),validateComponent:vi.fn(),publishComponent:vi.fn(),offlineComponent:vi.fn(),copyComponentVersion:vi.fn()}));
+test('renders component library',()=>{render(<QueryClientProvider client={new QueryClient()}><MemoryRouter><ComponentLibraryPage/></MemoryRouter></QueryClientProvider>);expect(screen.getByText('组件库管理')).toBeInTheDocument()});
