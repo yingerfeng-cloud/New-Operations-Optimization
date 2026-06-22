@@ -1,0 +1,1 @@
+import {test,expect} from '@playwright/test';import {mockApi} from './fixtures';test('generic builder is the default creation mode',async({page})=>{await mockApi(page);await page.goto('/models/create');await expect(page.getByText('通用线性 Builder')).toBeVisible();await expect(page.getByText('数学展开')).toBeVisible()});

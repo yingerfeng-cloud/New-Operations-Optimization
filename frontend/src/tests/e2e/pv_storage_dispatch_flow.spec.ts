@@ -1,0 +1,1 @@
+import {test,expect} from '@playwright/test';import {mockApi} from './fixtures';test('task center accepts solve tasks',async({page})=>{await mockApi(page);await page.goto('/tasks');await expect(page.getByText('创建任务')).toBeVisible();await expect(page.getByText('任务调度中心').first()).toBeVisible()});

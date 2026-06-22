@@ -9,6 +9,7 @@ from fastapi.staticfiles import StaticFiles
 
 from app.api import components, demo, invocations, jobs, llm, models, optimize, pv_storage, reports, results, rolling, tasks, templates
 from app.services.model_service import model_service
+from app.frontend import mount_frontends
 from app.utils import has_highspy, has_pyomo
 
 
@@ -87,6 +88,7 @@ def create_app() -> FastAPI:
     Path("reports").mkdir(exist_ok=True)
     app.mount("/reports", StaticFiles(directory="reports"), name="reports")
     model_service.seed_default_templates()
+    mount_frontends(app)
     return app
 
 

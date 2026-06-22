@@ -26,3 +26,13 @@
 - 后端相关回归：28 passed（公式编译、创建校验、统一 ModelDraft）。
 - 覆盖：五步创建流程、Zustand 草稿持久化、time/time_volume 规范化、结构化 TokenCanvas、AggregateToken、DSL/display/tokens 同步、引用与自由索引识别、线性校验、最小 LP generic_spec 编译、发布/测试阻断。
 - 明确阻断：`!=`、变量乘除变量，以及未线性化的 abs/max/min/piecewise 不会伪装成可发布线性模型。
+
+## 阶段 4：托管与最终验收（2026-06-22）
+
+- `npm run build`：成功。
+- `npm run test`：11 files / 15 tests passed。
+- `npm run test:e2e`：6 passed（使用隔离端口 5178，避免本机已占用 5173 的其他应用污染结果）。
+- FastAPI React/SPA/legacy 托管测试：2 passed。
+- 后端验收回归：29 passed；覆盖 12 个内置模板的 clone/publish/test 路径、24 个组件 validate、通用线性最小 LP、光储 V2 与梯级水电。
+- 实际浏览器生产验收：`http://127.0.0.1:8000/models` 显示“API 已连接”并加载真实模型数据；`/legacy` 返回旧平台页面。
+- 已知非阻断项：Vite 对 Ant Design/ECharts vendor chunk 给出大于 500 kB 的性能提示；不影响构建与运行，后续可进一步拆 vendor chunk。

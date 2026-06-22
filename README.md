@@ -277,3 +277,46 @@ reports/
 ```text
 logs/
 ```
+
+## React 正式前端
+
+正式前端位于 `frontend/`，使用 Vite、React、TypeScript、React Router、TanStack Query、Zustand、Ant Design、Axios 和 ECharts。原 `prototype.html` 保留为 legacy 入口。
+
+开发环境：
+
+```powershell
+# 终端 1：FastAPI API
+$env:PORT='8000'
+python server.py
+
+# 终端 2：Vite UI
+cd frontend
+Copy-Item .env.example .env
+npm install
+npm run dev
+```
+
+前端地址为 `http://localhost:5173`，后端为 `http://localhost:8000`，Vite 将 `/api` 代理到后端。
+
+生产构建与测试：
+
+```powershell
+cd frontend
+npm run build
+npm run test
+npm run test:e2e
+cd ..
+$env:PORT='8000'
+python server.py
+```
+
+构建后 FastAPI 自动托管：
+
+- `/`：React 应用，客户端路由支持直接刷新。
+- `/api/*`：原 FastAPI API。
+- `/legacy`、`/prototype.html`：原生 JS legacy 页面。
+- `/static/*`：legacy CSS/JS。
+
+阶段测试记录见 `docs/frontend-migration-test-log.md`。本次未改写 FastAPI、Pyomo、HiGHS、模型模板、组件注册表或求解器核心。
+
+当前明确边界：Monaco Editor 是可选项，本版未引入；结果导出按钮仅预留；Agent 仅迁移页面；`abs`、值函数 `min/max`、`piecewise`、`!=` 和变量乘除变量在完成线性化前会阻止通用线性模型发布。聚合 `sum/min/max` 以结构化 AggregateToken 保存。
