@@ -1,0 +1,3 @@
+import { render,screen } from '@testing-library/react'; import { QueryClient,QueryClientProvider } from '@tanstack/react-query'; import { MemoryRouter } from 'react-router-dom'; import { vi } from 'vitest'; import { ModelCreationPage } from '../../features/model-creation/ModelCreationPage';
+vi.mock('../../api/templates',()=>({getTemplates:async()=>[],getTemplateDetail:vi.fn()}));vi.mock('../../api/models',()=>({createModel:vi.fn(),publishModel:vi.fn(),testModel:vi.fn()}));
+test('renders five-step model creation',()=>{render(<QueryClientProvider client={new QueryClient()}><MemoryRouter><ModelCreationPage/></MemoryRouter></QueryClientProvider>);expect(screen.getByText('模型创建')).toBeInTheDocument();expect(screen.getByText('校验发布')).toBeInTheDocument()});

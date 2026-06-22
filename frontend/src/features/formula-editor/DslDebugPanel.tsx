@@ -1,0 +1,1 @@
+import { Input } from 'antd'; export function DslDebugPanel({value,onChange}:{value:string;onChange:(v:string)=>void}){return <Input.TextArea aria-label="DSL 调试" value={value} onChange={e=>onChange(e.target.value)} rows={4} placeholder="高级调试：直接输入底层 DSL"/>}

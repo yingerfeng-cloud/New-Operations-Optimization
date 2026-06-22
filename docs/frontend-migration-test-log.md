@@ -18,3 +18,11 @@
 - `npm run build`：成功；路由页面已拆为独立 chunk。ECharts 报告 chunk 仍有体积提示，不影响功能。
 - `npm run test`：4 files / 4 tests passed。
 - 覆盖：模型列表/详情/发布/测试/复制/模板克隆；组件列表/详情/编辑/参数绑定/依赖阻断/校验/发布/复制/停用；任务创建/轮询/取消/日志/结果；报告指标/图表/JSON；Agent 基础工作台。
+
+## 阶段 3：模型创建与公式链路（2026-06-22）
+
+- `npm run build`：成功。
+- `npm run test`：11 files / 15 tests passed。
+- 后端相关回归：28 passed（公式编译、创建校验、统一 ModelDraft）。
+- 覆盖：五步创建流程、Zustand 草稿持久化、time/time_volume 规范化、结构化 TokenCanvas、AggregateToken、DSL/display/tokens 同步、引用与自由索引识别、线性校验、最小 LP generic_spec 编译、发布/测试阻断。
+- 明确阻断：`!=`、变量乘除变量，以及未线性化的 abs/max/min/piecewise 不会伪装成可发布线性模型。

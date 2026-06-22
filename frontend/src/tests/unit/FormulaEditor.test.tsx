@@ -1,0 +1,2 @@
+import { render,screen } from '@testing-library/react'; import { FormulaEditor } from '../../features/formula-editor/FormulaEditor';
+test('renders structured token canvas and debug panels',()=>{render(<FormulaEditor symbols={{variables:{p:{label:'出力'}},parameters:{load:{label:'负荷'}},sets:{unit:'机组'}}}/>);expect(screen.getByTestId('token-canvas')).toBeInTheDocument();expect(screen.getByText('DSL 调试面板')).toBeInTheDocument()});

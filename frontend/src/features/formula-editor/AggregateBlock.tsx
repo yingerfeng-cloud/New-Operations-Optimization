@@ -1,0 +1,1 @@
+import { Tag } from 'antd'; import type { AggregateToken } from '../../types/formula'; import { TokenCanvas } from './TokenCanvas'; export function AggregateBlock({token}:{token:AggregateToken}){return <div className="aggregate-token"><Tag color="green">{token.fn==='sum'?'Σ':token.fn}（{token.setCode} {token.alias}）</Tag><TokenCanvas tokens={token.bodyTokens}/></div>}

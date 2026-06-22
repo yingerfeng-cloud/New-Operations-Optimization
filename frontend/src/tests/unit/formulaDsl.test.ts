@@ -1,0 +1,4 @@
+import { collectReferences,tokensToDisplay,tokensToDsl } from '../../features/formula-editor/formulaDsl'; import type { FormulaToken } from '../../types/formula';
+const tokens:FormulaToken[]=[{type:'aggregate',fn:'sum',setCode:'unit',alias:'u',bodyTokens:[{type:'variable',code:'p',label:'机组出力',indices:['unit','time'],indexAliases:['u','t']}]},{type:'operator',code:'>=',label:'≥'},{type:'parameter',code:'load',label:'负荷',indices:['time'],indexAliases:['t']}];
+test('syncs aggregate token to DSL and display',()=>{expect(tokensToDsl(tokens)).toBe('sum(p[u,t] for u in unit) >= load[t]');expect(tokensToDisplay(tokens)).toContain('Σ(unit u)')});
+test('collects references and free indices',()=>{const r=collectReferences(tokens);expect(r.referenced_variables).toEqual(['p']);expect(r.free_indices).toEqual(['time'])});
