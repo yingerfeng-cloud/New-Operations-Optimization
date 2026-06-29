@@ -10,7 +10,7 @@ from app.builders.pyomo_builder import PyomoModelBuilder
 from app.diagnosis.infeasible_diagnosis import diagnose_infeasible
 from app.explain.result_formatter import SolveResultFormatter
 from app.schemas.solve import TaskRecord, TaskStatus
-from app.solvers.highs_adapter import HiGHSAdapter
+from app.solvers.solver_router import SolverRouteError, solver_router
 from app.storage.memory_store import STORE
 from app.utils import now_text
 
@@ -53,9 +53,16 @@ class JobRunner:
                 )
                 self._update(task, status="SOLVING", progress=60)
                 solve_started = time.monotonic()
-                self._log(task, "INFO", f"开始调用 HiGHS 求解器，time_limit_seconds={task.request.time_limit_seconds}")
-                solver_result = HiGHSAdapter().solve(
+                self._log(task, "INFO", f"开始调用路由求解器，time_limit_seconds={task.request.time_limit_seconds}")
+                problem_type = self._problem_type(semantic_spec, model)
+                requested_solver = runtime.get("solver")
+                route = solver_router.route(problem_type, requested_solver)
+                if not route["ok"]:
+                    raise SolverRouteError(route)
+                solver_result = solver_router.solve(
                     model,
+                    problem_type=problem_type,
+                    requested_solver=requested_solver,
                     mip_gap=task.request.mip_gap,
                     time_limit_seconds=task.request.time_limit_seconds,
                     threads=task.request.thread_num,
@@ -85,9 +92,10 @@ class JobRunner:
                     "job_id": task.id,
                     "model_id": task.request.model_id,
                     "status": "SUCCESS",
-                    "solver": "HiGHS",
+                    "solver": route["selected_solver"],
                     "solver_config": {
-                        "backend": "HiGHS",
+                        "backend": route["selected_solver"],
+                        "problem_type": problem_type,
                         "mip_gap": task.request.mip_gap,
                         "time_limit_seconds": task.request.time_limit_seconds,
                         "thread_num": task.request.thread_num,
@@ -120,7 +128,7 @@ class JobRunner:
                         "summary": {
                             "model": task.request.model,
                             "scene": task.request.scene,
-                            "solver": "HiGHS",
+                            "solver": route["selected_solver"],
                             "total_cost": task.cost,
                             "gap": task.gap,
                             "risk": task.risk,
@@ -132,8 +140,12 @@ class JobRunner:
                 self._log(task, "INFO", "结果保存完成")
         except Exception as exc:
             diagnosis = diagnose_infeasible(self._model_code(task), task.request.payload or {})
+            if isinstance(exc, SolverRouteError):
+                task.result = {"status": "FAILED", "solver_route_error": exc.payload, "trace": task.trace, "logs": task.logs, "run_metrics": task.run_metrics}
+                self._finish(task, status="FAILED", error=str(exc.payload))
+                return
             if diagnosis and task.result is None:
-                task.result = {"status": "INFEASIBLE", "diagnosis": diagnosis, "solver": "HiGHS", "trace": task.trace, "logs": task.logs, "run_metrics": task.run_metrics}
+                task.result = {"status": "INFEASIBLE", "diagnosis": diagnosis, "solver": (task.request.payload or {}).get("solver") or "routed", "trace": task.trace, "logs": task.logs, "run_metrics": task.run_metrics}
             if task.retry_count < task.max_retries:
                 task.retry_count += 1
                 task.error = str(exc)
@@ -186,6 +198,16 @@ class JobRunner:
         variable_count = sum(1 for component in model.component_objects(pyo.Var, active=True) for _ in component)
         constraint_count = sum(1 for component in model.component_objects(pyo.Constraint, active=True) for _ in component)
         return {"variable_count": variable_count, "constraint_count": constraint_count}
+
+    def _problem_type(self, semantic_spec: dict[str, Any], model: Any) -> str:
+        component_spec = semantic_spec.get("component_spec") or {}
+        diagnosis = component_spec.get("problem_type_diagnosis") or semantic_spec.get("problem_type_diagnosis") or {}
+        return str(
+            diagnosis.get("inferred_problem_type")
+            or component_spec.get("model_problem_type")
+            or semantic_spec.get("model_problem_type")
+            or solver_router.infer_problem_type_from_model(model, "LP")
+        )
 
 
 job_runner = JobRunner()

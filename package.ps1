@@ -33,6 +33,9 @@ function Clean-Package {
 
   Get-ChildItem -LiteralPath $Root -Directory -Recurse -Force -Filter "__pycache__" -ErrorAction SilentlyContinue |
     Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
+
+  Get-ChildItem -LiteralPath $Root -Directory -Recurse -Force -Filter ".pytest_cache" -ErrorAction SilentlyContinue |
+    Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
 }
 
 Clean-Package
@@ -46,14 +49,18 @@ New-Item -ItemType Directory -Path $staging | Out-Null
 try {
   Get-ChildItem -LiteralPath $Root -Force |
     Where-Object {
-      $_.Name -notin @(".git", ".venv", ".pytest_cache", "pytest_tmp", "__chrome_frontend_profile", [System.IO.Path]::GetFileName($OutputFullPath))
+      $_.Name -notin @(".git", ".venv", ".pytest_cache", "pytest_tmp", "__chrome_frontend_profile", "logs", [System.IO.Path]::GetFileName($OutputFullPath))
     } |
     Copy-Item -Destination $staging -Recurse -Force
 
   Get-ChildItem -LiteralPath $staging -Recurse -Force |
     Where-Object {
       $_.FullName -match "\\__pycache__(\\|$)" -or
-      $_.FullName -match "\\logs\\.*\.log$" -or
+      $_.FullName -match "\\\.pytest_cache(\\|$)" -or
+      $_.FullName -match "\\logs(\\|$)" -or
+      $_.FullName -match "\\frontend\\node_modules(\\|$)" -or
+      $_.FullName -match "\\frontend\\test-results(\\|$)" -or
+      $_.FullName -match "\\frontend\\[^\\]+\.tsbuildinfo$" -or
       $_.FullName -match "\\reports\\.*\.html$" -or
       $_.FullName -match "\\data\\runtime_store\.json$" -or
       $_.FullName -match "\\data\\runtime_store\.local\.json$"

@@ -136,7 +136,11 @@ def test_cascade_hydro_skill_run_complete_chain() -> None:
 def test_cascade_hydro_model_invoke_complete_chain() -> None:
     models = client.get("/api/models")
     assert models.status_code == 200, models.text
-    model = next(item for item in models.json() if item.get("template_id") == "cascade_hydro_dispatch")
+    model = next(
+        item
+        for item in models.json()
+        if item.get("template_id") == "cascade_hydro_dispatch" and item.get("status") in {"published", "trial", "tested"}
+    )
     template = get_template("cascade_hydro_dispatch")
     params = deepcopy(template["sample_runtime_parameters"])
     response = client.post(

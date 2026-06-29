@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import os
+import sys
 import tempfile
 import uuid
 from pathlib import Path
 
 import pytest
+from fastapi.testclient import TestClient
 
 
 os.environ.setdefault(
@@ -56,3 +58,12 @@ def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item
     for item in items:
         if item.nodeid in SLOW_TESTS:
             item.add_marker(slow)
+
+
+def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:
+    seen: set[int] = set()
+    for module in list(sys.modules.values()):
+        for value in vars(module).values() if module else []:
+            if isinstance(value, TestClient) and id(value) not in seen:
+                seen.add(id(value))
+                value.close()

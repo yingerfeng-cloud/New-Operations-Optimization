@@ -68,7 +68,7 @@ def test_prototype_open_without_state_initialization_error() -> None:
         browser.close()
     assert "Cannot access 'state' before initialization" not in "\n".join(errors)
     assert content.strip()
-    assert status in {"未连接", "鏈繛鎺?"}
+    assert status == "未连接"
 
 
 def _function_body(name: str) -> str:

@@ -182,7 +182,11 @@ def test_all_builtin_components_validate_without_exception() -> None:
 
 def test_reserved_components_not_marked_implemented() -> None:
     catalog = {item["component_id"]: item for item in client.get("/api/components/catalog").json()}
-    for component_id in ["piecewise_linear_curve", "hydro_head_calculation"]:
+    piecewise = catalog["piecewise_linear_curve"]
+    assert piecewise["implemented"] is True
+    assert piecewise.get("enabled", True) is not False
+    assert piecewise["status"] in {"published", "trial", "tested"}
+    for component_id in ["hydro_head_calculation"]:
         item = catalog[component_id]
         assert item["implemented"] is False
         assert item["enabled"] is False

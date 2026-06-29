@@ -122,11 +122,26 @@ class GenericLinearBuilder:
                     result += coef * var_map[label]
             return result
 
+        def param_expr(terms: list[dict[str, Any]], constant: float = 0.0, outer: dict[str, Any] | None = None) -> Any:
+            outer = outer or {}
+            result: Any = float(constant)
+            for term in terms:
+                key_tokens = list(term.get("key", term.get("param_key", [])))
+                value = param(str(term["param"]), resolve(key_tokens, outer))
+                value *= float(term.get("coef", 1.0))
+                if term.get("sign") == "-":
+                    value *= -1.0
+                result += value
+            return result
+
         for idx, cons in enumerate(constraints):
             foreach = list(cons.get("foreach", []))
             for count, context in enumerate(iter_context(foreach), start=1):
                 lhs = expr(cons.get("terms", []), cons.get("constant", 0.0), context)
-                rhs = param(str(cons["rhs_param"]), resolve(list(cons.get("rhs_key", foreach)), context)) if "rhs_param" in cons else float(cons.get("rhs", 0.0))
+                if cons.get("rhs_terms"):
+                    rhs = param_expr(list(cons.get("rhs_terms") or []), float(cons.get("rhs", 0.0)), context)
+                else:
+                    rhs = param(str(cons["rhs_param"]), resolve(list(cons.get("rhs_key", foreach)), context)) if "rhs_param" in cons else float(cons.get("rhs", 0.0))
                 cons_sense = str(cons.get("sense", "<="))
                 relation = lhs <= rhs if cons_sense == "<=" else lhs >= rhs if cons_sense == ">=" else lhs == rhs
                 suffix = "_" + "_".join(map(str, resolve(foreach, context))) if foreach else ""

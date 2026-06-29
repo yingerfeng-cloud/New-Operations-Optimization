@@ -25,6 +25,7 @@ class MemoryStore:
         self.template_status: dict[str, str] = {}
         self.rolling_jobs: dict[str, Any] = {}
         self.custom_components: dict[str, dict[str, Any]] = {}
+        self.function_assets: dict[str, dict[str, Any]] = {}
         self.model_versions: dict[str, list[dict[str, Any]]] = {}
         root = Path(__file__).resolve().parents[2]
         self._persistence_path = Path(os.getenv("RUNTIME_STORE_PATH", str(root / "data" / "runtime_store.json")))
@@ -41,6 +42,7 @@ class MemoryStore:
             "conversations": self.conversations,
             "llm_config": self.llm_config,
             "custom_components": self.custom_components,
+            "function_assets": self.function_assets,
         }
         try:
             self._persistence_path.parent.mkdir(parents=True, exist_ok=True)
@@ -58,6 +60,7 @@ class MemoryStore:
             self.conversations.update(payload.get("conversations") or {})
             self.llm_config.update(payload.get("llm_config") or {})
             self.custom_components.update(payload.get("custom_components") or {})
+            self.function_assets.update(payload.get("function_assets") or {})
         except Exception:
             return
 

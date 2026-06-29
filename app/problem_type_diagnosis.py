@@ -12,7 +12,18 @@ SOLVER_CAPABILITIES = {
     "highs": ["LP", "MILP", "QP", "MIQP"],
     "appsi_highs": ["LP", "MILP", "QP", "MIQP"],
     "ipopt": ["NLP"],
+    "scip": ["MINLP"],
+    "scip/bonmin": ["MINLP"],
     "bonmin": ["MINLP"],
+}
+
+RECOMMENDED_SOLVERS = {
+    "LP": "HiGHS",
+    "MILP": "HiGHS",
+    "QP": "HiGHS",
+    "MIQP": "HiGHS",
+    "NLP": "Ipopt",
+    "MINLP": "SCIP/Bonmin",
 }
 
 
@@ -115,22 +126,27 @@ def infer_problem_type(
         inferred = "MILP" if has_integer else "LP"
     requested = normalize_problem_type(requested_problem_type or inferred)
     integer_details = [item for item in variable_details or [] if item.get("is_integer")]
-    supported = solver_supports_problem_type(solver_name, requested)
+    effective_solver = solver_name or RECOMMENDED_SOLVERS.get(requested, "HiGHS")
+    supported = solver_supports_problem_type(effective_solver, requested)
     warnings = _risk_lines(inferred, requested, solver_name, supported)
+    function_usage = _function_asset_usage(components or [])
     return {
         "inferred_problem_type": inferred,
         "recommended_problem_type": inferred,
+        "recommended_solver": RECOMMENDED_SOLVERS.get(inferred, "HiGHS"),
         "requested_problem_type": requested,
         "effective_problem_type": requested,
         "expression_class": expression_class,
         "has_integer_variables": has_integer,
         "variable_types": sorted(set(variable_types or ["continuous"])),
         "integer_variable_details": integer_details,
-        "solver": solver_name or "HiGHS",
+        "solver": effective_solver,
         "solver_supported": supported,
         "solver_supported_problem_types": SOLVER_CAPABILITIES.get(str(solver_name or "highs").lower(), []),
         "reasons": _reason_lines(inferred, has_integer, expression_class, integer_details),
         "warnings": warnings,
+        "function_assets_used": function_usage["function_assets_used"],
+        "linearization_strategy": function_usage["linearization_strategy"],
         "publish_valid": is_problem_type_override_valid(inferred, requested) and supported,
     }
 
@@ -238,8 +254,14 @@ def _resolve_components(components: list[dict[str, Any]]) -> list[dict[str, Any]
     return [_resolve_component_definition(item) for item in components if item.get("enabled", True) is not False]
 
 
+def _component_cfg(component: dict[str, Any]) -> dict[str, Any]:
+    config = component.get("config") if isinstance(component.get("config"), dict) else {}
+    return {**config, **component}
+
+
 def _resolve_component_definition(component: dict[str, Any]) -> dict[str, Any]:
-    component_id = str(component.get("type") or component.get("component_id") or component.get("code") or "")
+    cfg = _component_cfg(component)
+    component_id = str(cfg.get("type") or cfg.get("component_id") or cfg.get("code") or "")
     definition = deepcopy(component.get("definition") or {})
     if not definition and component_id:
         definition = _custom_component_from_known_stores(component_id)
@@ -251,9 +273,40 @@ def _resolve_component_definition(component: dict[str, Any]) -> dict[str, Any]:
         except Exception:
             definition = {}
     if definition:
+        if component_id in {"function_mapping_component", "piecewise_linear_curve"}:
+            strategy = str(cfg.get("solve_strategy") or definition.get("linearization_strategy") or "convex_combination_lp")
+            for row in definition.get("generated_constraints") or []:
+                row["piecewise_method"] = strategy
+                row["compiler"] = strategy
+                row["solve_participation"] = "display_only" if strategy == "display_only" else row.get("solve_participation", "solve_active")
+                row["participates_in_solve"] = strategy != "display_only"
+            if strategy == "binary_segment_milp":
+                definition["variable_types"] = ["continuous", "binary"]
+                definition["problem_type"] = "MILP"
+                definition["problem_types"] = ["MILP"]
+                definition["solver_capabilities"] = ["MILP"]
+            definition["linearization_strategy"] = strategy
+            if cfg.get("function_asset_id") or cfg.get("curve_asset_id"):
+                definition["function_asset_id"] = cfg.get("function_asset_id") or cfg.get("curve_asset_id")
         problem_fields = component_problem_type_fields(definition)
         definition = {**definition, **problem_fields}
     return {**deepcopy(component), "component_id": component_id, "type": component_id, "definition": definition}
+
+
+def _function_asset_usage(components: list[dict[str, Any]]) -> dict[str, Any]:
+    assets: list[dict[str, Any]] = []
+    strategies: list[str] = []
+    for component in components:
+        component_id = str(component.get("component_id") or component.get("type") or "")
+        definition = component.get("definition") or {}
+        cfg = _component_cfg(component)
+        function_id = cfg.get("function_asset_id") or cfg.get("curve_asset_id") or definition.get("function_asset_id")
+        strategy = str(cfg.get("solve_strategy") or definition.get("linearization_strategy") or "")
+        if function_id:
+            assets.append({"function_asset_id": str(function_id), "component": component_id, "solve_strategy": strategy or "convex_combination_lp"})
+        if strategy:
+            strategies.append(strategy)
+    return {"function_assets_used": assets, "linearization_strategy": sorted(set(strategies))}
 
 
 def _custom_component_from_known_stores(component_id: str) -> dict[str, Any]:

@@ -12,7 +12,7 @@ from app.explain.result_formatter import SolveResultFormatter
 from app.services.rolling_service import RollingRunRequest, rolling_service
 from app.services.model_service import model_service
 from app.templates.power_templates import get_template
-from app.solvers.highs_adapter import HiGHSAdapter
+from app.solvers.solver_router import SolverRouteError, solver_router
 
 router = APIRouter(prefix="/api/pv-storage", tags=["pv-storage"])
 
@@ -108,7 +108,8 @@ def sizing_compare_lite(req: SizingCompareLiteRequest) -> dict[str, Any]:
         }
         try:
             model, context = PyomoModelBuilder().build(template, runtime)
-            solve_result = HiGHSAdapter().solve(model, time_limit_seconds=30)
+            problem_type = str(template.get("model_problem_type") or template.get("problem_type") or "LP")
+            solve_result = solver_router.solve(model, problem_type=problem_type, time_limit_seconds=30)
             if solve_result.status != "optimal":
                 reason = solve_result.message or "当前候选方案不可行，请检查 SOC、容量、功率和计划约束。"
                 rows.append({"name": scheme.name, "status": solve_result.status, "feasible": False, "reason": reason, **soc_adjustment})
@@ -155,6 +156,8 @@ def sizing_compare_lite(req: SizingCompareLiteRequest) -> dict[str, Any]:
                     **soc_adjustment,
                 }
             )
+        except SolverRouteError as exc:
+            rows.append({"name": scheme.name, "status": exc.payload.get("status", "solver_unavailable"), "feasible": False, "reason": exc.payload.get("message"), "solver_error": exc.payload, **soc_adjustment})
         except Exception as exc:
             reason = str(exc)
             if original_initial_soc > soc_upper or original_terminal_soc_target > soc_upper:

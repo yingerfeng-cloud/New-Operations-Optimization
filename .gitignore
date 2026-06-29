@@ -1,6 +1,8 @@
 data/runtime_store.json
 data/runtime_store.local.json
 data/runtime_store_test_*.json
+artifacts/
+reports/*.html
 .venv/
 logs/
 node_modules/

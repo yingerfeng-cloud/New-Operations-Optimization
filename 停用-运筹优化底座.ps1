@@ -1,9 +1,16 @@
-﻿param()
+param(
+    [int[]]$Ports = @(8000, 5173, 8090, 8091)
+)
 $ErrorActionPreference = "Stop"
 
-$Root    = Split-Path -Parent $MyInvocation.MyCommand.Path
-$PidFile = Join-Path $Root "logs\.platform.pid"
-$Port    = 8090
+$Root = Split-Path -Parent $MyInvocation.MyCommand.Path
+$LogDir = Join-Path $Root "logs"
+$PidFiles = @(
+    (Join-Path $LogDir ".platform-api.pid"),
+    (Join-Path $LogDir ".platform-frontend.pid"),
+    (Join-Path $LogDir ".platform.pid"),
+    (Join-Path $LogDir ".agent.pid")
+)
 
 function Stop-ProcessTree {
     param([int]$Id)
@@ -12,30 +19,53 @@ function Stop-ProcessTree {
     try { Stop-Process -Id $Id -Force -ErrorAction Stop } catch {}
 }
 
-$stopped = $false
+function Stop-FromPidFile {
+    param([string]$Path)
+    if (-not (Test-Path -LiteralPath $Path)) { return $false }
 
-# 1. 通过 PID 文件停止进程树（含 uvicorn 子进程）
-if (Test-Path -LiteralPath $PidFile) {
-    $stored = (Get-Content -LiteralPath $PidFile -Raw).Trim()
+    $stopped = $false
+    $stored = (Get-Content -LiteralPath $Path -Raw).Trim()
     if ($stored -match '^\d+$') {
         $targetPid = [int]$stored
         if (Get-Process -Id $targetPid -ErrorAction SilentlyContinue) {
             Stop-ProcessTree -Id $targetPid
-            Write-Host "【运筹优化底座】已停止进程树  PID $targetPid"
+            Write-Host "Stopped process tree PID $targetPid ($Path)"
             $stopped = $true
         }
     }
-    Remove-Item -LiteralPath $PidFile -Force
+    Remove-Item -LiteralPath $Path -Force
+    return $stopped
 }
 
-# 2. 兜底：清理端口上的孤儿进程
-Start-Sleep -Milliseconds 300
-$conn = Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue
-if ($conn) {
-    $orphanPid = $conn.OwningProcess
-    try { Stop-Process -Id $orphanPid -Force -ErrorAction Stop } catch {}
-    Write-Host "【运筹优化底座】已清理端口 $Port 孤儿进程  PID $orphanPid"
-    $stopped = $true
+function Stop-PortOwner {
+    param([int]$Port)
+    $conns = Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue
+    if (-not $conns) { return $false }
+
+    $stopped = $false
+    foreach ($processId in ($conns | Select-Object -ExpandProperty OwningProcess -Unique)) {
+        if ($processId -and (Get-Process -Id $processId -ErrorAction SilentlyContinue)) {
+            Stop-ProcessTree -Id ([int]$processId)
+            Write-Host "Stopped listener on port $Port, PID $processId"
+            $stopped = $true
+        }
+    }
+    return $stopped
 }
 
-if (-not $stopped) { Write-Host "【运筹优化底座】服务未在运行" }
+$stoppedAny = $false
+
+foreach ($pidFile in $PidFiles) {
+    if (Stop-FromPidFile -Path $pidFile) { $stoppedAny = $true }
+}
+
+Start-Sleep -Milliseconds 500
+foreach ($port in $Ports) {
+    if (Stop-PortOwner -Port $port) { $stoppedAny = $true }
+}
+
+if ($stoppedAny) {
+    Write-Host "Platform services stopped."
+} else {
+    Write-Host "Platform services were not running."
+}

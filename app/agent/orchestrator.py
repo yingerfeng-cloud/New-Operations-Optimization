@@ -679,7 +679,7 @@ class AgentOrchestrator:
         return text
 
     def _looks_like_mojibake(self, text: str) -> bool:
-        return any(marker in text for marker in ("鏁", "鐢", "璋", "搴", "鍖", "绯", "鎴", "涓", "锟"))
+        return any("\ue000" <= ch <= "\uf8ff" for ch in text)
 
     def _looks_like_technical_english(self, text: str) -> bool:
         return bool(re.search(r"[A-Za-z]", text)) and not re.search(r"[\u4e00-\u9fff]", text)
@@ -903,13 +903,13 @@ class AgentOrchestrator:
 
     def _select_skill(self, message: str) -> str | None:
         compact = "".join(str(message or "").lower().split())
-        if any(key in compact for key in ["经济", "缁忔祹", "economic"]):
+        if any(key in compact for key in ["经济", "economic"]):
             return "run_economic_dispatch"
-        if any(key in compact for key in ["机组", "日前", "鏈虹粍", "unitcommitment", "鏃ュ墠"]):
+        if any(key in compact for key in ["机组", "日前", "unitcommitment"]):
             return "run_unit_commitment_day_ahead"
-        if any(key in compact for key in ["储能", "峰谷", "鍌ㄨ兘", "storage"]):
+        if any(key in compact for key in ["储能", "峰谷", "storage"]):
             return "run_storage_dispatch"
-        if any(key in compact for key in ["水电", "cascade", "姊骇"]):
+        if any(key in compact for key in ["水电", "cascade"]):
             return "run_cascade_hydro_dispatch"
         if any(key in compact for key in ["风光储", "新能源"]):
             return "run_renewable_storage_dispatch"

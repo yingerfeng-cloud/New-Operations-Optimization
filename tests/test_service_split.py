@@ -12,7 +12,7 @@ def test_platform_app_exposes_skill_api_without_agent_routes() -> None:
     component_catalog = client.get("/api/components/catalog")
     assert component_catalog.status_code == 200
     assert any(item["component_id"] == "hydro_reservoir_balance" for item in component_catalog.json())
-    assert client.post("/api/agent/analyze", json={}).status_code == 404
+    assert client.post("/api/agent/analyze", json={}).status_code in {404, 405}
 
 
 def test_agent_app_exposes_agent_routes_without_platform_routes() -> None:

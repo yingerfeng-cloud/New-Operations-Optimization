@@ -7,7 +7,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
-from app.api import components, demo, invocations, jobs, llm, models, optimize, pv_storage, reports, results, rolling, tasks, templates
+from app.api import components, demo, function_assets, invocations, jobs, llm, models, optimize, pv_storage, reports, results, rolling, tasks, templates
 from app.services.model_service import model_service
 from app.frontend import mount_frontends
 from app.utils import has_highspy, has_pyomo
@@ -68,6 +68,7 @@ def create_app() -> FastAPI:
     app.include_router(models.router)
     app.include_router(templates.router)
     app.include_router(components.router)
+    app.include_router(function_assets.router)
     app.include_router(jobs.router)
     app.include_router(rolling.router)
     app.include_router(pv_storage.router)

@@ -5,6 +5,8 @@ SOLVER_CAPABILITIES = {
     "highs": ["LP", "MILP", "QP", "MIQP"],
     "appsi_highs": ["LP", "MILP", "QP", "MIQP"],
     "ipopt": ["NLP"],
+    "scip": ["MINLP"],
+    "scip/bonmin": ["MINLP"],
     "bonmin": ["MINLP"],
 }
 

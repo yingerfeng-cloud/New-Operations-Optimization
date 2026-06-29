@@ -1,70 +1,110 @@
 # Engineering Map
 
-This file is the first stop for future iterations. It lists the narrow entry points that usually matter, so changes do not require rediscovering the whole repository.
+本文件是后续迭代的代码入口索引。正式前端位于 `frontend/`；`prototype.html` 和 `static/js/` 仅作为 legacy 维护。
 
-## Model Creation And Drafts
+## React 应用框架
 
-- Model draft assembly: `app/model_draft.py`
-- Problem type diagnosis: `app/problem_type_diagnosis.py`
-- Model asset create/publish flow: `app/services/model_service.py`
-- Model API router: `app/api/models.py`
+- 入口：`frontend/src/main.tsx`、`frontend/src/App.tsx`
+- 路由：`frontend/src/app/router.tsx`
+- Provider：`frontend/src/app/providers.tsx`
+- 主布局：`frontend/src/app/layout/`
+- 全局样式：`frontend/src/styles.css`
+- Vite 配置：`frontend/vite.config.ts`
 
-When changing component-based model creation, inspect `create_model_draft_from_template`, `build_component_spec_from_draft`, and the publish path in `ModelService` before changing lower-level builders.
+页面使用路由级懒加载。新增正式页面时，应在 `frontend/src/pages/` 建立独立目录，并在 `router.tsx` 注册，避免把业务页面堆入 `App.tsx`。
 
-## Component Library
+## 前端 API 层
 
-- Runtime component store: `app/storage/memory_store.py`
-- Dynamic formula components: `app/model_components/formula_components.py`
-- Built-in component registry: `app/model_components/registry.py`
-- Default seeded library components: `app/services/model_service.py` (`_default_library_components`)
-- Component API router: `app/api/components.py`
+- Axios Client 与统一错误处理：`frontend/src/api/client.ts`
+- 模板：`frontend/src/api/templates.ts`
+- 模型：`frontend/src/api/models.ts`
+- 组件：`frontend/src/api/components.ts`
+- 任务：`frontend/src/api/tasks.ts`
+- 结果：`frontend/src/api/results.ts`
+- Agent：`frontend/src/api/agents.ts`
 
-For library component references, the important invariant is: a draft component with only `{"type": component_id}` must resolve the stored component definition before diagnosis, build, and publish validation.
+服务端状态由 TanStack Query 管理。Mutation 成功后应失效相关 query key，避免页面维护重复缓存。
 
-## Pyomo Build And Solve
+## 模型创建与公式
 
-- Build dispatcher: `app/builders/pyomo_builder.py`
-- Component model builder: `app/builders/component_model_builder.py`
-- Weighted objective compiler: `app/model_components/objective_components.py`
-- HiGHS adapter: `app/solvers/highs_adapter.py`
-- Runtime parameter validation: `app/semantic/semantic_validator.py`
+- 五步页面：`frontend/src/features/model-creation/ModelCreationPage.tsx`
+- 步骤组件：`frontend/src/features/model-creation/steps/`
+- Zustand 草稿：`frontend/src/features/model-creation/stores/modelCreationStore.ts`
+- 草稿规范化与校验：`frontend/src/features/model-creation/utils/`
+- generic_spec 编译：`frontend/src/features/model-creation/utils/compileFormulaToGenericSpec.ts`
+- 公式编辑器：`frontend/src/features/formula-editor/`
 
-For objective bugs, check `build_weighted_objective` first, then confirm the template/component objective terms are `solve_active` and `supported_by_backend`.
+后端对应入口：
 
-## Power Templates
+- ModelDraft：`app/model_draft.py`
+- 后端公式编译：`app/generic_formula_compiler.py`
+- 问题类型诊断：`app/problem_type_diagnosis.py`
+- 模型服务：`app/services/model_service.py`
+- 模型 API：`app/api/models.py`
 
-- Template registry: `app/templates/power_templates.py`
-- Template service: `app/services/template_service.py`
-- Business result formatter: `app/explain/result_formatter.py`
+修改公式编译时，必须同时运行前端 DSL/Parser/Validator/Compiler 测试和后端 GenericLinearBuilder 回归。
 
-Current PV-storage templates:
+## 组件库
 
-- `pv_storage_capacity_planning`
-- `pv_storage_day_ahead_dispatch`
-- `pv_storage_intraday_dispatch`
+前端：
 
-## Frontend Prototype
+- 页面：`frontend/src/pages/ComponentLibrary/ComponentLibraryPage.tsx`
+- 编辑器与产品化面板：`frontend/src/features/component-library/`
 
-- Main prototype shell: `prototype.html`
-- Problem type diagnosis frontend module: `static/js/problem_type_diagnosis.js`
-- Frontend static regression tests: `tests/test_component_builder_frontend_static.py`
+后端：
 
-Keep new frontend logic out of `prototype.html` when it has a clear domain boundary. Prefer adding a file under `static/js/` and referencing it from the prototype.
+- API：`app/api/components.py`
+- 动态公式组件：`app/model_components/formula_components.py`
+- 内置注册表：`app/model_components/registry.py`
+- 运行时存储：`app/storage/memory_store.py`
 
-## Local Run Scripts
+关键不变量：缺失依赖必须阻止发布；只包含组件 ID 的草稿必须在诊断、构建和发布前解析为完整组件定义。
 
-- Local start script: `Run.ps1`
-- Local stop script: `Shutdown.ps1`
-- Compatibility app selector: `server.py`
+## Pyomo 构建与求解
 
-`Run.ps1 -Full -Restart` is the canonical local full-stack command. It starts platform API, Agent API, and the static frontend server with shared `data/runtime_store.json` persistence.
+- 构建分发：`app/builders/pyomo_builder.py`
+- 通用线性 Builder：`app/builders/generic_linear_builder.py`
+- 组件化 Builder：`app/builders/component_model_builder.py`
+- 目标编译：`app/model_components/objective_components.py`
+- HiGHS 适配器：`app/solvers/highs_adapter.py`
+- 参数校验：`app/semantic/semantic_validator.py`
 
-## Agent Layer
+前端改造不应绕过或复制这些核心逻辑。
 
-- Orchestrator: `app/agent/orchestrator.py`
-- Skill routing: `app/agent/skill_router.py`
-- Parameter extraction: `app/agent/parameter_extractor.py`
-- Platform client: `app/agent/platform_client.py`
-- Skill service: `app/services/agent_skill_service.py`
+## 模板、任务与结果
 
-Agent tests can be order-sensitive because they share runtime store state. Prefer preserving conversation-local state and avoiding global mutation in tests.
+- 模板注册：`app/templates/power_templates.py`
+- 模板服务：`app/services/template_service.py`
+- 任务服务：`app/services/job_service.py`
+- 结果服务：`app/services/result_service.py`
+- 业务解释：`app/explain/result_formatter.py`
+- React 页面：`frontend/src/pages/ModelCenter/`、`TaskCenter/`、`ResultCenter/`
+
+## 静态托管与 legacy
+
+- React/legacy 挂载：`app/frontend.py`
+- 应用工厂：`app/main.py`、`app/platform_main.py`
+- legacy 页面：`prototype.html`、`agent_console.html`
+- legacy 模块：`static/js/`
+
+生产构建存在时，FastAPI 在 `/` 提供 React SPA，并在 `/legacy`、`/prototype.html` 提供旧页面。
+
+## Agent
+
+- React 页面：`frontend/src/pages/AgentWorkbench/AgentWorkbenchPage.tsx`
+- Orchestrator：`app/agent/orchestrator.py`
+- Skill 路由：`app/agent/skill_router.py`
+- 参数抽取：`app/agent/parameter_extractor.py`
+- 平台 Client：`app/agent/platform_client.py`
+
+当前只完成页面迁移，Agent 后端不属于本次前端工程化重构范围。
+
+## 测试入口
+
+- 前端单元测试：`frontend/src/tests/unit/`
+- Playwright：`frontend/src/tests/e2e/`
+- FastAPI React 托管：`tests/test_react_frontend_hosting.py`
+- 后端测试：`tests/`
+- 阶段结果：`docs/frontend-migration-test-log.md`
+
+具体命令见 `docs/iteration-test-entrypoints.md`。

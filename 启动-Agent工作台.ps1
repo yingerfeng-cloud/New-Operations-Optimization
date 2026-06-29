@@ -1,44 +1,34 @@
-﻿param()
+param(
+    [int]$ApiPort = 8000,
+    [int]$FrontendPort = 5173,
+    [switch]$NoFrontend
+)
 $ErrorActionPreference = "Stop"
 
-$Root    = Split-Path -Parent $MyInvocation.MyCommand.Path
-$PidFile = Join-Path $Root "logs\.agent.pid"
-$LogFile = Join-Path $Root "logs\agent.log"
-$OutFile = Join-Path $Root "logs\agent-stdout.log"
-$Python  = Join-Path $Root ".venv\Scripts\python.exe"
-$Port    = 8091
+$Root = Split-Path -Parent $MyInvocation.MyCommand.Path
+$PlatformStart = Get-ChildItem -LiteralPath $Root -Filter "*.ps1" |
+    Where-Object {
+        $_.Name -notlike "*Agent*" -and
+        (Get-Content -LiteralPath $_.FullName -Raw -Encoding UTF8 -ErrorAction SilentlyContinue) -match "function Start-Backend"
+    } |
+    Select-Object -First 1 -ExpandProperty FullName
 
-if (-not (Test-Path -LiteralPath $Python)) {
-    Write-Error "未找到 Python 虚拟环境，请先执行: python -m venv .venv 并安装依赖"
+if (-not $PlatformStart) {
+    Write-Error "Unable to find the platform start script."
     exit 1
 }
 
-$LogDir = Join-Path $Root "logs"
-if (-not (Test-Path -LiteralPath $LogDir)) {
-    New-Item -ItemType Directory -Path $LogDir | Out-Null
+Write-Host "Agent Workbench is now served by the React app at /agents. Starting the unified platform service."
+
+if ($NoFrontend) {
+    & $PlatformStart -ApiPort $ApiPort -FrontendPort $FrontendPort -NoFrontend
+} else {
+    & $PlatformStart -ApiPort $ApiPort -FrontendPort $FrontendPort
 }
 
-# 端口占用检测
-$conn = Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue
-if ($conn) {
-    Write-Host "【Agent 工作台】端口 $Port 已被占用 (PID $($conn.OwningProcess))，请先运行停用脚本"
-    exit 1
+Write-Host "Agent Workbench URL:"
+if ($NoFrontend) {
+    Write-Host "  http://127.0.0.1:$ApiPort/agents"
+} else {
+    Write-Host "  http://127.0.0.1:$FrontendPort/agents"
 }
-
-if (Test-Path -LiteralPath $PidFile) { Remove-Item -LiteralPath $PidFile -Force }
-
-# 直接启动 Python，stderr（uvicorn 日志）写入 agent.log
-$env:SERVICE_MODE = "agent"
-$env:PORT         = "$Port"
-
-$proc = Start-Process $Python `
-    -ArgumentList "-u", "server.py" `
-    -WorkingDirectory $Root `
-    -WindowStyle Hidden `
-    -RedirectStandardOutput $OutFile `
-    -RedirectStandardError  $LogFile `
-    -PassThru
-
-$proc.Id | Out-File -FilePath $PidFile -Encoding utf8 -Force
-Write-Host "【Agent 工作台】已在后台启动  PID $($proc.Id)  http://127.0.0.1:$Port"
-Write-Host "日志: $LogFile"

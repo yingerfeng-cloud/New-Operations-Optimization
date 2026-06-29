@@ -250,6 +250,8 @@ def component_definition(component_type: str, builder: Any | None = None) -> dic
     for code in COMPONENT_INDICES.get(component_type, []):
         if code in SET_DEFINITIONS and code not in {item["code"] for item in required_sets}:
             required_sets.append(deepcopy(SET_DEFINITIONS[code]))
+    if component_type in {"function_mapping_component", "piecewise_linear_curve"}:
+        generated_constraints = []
     terms = []
     for term in HYDRO_OBJECTIVE_TERM_OVERRIDES.get(component_type) or COMPONENT_OBJECTIVE_TERMS.get(component_type, []):
         terms.append(
@@ -270,6 +272,7 @@ def component_definition(component_type: str, builder: Any | None = None) -> dic
         "category": getattr(builder, "category", "未分类"),
         "version": "1.0.0",
         "implemented": True,
+        "status": "published",
         "required": component_type in {"hydro_power_flow_conversion", "hydro_outflow_balance"},
         "depends_on": COMPONENT_DEPENDENCIES.get(component_type, []),
         "inputs": list(getattr(builder, "required_parameters", [])),
@@ -285,7 +288,7 @@ def component_definition(component_type: str, builder: Any | None = None) -> dic
         "math_template": {"formula": formula, "business_meaning": description},
         "description": description,
     }
-    if component_type in {"piecewise_linear_curve", "hydro_head_calculation"}:
+    if component_type in {"hydro_head_calculation"}:
         item.update(
             {
                 "implemented": False,
@@ -297,6 +300,10 @@ def component_definition(component_type: str, builder: Any | None = None) -> dic
         )
     if hasattr(builder, "explain"):
         item.update(builder.explain())
+    if component_type.startswith("hydro_"):
+        item.setdefault("legacy_preset", True)
+        item["component_family"] = "legacy preset"
+        item.setdefault("can_be_composed_from", _hydro_generic_composition(component_type))
     problem_type = item.get("problem_type") or item.get("problem_type_effect") or "LP"
     item["problem_type"] = problem_type
     item["problem_types"] = list(item.get("problem_types") or item.get("solver_capabilities") or [problem_type])
@@ -305,3 +312,21 @@ def component_definition(component_type: str, builder: Any | None = None) -> dic
     item.setdefault("generated_constraints", generated_constraints)
     item.setdefault("generated_objective_terms", terms)
     return item
+
+
+def _hydro_generic_composition(component_type: str) -> list[str]:
+    mapping = {
+        "hydro_initial_volume": ["terminal_state_tracking_component"],
+        "hydro_volume_bounds": ["capacity_bounds_component"],
+        "hydro_station_available_capacity": ["capacity_bounds_component"],
+        "hydro_power_flow_conversion": ["balance_equation_component", "function_mapping_component"],
+        "hydro_outflow_balance": ["balance_equation_component"],
+        "hydro_outflow_bounds": ["capacity_bounds_component"],
+        "hydro_spill_bounds": ["capacity_bounds_component"],
+        "hydro_cascade_inflow_delay": ["network_delay_flow_component"],
+        "hydro_reservoir_balance": ["state_balance_component"],
+        "hydro_load_tracking": ["schedule_tracking_component"],
+        "hydro_terminal_volume": ["terminal_state_tracking_component"],
+        "hydro_ramp_smoothing": ["ramp_smoothing_component"],
+    }
+    return mapping.get(component_type, [])

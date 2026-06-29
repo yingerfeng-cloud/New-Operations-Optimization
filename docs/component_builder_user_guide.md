@@ -1,256 +1,139 @@
-# 组件化自定义 Builder 使用说明
+# 组件化 Builder 使用说明
 
-## 1. 启动服务
+本文说明 React 正式前端中的组件管理与组件化模型创建。旧版 `prototype.html` 仅通过 `/legacy` 保留，不再作为本指南的主操作入口。
 
-推荐使用一键脚本启动完整本地环境：
+## 1. 启动
 
-```powershell
-.\Run.ps1 -Full -Restart
-```
-
-如果只需要平台 API 和静态前端：
+开发模式：
 
 ```powershell
-.\Run.ps1 -Restart
+# 终端 1
+$env:PORT='8000'
+.\.venv\Scripts\python.exe server.py
+
+# 终端 2
+cd frontend
+npm run dev
 ```
 
-默认地址：
+访问：
+
+- React：`http://localhost:5173`
+- API：`http://localhost:8000/api`
+
+生产模式先在 `frontend/` 执行 `npm run build`，然后访问 `http://localhost:8000/`。
+
+## 2. 组件库
+
+访问 `/components`。列表展示组件名称、编码、分类、领域、状态、启用状态、实现状态与版本。
+
+可执行操作：
+
+- 查看：打开组件详情。
+- 编辑：维护组件基础信息与定义。
+- 校验：调用 `/api/components/{id}/validate`。
+- 发布：校验通过后发布组件。
+- 复制版本：生成独立的新版本草稿。
+- 停用：关闭组件启用状态。
+
+## 3. 组件详情
+
+详情页按产品化面板展示：
+
+- 基础信息
+- `required_sets`
+- 参数与参数绑定
+- 变量
+- 生成约束
+- 生成目标项
+- 依赖关系
+- 校验结果
+
+参数绑定表包含参数编码、名称、数据来源、是否必填、默认值、单位、示例值和绑定状态。
+
+依赖面板会区分可用与缺失依赖。缺失依赖是发布阻断项，不能通过隐藏错误或只修改前端状态绕过。
+
+## 4. 创建组件
+
+1. 在组件库点击“新建组件”。
+2. 填写组件名称、编码、分类、领域和版本。
+3. 配置集合、参数、变量、约束、目标项、参数绑定与依赖。
+4. 保存草稿。
+5. 执行校验。
+6. 修复所有错误和缺失依赖。
+7. 发布组件。
+
+已发布且被模型引用的组件不应直接破坏性修改，应使用“复制版本”建立新版本。
+
+## 5. 创建组件化模型
+
+访问 `/models/create`：
+
+1. Step 1 选择“组件化 Builder”。
+2. 可选择组件化内置模板初始化 ModelDraft。
+3. Step 2 检查组件回写的集合、参数与变量。
+4. Step 3 查看组件生成的约束、目标项和依赖校验。
+5. Step 4 维护运行时参数与参数来源。
+6. Step 5 执行语义、依赖、绑定、问题类型和求解器兼容性校验。
+7. 校验通过后发布或测试运行。
+
+组件草稿最终保存到 `component_spec.components`。后端仍由 `ComponentModelBuilder` 与组件注册表构建 Pyomo 模型。
+
+## 6. 时间集合约定
+
+调度模型统一使用：
 
 ```text
-平台 API：http://127.0.0.1:8090/api
-Agent API：http://127.0.0.1:8091/api
-前端页面：http://127.0.0.1:8092/prototype.html?apiBase=http%3A%2F%2F127.0.0.1%3A8090%2Fapi
+time        = 调度时段，长度 horizon
+time_volume = 状态时点，长度 horizon + 1
 ```
 
-也可以手工启动：
+储能 SOC、梯级水电库容等状态变量通常使用 `time_volume`；区间功率、流量和成本通常使用 `time`。
+
+## 7. 梯级水电样例
+
+内置模板 `cascade_hydro_dispatch` 使用组件化 Builder。
+
+操作：
+
+1. 进入模型资产中心。
+2. 点击“从模板克隆”。
+3. 选择梯级水电模板。
+4. 查看模型的 `component_spec` 与运行参数。
+5. 发布并执行测试。
+6. 在任务中心查看求解状态，在结果报告库查看出力、发电流量、弃水和库容变化。
+
+后端回归入口：
 
 ```powershell
-.\.venv\Scripts\python.exe -m uvicorn app.platform_main:app --host 127.0.0.1 --port 8090
+python -m pytest `
+  tests/test_component_builder_e2e.py `
+  tests/test_component_based_hydro_model.py -q
 ```
 
-然后打开：
+## 8. 光储样例
 
-```text
-http://127.0.0.1:8092/prototype.html?apiBase=http%3A%2F%2F127.0.0.1%3A8090%2Fapi
-```
+组件化光储模板包括容量配置、日前调度、日内调度及 V2 版本。结果建议关注：
 
-如果直接双击打开 `prototype.html`，需要确认页面右下角 API Base 指向正在运行的后端。
+- 光伏利用率与弃光量
+- 电池充放电
+- SOC 曲线
+- 偏差成本
+- 收益/成本拆解
 
-停止默认端口服务：
+回归入口：
 
 ```powershell
-.\Shutdown.ps1 -All
+python -m pytest tests/test_pv_storage_v2_acceptance.py -q
 ```
 
-## 2. 加载梯级水电组件化样例
+## 9. 关键约束
 
-1. 打开 `prototype.html`。
-2. 进入“模型创建”。
-3. 点击“加载组件化水电样例”。
-4. 页面会切换到“组件化自定义 Builder”模式。
-5. 第 3 步会展示组件清单、组件说明、`component_spec` 预览和运行参数 JSON。
+- 不在前端复制后端组件构建逻辑。
+- 不允许缺失依赖的组件发布。
+- 不允许组件 validate 抛出未处理异常。
+- 模型 publish 前必须完成组件依赖与参数绑定校验。
+- 组件生成公式与自定义公式均应进入 ModelDraft。
+- legacy 页面继续可用，但新组件功能只进入 React 工程。
 
-## 3. 查看组件说明
-
-组件表格展示：
-
-- 启用状态
-- 顺序
-- 中文名称
-- 英文编码
-- 分类
-- 依赖组件
-- 操作按钮
-
-点击“说明”后，右侧会展示：
-
-- 业务说明
-- 数学公式
-- 输入参数
-- 输出变量 / 约束
-- 示例说明
-- 常见错误
-
-英文编码保留给开发和排障，例如：
-
-```text
-水库水量平衡组件（hydro_reservoir_balance）
-梯级传播时滞入库组件（hydro_cascade_inflow_delay）
-```
-
-## 4. 启用、禁用和调整组件顺序
-
-在组件表格中：
-
-- 使用复选框启用或禁用组件。
-- 使用“上移”“下移”调整组件顺序。
-- 点击“生成 Component Spec”后，页面会根据当前启用组件重建 `component_spec.components`。
-- 点击“校验组件依赖”可检查启用组件是否缺少依赖。
-
-第一版暂不支持拖拽式编排和拓扑图编辑，但保留了组件顺序、依赖和参数映射的扩展点。
-
-## 5. 编辑运行参数
-
-在“运行参数 JSON”区域编辑参数。
-
-保存模型资产时，平台会优先使用当前页面中的运行参数 JSON，而不是固定样例参数。
-
-梯级水电样例常用参数包括：
-
-```text
-station
-horizon
-time
-time_volume
-units
-unit_pmax
-availability
-power_conversion
-local_inflow
-load_forecast
-volume_min
-volume_max
-initial_volume
-target_terminal_volume
-outflow_min
-outflow_max
-spill_max
-edges
-initial_upstream_outflow
-time_step_seconds
-weights
-```
-
-如果未显式传入 `time` 和 `time_volume`，后端会根据 `horizon` 自动生成：
-
-```text
-time = 0...(horizon-1)
-time_volume = 0...horizon
-```
-
-## 6. 保存和发布模型
-
-1. 在模型创建页完成组件配置和运行参数编辑。
-2. 点击“校验组件模型”。
-3. 点击“覆盖保存”或“另存为新模型”。
-4. 到“模型资产中心”查看模型版本。
-5. 发布或试运行模型后，模型可以被任务中心、API 和 Skill 调用。
-
-复制模型时，平台会生成唯一 `model_code`，例如：
-
-```text
-cascade_hydro_dispatch_custom_a1b2
-```
-
-这样不会抢占内置 Skill：
-
-```text
-run_cascade_hydro_dispatch
-```
-
-内置 Skill 始终优先指向默认模板模型：
-
-```text
-MODEL-POWER-CASCADE-HYDRO-DISPATCH
-```
-
-## 7. 调用模型
-
-在“模型资产中心”中点击“调用模型”，页面会跳转到“任务调度中心”，并自动填入模型运行参数。
-
-确认参数后点击“实例化并提交任务”。
-
-成功结果应包含：
-
-- `dispatch_detail`
-- `system_curve`
-- `station_summary`
-- `metrics`
-- 中文解释
-
-弃水指标使用体积口径：
-
-```text
-total_spill_volume_m3
-total_spill_volume_million_m3
-station_summary[].spill_volume_m3
-station_summary[].spill_volume_million_m3
-```
-
-## 8. API 调用示例
-
-```powershell
-$params = Invoke-RestMethod `
-  -Uri "http://127.0.0.1:8090/api/templates/cascade_hydro_dispatch/sample-runtime-parameters"
-
-Invoke-RestMethod `
-  -Method Post `
-  -Uri "http://127.0.0.1:8090/api/skills/run_cascade_hydro_dispatch/run" `
-  -ContentType "application/json" `
-  -Body (@{
-    parameters = $params
-    options = @{
-      mode = "sync"
-      explain = $true
-      time_limit_seconds = 30
-    }
-  } | ConvertTo-Json -Depth 20)
-```
-
-返回中会包含：
-
-```json
-{
-  "resolved_model_id": "MODEL-POWER-CASCADE-HYDRO-DISPATCH",
-  "resolved_model_code": "cascade_hydro_dispatch"
-}
-```
-
-## 9. 常见错误
-
-### time_volume 长度错误
-
-现象：
-
-```text
-梯级水电模型参数错误：time_volume 长度为 4，但 horizon + 1 为 5。
-```
-
-处理：
-
-- 删除 `time_volume` 让后端自动生成；或
-- 保证 `time_volume.length = horizon + 1`。
-
-### availability 长度错误
-
-现象：
-
-```text
-梯级水电模型参数错误：机组 S1_U2 的 availability 长度为 3，但 horizon 为 4。
-```
-
-处理：
-
-- 每台机组的 `availability` 必须覆盖全部调度时段。
-
-### 组件依赖缺失
-
-现象：
-
-```text
-水库水量平衡组件 依赖 梯级传播时滞入库组件
-```
-
-处理：
-
-- 启用依赖组件；或
-- 调整组件顺序，保证派生表达式先于依赖它的组件构建。
-
-### 长时间停留 SOLVING
-
-处理：
-
-1. 查看任务日志。
-2. 检查 `time_limit_seconds`。
-3. 检查模型规模和约束边界。
-4. 放宽明显冲突的水量、下泄或库容约束后重试。
+代码入口见 `docs/engineering-map.md`，测试命令见 `docs/iteration-test-entrypoints.md`。

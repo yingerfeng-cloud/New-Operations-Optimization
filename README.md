@@ -1,322 +1,270 @@
-# 电力业务语义驱动运筹优化平台内核
+# 电力业务语义驱动运筹优化平台
 
-本仓库是一个面向电力业务场景的运筹优化平台原型，后端采用 FastAPI + Pyomo + HiGHS，前端以单文件原型 `prototype.html` 和 `agent_console.html` 承载演示、模型创建、资产治理和 Agent 调用流程。
-
-当前版本重点完成了组件化自定义 Builder 与梯级水电调度模型接入，已支持从模型创建、资产中心调用、任务实例化、Skill API 到模型 invoke 的完整链路。
+本项目是面向电力优化场景的模型资产与求解平台。后端保留 FastAPI + Pyomo + HiGHS，正式前端已升级为 Vite + React + TypeScript；原 `prototype.html` 作为 legacy 入口继续保留。
 
 ## 技术栈
 
-- 后端框架：FastAPI
-- 建模引擎：Pyomo
-- 求解器：HiGHS / highspy
-- 前端原型：原生 HTML/CSS/JavaScript
-- 本地运行：PowerShell 脚本 + Python 虚拟环境
+- 前端：Vite、React、TypeScript、React Router、TanStack Query、Zustand、Ant Design、Axios、ECharts、Vitest、React Testing Library、Playwright
+- 后端：FastAPI、Pyomo、HiGHS / highspy
+- 数据：本地运行时存储 `data/runtime_store.json`
 
-暂不引入 COPT、Gurobi、多求解器路由、数据库持久化和工程化前端构建工具。
-
-## 工程结构
+## 目录结构
 
 ```text
-app/
-  api/                         API 路由
-  builders/                    Pyomo、Generic Linear、组件化 Builder
-  model_components/            组件注册表、水电组件、组件运行时校验
-  semantic/                    语义校验与运行时参数校验
-  services/                    模型、任务、Skill、调用记录等服务
-  templates/                   内置电力模型模板
-  explain/                     业务结果格式化与解释
-  solvers/                     HiGHS 适配器
-agent_skills/                  Agent Skill 包
-tests/                         自动化测试
-prototype.html                 平台原型 UI
-agent_console.html             Agent 控制台 UI
-server.py                      兼容启动入口
-Run.ps1                        本地启动脚本
-Shutdown.ps1                   本地停止脚本
+frontend/                       React 正式前端
+  src/app/                      路由、Provider、主布局
+  src/api/                      统一 API Client
+  src/pages/                    各业务中心页面
+  src/features/                 模型创建、公式编辑器、组件库、模型/任务/结果/Agent 面板
+  src/tests/unit/               Vitest / RTL 测试
+  src/tests/e2e/                Playwright 测试
+scripts/                        交付与测试矩阵校验脚本
+app/                            FastAPI 后端
+  api/                          API 路由
+  builders/                     Pyomo、Generic Linear、组件化 Builder
+  model_components/             组件注册表与运行时校验
+  services/                     模型、模板、任务、结果、Agent 服务
+  templates/                    12 个内置模板
+tests/                          后端回归测试
+prototype.html                 legacy 平台入口
+agent_console.html             legacy Agent 控制台
+server.py                      后端启动入口
 ```
 
 ## 快速启动
 
-首次准备依赖：
+### 1. 安装后端依赖
 
 ```powershell
 python -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -r requirements.txt
 ```
 
-一键启动完整本地环境（平台 API、Agent API、静态前端）：
+### 2. 脚本启动（推荐）
+
+Windows PowerShell 下可直接使用仓库根目录脚本启动新版平台：
 
 ```powershell
-.\Run.ps1 -Full -Restart
+.\启动-运筹优化底座.ps1
 ```
 
-只启动平台 API 和静态前端服务：
+该脚本会启动：
+
+- FastAPI 后端：`http://127.0.0.1:8000`
+- React/Vite 前端：`http://127.0.0.1:5173`
+- legacy 入口：`http://127.0.0.1:8000/legacy`
+
+停用服务：
 
 ```powershell
-.\Run.ps1 -Restart
+.\停用-运筹优化底座.ps1
 ```
 
-默认端口：
+兼容脚本 `.\启动-Agent工作台.ps1` 和 `.\停用-Agent工作台.ps1` 仍可使用；Agent 工作台现在位于 React 前端 `/agents`。
 
-- 平台 API：`http://127.0.0.1:8090/api`
-- Agent API：`http://127.0.0.1:8091/api`
-- 静态前端：`http://127.0.0.1:8092`
-
-常用启动方式：
+如只需生产/后端托管模式，可先执行 `cd frontend; npm run build`，再运行：
 
 ```powershell
-# 只启动平台 API 和 prototype.html
-.\Run.ps1
-
-# 平台 + Agent + 两个前端页面
-.\Run.ps1 -Full -Restart
-
-# 等价写法
-.\Run.ps1 -Mode both -Restart
-
-# 只启动后端，不启动静态前端服务
-.\Run.ps1 -NoStaticUi -NoOpenUi
-
-# 使用临时端口，避免和旧进程冲突
-.\Run.ps1 -Port 8093 -UiPort 8092 -Restart
+.\启动-运筹优化底座.ps1 -NoFrontend
 ```
 
-启动成功后，脚本会输出并打开类似以下地址：
+### 3. 手工开发环境
 
-```text
-http://127.0.0.1:8092/prototype.html?apiBase=http%3A%2F%2F127.0.0.1%3A8090%2Fapi
-```
-
-停止服务：
+终端 1：启动 FastAPI。
 
 ```powershell
-# 停止平台 API 和静态前端
-.\Shutdown.ps1
-
-# 停止平台 API、Agent API 和静态前端
-.\Shutdown.ps1 -Both
-
-# 停止所有默认端口
-.\Shutdown.ps1 -All
-```
-
-`Run.ps1` 会自动创建 `.venv` 并安装缺失依赖。若只希望做启动检查、不自动安装依赖，可加 `-SkipDependencyInstall`。
-
-健康检查：
-
-```powershell
-Invoke-RestMethod http://127.0.0.1:8090/api/health
-```
-
-`capabilities` 应包含：
-
-```text
-component_based_builder
-component_registry
-cascade_hydro_dispatch
-```
-
-如果缺少这些能力，通常说明端口上仍是旧后端进程，请执行：
-
-```powershell
-.\Run.ps1 -Restart
-```
-
-## 内置模型模板
-
-服务启动时会加载以下模型模板：
-
-- `unit_commitment_day_ahead`：日前机组组合优化
-- `economic_dispatch`：经济负荷分配
-- `storage_dispatch`：储能充放电优化
-- `renewable_storage_dispatch`：风光储协同优化
-- `chp_dispatch`：电热协同优化
-- `cascade_hydro_dispatch`：梯级水电日前调度优化，组件化 Builder 模型
-
-`cascade_hydro_dispatch` 使用 `build_mode=component_based`，其 `component_spec` 由水电组件注册表构建 Pyomo 模型，覆盖初始库容、库容边界、检修可用容量、出力-流量转换、下泄平衡、弃水边界、梯级时滞入库、水量平衡、负荷跟踪、期末库容控制和出力平滑等组件。
-
-## 核心 API
-
-模板库：
-
-```text
-GET  /api/templates
-GET  /api/templates/{template_code}
-GET  /api/templates/{template_code}/parameter-schema
-GET  /api/templates/{template_code}/sample-runtime-parameters
-POST /api/templates/{template_code}/clone
-```
-
-模型资产：
-
-```text
-GET  /api/models
-POST /api/models
-GET  /api/models/{model_id}
-PUT  /api/models/{model_id}
-GET  /api/models/{model_id}/schema
-POST /api/models/{model_id}/publish
-POST /api/models/{model_id}/offline
-POST /api/models/{model_id}/copy
-POST /api/models/{model_id}/invoke
-```
-
-优化任务：
-
-```text
-POST /api/optimize/run
-GET  /api/optimize/jobs
-GET  /api/optimize/jobs/{job_id}
-GET  /api/optimize/result/{job_id}
-POST /api/tasks/{task_id}/retry
-POST /api/tasks/{task_id}/cancel
-```
-
-Skill 调用：
-
-```text
-GET  /api/skills
-POST /api/skills/{skill_name}/analyze-input
-POST /api/skills/{skill_name}/run
-```
-
-梯级水电 Skill：
-
-```text
-POST /api/skills/run_cascade_hydro_dispatch/run
-```
-
-## 梯级水电调用示例
-
-```powershell
-$params = Invoke-RestMethod `
-  -Uri "http://127.0.0.1:8090/api/templates/cascade_hydro_dispatch/sample-runtime-parameters"
-
-$task = Invoke-RestMethod `
-  -Method Post `
-  -Uri "http://127.0.0.1:8090/api/optimize/run" `
-  -ContentType "application/json" `
-  -Body (@{
-    model_code = "cascade_hydro_dispatch"
-    runtime_parameters = $params
-    time_limit_seconds = 30
-  } | ConvertTo-Json -Depth 20)
-
-$task
-```
-
-结果指标中弃水使用体积单位：
-
-```text
-total_spill_million_m3
-spill_volume_million_m3
-```
-
-## 前端验证路径
-
-详细操作说明见 [组件化自定义 Builder 使用说明](docs/component_builder_user_guide.md)。
-
-平台 UI：
-
-1. 打开 `prototype.html`。
-2. 进入“模型创建”。
-3. 点击“加载组件化水电样例”。
-4. 第 3 步应显示“组件化 Builder”和 12 个水电组件。
-5. 进入“模型资产中心”，点击水电模型的“调用模型”。
-6. 任务页应自动填入 `time_volume` 等英文运行时参数 key。
-7. 点击“实例化并提交任务”，任务应成功完成。
-
-Agent UI：
-
-1. 使用 `.\Run.ps1 -Mode both -Restart`。
-2. 打开 `agent_console.html`。
-3. 调用 `run_cascade_hydro_dispatch` 或输入梯级水电调度目标。
-
-## 测试
-
-专项测试：
-
-```powershell
-.\.venv\Scripts\python.exe -m pytest tests\test_component_based_hydro_model.py -q
-```
-
-全量回归：
-
-```powershell
-.\.venv\Scripts\python.exe -m pytest -q
-```
-
-前端脚本语法检查：
-
-```powershell
-$raw = Get-Content prototype.html -Raw -Encoding UTF8
-$script = [regex]::Match($raw, '<script>([\s\S]*)</script>').Groups[1].Value
-Set-Content -Path __prototype_check.js -Value $script -Encoding UTF8
-node --check __prototype_check.js
-Remove-Item -LiteralPath __prototype_check.js -Force
-```
-
-当前已验证：`114 passed`。
-
-## 运行时数据
-
-默认运行时数据保存在：
-
-```text
-data/runtime_store.json
-```
-
-报告导出目录：
-
-```text
-reports/
-```
-
-日志目录：
-
-```text
-logs/
-```
-
-## React 正式前端
-
-正式前端位于 `frontend/`，使用 Vite、React、TypeScript、React Router、TanStack Query、Zustand、Ant Design、Axios 和 ECharts。原 `prototype.html` 保留为 legacy 入口。
-
-开发环境：
-
-```powershell
-# 终端 1：FastAPI API
 $env:PORT='8000'
-python server.py
+.\.venv\Scripts\python.exe server.py
+```
 
-# 终端 2：Vite UI
+终端 2：启动 Vite。
+
+```powershell
 cd frontend
-Copy-Item .env.example .env
+Copy-Item .env.example .env -ErrorAction SilentlyContinue
 npm install
 npm run dev
 ```
 
-前端地址为 `http://localhost:5173`，后端为 `http://localhost:8000`，Vite 将 `/api` 代理到后端。
+访问地址：
 
-生产构建与测试：
+- React 前端：`http://localhost:5173`
+- FastAPI：`http://localhost:8000`
+- 健康检查：`http://localhost:8000/api/health`
+
+Vite 会把 `/api` 代理到 `http://localhost:8000`。API 地址可通过 `frontend/.env` 的 `VITE_API_BASE_URL` 覆盖。
+
+### 4. 手工生产模式
 
 ```powershell
 cd frontend
+npm install
 npm run build
-npm run test
-npm run test:e2e
 cd ..
 $env:PORT='8000'
-python server.py
+.\.venv\Scripts\python.exe server.py
 ```
 
-构建后 FastAPI 自动托管：
+FastAPI 自动托管 `frontend/dist`：
 
-- `/`：React 应用，客户端路由支持直接刷新。
-- `/api/*`：原 FastAPI API。
-- `/legacy`、`/prototype.html`：原生 JS legacy 页面。
-- `/static/*`：legacy CSS/JS。
+- `/`：React 应用
+- `/api/*`：后端 API
+- `/legacy`、`/prototype.html`：legacy 平台
+- `/static/*`：legacy CSS/JS
 
-阶段测试记录见 `docs/frontend-migration-test-log.md`。本次未改写 FastAPI、Pyomo、HiGHS、模型模板、组件注册表或求解器核心。
+React 客户端路由支持直接刷新。
 
-当前明确边界：Monaco Editor 是可选项，本版未引入；结果导出按钮仅预留；Agent 仅迁移页面；`abs`、值函数 `min/max`、`piecewise`、`!=` 和变量乘除变量在完成线性化前会阻止通用线性模型发布。聚合 `sum/min/max` 以结构化 AggregateToken 保存。
+## 前端功能
+
+正式前端路由：
+
+| 路由 | 功能 |
+| --- | --- |
+| `/` | 总览驾驶舱 |
+| `/scenarios` | 业务场景库 |
+| `/models` | 模型资产中心 |
+| `/models/create` | 五步模型创建 |
+| `/models/:id` | 模型详情 |
+| `/components` | 组件库管理 |
+| `/components/:id` | 组件详情与编辑 |
+| `/tasks` | 任务调度中心 |
+| `/results` | 结果报告库 |
+| `/services` / `/model-services` | 模型服务接口 |
+| `/agents` | Agent 工作台 |
+| `/settings` | 系统配置 |
+
+模型创建流程为：基础信息 → 模型语义 → 数学展开 → 运行参数 → 校验发布。支持通用线性 Builder 和组件化 Builder。
+
+统一公式编辑器使用结构化 token，不以 textarea 作为主要编辑方式。公式同步保存 `display_formula`、`dsl_formula` 与 `tokens`，并识别引用集合、参数、变量和自由索引。通用线性公式必须成功编译为 `generic_spec` 才能发布。
+
+当前会阻止发布的表达式包括：未线性化的 `abs`、值函数 `min/max`、`piecewise`、`!=` 和变量乘除变量。聚合 `sum/min/max` 使用结构化 `AggregateToken`。
+
+## 内置资产
+
+当前内置 12 个模型模板：
+
+- `unit_commitment_day_ahead`
+- `economic_dispatch`
+- `storage_dispatch`
+- `renewable_storage_dispatch`
+- `chp_dispatch`
+- `cascade_hydro_dispatch`
+- `pv_storage_capacity_planning`
+- `pv_storage_day_ahead_dispatch`
+- `pv_storage_intraday_dispatch`
+- `pv_storage_dispatch_v2`
+- `pv_storage_day_ahead_dispatch_v2`
+- `pv_storage_intraday_dispatch_v2`
+
+组件库包含 24 个内置组件。模板与组件仍由原后端注册表和服务管理，前端改造未重写求解核心。
+
+## 常用 API
+
+```text
+GET  /api/templates
+GET  /api/templates/{code}
+POST /api/templates/{code}/clone
+
+GET  /api/models
+POST /api/models
+GET  /api/models/{id}
+PUT  /api/models/{id}
+POST /api/models/{id}/publish
+POST /api/models/{id}/test
+POST /api/models/{id}/copy
+
+GET  /api/components/catalog
+POST /api/components/catalog
+GET  /api/components/{id}
+PUT  /api/components/{id}
+POST /api/components/{id}/validate
+POST /api/components/{id}/publish
+POST /api/components/{id}/copy-version
+POST /api/components/{id}/offline
+
+GET  /api/tasks
+POST /api/tasks
+GET  /api/tasks/{id}
+POST /api/tasks/{id}/cancel
+POST /api/tasks/{id}/retry
+GET  /api/tasks/{id}/result
+GET  /api/results
+
+GET  /api/agent/status
+GET  /api/agent/agent-skills
+GET  /api/agent/conversations
+POST /api/agent/analyze
+POST /api/agent/confirm-defaults
+POST /api/agent/confirm-invoke
+```
+
+## 测试
+
+前端迁移阶段收口：
+
+```powershell
+python scripts/verify_test_matrix.py
+cd frontend
+npm ci
+npm run typecheck
+npm run test:phase
+npm run build
+npm run test
+npx playwright install chromium
+npm run test:e2e
+npx playwright show-report
+```
+
+Linux CI 环境如缺少系统依赖，先执行：
+
+```bash
+cd frontend
+npx playwright install --with-deps chromium
+npm run test:e2e
+```
+
+本项目的 `playwright.config.ts` 默认使用 Playwright 托管 Chromium，不写死本机 Chrome。需要指定本机 Chrome 时可设置 `PW_CHANNEL=chrome`；如系统已有 Chromium（例如 `/usr/bin/chromium`），也可通过 `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/usr/bin/chromium` 指定可执行文件。
+
+E2E 会输出 `frontend/playwright-report` 和 `frontend/test-results`，其中包含 HTML 报告、trace 与 screenshot。查看报告：
+
+```powershell
+cd frontend
+npx playwright show-report
+```
+
+`real_backend_smoke.spec.ts` 会启动并调用真实 FastAPI 后端，依赖 Python 后端环境、Pyomo 与 HiGHS/highspy 可用；如果求解依赖缺失，用例接受后端错误在页面可见，但真实求解闭环需要完整安装这些依赖。
+
+前端全量单测：
+
+```powershell
+cd frontend
+npm run test:unit
+```
+
+后端回归：
+
+```powershell
+python -m pytest -q
+```
+
+分组测试命令见 [迭代测试入口](docs/iteration-test-entrypoints.md)，阶段验收结果见 [前端迁移测试记录](docs/frontend-migration-test-log.md)，测试体系收口见 [前端迁移测试体系收口](docs/frontend-migration-test-closure.md)。
+
+当前 Codex 沙箱中 Vite/Vitest 可能因 esbuild 子进程启动报 `spawn EPERM`。遇到该限制时，先以 `python scripts/verify_test_matrix.py` 与 `npm run typecheck` 完成静态收口；在本地或 CI 的非受限环境继续运行 `npm run test:phase`、`npm run build`、`npm run test:e2e` 和 `python -m pytest -q`。
+
+## 交付说明
+
+React 前端迁移已按阶段拆分交付，覆盖五步模型创建、统一公式编辑器、`generic_spec` 编译闭环、运行参数、校验发布、组件库、模型资产中心、任务调度中心、结果报告中心、Agent 工作台接口对齐和测试体系收口。
+
+交付包不得包含 `frontend/node_modules`、`frontend/tsconfig*.tsbuildinfo`、`frontend/test-results`、`logs/`、`__pycache__/` 等本地依赖、构建缓存和运行产物。解压后进入 `frontend` 执行 `npm ci` 安装依赖；不要提交或打包 `node_modules`。
+
+交付入口见 [React 前端迁移交付说明](docs/react-frontend-delivery.md)。正式功能优先使用 `frontend/`；`prototype.html` 与 `agent_console.html` 仅保留兼容和回归用途。
+
+## 已知边界
+
+- Monaco Editor 为可选项，当前未引入。
+- 结果导出按钮当前仅预留。
+- Agent 工作台已对齐 `/api/agent/*` 状态、Skill、会话、分析、默认值确认和调用确认接口；后端 Agent 编排仍沿用现有服务实现。
+- Ant Design/ECharts vendor chunk 存在构建体积提示，不影响构建和运行。
+- `prototype.html` 与 `agent_console.html` 只做兼容维护，新功能优先进入 `frontend/`。
+
+详细操作见 [操作手册](OPERATION_MANUAL.md)，代码入口见 [Engineering Map](docs/engineering-map.md)。

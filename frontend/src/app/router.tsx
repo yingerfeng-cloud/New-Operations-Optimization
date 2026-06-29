@@ -1,3 +1,41 @@
-import { lazy, Suspense } from 'react'; import { Spin } from 'antd'; import { createBrowserRouter } from 'react-router-dom'; import { MainLayout } from './layout/MainLayout'; import { DashboardPage } from '../pages/Dashboard/DashboardPage'; import { SettingsPage } from '../pages/Settings/SettingsPage'; import { AgentWorkbenchPage } from '../pages/AgentWorkbench/AgentWorkbenchPage';
-const ModelCenter=lazy(()=>import('../pages/ModelCenter/ModelCenterPage').then(m=>({default:m.ModelCenterPage})));const ComponentLibrary=lazy(()=>import('../pages/ComponentLibrary/ComponentLibraryPage').then(m=>({default:m.ComponentLibraryPage})));const TaskCenter=lazy(()=>import('../pages/TaskCenter/TaskCenterPage').then(m=>({default:m.TaskCenterPage})));const ResultCenter=lazy(()=>import('../pages/ResultCenter/ResultCenterPage').then(m=>({default:m.ResultCenterPage})));const ModelCreation=lazy(()=>import('../features/model-creation/ModelCreationPage').then(m=>({default:m.ModelCreationPage})));const load=(node:React.ReactNode)=><Suspense fallback={<Spin fullscreen/>}>{node}</Suspense>;
-export const router=createBrowserRouter([{path:'/',element:<MainLayout/>,children:[{index:true,element:<DashboardPage/>},{path:'models',element:load(<ModelCenter/>)},{path:'models/create',element:load(<ModelCreation/>)},{path:'models/:id',element:load(<ModelCenter/>)},{path:'components',element:load(<ComponentLibrary/>)},{path:'components/:id',element:load(<ComponentLibrary/>)},{path:'tasks',element:load(<TaskCenter/>)},{path:'results',element:load(<ResultCenter/>)},{path:'agents',element:<AgentWorkbenchPage/>},{path:'settings',element:<SettingsPage/>}]}]);
+import { lazy, Suspense } from 'react';
+import { Spin } from 'antd';
+import { createBrowserRouter } from 'react-router-dom';
+import { MainLayout } from './layout/MainLayout';
+import { DashboardPage } from '../pages/Dashboard/DashboardPage';
+import { SettingsPage } from '../pages/Settings/SettingsPage';
+import { AgentWorkbenchPage } from '../pages/AgentWorkbench/AgentWorkbenchPage';
+
+const ScenarioLibrary = lazy(() => import('../pages/ScenarioLibrary/ScenarioLibraryPage').then(m => ({ default: m.ScenarioLibraryPage })));
+const ModelCenter = lazy(() => import('../pages/ModelCenter/ModelCenterPage').then(m => ({ default: m.ModelCenterPage })));
+const ComponentLibrary = lazy(() => import('../pages/ComponentLibrary/ComponentLibraryPage').then(m => ({ default: m.ComponentLibraryPage })));
+const FunctionAssets = lazy(() => import('../pages/FunctionAssets/FunctionAssetsPage').then(m => ({ default: m.FunctionAssetsPage })));
+const TaskCenter = lazy(() => import('../pages/TaskCenter/TaskCenterPage').then(m => ({ default: m.TaskCenterPage })));
+const ResultCenter = lazy(() => import('../pages/ResultCenter/ResultCenterPage').then(m => ({ default: m.ResultCenterPage })));
+const ModelServices = lazy(() => import('../pages/ModelServices/ModelServicesPage').then(m => ({ default: m.ModelServicesPage })));
+const ModelCreation = lazy(() => import('../features/model-creation/ModelCreationPage').then(m => ({ default: m.ModelCreationPage })));
+const load = (node: React.ReactNode) => <Suspense fallback={<Spin fullscreen />}>{node}</Suspense>;
+
+export const router = createBrowserRouter([
+  {
+    path: '/',
+    element: <MainLayout />,
+    children: [
+      { index: true, element: <DashboardPage /> },
+      { path: 'scenarios', element: load(<ScenarioLibrary />) },
+      { path: 'models', element: load(<ModelCenter />) },
+      { path: 'models/create', element: load(<ModelCreation />) },
+      { path: 'models/:id', element: load(<ModelCenter />) },
+      { path: 'components', element: load(<ComponentLibrary />) },
+      { path: 'components/:id', element: load(<ComponentLibrary />) },
+      { path: 'functions', element: load(<FunctionAssets />) },
+      { path: 'runtime', element: <SettingsPage variant="runtime" /> },
+      { path: 'tasks', element: load(<TaskCenter />) },
+      { path: 'results', element: load(<ResultCenter />) },
+      { path: 'services', element: load(<ModelServices />) },
+      { path: 'model-services', element: load(<ModelServices />) },
+      { path: 'agents', element: <AgentWorkbenchPage /> },
+      { path: 'settings', element: <SettingsPage variant="settings" /> },
+    ],
+  },
+]);

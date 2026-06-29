@@ -17,7 +17,8 @@ from app.problem_type_diagnosis import (
 )
 from app.schemas.model import AssetPackage, AssetView, ModelPackage, ModelView
 from app.semantic.semantic_validator import RuntimeParameterValidator
-from app.solvers.highs_adapter import HiGHSAdapter
+from app.services.function_asset_service import get_function_asset, validate_function_asset
+from app.solvers.solver_router import solver_router
 from app.storage.memory_store import STORE
 from app.templates.power_templates import power_template_library
 from app.utils import has_pyomo, now_text, require_pyomo_for_publish
@@ -107,7 +108,7 @@ class ModelService:
                 "status": "published",
                 "published_at": now_text(),
                 "updated_at": now_text(),
-                "solver": "HiGHS",
+                "solver": diagnosis.get("recommended_solver") or normalized_model.solver,
                 "validation_warnings": warnings,
                 "dry_run_result": dry_run_result,
                 "ui_metadata": {
@@ -428,6 +429,7 @@ class ModelService:
             component_spec = model.component_spec or semantic_spec.get("component_spec") or {}
             is_component_based = self._is_component_based_model(model)
             is_template_backed = self._is_known_template_model(model)
+            has_function_binding_errors = False
             if not semantic_spec:
                 errors.append({"field": "semantic_spec", "error": "semantic_spec is required before publish"})
             errors.extend(self._validate_required_parameter_bindings(model))
@@ -435,6 +437,10 @@ class ModelService:
                 errors.append({"field": "component_spec", "error": "component_spec is required before publish"})
             if is_component_based:
                 errors.extend(self._validate_component_sets(model))
+                function_errors, function_warnings = self._validate_function_asset_bindings(component_spec)
+                has_function_binding_errors = bool(function_errors)
+                errors.extend(function_errors)
+                warnings.extend(function_warnings)
                 if not (component_spec.get("variables") or []):
                     errors.append({"field": "component_spec.variables", "error": "variables are required before publish"})
                 if not (component_spec.get("components") or []):
@@ -455,14 +461,15 @@ class ModelService:
                 errors.append({"field": "generic_spec.variables", "error": "variables are required before publish"})
             if not is_component_based and not is_template_backed and not ((generic_spec.get("objective") or {}).get("terms") or []):
                 errors.append({"field": "generic_spec.objective.terms", "error": "objective terms are required before publish"})
-            dry_run_result = self._dry_run_model(model, run_solver=require_publish_ready)
-            dry_run_result["problem_type_diagnosis"] = diagnosis
-            if dry_run_result["structure_check"]["status"] == "failed":
-                errors.extend(dry_run_result["structure_check"].get("errors", []))
-            if require_publish_ready and dry_run_result["solver_check"]["status"] != "passed":
-                solver_warnings = dry_run_result["solver_check"].get("warnings", [])
-                errors.extend(solver_warnings or [{"field": "solver_check", "error": "solver dry-run did not pass", "actual": dry_run_result["solver_check"].get("status")}])
-            warnings.extend(dry_run_result["solver_check"].get("warnings", []))
+            if not has_function_binding_errors:
+                dry_run_result = self._dry_run_model(model, run_solver=require_publish_ready)
+                dry_run_result["problem_type_diagnosis"] = diagnosis
+                if dry_run_result["structure_check"]["status"] == "failed":
+                    errors.extend(dry_run_result["structure_check"].get("errors", []))
+                if require_publish_ready and dry_run_result["solver_check"]["status"] != "passed":
+                    solver_warnings = dry_run_result["solver_check"].get("warnings", [])
+                    errors.extend(solver_warnings or [{"field": "solver_check", "error": "solver dry-run did not pass", "actual": dry_run_result["solver_check"].get("status")}])
+                warnings.extend(dry_run_result["solver_check"].get("warnings", []))
         if errors:
             raise HTTPException(status_code=422, detail={"message": "模型发布失败" if require_publish_ready else "模型校验失败", "errors": self._structured_publish_errors(errors), "warnings": warnings, "dry_run_result": dry_run_result})
         return warnings, dry_run_result
@@ -505,14 +512,18 @@ class ModelService:
             return infer_problem_type_from_draft(draft, model.solver)
         component_spec = deepcopy(model.component_spec or (model.semantic_spec or {}).get("component_spec") or {})
         if component_spec:
+            solver_for_diagnosis = model.solver
+            if str(solver_for_diagnosis or "").lower() in {"", "highs"}:
+                solver_for_diagnosis = None
             return infer_problem_type_from_component_spec(
                 component_spec,
-                solver_name=model.solver,
+                solver_name=solver_for_diagnosis,
                 requested_problem_type=model.model_problem_type or component_spec.get("model_problem_type") or model.problem_type,
             )
         return {
             "inferred_problem_type": model.model_problem_type or model.problem_type or "LP",
             "recommended_problem_type": model.model_problem_type or model.problem_type or "LP",
+            "recommended_solver": "HiGHS",
             "requested_problem_type": model.model_problem_type or model.problem_type or "LP",
             "effective_problem_type": model.model_problem_type or model.problem_type or "LP",
             "expression_class": "linear",
@@ -523,6 +534,8 @@ class ModelService:
             "solver_supported_problem_types": [],
             "reasons": ["非组件化模型沿用已声明的问题类型"],
             "warnings": [],
+            "function_assets_used": [],
+            "linearization_strategy": [],
             "publish_valid": True,
         }
 
@@ -771,16 +784,146 @@ class ModelService:
                 dry_spec["parameters"] = dry_parameters
                 pyomo_model, _ = GenericLinearBuilder().build(dry_spec)
             if run_solver:
-                solver_result = HiGHSAdapter().solve(pyomo_model)
+                problem_type = (self._diagnose_problem_type(model) or {}).get("inferred_problem_type") or model.model_problem_type or model.problem_type
+                solver_result = solver_router.solve(pyomo_model, problem_type=problem_type, requested_solver=None)
                 result["solver_check"] = {"status": "passed", "warnings": [], "objective_value": solver_result.objective_value, "solver_status": solver_result.status}
         except Exception as exc:
-            field = "component_spec.additional_custom_constraints" if is_component_based else "generic_spec"
+            function_component_index = self._first_function_mapping_component_index(component_spec) if is_component_based else None
+            field = (
+                f"component_spec.components[{function_component_index}]"
+                if function_component_index is not None
+                else ("component_spec.additional_custom_constraints" if is_component_based else "generic_spec")
+            )
+            suggestion = (
+                "请检查函数映射组件的 x/y 变量、索引集合、函数资产定义域和求解策略。"
+                if function_component_index is not None
+                else None
+            )
             message = {"field": field, "level": "error", "error": "solver test failed" if run_solver else "dry run build failed", "actual": str(exc)}
+            if suggestion:
+                message["suggestion"] = suggestion
             if run_solver:
                 result["solver_check"] = {"status": "failed", "warnings": [message]}
             else:
                 result["structure_check"] = {"status": "failed", "errors": [message]}
         return result
+
+    def _first_function_mapping_component_index(self, component_spec: dict[str, Any]) -> int | None:
+        for index, component in enumerate(component_spec.get("components") or []):
+            config = component.get("config") if isinstance(component.get("config"), dict) else {}
+            component_type = str(component.get("type") or component.get("component_id") or config.get("type") or config.get("component_id") or "")
+            if component_type in {"function_mapping_component", "piecewise_linear_curve"}:
+                return index
+        return None
+
+    def _validate_function_asset_bindings(self, component_spec: dict[str, Any]) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+        errors: list[dict[str, Any]] = []
+        warnings: list[dict[str, Any]] = []
+        variables = {
+            str(item.get("code") or item.get("name") or item.get("key")): item
+            for item in component_spec.get("variables") or []
+        }
+        for index, component in enumerate(component_spec.get("components") or []):
+            component_type = str(component.get("type") or component.get("component_id") or "")
+            if component_type not in {"function_mapping_component", "piecewise_linear_curve"}:
+                continue
+            config = component.get("config") if isinstance(component.get("config"), dict) else {}
+            cfg = {**config, **component}
+            function_id = str(cfg.get("function_asset_id") or cfg.get("curve_asset_id") or cfg.get("curve") or "")
+            field = f"component_spec.components[{index}].function_asset_id"
+            if not function_id:
+                errors.append({"field": field, "error": "function_asset_id is required"})
+                continue
+            try:
+                asset = get_function_asset(function_id)
+            except RuntimeError as exc:
+                errors.append({"field": field, "error": "function asset does not exist", "actual": function_id, "suggestion": str(exc)})
+                continue
+            validation = validate_function_asset(asset)
+            if not validation["valid"]:
+                errors.append(
+                    {
+                        "field": field,
+                        "error": "function asset validation failed",
+                        "actual": validation["errors"],
+                        "suggestion": "请先修正函数/曲线资产断点、状态或绑定关系。",
+                    }
+                )
+                continue
+            strategy = str(cfg.get("solve_strategy") or asset.get("solve_strategy") or "convex_combination_lp")
+            if not cfg.get("x"):
+                errors.append({"field": f"component_spec.components[{index}].x", "error": "x is required"})
+            if not cfg.get("y"):
+                errors.append({"field": f"component_spec.components[{index}].y", "error": "y is required"})
+            if strategy not in {"display_only", "convex_combination_lp", "binary_segment_milp"}:
+                errors.append({"field": f"component_spec.components[{index}].solve_strategy", "error": "unsupported solve_strategy", "actual": strategy})
+                continue
+            y_var = self._base_variable_name(str(cfg.get("y") or ""))
+            if y_var and y_var not in variables:
+                row = {
+                    "field": f"component_spec.components[{index}].y",
+                    "level": "warning" if strategy == "display_only" else "error",
+                    "error": f"输出变量 {y_var} 未在语义模型变量中定义，请先在 Step2 新增该变量，或选择已有变量。",
+                    "actual": str(cfg.get("y") or ""),
+                    "suggestion": "请先在 Step2 新增该变量，或选择已有变量。",
+                }
+                if strategy == "display_only":
+                    warnings.append({**row, "message": row["error"]})
+                else:
+                    errors.append(row)
+            if strategy == "binary_segment_milp":
+                errors.append(
+                    {
+                        "field": f"component_spec.components[{index}].solve_strategy",
+                        "error": "binary_segment_milp is reserved and cannot be published as a solvable model",
+                        "actual": strategy,
+                        "suggestion": "Use convex_combination_lp for the current LP approximation or display_only for diagnostics.",
+                    }
+                )
+            if strategy == "convex_combination_lp" and validation["diagnostics"].get("convexity") in {"nonconvex", "unknown"}:
+                warnings.append(
+                    {
+                        "field": f"component_spec.components[{index}].solve_strategy",
+                        "level": "warning",
+                        "message": "convex_combination_lp may allow convex combinations of non-adjacent breakpoints; results may not lie strictly on the original piecewise curve",
+                        "actual": validation["diagnostics"].get("convexity"),
+                        "suggestion": "declare a convex/concave curve shape or use binary_segment_milp when exact segment selection is required",
+                    }
+                )
+            x_var = self._base_variable_name(str(cfg.get("x") or ""))
+            domain = validation.get("domain") or asset.get("domain") or {}
+            if x_var and x_var in variables and domain:
+                variable = variables[x_var]
+                lower = self._numeric_bound(variable.get("lower_bound", variable.get("lb")))
+                upper = self._numeric_bound(variable.get("upper_bound", variable.get("ub")))
+                x_min = self._numeric_bound(domain.get("x_min"))
+                x_max = self._numeric_bound(domain.get("x_max"))
+                if lower is None or upper is None:
+                    warnings.append({"field": f"component_spec.variables.{x_var}", "level": "warning", "message": "variable bound is missing; function asset domain coverage cannot be fully verified", "expected": domain})
+                else:
+                    if x_min is not None and lower < x_min:
+                        errors.append({"field": f"component_spec.variables.{x_var}.lower_bound", "error": "variable lower bound is outside function asset domain", "actual": lower, "expected": f">= {x_min}"})
+                    if x_max is not None and upper > x_max:
+                        errors.append({"field": f"component_spec.variables.{x_var}.upper_bound", "error": "variable upper bound is outside function asset domain", "actual": upper, "expected": f"<= {x_max}"})
+            elif x_var:
+                warnings.append({"field": f"component_spec.components[{index}].x", "level": "warning", "message": "x variable was not found in component_spec.variables", "actual": x_var})
+        return errors, warnings
+
+    def _base_variable_name(self, expression: str) -> str:
+        import re
+
+        match = re.match(r"\s*([A-Za-z_]\w*)", expression or "")
+        return match.group(1) if match else ""
+
+    def _numeric_bound(self, value: Any) -> float | None:
+        if isinstance(value, (int, float)):
+            return float(value)
+        if isinstance(value, str):
+            try:
+                return float(value)
+            except ValueError:
+                return None
+        return None
 
     def _fill_component_dry_parameters(self, params: dict[str, Any], component_spec: dict[str, Any]) -> None:
         sets = {str(item.get("code") or item.get("name") or item.get("key")): list(item.get("values") or []) for item in component_spec.get("sets", []) or []}

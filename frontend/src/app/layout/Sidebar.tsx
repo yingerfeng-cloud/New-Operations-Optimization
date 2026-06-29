@@ -1,8 +1,68 @@
-import { DashboardOutlined, DatabaseOutlined, ExperimentOutlined, AppstoreOutlined, ScheduleOutlined, BarChartOutlined, RobotOutlined, SettingOutlined } from '@ant-design/icons';
-import { Menu } from 'antd'; import { useLocation, useNavigate } from 'react-router-dom';
-const items = [
-  ['/', <DashboardOutlined/>, '总览驾驶舱'], ['/models', <DatabaseOutlined/>, '模型资产中心'], ['/models/create', <ExperimentOutlined/>, '模型创建'],
-  ['/components', <AppstoreOutlined/>, '组件库管理'], ['/tasks', <ScheduleOutlined/>, '任务调度中心'], ['/results', <BarChartOutlined/>, '结果报告库'],
-  ['/agents', <RobotOutlined/>, 'Agent 工作台'], ['/settings', <SettingOutlined/>, '系统配置'],
-].map(([key, icon, label]) => ({ key: key as string, icon, label }));
-export function Sidebar(){ const nav=useNavigate(); const {pathname}=useLocation(); const selected=items.find(x=>x.key!=='/'&&pathname.startsWith(x.key))?.key || '/'; return <><div className="brand"><div className="brand-mark">优</div><div>运筹优化平台<small>Pyomo + HiGHS</small></div></div><Menu theme="dark" mode="inline" selectedKeys={[selected]} items={items} onClick={({key})=>nav(key)}/></>; }
+import { useLocation, useNavigate } from 'react-router-dom';
+import { navEntries, type NavEntry } from '../navigation';
+
+interface NavGroup {
+  label: NavEntry['group'];
+  items: NavEntry[];
+}
+
+const navGroups = navEntries.reduce<NavGroup[]>((groups, entry) => {
+  const group = groups.find(item => item.label === entry.group);
+  if (group) {
+    group.items.push(entry);
+  } else {
+    groups.push({ label: entry.group, items: [entry] });
+  }
+  return groups;
+}, []);
+
+export function Sidebar() {
+  const nav = useNavigate();
+  const { pathname } = useLocation();
+  const allItems = navGroups.flatMap(group => group.items);
+  const matchesPath = (key: string) => {
+    if (key === '/') return pathname === '/';
+    return pathname === key || pathname.startsWith(`${key}/`);
+  };
+  const activeKey = allItems
+    .filter(item => matchesPath(item.key))
+    .sort((a, b) => b.key.length - a.key.length)[0]?.key;
+  const selected = (key: string) => {
+    if (key === '/') return pathname === '/';
+    return activeKey === key;
+  };
+  const openItem = (key: string) => {
+    nav(key);
+  };
+
+  return (
+    <aside className="sidebar">
+      <div className="brand">
+        <div className="brand-mark">优</div>
+        <div>
+          安全生产运筹优化底座
+          <small>Pyomo + HiGHS</small>
+        </div>
+      </div>
+      <nav className="nav">
+        {navGroups.map(group => (
+          <div className="nav-group" key={group.label}>
+            <div className="nav-group-label">{group.label}</div>
+            {group.items.map(item => (
+              <button
+                key={`${group.label}-${item.label}`}
+                className={selected(item.key) ? 'active' : ''}
+                type="button"
+                onClick={() => openItem(item.key)}
+                title={item.label}
+              >
+                <span className="nav-icon">{item.icon}</span>
+                <span className="nav-label">{item.label}</span>
+              </button>
+            ))}
+          </div>
+        ))}
+      </nav>
+    </aside>
+  );
+}

@@ -7,11 +7,19 @@ from app.schemas.result import SolverRunResult
 
 
 class HiGHSAdapter:
+    name = "HiGHS"
+    supported_problem_types = ["LP", "MILP", "QP", "MIQP"]
+
+    def available(self) -> bool:
+        import pyomo.environ as pyo
+
+        return bool(pyo.SolverFactory("appsi_highs").available(False))
+
     def solve(self, model: Any, *, mip_gap: float = 0.001, time_limit_seconds: int = 300, threads: int | None = None) -> SolverRunResult:
         import pyomo.environ as pyo
 
         solver = pyo.SolverFactory("appsi_highs")
-        if not solver.available(False):
+        if not self.available():
             raise RuntimeError("Pyomo appsi_highs solver is not available. Ensure pyomo and highspy are installed.")
         solver.options["time_limit"] = float(time_limit_seconds)
         solver.options["mip_rel_gap"] = float(mip_gap)

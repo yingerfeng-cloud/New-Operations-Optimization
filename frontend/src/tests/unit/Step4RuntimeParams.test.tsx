@@ -1,0 +1,57 @@
+import { fireEvent, render, screen } from '@testing-library/react';
+import { useState } from 'react';
+import { Step4RuntimeParams, buildRuntimeParameterRows, validateRuntimeParameters } from '../../features/model-creation/steps/Step4RuntimeParams';
+import { createInitialDraft, type ModelDraft } from '../../features/model-creation/stores/modelCreationStore';
+
+function makeDraft() {
+  const draft = createInitialDraft();
+  draft.semantic.parameters = [
+    { code: 'load', name: '负荷预测', unit: 'MW', indices: ['time'], dimension: ['time'], sourceType: 'runtime', source_type: 'runtime', required: true, exampleValue: [100, 120], description: '运行时负荷' },
+    { code: 'fuel_cost', name: '燃料成本', unit: '元/MWh', indices: ['unit'], dimension: ['unit'], sourceType: 'static', source_type: 'static', defaultValue: { U1: 10 }, default: { U1: 10 }, required: false },
+    { code: 'asset_capacity', name: '装机容量', unit: 'MW', sourceType: 'ledger', source_type: 'ledger', required: false },
+    { code: 'solver_timeout', name: '求解超时', unit: 's', sourceType: 'system', source_type: 'system', defaultValue: 60, default: 60, required: false },
+    { code: 'deviation_weight', name: '偏差权重', sourceType: 'runtime', source_type: 'runtime', defaultValue: 1, default: 1, required: false },
+  ];
+  draft.runtime_parameters = { horizon: 24 };
+  draft.parameter_groups = { runtime: {}, static: {}, ledger: {}, system: {}, objective_weights: {} };
+  return draft;
+}
+
+function Harness({ initial = makeDraft() }: { initial?: ModelDraft }) {
+  const [draft, setDraft] = useState(initial);
+  return <Step4RuntimeParams draft={draft} onChange={setDraft} />;
+}
+
+test('builds classified runtime parameter rows and missing validation', () => {
+  const draft = makeDraft();
+  const rows = buildRuntimeParameterRows(draft);
+  expect(rows.find(row => row.code === 'load')?.source).toBe('runtime');
+  expect(rows.find(row => row.code === 'fuel_cost')?.source).toBe('static');
+  expect(rows.find(row => row.code === 'deviation_weight')?.source).toBe('objective_weights');
+  expect(validateRuntimeParameters(draft)).toContain('负荷预测 load 缺少必填值');
+});
+
+test('renders parameter categories and missing prompts', () => {
+  render(<Harness />);
+  expect(screen.getByText('缺少必填运行参数')).toBeInTheDocument();
+  expect(screen.getByText(/负荷预测 load 缺少必填值/)).toBeInTheDocument();
+  expect(screen.getByText('运行时输入参数 1')).toBeInTheDocument();
+  expect(screen.getByText('模型静态参数 1')).toBeInTheDocument();
+  expect(screen.getByText('目标权重参数 1')).toBeInTheDocument();
+});
+
+test('imports JSON runtime parameters and updates preview', () => {
+  render(<Harness />);
+  fireEvent.change(screen.getByLabelText('运行参数 JSON'), { target: { value: JSON.stringify({ horizon: 2, load: [100, 120] }) } });
+  fireEvent.click(screen.getByText('导入并校验'));
+  expect(screen.queryByText('缺少必填运行参数')).not.toBeInTheDocument();
+  expect(screen.getByText(/"load": \[/)).toBeInTheDocument();
+});
+
+test('edits table value into runtime schema', () => {
+  render(<Harness />);
+  const loadInput = screen.getByLabelText('load 当前值');
+  fireEvent.change(loadInput, { target: { value: '[90,95]' } });
+  fireEvent.blur(loadInput);
+  expect(screen.getAllByText(/"load": \[/).length).toBeGreaterThan(0);
+});

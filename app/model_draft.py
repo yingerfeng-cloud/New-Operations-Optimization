@@ -9,6 +9,20 @@ from app.model_components.registry import component_definition, list_component_c
 from app.problem_type_diagnosis import infer_problem_type_from_draft, normalize_problem_type
 from app.storage.memory_store import STORE
 
+COMPONENT_CONFIG_COMPONENTS = {"function_mapping_component", "piecewise_linear_curve"}
+COMPONENT_CONFIG_FIELDS = {
+    "function_asset_id",
+    "curve_asset_id",
+    "x",
+    "y",
+    "indices",
+    "solve_strategy",
+    "constraint_id",
+    "generated_constraints",
+    "config",
+    "metadata",
+}
+
 
 def create_model_draft_from_template(template: dict[str, Any]) -> dict[str, Any]:
     if template.get("build_mode") != "component_based":
@@ -394,13 +408,9 @@ def build_component_spec_from_draft(draft: dict[str, Any]) -> dict[str, Any]:
     semantic = draft.get("semantic") or {}
     advanced = draft.get("advanced") or {}
     current = deepcopy(advanced.get("component_spec") or {})
-    enabled_components = [
-        {"type": item.get("type") or item.get("component_id"), "config": deepcopy(item.get("config") or {})}
-        for item in draft.get("components", []) or []
-        if item.get("enabled", True)
-    ]
+    enabled_components = [_component_spec_item_from_draft(item) for item in draft.get("components", []) or [] if item.get("enabled", True)]
     for item in enabled_components:
-        if not item["config"]:
+        if "config" in item and not item["config"]:
             item.pop("config", None)
     objective = deepcopy(draft.get("objective") or {})
     merged_sets = _merge_by_code(deepcopy(semantic.get("sets") or current.get("sets") or []), "code", _component_items(draft, "required_sets"))
@@ -426,6 +436,24 @@ def build_component_spec_from_draft(draft: dict[str, Any]) -> dict[str, Any]:
         "objective_strategy": deepcopy(draft.get("objective_strategy") or generate_objective_strategy(objective)),
         "additional_custom_constraints": deepcopy(draft.get("constraints") or []),
     }
+
+
+def _component_spec_item_from_draft(item: dict[str, Any]) -> dict[str, Any]:
+    component_type = item.get("type") or item.get("component_id")
+    row: dict[str, Any] = {"type": component_type}
+    config = deepcopy(item.get("config") or {})
+    if component_type in COMPONENT_CONFIG_COMPONENTS:
+        for field in COMPONENT_CONFIG_FIELDS:
+            if field == "config":
+                continue
+            if field in item:
+                row[field] = deepcopy(item[field])
+            elif field in config:
+                row[field] = deepcopy(config[field])
+        row["config"] = config
+        return row
+    row["config"] = config
+    return row
 
 
 def _component_items(draft: dict[str, Any], key: str) -> list[dict[str, Any]]:
@@ -479,7 +507,7 @@ def _variable_domain(variable: dict[str, Any]) -> str:
     return "NonNegativeReals"
 
 
-FORMULA_NOT_GENERATED = "鏈敓鎴愬叕寮忥紝璇锋鏌ュ彉閲忋€侀泦鍚堛€佸弬鏁板拰鍏紡閰嶇疆"
+FORMULA_NOT_GENERATED = "未生成公式，请检查变量、集合、参数和公式配置"
 
 
 def _first_non_blank(*values: Any) -> str:
@@ -637,6 +665,7 @@ def build_mathematical_expansion(draft: dict[str, Any]) -> dict[str, Any]:
 
 def normalize_component_model_package(model_data: dict[str, Any]) -> dict[str, Any]:
     draft = deepcopy(model_data.get("model_draft") or {})
+    has_explicit_draft = bool(draft)
     if not draft:
         semantic = deepcopy(model_data.get("semantic_spec") or {})
         template_like = {
@@ -656,7 +685,16 @@ def normalize_component_model_package(model_data: dict[str, Any]) -> dict[str, A
     if model_data.get("component_spec"):
         edited_component_spec = deepcopy(model_data["component_spec"])
         draft.setdefault("advanced", {})["component_spec"] = edited_component_spec
-        if "components" in edited_component_spec:
+        semantic_payload = model_data.get("semantic_spec") or {}
+        template_detail_payload = any(key in semantic_payload for key in ("objectives", "sample_runtime_parameters", "component_schema", "display_name"))
+        if "components" in edited_component_spec and (
+            not has_explicit_draft
+            or not (draft.get("components") or [])
+            or (
+                template_detail_payload
+                and not _draft_components_match_component_spec(draft.get("components") or [], edited_component_spec)
+            )
+        ):
             draft["components"] = _draft_components_from_component_spec(edited_component_spec)
         if edited_component_spec.get("objective"):
             draft["objective"] = _objective_from_components(draft.get("components") or [], edited_component_spec.get("objective") or {})
@@ -698,19 +736,61 @@ def _draft_components_from_component_spec(component_spec: dict[str, Any]) -> lis
         if not component_type:
             continue
         definition = _component_definition_or_metadata(component_type)
-        components.append(
-            {
-                "component_id": component_type,
-                "type": component_type,
-                "enabled": item.get("enabled", True),
-                "required": item.get("required", definition.get("required", False)),
-                "config": deepcopy(item.get("config") or {}),
-                "definition": definition,
-                "generated_constraints": deepcopy(definition.get("generated_constraints") or []),
-                "generated_objective_terms": deepcopy(definition.get("generated_objective_terms") or []),
-            }
-        )
+        config = deepcopy(item.get("config") or {})
+        draft_item = {
+            "component_id": component_type,
+            "type": component_type,
+            "enabled": item.get("enabled", True),
+            "required": item.get("required", definition.get("required", False)),
+            "config": config,
+            "definition": definition,
+            "generated_constraints": deepcopy(item.get("generated_constraints") or definition.get("generated_constraints") or []),
+            "generated_objective_terms": deepcopy(item.get("generated_objective_terms") or definition.get("generated_objective_terms") or []),
+        }
+        if component_type in COMPONENT_CONFIG_COMPONENTS:
+            for field in COMPONENT_CONFIG_FIELDS:
+                if field == "config":
+                    continue
+                if field in item:
+                    draft_item[field] = deepcopy(item[field])
+                elif field in config:
+                    draft_item[field] = deepcopy(config[field])
+        components.append(draft_item)
     return components
+
+
+def _draft_components_match_component_spec(components: list[dict[str, Any]], component_spec: dict[str, Any]) -> bool:
+    return _component_signature_from_draft(components) == _component_signature_from_spec(component_spec.get("components") or [])
+
+
+def _component_signature_from_draft(components: list[dict[str, Any]]) -> list[tuple[Any, ...]]:
+    return [
+        (
+            item.get("type") or item.get("component_id"),
+            item.get("function_asset_id") or (item.get("config") or {}).get("function_asset_id") if isinstance(item.get("config"), dict) else item.get("function_asset_id"),
+            item.get("x") or (item.get("config") or {}).get("x") if isinstance(item.get("config"), dict) else item.get("x"),
+            item.get("y") or (item.get("config") or {}).get("y") if isinstance(item.get("config"), dict) else item.get("y"),
+            item.get("solve_strategy") or (item.get("config") or {}).get("solve_strategy") if isinstance(item.get("config"), dict) else item.get("solve_strategy"),
+        )
+        for item in components
+        if item.get("enabled", True) is not False
+    ]
+
+
+def _component_signature_from_spec(components: list[dict[str, Any]]) -> list[tuple[Any, ...]]:
+    rows = []
+    for item in components:
+        config = item.get("config") if isinstance(item.get("config"), dict) else {}
+        rows.append(
+            (
+                item.get("type") or item.get("component_id") or item.get("code"),
+                item.get("function_asset_id") or config.get("function_asset_id"),
+                item.get("x") or config.get("x"),
+                item.get("y") or config.get("y"),
+                item.get("solve_strategy") or config.get("solve_strategy"),
+            )
+        )
+    return rows
 
 
 def normalize_generic_model_package(model_data: dict[str, Any]) -> dict[str, Any]:

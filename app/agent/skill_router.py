@@ -4,7 +4,7 @@ from typing import Any
 
 
 HOW_TO_USE_MARKERS = ["我该怎么用", "怎么使用", "这个平台怎么用", "怎么开始", "使用流程是什么"]
-HELP_MARKERS = ["参数示例", "样例参数", "给我一个参数", "怎么填写", "怎么填参数", "璇风粰鎴戜釜鍙傛暟绀轰緥", "缁欐垜涓€涓弬鏁扮ず渚"]
+HELP_MARKERS = ["参数示例", "样例参数", "给我一个参数", "怎么填写", "怎么填参数"]
 REQUIRED_MARKERS = [
     "我需要提供哪些参数",
     "需要哪些参数",
@@ -13,18 +13,16 @@ REQUIRED_MARKERS = [
     "这个模型要填啥",
     "缺哪些参数",
     "参数清单",
-    "闇€瑕佸摢浜涘弬鏁",
-    "缂轰粈涔堝弬鏁",
 ]
-SWITCH_MARKERS = ["切换到", "换成", "改成", "鍒囨崲鍒", "鏀规垚", "鎹㈡垚"]
-CONFIRM_DEFAULT_MARKERS = ["确认使用默认值", "使用默认值", "默认值确认", "纭浣跨敤榛樿鍊", "浣跨敤榛樿鍊"]
-CONFIRM_INVOKE_MARKERS = ["确认调用", "开始求解", "执行优化", "开始优化", "运行模型", "纭璋冪敤", "寮€濮嬫眰瑙", "鎵ц浼樺寲"]
-RESULT_MARKERS = ["解释结果", "结果解释", "总结结果", "分析结果", "上一次结果", "上一次优化结果", "瑙ｉ噴缁撴灉", "缁撴灉瑙ｉ噴"]
-CONFIRM_SWITCH_CLEAR_MARKERS = ["确认清空", "清空后切换", "确认切换", "清空参数", "纭娓呯┖"]
-CONFIRM_SWITCH_MIGRATE_MARKERS = ["迁移参数", "保留兼容参数", "迁移后切换", "杩佺Щ鍙傛暟"]
-CANCEL_SWITCH_MARKERS = ["取消切换", "不切换", "保持当前", "鍙栨秷鍒囨崲"]
-AVAILABILITY_MARKERS = ["有没有", "支持", "能不能做", "平台有", "是否支持", "有模型", "没有", "鏈夋病鏈", "鏀寔", "鑳戒笉鑳藉仛"]
-OPTIMIZATION_MARKERS = ["帮我", "运行", "求解", "优化", "调度", "分配", "dispatch", "optimize", "调用", "甯垜", "杩愯", "姹傝В", "浼樺寲", "璋冨害"]
+SWITCH_MARKERS = ["切换到", "换成", "改成"]
+CONFIRM_DEFAULT_MARKERS = ["确认使用默认值", "使用默认值", "默认值确认"]
+CONFIRM_INVOKE_MARKERS = ["确认调用", "开始求解", "执行优化", "开始优化", "运行模型"]
+RESULT_MARKERS = ["解释结果", "结果解释", "总结结果", "分析结果", "上一次结果", "上一次优化结果"]
+CONFIRM_SWITCH_CLEAR_MARKERS = ["确认清空", "清空后切换", "确认切换", "清空参数"]
+CONFIRM_SWITCH_MIGRATE_MARKERS = ["迁移参数", "保留兼容参数", "迁移后切换"]
+CANCEL_SWITCH_MARKERS = ["取消切换", "不切换", "保持当前"]
+AVAILABILITY_MARKERS = ["有没有", "支持", "能不能做", "平台有", "是否支持", "有模型", "没有"]
+OPTIMIZATION_MARKERS = ["帮我", "运行", "求解", "优化", "调度", "分配", "dispatch", "optimize", "调用"]
 
 
 class AgentSkillRouter:
@@ -95,10 +93,10 @@ class AgentSkillRouter:
             if any(str(item).lower() and str(item).lower() in text for item in names):
                 return skill.get("name")
         aliases = [
-            ("unit_commitment_day_ahead", ["日前机组组合", "机组组合", "机组", "日前", "启停", "备用", "unit commitment", "鏃ュ墠", "鏈虹粍"]),
-            ("storage_dispatch", ["储能调度", "储能", "峰谷", "soc", "storage", "鍌ㄨ兘"]),
-            ("renewable_storage_dispatch", ["风光储", "新能源", "可再生", "renewable", "椋庡厜鍌"]),
-            ("chp_dispatch", ["电热协同", "热电", "chp", "鐢电儹"]),
+            ("unit_commitment_day_ahead", ["日前机组组合", "机组组合", "机组", "日前", "启停", "备用", "unit commitment"]),
+            ("storage_dispatch", ["储能调度", "储能", "峰谷", "soc", "storage"]),
+            ("renewable_storage_dispatch", ["风光储", "新能源", "可再生", "renewable"]),
+            ("chp_dispatch", ["电热协同", "热电", "chp"]),
             (
                 "cascade_hydro_dispatch",
                 [
@@ -116,12 +114,9 @@ class AgentSkillRouter:
                     "帮我做梯级水电调度计划",
                     "cascade hydro",
                     "hydro dispatch",
-                    "姊骇",
-                    "姘寸數",
-                    "姘村簱",
                 ],
             ),
-            ("economic_dispatch", ["经济调度", "经济负荷分配", "出力分配", "负荷分配", "economic dispatch", "缁忔祹"]),
+            ("economic_dispatch", ["经济调度", "经济负荷分配", "出力分配", "负荷分配", "economic dispatch"]),
         ]
         available = {item.get("name") for item in skills}
         for name, markers in aliases:

@@ -1,3 +1,54 @@
-import { Badge, Space, Tag, Typography } from 'antd'; import { useQuery } from '@tanstack/react-query'; import { apiClient, unwrap } from '../../api/client';
-const titles: Record<string,string> = {'/':'总览驾驶舱','/models':'模型资产中心','/models/create':'模型创建','/components':'组件库管理','/tasks':'任务调度中心','/results':'结果报告库','/agents':'Agent 工作台','/settings':'系统配置'};
-export function Header({pathname}:{pathname:string}){ const {data,isError}=useQuery({queryKey:['health'],queryFn:()=>unwrap<{ok:boolean}>(apiClient.get('/api/health')),refetchInterval:30000}); const title=pathname.startsWith('/models/create')?titles['/models/create']:Object.entries(titles).find(([p])=>p!=='/'&&pathname.startsWith(p))?.[1]||titles['/']; return <header className="top-header"><Typography.Title level={4} style={{margin:0}}>{title}</Typography.Title><Space><Badge status={data?.ok?'success':isError?'error':'processing'} text={data?.ok?'API 已连接':isError?'API 连接失败':'API 检查中'}/><Tag color="blue">HiGHS</Tag></Space></header>; }
+import { Button, Input, Space, Tag } from 'antd';
+import { useQuery } from '@tanstack/react-query';
+import { PlusOutlined, SearchOutlined } from '@ant-design/icons';
+import { useNavigate } from 'react-router-dom';
+import { apiClient, unwrap } from '../../api/client';
+import { titleForPath } from '../navigation';
+
+interface HealthResponse {
+  ok: boolean;
+  service?: string;
+  solver?: string;
+  pyomo_installed?: boolean;
+  highspy_installed?: boolean;
+}
+
+export function Header({ pathname }: { pathname: string }) {
+  const nav = useNavigate();
+  const refetchInterval = import.meta.env.MODE === 'test' ? false : 30000;
+  const { data, isError, isFetching } = useQuery({
+    queryKey: ['health'],
+    queryFn: () => unwrap<HealthResponse>(apiClient.get('/api/health')),
+    refetchInterval,
+  });
+  const legacyBaseUrl = import.meta.env.VITE_API_BASE_URL?.replace(/\/$/, '') || '';
+  const legacyHref = `${legacyBaseUrl}/legacy`;
+  const backendOnline = Boolean(data?.ok);
+  const current = titleForPath(pathname);
+
+  return (
+    <header className="top-header">
+      <div className="top-search-area">
+        <span className="current-page-chip">{current.label}</span>
+        <Input
+          className="global-search"
+          prefix={<SearchOutlined />}
+          placeholder="搜索模型、组件、任务或报告"
+          allowClear
+        />
+      </div>
+      <div className="top-actions">
+        <Space size={10} wrap>
+          <span className={`status-pill ${backendOnline ? 'status-pill-green' : isError ? 'status-pill-red' : 'status-pill-amber'}`}>
+            后端状态：{backendOnline ? '在线' : isError ? '离线' : isFetching ? '检查中' : '未检测'}
+          </span>
+          <span className={`status-pill ${data?.highspy_installed === false ? 'status-pill-red' : 'status-pill-blue'}`}>
+            当前求解器：{data?.solver || 'HiGHS'}
+          </span>
+          <Button href={legacyHref} target="_blank">Legacy</Button>
+          <Button type="primary" icon={<PlusOutlined />} onClick={() => nav('/models/create')}>新建模型</Button>
+        </Space>
+      </div>
+    </header>
+  );
+}

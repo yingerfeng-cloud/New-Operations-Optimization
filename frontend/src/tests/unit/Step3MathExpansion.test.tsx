@@ -1,0 +1,123 @@
+import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { useState } from 'react';
+import { vi } from 'vitest';
+import { Step3MathExpansion } from '../../features/model-creation/steps/Step3MathExpansion';
+import { createInitialDraft, type ModelDraft } from '../../features/model-creation/stores/modelCreationStore';
+import { renderWithQueryClient } from '../testUtils';
+import type { FormulaDef } from '../../types/formula';
+
+const formula = (kind: 'constraint' | 'objective', dsl: string, foreach: string[] = []): FormulaDef => ({
+  formula_id: dsl,
+  name: dsl,
+  kind,
+  display_formula: dsl,
+  dsl_formula: dsl,
+  tokens: [],
+  foreach,
+  referenced_sets: [],
+  referenced_parameters: [],
+  referenced_variables: [],
+  free_indices: foreach,
+  compile_status: 'ready',
+});
+
+vi.mock('../../api/functionAssets', () => ({
+  getFunctionAssets: async () => [
+    {
+      function_id: 'curve_storage_level',
+      name: '水位库容曲线',
+      function_type: 'piecewise_1d',
+      validation_status: 'valid',
+      validation_errors: [],
+      points: [[0, 0], [10, 10]],
+      domain: { x_min: 0, x_max: 10 },
+      solve_strategy: 'convex_combination_lp',
+    },
+    {
+      function_id: 'bad_curve',
+      name: '异常曲线',
+      function_type: 'piecewise_1d',
+      validation_status: 'invalid',
+      validation_errors: [{ message: 'x must be strictly increasing' }],
+      points: [[0, 0], [0, 1]],
+      solve_strategy: 'convex_combination_lp',
+    },
+  ],
+}));
+
+function Harness({ initial }: { initial: ModelDraft }) {
+  const [draft, setDraft] = useState(initial);
+  return (
+    <>
+      <Step3MathExpansion draft={draft} onChange={setDraft} />
+      <div data-testid="component-count">{draft.components.length}</div>
+      <pre data-testid="draft-json">{JSON.stringify(draft.components)}</pre>
+    </>
+  );
+}
+
+function genericDraft() {
+  const draft = createInitialDraft();
+  draft.basic_info.builder_mode = 'generic_linear';
+  draft.semantic.sets = [{ code: 'unit', name: '机组', values: ['u1'] }, { code: 'time', name: '时段', values: [0] }];
+  draft.semantic.parameters = [{ code: 'load', name: '负荷', dimension: ['time'], default: [10] }, { code: 'cost', name: '成本', dimension: ['unit'], default: { u1: 1 } }];
+  draft.semantic.variables = [{ code: 'p', name: '出力', dimension: ['unit', 'time'], domain: 'NonNegativeReals' }];
+  draft.formulas = [formula('constraint', 'sum(p[u,t] for u in unit) >= load[t]', ['time']), formula('objective', 'sum(cost[u] * p[u,t] for u in unit for t in time)')];
+  return draft;
+}
+
+function componentDraft() {
+  const draft = createInitialDraft();
+  draft.basic_info.builder_mode = 'component_based';
+  draft.semantic.sets = [{ code: 'time', name: '时段', values: [0] }];
+  draft.semantic.variables = [
+    { code: 'volume', name: '库容', dimension: ['time'], domain: 'NonNegativeReals' },
+    { code: 'level', name: '水位', dimension: ['time'], domain: 'NonNegativeReals' },
+  ];
+  return draft;
+}
+
+test('Step3 generic builder compiles formulas into generic_spec preview', () => {
+  renderWithQueryClient(<Harness initial={genericDraft()} />);
+  expect(screen.getByText('待编译')).toBeInTheDocument();
+  fireEvent.click(screen.getByText('编译 generic_spec'));
+  expect(screen.getByText('已生成')).toBeInTheDocument();
+  expect(screen.getByText('generic_spec 预览')).toBeInTheDocument();
+  expect(screen.getByText(/"rhs_param": "load"/)).toBeInTheDocument();
+});
+
+test('Step3 component builder renders generated constraints and dependencies', () => {
+  const draft = componentDraft();
+  draft.components = [{
+    component_id: 'power_balance',
+    name: '功率平衡组件',
+    generated_constraints: [{ constraint_id: 'balance', name: '功率平衡', formula: 'p_grid[t] == load[t]' }],
+    generated_objective_terms: [{ term_id: 'cost', name: '购电成本', formula: 'sum(price[t] * p_grid[t] for t in time)' }],
+    dependencies: ['network_limit'],
+    parameter_bindings: [{ component_parameter: 'load', model_parameter: 'load_forecast', status: 'bound' }],
+  }];
+
+  renderWithQueryClient(<Harness initial={draft} />);
+  expect(screen.getByText('组件化数学展开')).toBeInTheDocument();
+  expect(screen.getAllByText('功率平衡组件').length).toBeGreaterThan(0);
+  expect(screen.getByText('p_grid[t] == load[t]')).toBeInTheDocument();
+  expect(screen.getByText('network_limit')).toBeInTheDocument();
+  expect(screen.getByText('load_forecast')).toBeInTheDocument();
+});
+
+test('Step3 opens Add Function Mapping modal and saves complete component config', async () => {
+  renderWithQueryClient(<Harness initial={componentDraft()} />);
+  fireEvent.click(screen.getByRole('button', { name: '添加函数映射' }));
+  expect(await screen.findByRole('dialog')).toBeInTheDocument();
+  expect(screen.getByText(/binary_segment_milp/)).toBeInTheDocument();
+  expect(await screen.findByText(/水位库容曲线/)).toBeInTheDocument();
+  const submitButton = screen.getAllByRole('button', { name: /添\s*加/ }).find(button => button.getAttribute('type') === 'submit');
+  expect(submitButton).toBeTruthy();
+  fireEvent.click(submitButton!);
+  await waitFor(() => expect(screen.getByTestId('component-count')).toHaveTextContent('1'));
+  const json = screen.getByTestId('draft-json').textContent || '';
+  expect(json).toContain('"function_asset_id":"curve_storage_level"');
+  expect(json).toContain('"x":"volume[t]"');
+  expect(json).toContain('"y":"level[t]"');
+  expect(json).toContain('"solve_strategy":"convex_combination_lp"');
+});

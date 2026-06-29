@@ -5,8 +5,11 @@
   "type": "module",
   "scripts": {
     "dev": "vite --host 0.0.0.0 --port 5173",
+    "typecheck": "tsc -b",
     "build": "tsc -b && vite build",
     "test": "vitest run",
+    "test:unit": "vitest run src/tests/unit",
+    "test:phase": "vitest run src/tests/unit/DashboardPage.test.tsx src/tests/unit/ScenarioLibraryPage.test.tsx src/tests/unit/ModelCreationPage.test.tsx src/tests/unit/Step2SemanticModel.test.tsx src/tests/unit/Step3MathExpansion.test.tsx src/tests/unit/Step4RuntimeParams.test.tsx src/tests/unit/Step5ReviewPublish.test.tsx src/tests/unit/ModelCenterPage.test.tsx src/tests/unit/ComponentLibraryPage.test.tsx src/tests/unit/TaskCenterPage.test.tsx src/tests/unit/ResultCenterPage.test.tsx src/tests/unit/AgentWorkbenchPage.test.tsx",
     "test:watch": "vitest",
     "test:e2e": "playwright test"
   },
