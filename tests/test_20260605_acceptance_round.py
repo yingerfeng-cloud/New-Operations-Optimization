@@ -1,20 +1,15 @@
 from __future__ import annotations
 
-import re
 import uuid
 from copy import deepcopy
 from pathlib import Path
 
-from fastapi.testclient import TestClient
-
 from app.builders.generic_linear_builder import GenericLinearBuilder
 from app.generic_formula_compiler import compile_generic_formula_spec
-from app.main import app
 from app.services.template_service import template_library
 
 
 ROOT = Path(__file__).resolve().parents[1]
-client = TestClient(app)
 
 
 TEMPLATE_BASED_MODELS = [
@@ -78,28 +73,6 @@ def _generic_formula_payload() -> dict:
     }
 
 
-def test_prototype_loads_latest_split_frontend_assets() -> None:
-    prototype = (ROOT / "prototype.html").read_text(encoding="utf-8")
-    scripts = re.findall(r'<script\s+src="([^"]+)"\s*></script>', prototype)
-    expected = [
-        "static/js/platform-api.js",
-        "static/js/platform-core.js",
-        "static/js/problem_type_diagnosis.js",
-        "static/js/platform-pages-main.js",
-        "static/js/platform-formula-editor.js",
-        "static/js/platform-pages-modeling.js",
-        "static/js/platform-component-editor.js",
-        "static/js/platform-actions.js",
-        "static/js/platform-init.js",
-    ]
-    assert [path.split("?", 1)[0] for path in scripts] == expected
-    assert all("?v=20260605-final" in path for path in scripts)
-    assert "<script>" not in prototype
-    assert "addIndexedConstraintFromForm" not in prototype
-    assert "indexedConstraintRule" not in prototype
-    assert "indexedObjectiveType" not in prototype
-
-
 def test_generic_formula_dsl_compiles_to_generic_linear_spec() -> None:
     payload = _generic_formula_payload()
     compiled = compile_generic_formula_spec(payload["generic_spec"], payload["semantic_spec"])
@@ -123,7 +96,7 @@ def test_generic_builder_formula_constraint_can_solve() -> None:
     assert model.con_power_balance_T0_0_1.active
 
 
-def test_generic_builder_formula_objective_can_solve() -> None:
+def test_generic_builder_formula_objective_can_solve(client) -> None:
     created = client.post("/api/models", json=_generic_formula_payload())
     assert created.status_code == 200, created.text
     published = client.post(f"/api/models/{created.json()['id']}/publish")
@@ -133,7 +106,7 @@ def test_generic_builder_formula_objective_can_solve() -> None:
     assert tested.json()["dry_run_result"]["solver_check"]["status"] == "passed"
 
 
-def test_template_based_models_have_executable_generic_spec() -> None:
+def test_template_based_models_have_executable_generic_spec(client) -> None:
     for code in TEMPLATE_BASED_MODELS:
         cloned = client.post(f"/api/templates/{code}/clone")
         assert cloned.status_code == 200, cloned.text
@@ -142,7 +115,7 @@ def test_template_based_models_have_executable_generic_spec() -> None:
         assert body["dry_run_result"].get("structure_check", {}).get("status") in {None, "passed"}
 
 
-def test_all_template_based_models_clone_publish_test_success() -> None:
+def test_all_template_based_models_clone_publish_test_success(client) -> None:
     for code in TEMPLATE_BASED_MODELS:
         cloned = client.post(f"/api/templates/{code}/clone")
         assert cloned.status_code == 200, cloned.text
@@ -153,7 +126,7 @@ def test_all_template_based_models_clone_publish_test_success() -> None:
         assert tested.status_code == 200, tested.text
 
 
-def test_all_pv_storage_component_templates_publish_success() -> None:
+def test_all_pv_storage_component_templates_publish_success(client) -> None:
     for code in PV_STORAGE_COMPONENT_TEMPLATES:
         cloned = client.post(f"/api/templates/{code}/clone")
         assert cloned.status_code == 200, cloned.text
@@ -164,7 +137,7 @@ def test_all_pv_storage_component_templates_publish_success() -> None:
         assert tested.status_code == 200, tested.text
 
 
-def test_all_builtin_components_validate_without_exception() -> None:
+def test_all_builtin_components_validate_without_exception(client) -> None:
     catalog = client.get("/api/components/catalog")
     assert catalog.status_code == 200, catalog.text
     for item in catalog.json():
@@ -180,7 +153,7 @@ def test_all_builtin_components_validate_without_exception() -> None:
             assert body["enabled"] is False
 
 
-def test_reserved_components_not_marked_implemented() -> None:
+def test_reserved_components_not_marked_implemented(client) -> None:
     catalog = {item["component_id"]: item for item in client.get("/api/components/catalog").json()}
     piecewise = catalog["piecewise_linear_curve"]
     assert piecewise["implemented"] is True
@@ -194,7 +167,7 @@ def test_reserved_components_not_marked_implemented() -> None:
         assert item["metadata_only"] is True
 
 
-def test_component_parameter_bindings_enter_runtime_schema() -> None:
+def test_component_parameter_bindings_enter_runtime_schema(client) -> None:
     template = deepcopy(template_library.get_template("pv_storage_day_ahead_dispatch"))
     template["component_spec"]["parameter_bindings"] = [
         {"parameter": "pv_forecast", "source": "forecast.pv", "required": True}
@@ -206,7 +179,7 @@ def test_component_parameter_bindings_enter_runtime_schema() -> None:
     assert body["input_contract"]["parameter_bindings"][0]["required"] is True
 
 
-def test_component_dependency_validation_blocks_model_publish() -> None:
+def test_component_dependency_validation_blocks_model_publish(client) -> None:
     template = deepcopy(template_library.get_template("pv_storage_day_ahead_dispatch_v2"))
     template["status"] = "developing"
     template["component_spec"]["components"] = [

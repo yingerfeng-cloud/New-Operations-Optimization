@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import importlib.util
-import re
 import uuid
 import zipfile
 from pathlib import Path
@@ -62,20 +60,18 @@ def test_cascade_hydro_analyze_and_run_missing_required_consistent() -> None:
     assert {"local_inflow", "load_forecast"} <= run_missing
 
 
-def test_agent_console_no_duplicate_function_names() -> None:
-    html = Path("agent_console.html").read_text(encoding="utf-8")
-    core = ["pageChat", "render", "shell", "pageSkills", "pageAgentSkills", "analyzeMessage", "confirmInvoke"]
-    for name in core:
-        assert len(re.findall(rf"\bfunction\s+{name}\s*\(", html)) == 1, name
-
-
 def test_package_excludes_runtime_store_logs_reports_pycache() -> None:
     script = Path("package.ps1").read_text(encoding="utf-8")
-    assert '".venv"' in script
+    assert "\\\\.venv" in script
     assert '"data\\runtime_store.json"' in script
     assert '"logs"' in script and '"*.log"' in script
     assert '"reports"' in script and '"*.html"' in script
     assert '"__pycache__"' in script
+    assert "\\artifacts" in script
+    assert "\\\\frontend\\\\dist" in script
+    assert "\\\\frontend\\\\playwright-report" in script
+    assert "\\\\frontend\\\\node_modules" in script
+    assert '$IncludeItems' in script
 
     output = Path(f"copt-500-test-{uuid.uuid4().hex}.zip")
     sample_names = [
@@ -106,57 +102,3 @@ def test_package_excludes_runtime_store_logs_reports_pycache() -> None:
     assert not any(name.startswith("logs/") and name.endswith(".log") for name in names)
     assert not any(name.startswith("reports/") and name.endswith(".html") for name in names)
     assert not any("__pycache__/" in name or name.endswith(".pyc") for name in names)
-
-
-playwright_available = importlib.util.find_spec("playwright") is not None
-
-
-def require_playwright_browser() -> None:
-    if not playwright_available:
-        pytest.skip("playwright is not installed")
-    from playwright.sync_api import Error, sync_playwright
-
-    try:
-        with sync_playwright() as p:
-            browser = p.chromium.launch()
-            browser.close()
-    except Error as exc:
-        pytest.skip(f"Playwright Chromium browser is not installed: {exc}")
-
-
-@pytest.mark.skipif(not playwright_available, reason="playwright is not installed")
-def test_frontend_playwright_skill_modal() -> None:
-    require_playwright_browser()
-    from playwright.sync_api import sync_playwright
-
-    with sync_playwright() as p:
-        browser = p.chromium.launch()
-        page = browser.new_page()
-        page.goto(Path("prototype.html").resolve().as_uri())
-        page.get_by_text("模型资产中心").click()
-        page.get_by_text("生成 / 查看 Skill").first.click()
-        for text in ["Skill 概览", "调用入口", "输入参数", "输出结构"]:
-            assert page.get_by_text(text).first.is_visible()
-        browser.close()
-
-
-@pytest.mark.skipif(not playwright_available, reason="playwright is not installed")
-def test_frontend_playwright_agent_economic_dispatch_flow() -> None:
-    require_playwright_browser()
-    from playwright.sync_api import sync_playwright
-
-    with sync_playwright() as p:
-        browser = p.chromium.launch()
-        page = browser.new_page()
-        page.goto(Path("agent_console.html").resolve().as_uri())
-        page.get_by_text("新建聊天").click()
-        page.locator("#chatInput").fill("帮我跑经济调度，四个时段负荷100、120、90、110，U1最大80成本10，U2最大100成本20，U3最大60成本30")
-        page.get_by_text("发送").click()
-        page.get_by_text("确认使用默认值").click()
-        page.get_by_text("确认调用").click()
-        assert page.get_by_text("5900").first.is_visible()
-        page.get_by_text("Agent Skill 管理").click()
-        page.get_by_text("economic_dispatch").first.click()
-        for text in ["SKILL.md", "参数示例", "dry-run-request"]:
-            assert page.get_by_text(text).first.is_visible()
-        browser.close()

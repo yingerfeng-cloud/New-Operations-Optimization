@@ -9,12 +9,13 @@ from app.model_components.registry import component_definition, list_component_c
 from app.problem_type_diagnosis import infer_problem_type_from_draft, normalize_problem_type
 from app.storage.memory_store import STORE
 
-COMPONENT_CONFIG_COMPONENTS = {"function_mapping_component", "piecewise_linear_curve"}
+COMPONENT_CONFIG_COMPONENTS = {"function_mapping_component", "piecewise_linear_curve", "function_mapping_2d_component"}
 COMPONENT_CONFIG_FIELDS = {
     "function_asset_id",
     "curve_asset_id",
     "x",
     "y",
+    "z",
     "indices",
     "solve_strategy",
     "constraint_id",

@@ -9,9 +9,11 @@
     "build": "tsc -b && vite build",
     "test": "vitest run",
     "test:unit": "vitest run src/tests/unit",
-    "test:phase": "vitest run src/tests/unit/DashboardPage.test.tsx src/tests/unit/ScenarioLibraryPage.test.tsx src/tests/unit/ModelCreationPage.test.tsx src/tests/unit/Step2SemanticModel.test.tsx src/tests/unit/Step3MathExpansion.test.tsx src/tests/unit/Step4RuntimeParams.test.tsx src/tests/unit/Step5ReviewPublish.test.tsx src/tests/unit/ModelCenterPage.test.tsx src/tests/unit/ComponentLibraryPage.test.tsx src/tests/unit/TaskCenterPage.test.tsx src/tests/unit/ResultCenterPage.test.tsx src/tests/unit/AgentWorkbenchPage.test.tsx",
+    "test:phase": "vitest run src/tests/unit/DashboardPage.test.tsx src/tests/unit/ScenarioLibraryPage.test.tsx src/tests/unit/ModelCreationPage.test.tsx src/tests/unit/Step2SemanticModel.test.tsx src/tests/unit/Step3MathExpansion.test.tsx src/tests/unit/Step4RuntimeParams.test.tsx src/tests/unit/Step5ReviewPublish.test.tsx src/tests/unit/ModelCenterPage.test.tsx src/tests/unit/ComponentLibraryPage.test.tsx src/tests/unit/TaskCenterPage.test.tsx src/tests/unit/ResultCenterPage.test.tsx src/tests/unit/AgentWorkbenchPage.test.tsx src/tests/unit/OfficialFrontendOnly.test.tsx",
     "test:watch": "vitest",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test -c playwright.frontend-mock.config.ts",
+    "test:e2e:mock": "playwright test -c playwright.frontend-mock.config.ts",
+    "test:e2e:real": "playwright test -c playwright.real-backend.config.ts"
   },
   "dependencies": {
     "@ant-design/icons": "^6.1.0",

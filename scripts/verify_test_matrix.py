@@ -28,6 +28,7 @@ REQUIRED_FRONTEND_UNIT = [
     "TaskCenterPage.test.tsx",
     "ResultCenterPage.test.tsx",
     "AgentWorkbenchPage.test.tsx",
+    "OfficialFrontendOnly.test.tsx",
 ]
 
 REQUIRED_FRONTEND_E2E = [
@@ -67,6 +68,7 @@ REQUIRED_DOC_SNIPPETS = [
     "npm run test:phase",
     "python scripts/verify_test_matrix.py",
     "AgentWorkbenchPage.test.tsx",
+    "OfficialFrontendOnly.test.tsx",
 ]
 
 

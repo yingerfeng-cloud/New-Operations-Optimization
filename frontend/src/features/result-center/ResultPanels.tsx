@@ -1,4 +1,4 @@
-import { Alert, Card, Col, Empty, Row, Statistic, Table } from 'antd';
+import { Alert, Card, Col, Empty, Row, Space, Statistic, Table } from 'antd';
 import ReactECharts from 'echarts-for-react';
 import { JsonViewer } from '../../components/JsonViewer';
 import type { SolveResult } from '../../types/result';
@@ -137,5 +137,85 @@ export function ResultExplanationPanel({ result }: { result?: SolveResult }) {
         <JsonViewer value={{ risk_notes: obj.risk_notes || obj.risks || [], next_actions: obj.next_actions || obj.actions || [] }} />
       </Card>
     </>
+  );
+}
+
+function hydroRows(result?: SolveResult, key?: string): RowValue[] {
+  const output = objectValue(result?.business_output);
+  return rowsFrom(output[key || ''] || (result as Record<string, unknown> | undefined)?.[key || ''], key || 'hydro');
+}
+
+function hydroChartOption(title: string, rows: RowValue[], valueField: string) {
+  const reservoirs = [...new Set(rows.map(row => String(row.reservoir || row.station || '-')))];
+  const labels = [...new Set(rows.map(row => String(row.time ?? row.time_index ?? '-')))];
+  return {
+    title: { text: title, left: 12, top: 10, textStyle: { fontSize: 14 } },
+    grid: { top: 58, right: 24, bottom: 36, left: 56 },
+    tooltip: { trigger: 'axis' },
+    legend: { top: 10, right: 16 },
+    xAxis: { type: 'category', data: labels },
+    yAxis: { type: 'value' },
+    series: reservoirs.map(reservoir => ({
+      name: reservoir,
+      type: 'line',
+      smooth: true,
+      data: labels.map(label => {
+        const row = rows.find(item => String(item.reservoir || item.station || '-') === reservoir && String(item.time ?? item.time_index ?? '-') === label);
+        return Number(row?.[valueField] || 0);
+      }),
+    })),
+  };
+}
+
+export function ResultCascadeHydroPanel({ result }: { result?: SolveResult }) {
+  const output = objectValue(result?.business_output);
+  const hasHydroResult = Boolean(output.storage_curve || output.water_balance_check || output.function_asset_interpolation);
+  if (!hasHydroResult) return <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无水电结果解释" />;
+
+  const storageRows = hydroRows(result, 'storage_curve');
+  const outflowRows = hydroRows(result, 'outflow_curve');
+  const powerRows = hydroRows(result, 'power_curve');
+  const spillRows = hydroRows(result, 'spill_curve');
+  const balanceRows = hydroRows(result, 'water_balance_check');
+  const interpolationRows = hydroRows(result, 'function_asset_interpolation');
+
+  return (
+    <Space orientation="vertical" size={16} style={{ width: '100%' }}>
+      <ResultKpiStrip result={result} />
+      <Row gutter={[14, 14]}>
+        <Col xs={24} lg={12}><Card title="库容过程曲线"><ReactECharts style={{ height: 300 }} option={hydroChartOption('库容过程曲线', storageRows, 'storage')} /></Card></Col>
+        <Col xs={24} lg={12}><Card title="出库流量曲线"><ReactECharts style={{ height: 300 }} option={hydroChartOption('出库流量曲线', outflowRows, 'outflow')} /></Card></Col>
+        <Col xs={24} lg={12}><Card title="出力曲线"><ReactECharts style={{ height: 300 }} option={hydroChartOption('出力曲线', powerRows, 'power')} /></Card></Col>
+        <Col xs={24} lg={12}><Card title="弃水曲线"><ReactECharts style={{ height: 300 }} option={hydroChartOption('弃水曲线', spillRows, 'spill')} /></Card></Col>
+      </Row>
+      <Card title="水量平衡校验表">
+        <Table
+          size="small"
+          pagination={{ pageSize: 6 }}
+          rowKey="__row_key"
+          dataSource={balanceRows}
+          columns={['time', 'reservoir', 'previous_storage', 'natural_inflow', 'upstream_release', 'outflow', 'spill', 'expected_storage', 'actual_storage', 'balance_error'].map(field => ({
+            title: field,
+            dataIndex: field,
+            render: text,
+          }))}
+        />
+      </Card>
+      <Card title="函数资产插值解释">
+        <Table
+          size="small"
+          pagination={{ pageSize: 6 }}
+          rowKey="__row_key"
+          dataSource={interpolationRows}
+          columns={[
+            { title: 'time', dataIndex: 'time', render: text },
+            { title: 'reservoir', dataIndex: 'reservoir', render: text },
+            { title: '1D 水位库容', dataIndex: 'level_storage', render: text },
+            { title: '1D 尾水位流量', dataIndex: 'tailwater_outflow', render: text },
+            { title: '2D 出力曲面', dataIndex: 'power_surface', render: text },
+          ]}
+        />
+      </Card>
+    </Space>
   );
 }

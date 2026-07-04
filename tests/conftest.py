@@ -1,13 +1,63 @@
 from __future__ import annotations
 
 import os
+import faulthandler
 import sys
 import tempfile
+import threading
 import uuid
+import weakref
+from copy import deepcopy
 from pathlib import Path
 
 import pytest
-from fastapi.testclient import TestClient
+import fastapi.testclient
+from fastapi import FastAPI
+from fastapi.testclient import TestClient as _FastAPITestClient
+
+
+_OPEN_TEST_CLIENTS: weakref.WeakSet[_FastAPITestClient] = weakref.WeakSet()
+_BASE_STORE_SNAPSHOT: dict[str, object] | None = None
+_BASE_REGISTRY_SNAPSHOT: dict[str, object] | None = None
+
+
+class ManagedTestClient(_FastAPITestClient):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        _OPEN_TEST_CLIENTS.add(self)
+
+    def close(self) -> None:
+        try:
+            super().close()
+        finally:
+            _OPEN_TEST_CLIENTS.discard(self)
+
+
+fastapi.testclient.TestClient = ManagedTestClient
+TestClient = ManagedTestClient
+
+
+def _close_tracked_test_clients() -> None:
+    seen: set[int] = set()
+    for value in list(_OPEN_TEST_CLIENTS):
+        if id(value) not in seen:
+            seen.add(id(value))
+            value.close()
+    for module in list(sys.modules.values()):
+        for value in vars(module).values() if module else []:
+            if isinstance(value, TestClient) and id(value) not in seen:
+                seen.add(id(value))
+                value.close()
+
+
+def _clear_fastapi_dependency_overrides() -> None:
+    for module_name in ("app.main", "app.platform_main", "app.agent_main"):
+        module = sys.modules.get(module_name)
+        if not module:
+            continue
+        for value in vars(module).values():
+            if isinstance(value, FastAPI):
+                value.dependency_overrides.clear()
 
 
 os.environ.setdefault(
@@ -17,6 +67,11 @@ os.environ.setdefault(
 os.environ.setdefault("LLM_ENABLED", "false")
 os.environ.setdefault("AGENT_ALLOW_IN_PROCESS_PLATFORM_FALLBACK", "true")
 os.environ.setdefault("COPT_SYNC_JOBS", "true")
+
+try:
+    faulthandler.enable()
+except Exception:
+    pass
 
 
 SLOW_TESTS = {
@@ -60,10 +115,120 @@ def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item
             item.add_marker(slow)
 
 
+@pytest.fixture(autouse=True)
+def reset_runtime_store(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    global _BASE_STORE_SNAPSHOT, _BASE_REGISTRY_SNAPSHOT
+
+    from app.storage.memory_store import STORE
+    from app.model_components import registry as component_registry
+    from app.services.model_service import model_service
+
+    runtime_path = tmp_path / "runtime_store.json"
+    original_path = STORE.persistence_path
+    monkeypatch.setenv("RUNTIME_STORE_PATH", str(runtime_path))
+    STORE._persistence_path = runtime_path
+    required_default_components = {
+        "pv_available_output",
+        "storage_soc_balance",
+        "pv_storage_power_balance",
+        "grid_power_limit",
+        "storage_capacity_decision",
+        "schedule_tracking",
+        "storage_terminal_soc_tracking",
+    }
+    with STORE.lock:
+        needs_seed = not STORE.models or not required_default_components.issubset(STORE.custom_components)
+    if needs_seed:
+        model_service.seed_default_templates()
+
+    store_keys = (
+        "models",
+        "assets",
+        "tasks",
+        "results",
+        "invocations",
+        "skills",
+        "conversations",
+        "llm_config",
+        "template_status",
+        "rolling_jobs",
+        "custom_components",
+        "function_assets",
+        "model_versions",
+    )
+    registry_keys = (
+        "COMPONENT_REGISTRY",
+        "COMPONENT_DEPENDENCIES",
+        "COMPONENT_OUTPUTS",
+        "COMPONENT_CONSTRAINT_TYPES",
+        "COMPONENT_INDICES",
+        "SET_DEFINITIONS",
+        "COMPONENT_OBJECTIVE_TERMS",
+        "HYDRO_CONSTRAINT_OVERRIDES",
+        "HYDRO_OBJECTIVE_TERM_OVERRIDES",
+    )
+    if _BASE_STORE_SNAPSHOT is None:
+        with STORE.lock:
+            _BASE_STORE_SNAPSHOT = {key: deepcopy(getattr(STORE, key)) for key in store_keys}
+    if _BASE_REGISTRY_SNAPSHOT is None:
+        _BASE_REGISTRY_SNAPSHOT = {key: deepcopy(getattr(component_registry, key)) for key in registry_keys}
+    try:
+        faulthandler.dump_traceback_later(180, repeat=False)
+    except Exception:
+        pass
+    try:
+        yield
+    finally:
+        _clear_fastapi_dependency_overrides()
+        try:
+            faulthandler.cancel_dump_traceback_later()
+        except Exception:
+            pass
+        with STORE.lock:
+            for key, value in _BASE_STORE_SNAPSHOT.items():
+                target = getattr(STORE, key)
+                if isinstance(target, dict):
+                    target.clear()
+                    target.update(deepcopy(value))
+                else:
+                    setattr(STORE, key, deepcopy(value))
+            STORE._persistence_path = original_path
+        for key, value in _BASE_REGISTRY_SNAPSHOT.items():
+            target = getattr(component_registry, key)
+            if isinstance(target, dict):
+                target.clear()
+                target.update(deepcopy(value))
+            elif isinstance(target, list):
+                target[:] = deepcopy(value)
+            else:
+                setattr(component_registry, key, deepcopy(value))
+
+
+@pytest.fixture
+def runtime_store_path(tmp_path: Path) -> Path:
+    return tmp_path / "runtime_store.json"
+
+
+@pytest.fixture
+def client():
+    from app.main import app
+
+    try:
+        with TestClient(app) as test_client:
+            yield test_client
+    finally:
+        app.dependency_overrides.clear()
+
+
 def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:
-    seen: set[int] = set()
-    for module in list(sys.modules.values()):
-        for value in vars(module).values() if module else []:
-            if isinstance(value, TestClient) and id(value) not in seen:
-                seen.add(id(value))
-                value.close()
+    _clear_fastapi_dependency_overrides()
+    _close_tracked_test_clients()
+    active = [
+        thread
+        for thread in threading.enumerate()
+        if thread is not threading.main_thread() and not thread.daemon and thread.is_alive()
+    ]
+    if active:
+        print("PYTEST_ACTIVE_NON_DAEMON_THREADS:")
+        for thread in active:
+            print(f"- name={thread.name!r} ident={thread.ident} native_id={getattr(thread, 'native_id', None)}")

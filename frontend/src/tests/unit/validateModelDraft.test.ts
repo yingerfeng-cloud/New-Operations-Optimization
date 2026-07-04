@@ -33,7 +33,7 @@ test('blocks missing required runtime parameters', () => {
   const draft = baseDraft();
   draft.advanced.generic_spec = { variables: [{ name: 'p', indices: ['time'] }], objective: { terms: [{ var: 'p', key: ['time'] }] } };
   const result = validateModelDraft(draft);
-  expect(result.sections.parameter_bindings.errors).toContain('运行参数 负荷 load 缺少必填值');
+  expect(result.sections.runtime_parameters.errors).toContain('运行参数 负荷 load 缺少必填值');
 });
 
 test('blocks missing component dependencies', () => {

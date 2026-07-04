@@ -1,8 +1,5 @@
 from __future__ import annotations
 
-from pathlib import Path
-import re
-
 import pytest
 from fastapi.testclient import TestClient
 
@@ -13,23 +10,8 @@ from app.utils import has_highspy, has_pyomo
 client = TestClient(app)
 
 
-def _frontend_sources() -> str:
-    prototype = Path("prototype.html").read_text(encoding="utf-8")
-    js = "\n".join(
-        Path(match.split("?", 1)[0]).read_text(encoding="utf-8")
-        for match in re.findall(r'<script\s+src="([^"]+)"\s*></script>', prototype)
-    )
-    return prototype + "\n" + js
-
-
 @pytest.mark.skipif(not (has_pyomo() and has_highspy()), reason="pyomo/highspy are required")
-def test_frontend_core_e2e_flow_equivalent() -> None:
-    prototype = _frontend_sources()
-    agent_console = Path("agent_console.html").read_text(encoding="utf-8")
-    assert "apiBase" in prototype
-    assert "pageSkillAssets" in prototype
-    assert "/agent/agent-skills" in agent_console
-
+def test_react_frontend_core_api_flow_equivalent() -> None:
     skills = client.get("/api/skills")
     assert skills.status_code == 200, skills.text
     economic = client.get("/api/skills/run_economic_dispatch")

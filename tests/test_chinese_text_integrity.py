@@ -9,8 +9,6 @@ ROOT = Path(__file__).resolve().parents[1]
 BAD_TOKENS = ["\u93c3", "\u93c8", "\u934c", "\u748b", "\u59ca", "\u9a9e", "\u9411", "\u6434", "????"]
 SCAN_PATHS = [
     ROOT / "app" / "templates" / "power_templates.py",
-    ROOT / "prototype.html",
-    *sorted((ROOT / "static" / "js").glob("*.js")),
     *sorted((ROOT / "app" / "explain").glob("*.py")),
     *sorted((ROOT / "app" / "api").glob("*.py")),
 ]

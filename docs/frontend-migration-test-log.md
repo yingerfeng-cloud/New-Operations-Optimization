@@ -2,7 +2,7 @@
 
 ## 阶段 0：后端基线（2026-06-22）
 
-- 命令：`python -m pytest tests/test_frontend_e2e_flow.py tests/test_component_builder_e2e.py tests/test_unified_formula_editor_acceptance.py tests/test_pv_storage_v2_acceptance.py tests/test_component_based_hydro_model.py -q`
+- 命令：`python -m pytest tests/test_frontend_e2e_flow.py tests/test_component_builder_e2e.py tests/test_pv_storage_v2_acceptance.py tests/test_component_based_hydro_model.py -q`
 - 结果：36 passed，2 个既有 Pydantic protected namespace warning。
 - 结论：模板/模型、组件 Builder、公式编辑器后端约束、光储 V2、组件化水电基线正常。
 
@@ -32,7 +32,7 @@
 - `npm run build`：成功。
 - `npm run test`：11 files / 15 tests passed。
 - `npm run test:e2e`：6 passed（使用隔离端口 5178，避免本机已占用 5173 的其他应用污染结果）。
-- FastAPI React/SPA/legacy 托管测试：2 passed。
+- FastAPI React/SPA 托管测试：2 passed；legacy 路径已改为 404。
 - 后端验收回归：29 passed；覆盖 12 个内置模板的 clone/publish/test 路径、24 个组件 validate、通用线性最小 LP、光储 V2 与梯级水电。
-- 实际浏览器生产验收：`http://127.0.0.1:8000/models` 显示“API 已连接”并加载真实模型数据；`/legacy` 返回旧平台页面。
+- 实际浏览器生产验收：`http://127.0.0.1:8000/models` 显示“API 已连接”并加载真实模型数据；legacy prototype 入口已下线。
 - 已知非阻断项：Vite 对 Ant Design/ECharts vendor chunk 给出大于 500 kB 的性能提示；不影响构建与运行，后续可进一步拆 vendor chunk。

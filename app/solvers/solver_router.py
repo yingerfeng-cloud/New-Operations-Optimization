@@ -8,6 +8,7 @@ from app.problem_type_diagnosis import normalize_problem_type
 from app.schemas.result import SolverRunResult
 from app.solvers.base import UnavailableSolverAdapter
 from app.solvers.highs_adapter import HiGHSAdapter
+from app.solvers.nlp_adapter import NLPSolverAdapter
 
 
 PROBLEM_SOLVER_ROUTE = {
@@ -16,7 +17,7 @@ PROBLEM_SOLVER_ROUTE = {
     "QP": "HiGHS",
     "MIQP": "HiGHS",
     "NLP": "Ipopt",
-    "MINLP": "SCIP",
+    "MINLP_RESERVED": None,
 }
 
 
@@ -26,26 +27,33 @@ class SolverRouteError(RuntimeError):
         super().__init__(str(payload))
 
 
-class IpoptAdapter(UnavailableSolverAdapter):
-    def __init__(self) -> None:
-        super().__init__("Ipopt", ["NLP"], "Install Ipopt and expose it through Pyomo SolverFactory('ipopt').")
-
-
 class ScipAdapter(UnavailableSolverAdapter):
     def __init__(self) -> None:
-        super().__init__("SCIP", ["MINLP"], "Install SCIP or Bonmin and expose it through Pyomo before solving MINLP models.")
+        super().__init__("SCIP", [], "Production MINLP solving is not supported. Choose a linearization strategy or simplify the model.")
 
 
 class SolverRouter:
     def __init__(self) -> None:
         self.adapters = {
             "highs": HiGHSAdapter(),
-            "ipopt": IpoptAdapter(),
+            "ipopt": NLPSolverAdapter(),
             "scip": ScipAdapter(),
         }
 
     def route(self, problem_type: str | None, requested_solver: str | None = None) -> dict[str, Any]:
         normalized_type = normalize_problem_type(problem_type)
+        if normalized_type == "MINLP_RESERVED" and not requested_solver:
+            return {
+                "ok": False,
+                "status": "minlp_reserved",
+                "problem_type": normalized_type,
+                "recommended_solver": None,
+                "selected_solver": None,
+                "supported_problem_types": [],
+                "available": False,
+                "error_code": "MINLP_RESERVED_UNSUPPORTED",
+                "message": "当前平台暂不支持生产级 MINLP 求解，请选择线性化策略或简化模型。",
+            }
         recommended = PROBLEM_SOLVER_ROUTE.get(normalized_type)
         if not recommended and not requested_solver:
             return {
@@ -97,11 +105,15 @@ class SolverRouter:
         route = self.route(problem_type, requested_solver)
         if not route["ok"]:
             raise SolverRouteError(route)
+        self._assert_highs_can_accept_model(model, route)
         adapter = self.adapters[self._key(str(route["selected_solver"]))]
         return adapter.solve(model, mip_gap=mip_gap, time_limit_seconds=time_limit_seconds, threads=threads)
 
     def infer_problem_type_from_model(self, model: Any, default: str = "LP") -> str:
         has_integer = any(var.is_integer() or var.is_binary() for component in model.component_objects(pyo.Var, active=True) for var in component.values())
+        nonlinear = self._model_has_nonlinearity(model)
+        if nonlinear:
+            return "MINLP_RESERVED" if has_integer else "NLP"
         return "MILP" if has_integer else default
 
     def _key(self, solver_name: str | None) -> str:
@@ -118,6 +130,69 @@ class SolverRouter:
         if not supported:
             return f"{solver_name} does not support {problem_type}; supported types: {getattr(adapter, 'supported_problem_types', [])}"
         return f"{solver_name} is not available; no fallback solver was used"
+
+    def _assert_highs_can_accept_model(self, model: Any, route: dict[str, Any]) -> None:
+        if self._key(str(route.get("selected_solver"))) != "highs":
+            return
+        problem_type = normalize_problem_type(route.get("problem_type"))
+        nonlinear_constraints = []
+        for component in model.component_objects(pyo.Constraint, active=True):
+            for index, constraint in component.items():
+                if not constraint.active:
+                    continue
+                degree = constraint.body.polynomial_degree()
+                if degree is None or degree > 1:
+                    nonlinear_constraints.append({"constraint": f"{component.name}[{index}]", "degree": degree})
+                    if len(nonlinear_constraints) >= 5:
+                        break
+            if len(nonlinear_constraints) >= 5:
+                break
+        if nonlinear_constraints:
+            raise SolverRouteError(
+                {
+                    "ok": False,
+                    "status": "nonlinear_not_linearized",
+                    "problem_type": problem_type,
+                    "selected_solver": route.get("selected_solver"),
+                    "recommended_solver": "NLP/MINLP reserved",
+                    "error_code": "NONLINEAR_NOT_LINEARIZED",
+                    "message": "HiGHS cannot solve nonlinear constraints directly. Convert bilinear/function terms with McCormick or PWL before solving.",
+                    "nonlinear_constraints": nonlinear_constraints,
+                }
+            )
+        objectives = []
+        for objective in model.component_objects(pyo.Objective, active=True):
+            for index, item in objective.items():
+                degree = item.expr.polynomial_degree()
+                objectives.append({"objective": f"{objective.name}[{index}]", "degree": degree})
+                if degree is None or (problem_type in {"LP", "MILP"} and degree > 1) or degree > 2:
+                    raise SolverRouteError(
+                        {
+                            "ok": False,
+                            "status": "nonlinear_not_linearized",
+                            "problem_type": problem_type,
+                            "selected_solver": route.get("selected_solver"),
+                            "recommended_solver": "QP or PWL" if degree == 2 else "NLP/MINLP reserved",
+                            "error_code": "NONLINEAR_NOT_LINEARIZED",
+                            "message": "HiGHS route rejected an objective that is not compatible with the requested problem type.",
+                            "objectives": objectives,
+                        }
+                    )
+
+    def _model_has_nonlinearity(self, model: Any) -> bool:
+        for component in model.component_objects(pyo.Constraint, active=True):
+            for constraint in component.values():
+                if not constraint.active:
+                    continue
+                degree = constraint.body.polynomial_degree()
+                if degree is None or degree > 1:
+                    return True
+        for objective in model.component_objects(pyo.Objective, active=True):
+            for item in objective.values():
+                degree = item.expr.polynomial_degree()
+                if degree is None or degree > 1:
+                    return True
+        return False
 
 
 solver_router = SolverRouter()

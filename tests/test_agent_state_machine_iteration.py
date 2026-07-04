@@ -1,8 +1,6 @@
 from __future__ import annotations
 
 import uuid
-from pathlib import Path
-
 from fastapi.testclient import TestClient
 
 from app.agent.orchestrator import agent_orchestrator
@@ -99,21 +97,3 @@ def test_delete_conversation_from_history() -> None:
     deleted = client.delete(f"/api/agent/conversations/{created['conversation_id']}")
     assert deleted.status_code == 200
     assert client.get(f"/api/agent/conversations/{created['conversation_id']}").status_code == 404
-
-
-def test_delete_current_conversation_selects_next() -> None:
-    html = Path("agent_console.html").read_text(encoding="utf-8")
-    assert "deleteConversation(id)" in html
-    assert "const deletingCurrent=state.conversationId===id" in html
-    assert "const next=state.conversations[0]" in html
-    assert "await openConversation(next.conversation_id)" in html
-    assert "delete localStorage.agentConversationId" in html
-
-
-def test_chat_scroll_bottom_behavior() -> None:
-    html = Path("agent_console.html").read_text(encoding="utf-8")
-    assert "isChatNearBottom" in html
-    assert "scrollChatToBottom" in html
-    assert "state.forceScrollBottom=true" in html
-    assert "openConversation(id)" in html and "state.forceScrollBottom=true;render()" in html
-    assert "chat-aside" in html

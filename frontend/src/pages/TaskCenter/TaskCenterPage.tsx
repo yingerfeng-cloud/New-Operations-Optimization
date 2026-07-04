@@ -1,4 +1,5 @@
-import { Alert, Button, Card, Col, Drawer, Form, Input, InputNumber, Modal, Row, Select, Space, Table, Tabs, Tag, message } from 'antd';
+import { MoreOutlined } from '@ant-design/icons';
+import { Alert, Button, Card, Drawer, Dropdown, Form, Input, InputNumber, Select, Space, Table, Tabs, Tag, message } from 'antd';
 import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { cancelTask, createTask, getTask, getTasks, retryTask } from '../../api/tasks';
@@ -7,6 +8,7 @@ import { getResult } from '../../api/results';
 import { DataTable } from '../../components/DataTable';
 import { PageHeader } from '../../components/PageHeader';
 import { StatusTag } from '../../components/StatusTag';
+import { MetricCard, MetricGrid } from '../../components/WorkspaceUI';
 import {
   TaskExplanationPanel,
   TaskInputPanel,
@@ -164,12 +166,12 @@ export function TaskCenterPage() {
   return (
     <>
       <PageHeader title="任务调度中心" description="提交、监控、重试和取消所有求解任务。" extra={<Button type="primary" onClick={() => setCreateOpen(true)}>创建任务</Button>} />
-      <Row gutter={[14, 14]}>
-        <Col xs={24} md={6}><div className="card metric blue"><span>任务总数</span><b>{rows.length}</b><span>真实任务队列</span></div></Col>
-        <Col xs={24} md={6}><div className="card metric amber"><span>运行中</span><b>{running}</b><span>校验 / 建模 / 求解</span></div></Col>
-        <Col xs={24} md={6}><div className="card metric green"><span>成功</span><b>{success}</b><span>可查看结果</span></div></Col>
-        <Col xs={24} md={6}><div className="card metric red"><span>失败/无解</span><b>{failed}</b><span>需查看日志</span></div></Col>
-      </Row>
+      <MetricGrid>
+        <MetricCard title="任务总数" value={rows.length} description="真实任务队列" tone="blue" />
+        <MetricCard title="运行中" value={running} description="校验 / 建模 / 求解" tone="amber" />
+        <MetricCard title="成功" value={success} description="可查看结果" tone="green" />
+        <MetricCard title="失败/无解" value={failed} description="需查看日志" tone={failed ? 'red' : 'neutral'} />
+      </MetricGrid>
       <Card className="content-card section-gap" title="求解任务列表">
         <DataTable<SolveTask>
           dataSource={rows}
@@ -190,20 +192,34 @@ export function TaskCenterPage() {
               render: (_: unknown, task: SolveTask) => (
                 <Space className="task-actions">
                   <Button type="link" onClick={() => setViewId(task.id)}>查看</Button>
-                  <Button danger type="link" disabled={!isRunningStatus(task.status)} onClick={() => cancel.mutate(task.id)}>取消</Button>
-                  {isRetryableStatus(task.status) && <Button type="link" onClick={() => retry.mutate(task.id)}>重试</Button>}
-                  {task.status === 'SUCCESS' && <Button type="link" onClick={() => setViewId(task.id)}>查看结果</Button>}
+                  <Dropdown
+                    trigger={['click']}
+                    menu={{
+                      items: [
+                        { key: 'cancel', label: '取消任务', danger: true, disabled: !isRunningStatus(task.status) },
+                        { key: 'retry', label: '重试任务', disabled: !isRetryableStatus(task.status) },
+                        { key: 'result', label: '查看结果', disabled: task.status !== 'SUCCESS' },
+                      ],
+                      onClick: ({ key }) => {
+                        if (key === 'cancel') cancel.mutate(task.id);
+                        if (key === 'retry') retry.mutate(task.id);
+                        if (key === 'result') setViewId(task.id);
+                      },
+                    }}
+                  >
+                    <Button type="link" icon={<MoreOutlined />}>更多</Button>
+                  </Dropdown>
                 </Space>
               ),
             },
           ]}
         />
       </Card>
-      <Modal
+      <Drawer
         title="创建求解任务"
         open={createOpen}
-        width={860}
-        onCancel={() => setCreateOpen(false)}
+        size="large"
+        onClose={() => setCreateOpen(false)}
         footer={(
           <Space>
             <Button onClick={() => setCreateOpen(false)}>取消</Button>
@@ -212,12 +228,16 @@ export function TaskCenterPage() {
           </Space>
         )}
       >
-        <div className="form-card modal-form-card">
+        <div className="task-create-panel">
           <Form id="create-task-form" form={form} layout="vertical" onFinish={submitTask}>
-            <Form.Item name="model_id" label="选择模型" rules={[{ required: true }]}><Select options={models.data?.map(model => ({ value: model.id, label: model.name }))} /></Form.Item>
-            <Form.Item name="horizon" label="调度时段" initialValue={24}><InputNumber min={1} /></Form.Item>
-            <Form.Item name="solver" label="求解器" initialValue="HiGHS"><Select options={[{ value: 'HiGHS' }]} /></Form.Item>
-            <Card size="small" title="运行参数契约" loading={schema.isFetching || assetDetail.isFetching}>
+            <Card size="small" title="选择模型">
+              <Form.Item name="model_id" label="选择模型" rules={[{ required: true }]}><Select options={models.data?.map(model => ({ value: model.id, label: model.name }))} /></Form.Item>
+            </Card>
+            <Card size="small" title="运行配置">
+              <Form.Item name="horizon" label="调度时段" initialValue={24}><InputNumber min={1} /></Form.Item>
+              <Form.Item name="solver" label="求解器" initialValue="HiGHS"><Select options={[{ value: 'HiGHS' }]} /></Form.Item>
+            </Card>
+            <Card size="small" title="参数契约" loading={schema.isFetching || assetDetail.isFetching}>
               <Table<RuntimeField>
                 size="small"
                 pagination={false}
@@ -238,6 +258,8 @@ export function TaskCenterPage() {
                   },
                 ]}
               />
+            </Card>
+            <Card size="small" title="JSON 导入 / 校验">
               <Form.Item label="JSON 导入" className="section-gap">
                 <Input.TextArea rows={4} value={runtimeJson} onChange={event => setRuntimeJson(event.target.value)} placeholder='{"load":[100,120],"horizon":24}' />
                 <Button className="section-gap-tight" onClick={importRuntimeJson}>导入 JSON 参数</Button>
@@ -246,7 +268,7 @@ export function TaskCenterPage() {
             </Card>
           </Form>
         </div>
-      </Modal>
+      </Drawer>
       <Drawer
         size="large"
         open={!!viewId}

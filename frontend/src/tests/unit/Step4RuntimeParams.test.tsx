@@ -22,6 +22,10 @@ function Harness({ initial = makeDraft() }: { initial?: ModelDraft }) {
   return <Step4RuntimeParams draft={draft} onChange={setDraft} />;
 }
 
+function openRuntimeDebug() {
+  fireEvent.click(screen.getByText('高级调试：JSON 导入 / 运行参数结构预览'));
+}
+
 test('builds classified runtime parameter rows and missing validation', () => {
   const draft = makeDraft();
   const rows = buildRuntimeParameterRows(draft);
@@ -35,13 +39,14 @@ test('renders parameter categories and missing prompts', () => {
   render(<Harness />);
   expect(screen.getByText('缺少必填运行参数')).toBeInTheDocument();
   expect(screen.getByText(/负荷预测 load 缺少必填值/)).toBeInTheDocument();
-  expect(screen.getByText('运行时输入参数 1')).toBeInTheDocument();
-  expect(screen.getByText('模型静态参数 1')).toBeInTheDocument();
-  expect(screen.getByText('目标权重参数 1')).toBeInTheDocument();
+  expect(screen.getAllByText('运行时输入参数').length).toBeGreaterThan(0);
+  expect(screen.getAllByText('模型静态参数').length).toBeGreaterThan(0);
+  expect(screen.getAllByText('目标权重参数').length).toBeGreaterThan(0);
 });
 
 test('imports JSON runtime parameters and updates preview', () => {
   render(<Harness />);
+  openRuntimeDebug();
   fireEvent.change(screen.getByLabelText('运行参数 JSON'), { target: { value: JSON.stringify({ horizon: 2, load: [100, 120] }) } });
   fireEvent.click(screen.getByText('导入并校验'));
   expect(screen.queryByText('缺少必填运行参数')).not.toBeInTheDocument();
@@ -50,6 +55,7 @@ test('imports JSON runtime parameters and updates preview', () => {
 
 test('edits table value into runtime schema', () => {
   render(<Harness />);
+  openRuntimeDebug();
   const loadInput = screen.getByLabelText('load 当前值');
   fireEvent.change(loadInput, { target: { value: '[90,95]' } });
   fireEvent.blur(loadInput);

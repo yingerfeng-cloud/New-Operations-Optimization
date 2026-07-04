@@ -9,7 +9,7 @@ function validDraft(): ModelDraft {
   draft.semantic.sets = [{ code: 'time', name: '时段', values: [0] }];
   draft.semantic.variables = [{ code: 'p', name: '出力', dimension: ['time'], domain: 'NonNegativeReals' }];
   draft.semantic.parameters = [{ code: 'load', name: '负荷', dimension: ['time'], sourceType: 'runtime', source_type: 'runtime', required: true }];
-  draft.runtime_parameters = { horizon: 1, load: [100] };
+  draft.runtime_parameters = { horizon: 1, time: [0], load: [100] };
   draft.formulas = [{
     formula_id: 'obj',
     name: '目标',
@@ -61,4 +61,26 @@ test('runs test callback and renders dry-run result summary', async () => {
   expect(await screen.findByText('测试运行结果')).toBeInTheDocument();
   expect(screen.getByText('tested')).toBeInTheDocument();
   expect(screen.getAllByText('passed').length).toBeGreaterThan(0);
+});
+
+test('renders 2D PWL MILP risk diagnostics', () => {
+  const draft = validDraft();
+  draft.components = [{
+    type: 'function_mapping_2d_component',
+    function_asset_id: 'hydro_power_surface_001',
+    x: 'flow[t]',
+    y: 'head[t]',
+    z: 'power[t]',
+    indices: [{ set: 'time', alias: 't' }],
+    solve_strategy: 'triangulated_milp_exact',
+    metadata: { triangle_count: 120 },
+  }];
+  draft.runtime_parameters = { horizon: 24, time: Array.from({ length: 24 }, (_, index) => index), load: [100] };
+
+  render(<Step5ReviewPublish draft={draft} validation={validateModelDraft(draft)} onPublish={vi.fn()} onTest={vi.fn()} />);
+
+  expect(screen.getByText('二维 PWL 风险诊断')).toBeInTheDocument();
+  expect(screen.getByText('hydro_power_surface_001')).toBeInTheDocument();
+  expect(screen.getByText('2880')).toBeInTheDocument();
+  expect(screen.getByText('MILP 二进制变量风险')).toBeInTheDocument();
 });

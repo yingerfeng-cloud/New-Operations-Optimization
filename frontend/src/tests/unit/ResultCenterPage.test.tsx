@@ -36,10 +36,10 @@ test('renders result center and structured report detail', async () => {
   fireEvent.click(screen.getByRole('button', { name: '查看报告' }));
 
   await waitFor(() => expect(screen.getByText('objective_value')).toBeInTheDocument());
-  fireEvent.click(screen.getByText('变量结果表格'));
+  fireEvent.click(screen.getByText('变量表'));
   expect(screen.getByText('p_grid')).toBeInTheDocument();
   fireEvent.click(screen.getByText('约束检查'));
   expect(screen.getByText('balance')).toBeInTheDocument();
-  fireEvent.click(screen.getByText('业务解释'));
+  fireEvent.click(screen.getByText('结论摘要'));
   expect(screen.getByText('结果显示负荷平衡约束满足。')).toBeInTheDocument();
 }, 20000);

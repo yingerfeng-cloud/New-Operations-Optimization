@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import re
 import uuid
 from pathlib import Path
 
@@ -129,17 +128,6 @@ def test_agent_capability_question_inside_task_is_not_parameter_analysis() -> No
     assert detail["resolved_skill_name"].startswith("run_economic_dispatch")
 
 
-def test_extract_debug_does_not_pollute_chat_state() -> None:
-    html = Path("agent_console.html").read_text(encoding="utf-8")
-    match = re.search(r"async function testExtractOnly\([^)]*\)\{(?P<body>.*?)\nasync function analyzeInput", html, re.S)
-    assert match, "testExtractOnly must exist"
-    body = match.group("body")
-    assert "state.extractDebugResult" in body
-    assert "state.llmExtractTestResult" in body
-    assert "state.chatMessages" not in body
-    assert "state.conversationId=" not in body
-
-
 def test_skill_status_callable_consistency() -> None:
     res = client.get("/api/agent/skills")
     assert res.status_code == 200, res.text
@@ -173,14 +161,6 @@ def test_agent_status_platform_unavailable(monkeypatch) -> None:
     assert body["platform"]["reachable"] is False
     assert body["platform"]["skill_count"] == 0
     assert body["llm"]["fallback_mode"] in {"rule_based", "llm"}
-
-
-def test_agent_console_wrong_service_not_found_hint() -> None:
-    html = Path("agent_console.html").read_text(encoding="utf-8")
-    assert "当前连接的是 ${state.health.service}，不是 Agent 服务" in html
-    assert "Agent Console 请连接 Agent 服务，例如 http://127.0.0.1:8091/api" in html
-    assert "当前 API Base 不是 Agent 服务或 Agent 服务未启用 LLM 配置接口，请检查 API Base。" in html
-    assert "disabledWhenWrong" in html
 
 
 def test_create_conversation() -> None:
@@ -280,13 +260,6 @@ def test_agent_multiturn_economic_dispatch_success() -> None:
     assert explain_body["explanation"]["skill"]["skill_name"].startswith("run_economic_dispatch")
 
 
-def test_llm_config_wrong_base_shows_agent_service_hint() -> None:
-    html = Path("agent_console.html").read_text(encoding="utf-8")
-    assert "保存配置前检查当前服务是否为 optimization-agent" not in html
-    assert "当前连接的是非 Agent 服务，请先连接 Agent 服务。" in html
-    assert "当前 API Base 不是 Agent 服务或 Agent 服务未启用 LLM 配置接口，请检查 API Base。" in html
-
-
 def test_runtime_store_no_api_key_in_package() -> None:
     data_dir = Path("data")
     for path in data_dir.glob("runtime_store*.json"):
@@ -297,24 +270,3 @@ def test_runtime_store_no_api_key_in_package() -> None:
     text = files[0].read_text(encoding="utf-8").lower()
     assert "api_key" not in text
     assert '"enabled": false' in text
-
-
-def test_chat_scroll_to_bottom_after_message() -> None:
-    html = Path("agent_console.html").read_text(encoding="utf-8")
-    assert 'id="chatThread"' in html
-    assert "scrollChatToBottom" in html
-    assert "el.scrollHeight-el.scrollTop-el.clientHeight<80" in html
-    assert "state.forceScrollBottom=true" in html
-    assert "addThinkingMessage" in html
-    assert "正在思考" in html
-    assert "chat-layout" in html
-    assert "task-progress" in html
-    assert "oninput=\"state.message=this.value\"" in html
-    assert "isInvokeConfirmationText" in html
-    assert "isResultExplanationText" in html
-    assert "invokeCurrentTask" in html
-    assert "explainCurrentResult" in html
-    assert "formatExplanationResponse" in html
-    assert "compactResultInMessage" in html
-    assert "workflowCard" in html
-    assert "意图识别" in html

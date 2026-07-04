@@ -5,8 +5,14 @@ from typing import Any, Literal
 from pydantic import BaseModel, Field, field_validator
 
 
-FunctionType = Literal["piecewise_1d", "piecewise_2d", "formula"]
-SolveStrategy = Literal["display_only", "convex_combination_lp", "binary_segment_milp"]
+FunctionType = Literal["piecewise_1d", "piecewise_2d", "piecewise_nd", "formula"]
+SolveStrategy = Literal[
+    "display_only",
+    "convex_combination_lp",
+    "binary_segment_milp",
+    "triangulated_milp_exact",
+    "convex_hull_lp_approx",
+]
 
 
 class FunctionAsset(BaseModel):
@@ -18,9 +24,17 @@ class FunctionAsset(BaseModel):
     group_keys: list[str] = Field(default_factory=list)
     interpolation: str = "linear"
     points: list[list[float]] = Field(default_factory=list)
+    points_2d: list[list[float]] = Field(default_factory=list)
+    triangles: list[list[int]] = Field(default_factory=list)
+    surface_mode: str | None = None
     domain: dict[str, Any] = Field(default_factory=dict)
-    monotonicity: str | None = None
-    convexity: str | None = None
+    x_domain: list[float] | None = None
+    y_domain: list[float] | None = None
+    z_range: list[float] | None = None
+    triangulation_status: str | None = None
+    surface_diagnostics: dict[str, Any] = Field(default_factory=dict)
+    monotonicity: str | dict[str, Any] | None = None
+    convexity: str | dict[str, Any] | None = None
     solve_strategy: SolveStrategy = "convex_combination_lp"
     status: str = "draft"
     description: str = ""

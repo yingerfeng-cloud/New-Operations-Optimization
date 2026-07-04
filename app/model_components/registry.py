@@ -246,11 +246,29 @@ def component_definition(component_type: str, builder: Any | None = None) -> dic
                 "indices": row.get("indices") or COMPONENT_INDICES.get(component_type, []),
             }
         )
+    if component_type == "mccormick_bilinear_relaxation_component":
+        generated_constraints = [
+            {
+                "constraint_id": "mccormick_programmatic_envelope",
+                "name": display_name,
+                "type": "mccormick",
+                "formula": "w ~= x * y",
+                "expression": "w ~= x * y",
+                "business_meaning": description,
+                "indices": [],
+                "generation_mode": "programmatic",
+                "programmatic": True,
+                "generated_by": "validate_mccormick_spec",
+                "expression_class": "linear",
+                "participates_in_solve": True,
+                "solve_participation": "generated",
+            }
+        ]
     required_sets = []
     for code in COMPONENT_INDICES.get(component_type, []):
         if code in SET_DEFINITIONS and code not in {item["code"] for item in required_sets}:
             required_sets.append(deepcopy(SET_DEFINITIONS[code]))
-    if component_type in {"function_mapping_component", "piecewise_linear_curve"}:
+    if component_type in {"function_mapping_component", "piecewise_linear_curve", "function_mapping_2d_component"}:
         generated_constraints = []
     terms = []
     for term in HYDRO_OBJECTIVE_TERM_OVERRIDES.get(component_type) or COMPONENT_OBJECTIVE_TERMS.get(component_type, []):

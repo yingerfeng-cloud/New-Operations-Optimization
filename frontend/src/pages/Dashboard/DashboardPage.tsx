@@ -1,4 +1,4 @@
-import { Button, Card, Col, Progress, Row, Space, Statistic, Tag, Typography } from 'antd';
+import { Button, Card, Col, Progress, Row, Space, Tag, Typography } from 'antd';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { getModels } from '../../api/models';
@@ -7,11 +7,12 @@ import { getTemplates } from '../../api/templates';
 import { getTasks } from '../../api/tasks';
 import { PageHeader } from '../../components/PageHeader';
 import { StatusTag } from '../../components/StatusTag';
-import { navEntries } from '../../app/navigation';
+import { EmptyActionState, MetricCard, MetricGrid } from '../../components/WorkspaceUI';
 import type { SolveTask } from '../../types/task';
 
 const runningStatuses = ['RUNNING', 'VALIDATING', 'BUILDING_MODEL', 'SOLVING', 'FORMATTING_RESULT'];
 const failedStatuses = ['FAILED', 'INFEASIBLE', 'TIMEOUT', 'CANCELLED'];
+const callableStatuses = ['published', 'trial', 'tested', '已发布', '试运行', '已测试'];
 
 function normalizeStatus(task: SolveTask) {
   const status = String(task.status || '').toUpperCase();
@@ -27,15 +28,28 @@ export function DashboardPage() {
   const templates = useQuery({ queryKey: ['templates'], queryFn: getTemplates });
   const tasks = useQuery({ queryKey: ['tasks'], queryFn: getTasks, refetchInterval });
 
-  const rows = tasks.data || [];
-  const success = rows.filter(task => normalizeStatus(task) === 'SUCCESS').length;
-  const running = rows.filter(task => runningStatuses.includes(normalizeStatus(task))).length;
-  const failed = rows.filter(task => failedStatuses.includes(normalizeStatus(task))).length;
-  const successRate = rows.length ? Math.round((success / rows.length) * 100) : 0;
-  const publishedModels = (models.data || []).filter(model => ['published', 'trial', 'tested', '已发布', '试运行', '已测试'].includes(String(model.status))).length;
+  const taskRows = tasks.data || [];
+  const success = taskRows.filter(task => normalizeStatus(task) === 'SUCCESS').length;
+  const running = taskRows.filter(task => runningStatuses.includes(normalizeStatus(task))).length;
+  const failed = taskRows.filter(task => failedStatuses.includes(normalizeStatus(task))).length;
+  const successRate = taskRows.length ? Math.round((success / taskRows.length) * 100) : 0;
+  const publishedModels = (models.data || []).filter(model => callableStatuses.includes(String(model.status))).length;
   const implementedComponents = (components.data || []).filter(component => component.implemented !== false).length;
-
   const loading = models.isLoading || components.isLoading || templates.isLoading || tasks.isLoading;
+  const recentModels = (models.data || []).slice(0, 5);
+  const recentTasks = taskRows.slice(0, 8);
+  const alerts = [
+    ...(models.isError ? ['模型资产接口暂不可用'] : []),
+    ...(components.isError ? ['组件库接口暂不可用'] : []),
+    ...(tasks.isError ? ['任务接口暂不可用'] : []),
+    ...(failed ? [`存在 ${failed} 个失败/无解任务`] : []),
+  ];
+  const flowEntries = [
+    { title: '选择业务场景', desc: '从场景目录进入模板、模型列表和建模入口。', path: '/scenarios' },
+    { title: '创建优化模型', desc: '维护语义、公式、组件和运行参数。', path: '/models/create' },
+    { title: '发起求解任务', desc: '选择模型并提交运行参数。', path: '/tasks' },
+    { title: '查看结果报告', desc: '查看关键指标、变量曲线和业务解释。', path: '/results' },
+  ];
 
   return (
     <>
@@ -45,45 +59,23 @@ export function DashboardPage() {
         extra={<Button type="primary" onClick={() => nav('/tasks')}>发起任务</Button>}
       />
 
-      <Row gutter={[16, 16]}>
-        <Col xs={24} sm={12} xl={6}>
-          <Card className="metric-card metric-blue" loading={loading} onClick={() => nav('/models')}>
-            <Statistic title="模型资产数" value={models.data?.length || 0} />
-            <Typography.Text type="secondary">已发布/试运行 {publishedModels} 个</Typography.Text>
-          </Card>
-        </Col>
-        <Col xs={24} sm={12} xl={6}>
-          <Card className="metric-card metric-green" loading={loading} onClick={() => nav('/components')}>
-            <Statistic title="组件数量" value={components.data?.length || 0} />
-            <Typography.Text type="secondary">已实现 {implementedComponents} 个</Typography.Text>
-          </Card>
-        </Col>
-        <Col xs={24} sm={12} xl={6}>
-          <Card className="metric-card metric-amber" loading={loading} onClick={() => nav('/models')}>
-            <Statistic title="内置模板数" value={templates.data?.length || 0} />
-            <Typography.Text type="secondary">支持模板克隆建模</Typography.Text>
-          </Card>
-        </Col>
-        <Col xs={24} sm={12} xl={6}>
-          <Card className="metric-card metric-red" loading={loading} onClick={() => nav('/tasks')}>
-            <Statistic title="求解任务数" value={rows.length} />
-            <Typography.Text type="secondary">运行中 {running} / 失败 {failed}</Typography.Text>
-          </Card>
-        </Col>
-      </Row>
+      <MetricGrid>
+        <MetricCard title="模型资产数" value={loading ? '-' : models.data?.length || 0} description={`可发布/试运行 ${publishedModels} 个`} tone="blue" onClick={() => nav('/models')} />
+        <MetricCard title="组件数量" value={loading ? '-' : components.data?.length || 0} description={`已实现 ${implementedComponents} 个`} tone="green" onClick={() => nav('/components')} />
+        <MetricCard title="内置模板数" value={loading ? '-' : templates.data?.length || 0} description="支持模板克隆建模" tone="amber" onClick={() => nav('/scenarios')} />
+        <MetricCard title="求解任务数" value={loading ? '-' : taskRows.length} description={`运行中 ${running} / 失败 ${failed}`} tone={failed ? 'red' : 'purple'} onClick={() => nav('/tasks')} />
+      </MetricGrid>
 
-      <Card title="快捷入口" className="section-gap">
-        <Row gutter={[16, 16]}>
-          {navEntries.filter(entry => entry.key !== '/settings').map(entry => (
-            <Col xs={24} sm={12} lg={6} key={entry.key}>
-              <button className="dash-entry" onClick={() => nav(entry.key)}>
-                <span className="dash-entry-icon">{entry.icon}</span>
-                <strong>{entry.label}</strong>
-                <p>{entry.description}</p>
-              </button>
-            </Col>
+      <Card title="主流程入口" className="section-gap">
+        <div className="dashboard-flow-grid">
+          {flowEntries.map(entry => (
+            <button className="dash-entry" key={entry.path} onClick={() => nav(entry.path)}>
+              <strong>{entry.title}</strong>
+              <p>{entry.desc}</p>
+              <Tag color="blue">进入</Tag>
+            </button>
           ))}
-        </Row>
+        </div>
       </Card>
 
       <Row gutter={[16, 16]} className="section-gap">
@@ -99,34 +91,55 @@ export function DashboardPage() {
               </div>
               <Progress percent={successRate} status={failed ? 'exception' : 'active'} />
               <Row gutter={8}>
-                <Col span={8}><Statistic title="成功" value={success} /></Col>
-                <Col span={8}><Statistic title="运行中" value={running} /></Col>
-                <Col span={8}><Statistic title="失败" value={failed} /></Col>
+                <Col span={8}><MetricCard title="成功" value={success} tone="green" /></Col>
+                <Col span={8}><MetricCard title="运行中" value={running} tone="blue" /></Col>
+                <Col span={8}><MetricCard title="失败" value={failed} tone={failed ? 'red' : 'neutral'} /></Col>
               </Row>
-              <Button block onClick={() => nav('/settings')}>查看系统配置</Button>
             </Space>
           </Card>
         </Col>
-        <Col xs={24} lg={16}>
-          <Card title="近期求解任务" extra={<Button onClick={() => nav('/tasks')}>进入任务中心</Button>}>
-            {rows.slice(0, 8).length ? rows.slice(0, 8).map(task => (
-              <div className="dashboard-task-row" key={task.id}>
-                <div>
-                  <Space><span>{task.model || task.model_id || '未命名模型'}</span><Tag>{task.solver || 'HiGHS'}</Tag></Space>
-                  <Typography.Text type="secondary">{`${task.id} · ${task.scene || '未声明场景'} · ${task.created_at || '-'}`}</Typography.Text>
-                  <div className="task-progress">
-                    <Progress percent={Number(task.progress || 0)} size="small" />
-                  </div>
+        <Col xs={24} lg={8}>
+          <Card title="最近模型" extra={<Button onClick={() => nav('/models')}>模型资产中心</Button>}>
+            {recentModels.length ? recentModels.map(model => (
+              <div className="dashboard-task-row" key={model.id}>
+                <div className="dashboard-model-info">
+                  <Typography.Text strong>{model.name}</Typography.Text>
+                  <Typography.Text type="secondary">{model.template_id || model.id}</Typography.Text>
                 </div>
-                <Space>
-                  <StatusTag status={task.status} />
-                  <Button type="link" onClick={() => nav('/tasks')}>查看</Button>
-                </Space>
+                <StatusTag status={model.status} />
               </div>
-            )) : <Typography.Text type="secondary">暂无真实任务数据，请在任务调度中心提交求解任务。</Typography.Text>}
+            )) : <EmptyActionState title="暂无模型资产" description="可以从业务场景或模板开始创建模型。" action={<Button type="primary" onClick={() => nav('/models/create')}>创建优化模型</Button>} />}
+          </Card>
+        </Col>
+        <Col xs={24} lg={8}>
+          <Card title="异常提醒" extra={<Button onClick={() => nav('/settings')}>系统配置</Button>}>
+            {alerts.length ? alerts.map(item => (
+              <div className="dashboard-task-row" key={item}>
+                <Typography.Text>{item}</Typography.Text>
+                <Tag color="orange">待处理</Tag>
+              </div>
+            )) : <EmptyActionState title="暂无异常提醒" description="后端、组件、模型与任务接口当前未返回阻断问题。" />}
           </Card>
         </Col>
       </Row>
+
+      <Card title="最近求解任务" className="section-gap" extra={<Button onClick={() => nav('/tasks')}>进入任务中心</Button>}>
+        {recentTasks.length ? recentTasks.map(task => (
+          <div className="dashboard-task-row" key={task.id}>
+            <div>
+              <Space><span>{task.model || task.model_id || '未命名模型'}</span><Tag>{task.solver || 'HiGHS'}</Tag></Space>
+              <Typography.Text type="secondary">{`${task.id} / ${task.scene || '未声明场景'} / ${task.created_at || '-'}`}</Typography.Text>
+              <div className="task-progress">
+                <Progress percent={Number(task.progress || 0)} size="small" />
+              </div>
+            </div>
+            <Space>
+              <StatusTag status={task.status} />
+              <Button type="link" onClick={() => nav('/tasks')}>查看</Button>
+            </Space>
+          </div>
+        )) : <EmptyActionState title="暂无真实任务数据" description="在任务调度中心提交求解任务后，这里会展示最近运行状态。" action={<Button type="primary" onClick={() => nav('/tasks')}>发起求解任务</Button>} />}
+      </Card>
     </>
   );
 }

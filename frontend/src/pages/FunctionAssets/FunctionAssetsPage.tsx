@@ -1,32 +1,65 @@
 import { MoreOutlined } from '@ant-design/icons';
-import { Alert, Button, Card, Col, Collapse, Descriptions, Drawer, Dropdown, Form, Input, Row, Select, Space, Table, Tag, Typography, Upload, message } from 'antd';
+import { Alert, Button, Card, Col, Collapse, Descriptions, Drawer, Dropdown, Form, Input, InputNumber, Row, Select, Space, Table, Tag, Typography, Upload, message } from 'antd';
 import { useMemo, useState } from 'react';
 import ReactECharts from 'echarts-for-react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { createFunctionAsset, getFunctionAssets, importFunctionAssetCsv, previewFunctionAsset, updateFunctionAsset, validateFunctionAsset } from '../../api/functionAssets';
+import { checkFunctionAssetApiReady, createFunctionAsset, getFunctionAssets, importFunctionAssetCsv, previewFunctionAsset, updateFunctionAsset, validateFunctionAsset } from '../../api/functionAssets';
 import { PageHeader } from '../../components/PageHeader';
 import { StatusTag } from '../../components/StatusTag';
+import { MetricCard, MetricGrid } from '../../components/WorkspaceUI';
 import type { FunctionAsset, FunctionAssetPreview, FunctionAssetValidation } from '../../types/functionAsset';
 
-const starterPoints = [[0, 0], [100, 20], [200, 45]];
-const starterCsv = 'storage,level\n1000,245.0\n1200,246.3\n1500,248.1\n';
+type ManualPoint = { key: string; x: number; y: number; z?: number };
 
-function parsePoints(raw: string): number[][] {
-  const parsed = JSON.parse(raw);
-  if (!Array.isArray(parsed)) return [];
-  return parsed.map(point => Array.isArray(point) ? [Number(point[0]), Number(point[1])] : [Number(point.x), Number(point.y)]);
-}
+const samplePoints1d = [[0, 0], [100, 20], [200, 45]];
+const samplePoints2d = [[0, 0, 1], [10, 0, 21], [0, 10, 31], [10, 10, 51]];
+const sampleCsv1d = 'storage,level\n1000,245.0\n1200,246.3\n1500,248.1\n';
+const sampleCsv2d = 'flow,head,power\n0,0,1\n10,0,21\n0,10,31\n10,10,51\n';
 
 function pointText(points?: number[][]) {
-  return JSON.stringify(points && points.length ? points : starterPoints, null, 2);
+  return JSON.stringify(points || [], null, 2);
 }
 
-function pointRows(raw?: string) {
-  try {
-    return parsePoints(raw || '[]').map((point, index) => ({ key: `point_${index}`, x: point[0], y: point[1] }));
-  } catch {
-    return starterPoints.map((point, index) => ({ key: `point_${index}`, x: point[0], y: point[1] }));
-  }
+function pointRows(points?: number[][]): ManualPoint[] {
+  return (points || []).map((point, index) => ({
+    key: `point_${index}`,
+    x: Number(point[0]),
+    y: Number(point[1]),
+    z: point[2] === undefined ? undefined : Number(point[2]),
+  }));
+}
+
+function parsePointText(raw: string): ManualPoint[] {
+  if (!raw.trim()) return [];
+  const parsed = JSON.parse(raw);
+  if (!Array.isArray(parsed)) return [];
+  return parsed
+    .map((point, index) => Array.isArray(point)
+      ? { key: `json_${index}`, x: Number(point[0]), y: Number(point[1]), z: point[2] === undefined ? undefined : Number(point[2]) }
+      : { key: `json_${index}`, x: Number(point.x), y: Number(point.y), z: point.z === undefined ? undefined : Number(point.z) })
+    .filter(point => Number.isFinite(point.x) && Number.isFinite(point.y));
+}
+
+function parseCsvRows(csvText: string) {
+  const lines = csvText.trim().split(/\r?\n/).filter(Boolean);
+  if (!lines.length) return { fields: [] as string[], rows: [] as Record<string, string>[] };
+  const fields = lines[0].split(',').map(item => item.trim()).filter(Boolean);
+  const rows = lines.slice(1, 21).map(line => {
+    const values = line.split(',');
+    return Object.fromEntries(fields.map((field, index) => [field, values[index]?.trim() || '']));
+  });
+  return { fields, rows };
+}
+
+function pickRecommendedFields(fields: string[], type: FunctionAsset['function_type']) {
+  if (!fields.length) return { x_field: undefined, y_field: undefined, z_field: undefined };
+  const lower = new Map(fields.map(field => [field.toLowerCase(), field]));
+  const first = (...names: string[]) => names.map(name => lower.get(name)).find(Boolean);
+  return {
+    x_field: first('x', 'flow', 'storage', 'volume') || fields[0],
+    y_field: first('y', 'head', 'level') || fields[1],
+    z_field: type === 'piecewise_2d' ? first('z', 'power', 'value') || fields[2] : undefined,
+  };
 }
 
 function validationColor(status?: string) {
@@ -41,18 +74,31 @@ function validationText(status?: string) {
   return '正常';
 }
 
-function validationItems(items?: Array<Record<string, unknown>>) {
-  return (items || []).map((item, index) => ({
+function functionTypeText(type?: string) {
+  if (type === 'piecewise_2d') return '二维曲面';
+  if (type === 'piecewise_1d') return '一维曲线';
+  return type || '-';
+}
+
+function solveStrategyText(strategy?: string) {
+  const map: Record<string, string> = {
+    display_only: '仅展示',
+    convex_combination_lp: 'LP 凸组合',
+    convex_hull_lp_approx: 'LP 凸包近似',
+    binary_segment_milp: 'MILP 分段',
+    triangulated_milp_exact: 'MILP 三角剖分',
+  };
+  return map[String(strategy || '')] || String(strategy || '-');
+}
+
+function validationList(items?: Array<Record<string, unknown>>) {
+  const rows = (items || []).map((item, index) => ({
     key: `${String(item.field || 'item')}-${index}`,
-    field: String(item.field || '曲线断点'),
+    field: String(item.field || '字段'),
     message: String(item.message || item.error || '请检查该字段配置'),
     actual: item.actual,
     expected: item.expected,
   }));
-}
-
-function validationList(items?: Array<Record<string, unknown>>) {
-  const rows = validationItems(items);
   if (!rows.length) return null;
   return (
     <ul style={{ margin: 0, paddingLeft: 18 }}>
@@ -68,48 +114,17 @@ function validationList(items?: Array<Record<string, unknown>>) {
   );
 }
 
-function parseCsvRows(csvText: string) {
-  const lines = csvText.trim().split(/\r?\n/).filter(Boolean);
-  if (!lines.length) return { fields: [] as string[], rows: [] as Record<string, string>[] };
-  const fields = lines[0].split(',').map(item => item.trim());
-  const rows = lines.slice(1, 21).map(line => {
-    const values = line.split(',');
-    return Object.fromEntries(fields.map((field, index) => [field, values[index]?.trim() || '']));
-  });
-  return { fields, rows };
-}
-
-function schemaName(asset: FunctionAsset, kind: 'input' | 'output') {
+function schemaName(asset: FunctionAsset, kind: 'input' | 'output', index = 0) {
   if (kind === 'input') {
-    const first = asset.input_schema?.[0];
-    return String(first?.name || first?.code || 'x');
+    const field = asset.input_schema?.[index];
+    return String(field?.name || field?.code || (index === 0 ? 'x' : 'y'));
   }
-  return String(asset.output_schema?.name || asset.output_schema?.code || 'y');
+  return String(asset.output_schema?.name || asset.output_schema?.code || 'z');
 }
 
 function curveChartOption(asset: FunctionAsset, preview?: FunctionAssetPreview) {
   const originalPoints = (asset.points || []).map(point => [Number(point[0]), Number(point[1])]);
   const previewPoints = (preview?.values || []).map(point => [Number(point.x), Number(point.y)]);
-  const series = [
-    {
-      name: '原始断点',
-      type: 'line',
-      data: originalPoints,
-      symbol: 'circle',
-      symbolSize: 8,
-      lineStyle: { width: 2 },
-    },
-    previewPoints.length
-      ? {
-          name: 'preview 插值点',
-          type: 'line',
-          data: previewPoints,
-          symbol: 'diamond',
-          symbolSize: 7,
-          lineStyle: { width: 2, type: 'dashed' },
-        }
-      : undefined,
-  ].filter(Boolean);
   return {
     color: ['#1677ff', '#fa8c16'],
     tooltip: { trigger: 'axis' },
@@ -117,27 +132,71 @@ function curveChartOption(asset: FunctionAsset, preview?: FunctionAssetPreview) 
     grid: { top: 44, left: 54, right: 18, bottom: 42 },
     xAxis: { type: 'value', name: schemaName(asset, 'input') },
     yAxis: { type: 'value', name: schemaName(asset, 'output') },
-    series,
+    series: [
+      { name: '原始断点', type: 'line', data: originalPoints, symbol: 'circle', symbolSize: 8, lineStyle: { width: 2 } },
+      previewPoints.length ? { name: 'preview 插值点', type: 'line', data: previewPoints, symbol: 'diamond', symbolSize: 7, lineStyle: { width: 2, type: 'dashed' } } : undefined,
+    ].filter(Boolean),
   };
+}
+
+function surfaceChartOption(asset: FunctionAsset) {
+  const points = asset.points_2d || [];
+  const triangles = asset.triangles || [];
+  const zValues = points.map(point => Number(point[2])).filter(Number.isFinite);
+  const edgeData = triangles.flatMap(triangle => {
+    const vertices = triangle.map(index => points[index]).filter(Boolean);
+    if (vertices.length !== 3) return [];
+    return [
+      [[vertices[0][0], vertices[0][1]], [vertices[1][0], vertices[1][1]]],
+      [[vertices[1][0], vertices[1][1]], [vertices[2][0], vertices[2][1]]],
+      [[vertices[2][0], vertices[2][1]], [vertices[0][0], vertices[0][1]]],
+    ];
+  });
+  return {
+    tooltip: { formatter: (params: { data?: number[] }) => params.data ? `x=${params.data[0]}<br/>y=${params.data[1]}<br/>z=${params.data[2]}` : '' },
+    visualMap: zValues.length ? { min: Math.min(...zValues), max: Math.max(...zValues), dimension: 2, orient: 'horizontal', left: 'center', bottom: 0, inRange: { color: ['#2f54eb', '#13c2c2', '#fadb14', '#fa541c'] } } : undefined,
+    grid: { top: 24, left: 54, right: 18, bottom: 64 },
+    xAxis: { type: 'value', name: schemaName(asset, 'input', 0) },
+    yAxis: { type: 'value', name: schemaName(asset, 'input', 1) },
+    series: [
+      { name: 'z 值', type: 'scatter', data: points.map(point => [Number(point[0]), Number(point[1]), Number(point[2])]), symbolSize: 10 },
+      ...edgeData.map((line, index) => ({ name: `triangle_${index}`, type: 'line', data: line, showSymbol: false, lineStyle: { color: '#595959', width: 1 }, tooltip: { show: false } })),
+    ],
+  };
+}
+
+function is2d(asset?: FunctionAsset) {
+  return asset?.function_type === 'piecewise_2d';
+}
+
+function generatedId(type: FunctionAsset['function_type']) {
+  const prefix = type === 'piecewise_2d' ? 'surface' : 'curve';
+  return `${prefix}_${Date.now()}`;
 }
 
 export function FunctionAssetsPage() {
   const qc = useQueryClient();
   const [selected, setSelected] = useState<FunctionAsset | undefined>();
   const [editing, setEditing] = useState(false);
+  const [editingType, setEditingType] = useState<FunctionAsset['function_type']>('piecewise_1d');
   const [importing, setImporting] = useState(false);
+  const [importType, setImportType] = useState<FunctionAsset['function_type']>('piecewise_1d');
   const [validation, setValidation] = useState<FunctionAssetValidation | undefined>();
   const [preview, setPreview] = useState<FunctionAssetPreview | undefined>();
-  const [advancedIdMode, setAdvancedIdMode] = useState(false);
-  const [importCsvText, setImportCsvText] = useState(starterCsv);
-  const [manualPoints, setManualPoints] = useState(pointRows(pointText(starterPoints)));
+  const [importCsvText, setImportCsvText] = useState('');
+  const [manualPoints, setManualPoints] = useState<ManualPoint[]>([]);
   const [pastePointsText, setPastePointsText] = useState('');
+  const [previewInput, setPreviewInput] = useState({ x: 5, y: 5 });
   const [form] = Form.useForm();
   const [importForm] = Form.useForm();
   const list = useQuery({ queryKey: ['function-assets'], queryFn: getFunctionAssets });
   const rows = list.data || [];
+  const importPreview = useMemo(() => parseCsvRows(importCsvText), [importCsvText]);
+
   const usedCount = rows.filter(item => (item.referenced_by || []).length > 0).length;
-  const convexCount = rows.filter(item => item.solve_strategy === 'convex_combination_lp').length;
+  const oneDimCount = rows.filter(item => item.function_type === 'piecewise_1d').length;
+  const twoDimCount = rows.filter(item => item.function_type === 'piecewise_2d').length;
+  const lpStrategyCount = rows.filter(item => String(item.solve_strategy || '').includes('lp')).length;
   const invalidCount = rows.filter(item => item.validation_status === 'invalid').length;
 
   const done = (text: string) => {
@@ -147,138 +206,288 @@ export function FunctionAssetsPage() {
 
   const save = useMutation({
     mutationFn: async (values: Record<string, unknown>) => {
-      const payload = {
+      const apiReady = await checkFunctionAssetApiReady();
+      if (!apiReady) {
+        throw new Error('function_asset_api_not_ready');
+      }
+      const functionType = String(values.function_type || editingType || 'piecewise_1d') as FunctionAsset['function_type'];
+      const payload: Partial<FunctionAsset> & Record<string, unknown> = {
         ...values,
-        points: manualPoints.map(point => [Number(point.x), Number(point.y)]),
-        function_type: 'piecewise_1d' as const,
+        function_type: functionType,
+        input_schema: functionType === 'piecewise_2d'
+          ? [
+              { code: 'x', name: values.x_name || 'x', unit: values.x_unit || '', type: 'number' },
+              { code: 'y', name: values.y_name || 'y', unit: values.y_unit || '', type: 'number' },
+            ]
+          : [{ code: 'x', name: values.x_name || 'x', unit: values.x_unit || '', type: 'number' }],
+        output_schema: { code: functionType === 'piecewise_2d' ? 'z' : 'y', name: values.z_name || (functionType === 'piecewise_2d' ? 'z' : 'y'), unit: values.z_unit || '', type: 'number' },
+        points: functionType === 'piecewise_2d' ? [] : manualPoints.map(point => [Number(point.x), Number(point.y)]),
+        points_2d: functionType === 'piecewise_2d' ? manualPoints.map(point => [Number(point.x), Number(point.y), Number(point.z)]) : [],
       };
-      delete (payload as Record<string, unknown>).points_json;
+      delete payload.points_json;
+      delete payload.x_name;
+      delete payload.x_unit;
+      delete payload.y_name;
+      delete payload.y_unit;
+      delete payload.z_name;
+      delete payload.z_unit;
       return selected?.function_id ? updateFunctionAsset(selected.function_id, payload) : createFunctionAsset(payload);
     },
     onSuccess: asset => {
-      setSelected(asset);
+      setSelected(undefined);
       setEditing(false);
       done('函数资产已保存');
+    },
+    onError: () => {
+      message.error('函数资产保存失败，请确认 FastAPI 后端已启动且版本为最新');
     },
   });
 
   const importCsv = useMutation({
-    mutationFn: (values: Record<string, unknown>) => importFunctionAssetCsv(values),
+    mutationFn: (values: Record<string, unknown>) => importFunctionAssetCsv({ ...values, function_type: importType }),
     onSuccess: asset => {
       setSelected(asset);
       setImporting(false);
-      done('CSV 已导入为函数资产草稿');
+      done('CSV 已导入为函数资产');
     },
   });
 
   const validate = useMutation({
     mutationFn: (asset: FunctionAsset) => validateFunctionAsset(asset.function_id, asset),
-    onSuccess: result => {
-      setValidation(result);
-      if (import.meta.env.MODE !== 'test') {
-        message[result.valid ? 'success' : 'warning'](result.valid ? '曲线校验通过' : '曲线校验未通过');
-      }
-    },
+    onSuccess: result => setValidation(result),
   });
 
   const runPreview = useMutation({
-    mutationFn: (asset: FunctionAsset) => previewFunctionAsset(asset.function_id),
+    mutationFn: (asset: FunctionAsset) => previewFunctionAsset(asset.function_id, is2d(asset) ? previewInput : undefined),
     onSuccess: setPreview,
     onError: error => message.error(String(error)),
   });
 
-  const previewColumns = useMemo(() => [
-    { title: 'x', dataIndex: 'x' },
-    { title: 'y', dataIndex: 'y' },
-  ], []);
-  const importPreview = useMemo(() => parseCsvRows(importCsvText), [importCsvText]);
+  const previewColumns = useMemo(() => [{ title: 'x', dataIndex: 'x' }, { title: 'y', dataIndex: 'y' }], []);
 
-  const applyPastedPoints = () => {
-    const rows = pastePointsText.trim().split(/\r?\n/).map((line, index) => {
-      const [x, y] = line.split(/[\t,，\s]+/).filter(Boolean);
-      return { key: `paste_${Date.now()}_${index}`, x: Number(x), y: Number(y) };
-    }).filter(row => Number.isFinite(row.x) && Number.isFinite(row.y));
-    if (!rows.length) {
-      message.warning('未识别到有效断点，请粘贴两列 x、y 数值');
+  const validatePointCount = (type: FunctionAsset['function_type']) => {
+    if (type === 'piecewise_2d') {
+      if (manualPoints.length < 3) {
+        message.warning('二维曲面至少需要 3 个点，规则网格建议至少 4 个点。');
+        return false;
+      }
+      if (manualPoints.some(point => !Number.isFinite(point.z))) {
+        message.warning('二维曲面每个点都必须包含 z 值。');
+        return false;
+      }
+      return true;
+    }
+    if (manualPoints.length < 2) {
+      message.warning('一维曲线至少需要 2 个点。');
+      return false;
+    }
+    return true;
+  };
+
+  const submitAsset = (values: Record<string, unknown>) => {
+    const type = String(values.function_type || editingType) as FunctionAsset['function_type'];
+    if (!validatePointCount(type)) return;
+    save.mutate(values);
+  };
+
+  const submitCsv = (values: Record<string, unknown>) => {
+    if (!String(values.csv_text || '').trim()) {
+      message.warning('请上传 CSV 文件或粘贴 CSV 内容');
       return;
     }
-    setManualPoints(rows);
+    importCsv.mutate(values);
+  };
+
+  const applyPastedPoints = () => {
+    const parsed = pastePointsText.trim().split(/\r?\n/).map((line, index) => {
+      const [x, y, z] = line.split(/[\t,\s]+/).filter(Boolean);
+      return { key: `paste_${Date.now()}_${index}`, x: Number(x), y: Number(y), z: z === undefined ? undefined : Number(z) };
+    }).filter(row => Number.isFinite(row.x) && Number.isFinite(row.y));
+    if (!parsed.length) {
+      message.warning('未识别到有效点，请粘贴 x/y 或 x/y/z 数据');
+      return;
+    }
+    setManualPoints(parsed);
+    form.setFieldValue('points_json', pointText(parsed.map(point => editingType === 'piecewise_2d' ? [point.x, point.y, point.z ?? 0] : [point.x, point.y])));
     setPastePointsText('');
+  };
+
+  const setCommonFormValues = (type: FunctionAsset['function_type'], points: number[][], values: Record<string, unknown>) => {
+    setEditingType(type);
+    form.resetFields();
+    form.setFieldsValue({
+      function_type: type,
+      interpolation: 'linear',
+      status: 'draft',
+      solve_strategy: type === 'piecewise_2d' ? 'triangulated_milp_exact' : 'convex_combination_lp',
+      x_name: 'x',
+      y_name: type === 'piecewise_2d' ? 'y' : undefined,
+      z_name: type === 'piecewise_2d' ? 'z' : 'y',
+      points_json: pointText(points),
+      ...values,
+    });
+    setManualPoints(pointRows(points));
+    setEditing(true);
   };
 
   const startCreate = () => {
     setSelected(undefined);
     setValidation(undefined);
     setPreview(undefined);
-    form.setFieldsValue({
-      function_id: `curve_${Date.now()}`,
-      name: '新建曲线',
-      interpolation: 'linear',
-      solve_strategy: 'convex_combination_lp',
-      status: 'draft',
-      points_json: pointText(starterPoints),
-    });
-    setManualPoints(pointRows(pointText(starterPoints)));
-    setAdvancedIdMode(false);
-    setEditing(true);
+    setPastePointsText('');
+    setCommonFormValues('piecewise_1d', [], { function_id: generatedId('piecewise_1d'), name: '' });
   };
 
-  const startImport = () => {
-    setSelected(undefined);
-    setValidation(undefined);
-    setPreview(undefined);
-    importForm.setFieldsValue({
-      function_id: `curve_csv_${Date.now()}`,
-      name: 'CSV 导入曲线',
-      csv_text: starterCsv,
-      x_field: 'storage',
-      y_field: 'level',
-      solve_strategy: 'convex_combination_lp',
+  const onEditTypeChange = (type: FunctionAsset['function_type']) => {
+    setEditingType(type);
+    form.setFieldsValue({
+      function_type: type,
+      function_id: selected ? selected.function_id : generatedId(type),
+      solve_strategy: type === 'piecewise_2d' ? 'triangulated_milp_exact' : 'convex_combination_lp',
+      y_name: type === 'piecewise_2d' ? 'y' : undefined,
+      z_name: type === 'piecewise_2d' ? 'z' : 'y',
     });
-    setImportCsvText(starterCsv);
-    setAdvancedIdMode(false);
-    setImporting(true);
+    if (!selected) {
+      setManualPoints([]);
+      form.setFieldValue('points_json', pointText([]));
+    } else {
+      const points = selected.function_type === 'piecewise_2d' ? selected.points_2d : selected.points;
+      setManualPoints(pointRows(points));
+      form.setFieldValue('points_json', pointText(points));
+    }
+  };
+
+  const fillSamplePoints = () => {
+    const points = editingType === 'piecewise_2d' ? samplePoints2d : samplePoints1d;
+    setManualPoints(pointRows(points));
+    form.setFieldValue('points_json', pointText(points));
   };
 
   const startEdit = (asset: FunctionAsset) => {
     setSelected(asset);
     setValidation(undefined);
     setPreview(undefined);
-    form.setFieldsValue({ ...asset, points_json: pointText(asset.points) });
-    setManualPoints(pointRows(pointText(asset.points)));
-    setAdvancedIdMode(false);
-    setEditing(true);
+    setPastePointsText('');
+    const type = asset.function_type || 'piecewise_1d';
+    const points = type === 'piecewise_2d' ? (asset.points_2d || []) : (asset.points || []);
+    const xMeta = asset.input_schema?.[0] || {};
+    const yMeta = type === 'piecewise_2d' ? (asset.input_schema?.[1] || {}) : {};
+    setCommonFormValues(type, points, {
+      ...asset,
+      x_name: xMeta.name || xMeta.code || 'x',
+      x_unit: xMeta.unit || '',
+      y_name: type === 'piecewise_2d' ? (yMeta.name || yMeta.code || 'y') : undefined,
+      y_unit: type === 'piecewise_2d' ? (yMeta.unit || '') : undefined,
+      z_name: asset.output_schema?.name || asset.output_schema?.code || (type === 'piecewise_2d' ? 'z' : 'y'),
+      z_unit: asset.output_schema?.unit || '',
+      points_json: pointText(points),
+    });
   };
+
+  const startImport = () => {
+    setSelected(undefined);
+    setValidation(undefined);
+    setPreview(undefined);
+    setImportType('piecewise_1d');
+    setImportCsvText('');
+    importForm.resetFields();
+    importForm.setFieldsValue({
+      function_id: generatedId('piecewise_1d'),
+      name: '',
+      function_type: 'piecewise_1d',
+      csv_text: '',
+      x_field: undefined,
+      y_field: undefined,
+      z_field: undefined,
+      solve_strategy: 'convex_combination_lp',
+    });
+    setImporting(true);
+  };
+
+  const applyCsvText = (text: string, type = importType) => {
+    const parsed = parseCsvRows(text);
+    const recommendations = text.trim() ? pickRecommendedFields(parsed.fields, type) : { x_field: undefined, y_field: undefined, z_field: undefined };
+    setImportCsvText(text);
+    importForm.setFieldsValue({ csv_text: text, ...recommendations });
+  };
+
+  const onImportTypeChange = (type: FunctionAsset['function_type']) => {
+    setImportType(type);
+    const parsed = parseCsvRows(importCsvText);
+    const recommendations = importCsvText.trim() ? pickRecommendedFields(parsed.fields, type) : { x_field: undefined, y_field: undefined, z_field: undefined };
+    importForm.setFieldsValue({
+      function_type: type,
+      function_id: generatedId(type),
+      solve_strategy: type === 'piecewise_2d' ? 'triangulated_milp_exact' : 'convex_combination_lp',
+      ...recommendations,
+    });
+  };
+
+  const fillCsvSample = (type: FunctionAsset['function_type']) => {
+    setImportType(type);
+    const text = type === 'piecewise_2d' ? sampleCsv2d : sampleCsv1d;
+    importForm.setFieldsValue({
+      function_type: type,
+      function_id: generatedId(type),
+      solve_strategy: type === 'piecewise_2d' ? 'triangulated_milp_exact' : 'convex_combination_lp',
+    });
+    applyCsvText(text, type);
+  };
+
+  const editingStrategyOptions = editingType === 'piecewise_2d'
+    ? [
+        { value: 'display_only', label: solveStrategyText('display_only') },
+        { value: 'triangulated_milp_exact', label: solveStrategyText('triangulated_milp_exact') },
+        { value: 'convex_hull_lp_approx', label: solveStrategyText('convex_hull_lp_approx') },
+      ]
+    : [
+        { value: 'display_only', label: solveStrategyText('display_only') },
+        { value: 'convex_combination_lp', label: solveStrategyText('convex_combination_lp') },
+        { value: 'binary_segment_milp', label: solveStrategyText('binary_segment_milp') },
+      ];
+  const importStrategyOptions = importType === 'piecewise_2d'
+    ? [
+        { value: 'display_only', label: solveStrategyText('display_only') },
+        { value: 'triangulated_milp_exact', label: solveStrategyText('triangulated_milp_exact') },
+        { value: 'convex_hull_lp_approx', label: solveStrategyText('convex_hull_lp_approx') },
+      ]
+    : [
+        { value: 'display_only', label: solveStrategyText('display_only') },
+        { value: 'convex_combination_lp', label: solveStrategyText('convex_combination_lp') },
+        { value: 'binary_segment_milp', label: solveStrategyText('binary_segment_milp') },
+      ];
+
+  const surfaceDiagnostics = selected?.surface_diagnostics || selected?.diagnostics || {};
+  const drawerTitle = editing ? (selected ? '编辑函数资产' : '新建函数资产') : importing ? '导入 CSV 函数资产' : selected?.name || '函数资产';
+  const drawerRuntimeProps = import.meta.env.MODE === 'test'
+    ? { destroyOnHidden: true, getContainer: false as const }
+    : { destroyOnHidden: true };
 
   return (
     <>
       <PageHeader
         title="函数/曲线资产中心"
-        description="管理组件化运筹模型可复用的分段线性曲线、公式资产和求解策略。"
-        extra={<Space><Button onClick={startImport}>导入 CSV</Button><Button type="primary" onClick={startCreate}>新建曲线</Button></Space>}
+        description="管理组件化运筹模型可复用的分段线性曲线、二维曲面和求解策略。"
+        extra={<Space><Button onClick={startImport}>导入 CSV</Button><Button type="primary" onClick={startCreate}>新建函数资产</Button></Space>}
       />
-      <Row gutter={[14, 14]}>
-        <Col xs={24} md={6}><div className="card metric blue"><span>资产总数</span><b>{rows.length}</b><span>已登记函数/曲线</span></div></Col>
-        <Col xs={24} md={6}><div className="card metric green"><span>已被引用</span><b>{usedCount}</b><span>模型/组件绑定</span></div></Col>
-        <Col xs={24} md={6}><div className="card metric amber"><span>LP 策略</span><b>{convexCount}</b><span>凸组合近似</span></div></Col>
-        <Col xs={24} md={6}><div className="card metric red"><span>异常资产</span><b>{invalidCount}</b><span>需要修正</span></div></Col>
-      </Row>
+      <MetricGrid>
+        <MetricCard title="资产总数" value={rows.length} description={`${oneDimCount} 条一维曲线 / ${twoDimCount} 个二维曲面`} tone="blue" />
+        <MetricCard title="已被引用" value={usedCount} description="模型/组件绑定" tone="green" />
+        <MetricCard title="LP 策略" value={lpStrategyCount} description="分段线性与凸组合策略" tone="purple" />
+        <MetricCard title="异常资产" value={invalidCount} description={invalidCount ? '需要修正' : '暂无异常'} tone={invalidCount ? 'red' : 'neutral'} />
+      </MetricGrid>
+
       <Card className="content-card section-gap" title="函数与曲线资产">
         <Table<FunctionAsset>
           rowKey="function_id"
           loading={list.isLoading}
           dataSource={rows}
           pagination={false}
-          scroll={{ x: 1400 }}
           columns={[
             { title: '名称', render: (_, row) => <Space orientation="vertical" size={0}><Typography.Text strong>{row.name}</Typography.Text><Typography.Text type="secondary">{row.function_id}</Typography.Text></Space> },
-            { title: '类型', dataIndex: 'function_type' },
+            { title: '类型', render: (_, row) => functionTypeText(row.function_type) },
             { title: '校验状态', render: (_, row) => <Tag color={validationColor(row.validation_status)}>{validationText(row.validation_status)}</Tag> },
-            { title: '错误数', render: (_, row) => (row.validation_errors || []).length },
-            { title: '警告数', render: (_, row) => (row.validation_warnings || []).length },
-            { title: '定义域', render: (_, row) => `${row.domain?.x_min ?? '-'} .. ${row.domain?.x_max ?? '-'}` },
-            { title: '单调性', dataIndex: 'monotonicity' },
-            { title: '求解策略', dataIndex: 'solve_strategy' },
+            { title: '求解策略', render: (_, row) => solveStrategyText(row.solve_strategy) },
             { title: '状态', dataIndex: 'status', render: value => <StatusTag status={String(value || 'draft')} /> },
             { title: '引用数', render: (_, row) => <Tag color={(row.referenced_by || []).length ? 'blue' : undefined}>{(row.referenced_by || []).length}</Tag> },
             {
@@ -293,14 +502,12 @@ export function FunctionAssetsPage() {
                     trigger={['click']}
                     menu={{
                       items: [
-                        { key: 'validate', label: '校验曲线' },
-                        { key: 'preview', label: '预览插值', disabled: row.validation_status === 'invalid' },
+                        { key: 'validate', label: '校验' },
+                        { key: 'preview', label: '预览', disabled: row.validation_status === 'invalid' },
                       ],
                       onClick: ({ key }) => {
-                        if (key === 'validate') {
-                          setSelected(row);
-                          validate.mutate(row);
-                        }
+                        setSelected(row);
+                        if (key === 'validate') validate.mutate(row);
                         if (key === 'preview') runPreview.mutate(row);
                       },
                     }}
@@ -313,171 +520,227 @@ export function FunctionAssetsPage() {
           ]}
         />
       </Card>
+
       <Drawer
         size="large"
         open={editing || importing || !!selected || !!validation || !!preview}
         onClose={() => { setEditing(false); setImporting(false); setSelected(undefined); setValidation(undefined); setPreview(undefined); }}
-        title={editing ? '编辑函数资产' : importing ? '导入 CSV 曲线' : selected?.name || '函数资产'}
+        title={drawerTitle}
+        {...drawerRuntimeProps}
       >
         {editing ? (
-          <Form form={form} layout="vertical" onFinish={values => save.mutate(values)}>
+          <Form form={form} layout="vertical" onFinish={submitAsset}>
             <Row gutter={12}>
-              <Col span={12}>
-                {advancedIdMode ? (
-                  <Form.Item name="function_id" label="函数 ID" rules={[{ required: true }]}><Input disabled={!!selected} /></Form.Item>
-                ) : (
-                  <Form.Item name="function_id" hidden><Input /></Form.Item>
-                )}
-                <Button size="small" onClick={() => setAdvancedIdMode(value => !value)}>{advancedIdMode ? '收起高级设置' : '高级设置：函数 ID 与底层 Schema'}</Button>
+              <Col span={24}>
+                <Form.Item name="function_type" label="函数类型" rules={[{ required: true }]}>
+                  <Select
+                    disabled={!!selected}
+                    options={[
+                      { value: 'piecewise_1d', label: '一维曲线 y=f(x)' },
+                      { value: 'piecewise_2d', label: '二维曲面 z=f(x,y)' },
+                    ]}
+                    onChange={onEditTypeChange}
+                  />
+                </Form.Item>
               </Col>
-              <Col span={12}><Form.Item name="name" label="名称" rules={[{ required: true }]}><Input /></Form.Item></Col>
-              <Col span={12}><Form.Item name="interpolation" label="插值方式"><Select options={[{ value: 'linear', label: 'linear' }]} /></Form.Item></Col>
-              <Col span={12}><Form.Item name="solve_strategy" label="求解策略"><Select options={[
-                { value: 'display_only', label: 'display_only - 仅展示' },
-                { value: 'convex_combination_lp', label: 'convex_combination_lp - LP 凸组合近似' },
-                { value: 'binary_segment_milp', label: 'binary_segment_milp - 实验性，仅诊断' },
-              ]} /></Form.Item></Col>
+              <Col span={12}><Form.Item name="name" label="资产名称" rules={[{ required: true }]}><Input /></Form.Item></Col>
+              <Col span={12}><Form.Item name="solve_strategy" label="求解策略" rules={[{ required: true }]}><Select options={editingStrategyOptions} /></Form.Item></Col>
+              <Col span={24}><Typography.Text strong>输入字段</Typography.Text></Col>
+              <Col span={12}><Form.Item name="x_name" label="x 名称" rules={[{ required: true }]}><Input /></Form.Item></Col>
+              <Col span={12}><Form.Item name="x_unit" label="x 单位"><Input /></Form.Item></Col>
+              {editingType === 'piecewise_2d' && <Col span={12}><Form.Item name="y_name" label="y 名称" rules={[{ required: true }]}><Input /></Form.Item></Col>}
+              {editingType === 'piecewise_2d' && <Col span={12}><Form.Item name="y_unit" label="y 单位"><Input /></Form.Item></Col>}
+              <Col span={24}><Typography.Text strong>输出字段</Typography.Text></Col>
+              <Col span={12}><Form.Item name="z_name" label={editingType === 'piecewise_2d' ? 'z 名称' : '输出 y 名称'} rules={[{ required: true }]}><Input /></Form.Item></Col>
+              <Col span={12}><Form.Item name="z_unit" label={editingType === 'piecewise_2d' ? 'z 单位' : '输出 y 单位'}><Input /></Form.Item></Col>
               <Col span={12}><Form.Item name="status" label="状态"><Select options={['draft', 'published', 'trial', 'active'].map(value => ({ value, label: value }))} /></Form.Item></Col>
-              <Col span={12}><Form.Item name="description" label="说明"><Input /></Form.Item></Col>
+              <Col span={24}><Form.Item name="description" label="说明"><Input /></Form.Item></Col>
             </Row>
+            <Collapse
+              className="section-gap"
+              items={[{
+                key: 'advanced',
+                label: '高级配置',
+                children: (
+                  <>
+                    <Alert
+                      type="info"
+                      showIcon
+                      title="自定义技术标识"
+                      description="函数 ID 是系统技术标识，默认自动生成；仅在需要外部 API、模型模板或组件绑定时手工修改。"
+                    />
+                    <Form.Item className="section-gap" name="function_id" label="函数 ID" rules={[{ required: true }]}><Input disabled={!!selected} /></Form.Item>
+                  </>
+                ),
+              }]}
+            />
             <Card
               className="section-gap"
-              title="曲线数据"
-              extra={<Space><Button onClick={() => setManualPoints(points => [...points, { key: `point_${Date.now()}`, x: 0, y: 0 }])}>添加断点</Button><Button onClick={() => setManualPoints(points => [...points].sort((a, b) => Number(a.x) - Number(b.x)))}>按 x 排序</Button></Space>}
+              title={editingType === 'piecewise_2d' ? '二维曲面数据 points_2d' : '一维曲线数据 points'}
+              extra={<Space><Button onClick={() => setManualPoints(points => [...points, { key: `point_${Date.now()}`, x: 0, y: 0, z: editingType === 'piecewise_2d' ? 0 : undefined }])}>添加点</Button><Button onClick={fillSamplePoints}>填充示例数据</Button><Button onClick={() => setManualPoints(points => [...points].sort((a, b) => Number(a.x) - Number(b.x)))}>按 x 排序</Button></Space>}
             >
-              <Form.Item label="批量粘贴断点">
-                <Input.TextArea
-                  rows={3}
-                  value={pastePointsText}
-                  onChange={event => setPastePointsText(event.target.value)}
-                  placeholder={'0\t0\n100\t20\n200\t45'}
-                />
+              <Alert
+                className="section-gap-tight"
+                type="info"
+                showIcon
+                title={editingType === 'piecewise_2d' ? '二维曲面至少需要 3 个点，规则网格建议至少 4 个点。' : '一维曲线至少需要 2 个点。'}
+              />
+              <Form.Item label="批量粘贴点">
+                <Input.TextArea rows={3} value={pastePointsText} onChange={event => setPastePointsText(event.target.value)} placeholder={editingType === 'piecewise_2d' ? '0 0 1\n10 0 21\n0 10 31' : '0 0\n100 20\n200 45'} />
                 <Button className="section-gap-tight" onClick={applyPastedPoints}>应用粘贴数据</Button>
               </Form.Item>
               <Table
                 size="small"
                 pagination={false}
                 rowKey="key"
+                locale={{ emptyText: '暂无点数据，请添加点或粘贴数据' }}
                 dataSource={manualPoints}
                 columns={[
-                  { title: 'x', dataIndex: 'x', render: (_value, row, index) => <Input value={row.x} onChange={event => setManualPoints(points => points.map((item, itemIndex) => itemIndex === index ? { ...item, x: Number(event.target.value) } : item))} /> },
-                  { title: 'y', dataIndex: 'y', render: (_value, row, index) => <Input value={row.y} onChange={event => setManualPoints(points => points.map((item, itemIndex) => itemIndex === index ? { ...item, y: Number(event.target.value) } : item))} /> },
+                  { title: 'x', dataIndex: 'x', render: (_value, row, index) => <InputNumber value={row.x} onChange={value => setManualPoints(points => points.map((item, itemIndex) => itemIndex === index ? { ...item, x: Number(value) } : item))} /> },
+                  { title: editingType === 'piecewise_2d' ? 'y' : '输出 y', dataIndex: 'y', render: (_value, row, index) => <InputNumber value={row.y} onChange={value => setManualPoints(points => points.map((item, itemIndex) => itemIndex === index ? { ...item, y: Number(value) } : item))} /> },
+                  ...(editingType === 'piecewise_2d' ? [{ title: 'z', dataIndex: 'z', render: (_value: unknown, row: ManualPoint, index: number) => <InputNumber value={row.z} onChange={value => setManualPoints(points => points.map((item, itemIndex) => itemIndex === index ? { ...item, z: Number(value) } : item))} /> }] : []),
                   { title: '操作', width: 90, render: (_value, _row, index) => <Button danger type="link" onClick={() => setManualPoints(points => points.filter((_, itemIndex) => itemIndex !== index))}>删除</Button> },
                 ]}
               />
             </Card>
+            <Collapse className="section-gap" items={[{ key: 'debug', label: '高级 JSON 调试', children: <Form.Item name="points_json" label="点 JSON"><Input.TextArea rows={8} onBlur={event => setManualPoints(parsePointText(event.target.value))} /></Form.Item> }]} />
+            <Space><Button onClick={() => setEditing(false)}>取消</Button><Button type="primary" htmlType="submit" loading={save.isPending}>保存</Button></Space>
+          </Form>
+        ) : importing ? (
+          <Form form={importForm} layout="vertical" onFinish={submitCsv}>
+            <Row gutter={12}>
+              <Col span={12}><Form.Item name="name" label="资产名称" rules={[{ required: true }]}><Input /></Form.Item></Col>
+              <Col span={12}><Form.Item name="function_type" label="函数类型" rules={[{ required: true }]}><Select options={[{ value: 'piecewise_1d', label: '一维曲线 y=f(x)' }, { value: 'piecewise_2d', label: '二维曲面 z=f(x,y)' }]} onChange={onImportTypeChange} /></Form.Item></Col>
+              <Col span={12}><Form.Item name="solve_strategy" label="求解策略"><Select options={importStrategyOptions} /></Form.Item></Col>
+              <Col span={importType === 'piecewise_2d' ? 8 : 12}><Form.Item name="x_field" label="x 字段" rules={[{ required: true }]}><Select allowClear showSearch options={importPreview.fields.map(field => ({ value: field, label: field }))} /></Form.Item></Col>
+              <Col span={importType === 'piecewise_2d' ? 8 : 12}><Form.Item name="y_field" label="y 字段" rules={[{ required: true }]}><Select allowClear showSearch options={importPreview.fields.map(field => ({ value: field, label: field }))} /></Form.Item></Col>
+              {importType === 'piecewise_2d' && <Col span={8}><Form.Item name="z_field" label="z 字段" rules={[{ required: true }]}><Select allowClear showSearch options={importPreview.fields.map(field => ({ value: field, label: field }))} /></Form.Item></Col>}
+              <Col span={8}><Form.Item name="x_unit" label="x 单位"><Input /></Form.Item></Col>
+              <Col span={8}><Form.Item name="y_unit" label="y 单位"><Input /></Form.Item></Col>
+              {importType === 'piecewise_2d' && <Col span={8}><Form.Item name="z_unit" label="z 单位"><Input /></Form.Item></Col>}
+            </Row>
             <Collapse
               className="section-gap"
               items={[{
-                key: 'debug',
-                label: '高级 JSON 调试',
+                key: 'advanced',
+                label: '高级配置',
                 children: (
-                  <Form.Item name="points_json" label="断点 JSON">
-                    <Input.TextArea rows={8} onBlur={event => setManualPoints(pointRows(event.target.value))} />
-                  </Form.Item>
+                  <>
+                    <Alert
+                      type="info"
+                      showIcon
+                      title="自定义技术标识"
+                      description="函数 ID 是系统技术标识，默认自动生成；仅在需要外部 API、模型模板或组件绑定时手工修改。"
+                    />
+                    <Form.Item className="section-gap" name="function_id" label="函数 ID" rules={[{ required: true }]}><Input /></Form.Item>
+                  </>
                 ),
               }]}
             />
-            <Space>
-              <Button onClick={() => setEditing(false)}>取消</Button>
-              <Button type="primary" htmlType="submit" loading={save.isPending}>保存</Button>
+            <Space className="section-gap" wrap>
+              <Upload
+                accept=".csv,text/csv"
+                maxCount={1}
+                beforeUpload={file => {
+                  const reader = new FileReader();
+                  reader.onload = event => applyCsvText(String(event.target?.result || ''));
+                  reader.readAsText(file);
+                  return false;
+                }}
+              >
+                <Button>选择 CSV 文件</Button>
+              </Upload>
+              <Button onClick={() => fillCsvSample('piecewise_1d')}>填充一维示例</Button>
+              <Button onClick={() => fillCsvSample('piecewise_2d')}>填充二维示例</Button>
             </Space>
-          </Form>
-        ) : importing ? (
-          <Form form={importForm} layout="vertical" onFinish={values => importCsv.mutate(values)}>
-            <Alert
-              type="info"
-              title="Excel 多 Sheet 与多 group 曲线求解为预留能力"
-              description="当前轻量版仅使用第一组曲线参与求解，其余分组仅保存为元数据。"
-            />
-            <Row gutter={12} className="section-gap">
-              <Col span={12}>
-                {advancedIdMode ? (
-                  <Form.Item name="function_id" label="函数 ID" rules={[{ required: true }]}><Input /></Form.Item>
-                ) : (
-                  <Form.Item name="function_id" hidden><Input /></Form.Item>
-                )}
-                <Button size="small" onClick={() => setAdvancedIdMode(value => !value)}>{advancedIdMode ? '收起高级设置' : '高级设置：函数 ID 与底层 Schema'}</Button>
-              </Col>
-              <Col span={12}><Form.Item name="name" label="资产名称" rules={[{ required: true }]}><Input /></Form.Item></Col>
-              <Col span={8}><Form.Item name="x_field" label="x 字段" rules={[{ required: true }]}><Input /></Form.Item></Col>
-              <Col span={8}><Form.Item name="y_field" label="y 字段" rules={[{ required: true }]}><Input /></Form.Item></Col>
-              <Col span={8}><Form.Item name="group_field" label="分组字段"><Input placeholder="可选" /></Form.Item></Col>
-              <Col span={12}><Form.Item name="x_unit" label="x 单位"><Input /></Form.Item></Col>
-              <Col span={12}><Form.Item name="y_unit" label="y 单位"><Input /></Form.Item></Col>
-              <Col span={24}><Form.Item name="solve_strategy" label="求解策略"><Select options={[
-                { value: 'display_only', label: 'display_only - 仅展示' },
-                { value: 'convex_combination_lp', label: 'convex_combination_lp - LP 凸组合近似' },
-              ]} /></Form.Item></Col>
-            </Row>
-            <Upload
-              accept=".csv,text/csv"
-              maxCount={1}
-              beforeUpload={file => {
-                const reader = new FileReader();
-                reader.onload = event => {
-                  const text = String(event.target?.result || '');
-                  setImportCsvText(text);
-                  importForm.setFieldValue('csv_text', text);
-                  const parsed = parseCsvRows(text);
-                  importForm.setFieldsValue({ x_field: parsed.fields[0], y_field: parsed.fields[1] });
-                };
-                reader.readAsText(file);
-                return false;
-              }}
-            >
-              <Button>选择 CSV 文件</Button>
-            </Upload>
-            <Form.Item className="section-gap" name="csv_text" label="CSV 内容（调试备用）" rules={[{ required: true }]}>
-              <Input.TextArea rows={6} onChange={event => setImportCsvText(event.target.value)} />
+            <Form.Item className="section-gap" name="csv_text" label="CSV 内容" rules={[{ required: true, message: '请上传 CSV 文件或粘贴 CSV 内容' }]}>
+              <Input.TextArea rows={6} placeholder="请上传 CSV 文件或粘贴 CSV 内容" onChange={event => applyCsvText(event.target.value)} />
             </Form.Item>
-            <Card size="small" title="数据预览与字段识别">
-              <Descriptions size="small" column={3} items={[
-                { key: 'fields', label: '识别字段', children: importPreview.fields.join('、') || '-' },
-                { key: 'x', label: 'x 字段', children: importForm.getFieldValue('x_field') || importPreview.fields[0] || '-' },
-                { key: 'y', label: 'y 字段', children: importForm.getFieldValue('y_field') || importPreview.fields[1] || '-' },
-              ]} />
-              <Table className="section-gap" size="small" pagination={false} rowKey={row => JSON.stringify(row)} dataSource={importPreview.rows} columns={importPreview.fields.map(field => ({ title: field, dataIndex: field }))} scroll={{ x: 700 }} />
+            <Card size="small" title="字段识别">
+              {!importCsvText.trim() ? (
+                <Alert type="info" showIcon title="请上传 CSV 文件或粘贴 CSV 内容" />
+              ) : (
+                <>
+                  <Descriptions size="small" column={3} items={[
+                    { key: 'fields', label: '字段列表', children: importPreview.fields.join(', ') || '-' },
+                    { key: 'x', label: 'x 字段', children: importForm.getFieldValue('x_field') || '-' },
+                    { key: 'y', label: 'y 字段', children: importForm.getFieldValue('y_field') || '-' },
+                    { key: 'z', label: 'z 字段', children: importType === 'piecewise_2d' ? (importForm.getFieldValue('z_field') || '-') : '不适用' },
+                  ]} />
+                  <Collapse
+                    className="section-gap"
+                    items={[{
+                      key: 'preview',
+                      label: `高级预览：前 ${importPreview.rows.length} 行`,
+                      children: <Table className="import-preview-table" size="small" pagination={false} rowKey={row => JSON.stringify(row)} dataSource={importPreview.rows} columns={importPreview.fields.map(field => ({ title: field, dataIndex: field }))} />,
+                    }]}
+                  />
+                </>
+              )}
             </Card>
-            <Space>
-              <Button onClick={() => setImporting(false)}>取消</Button>
-              <Button type="primary" htmlType="submit" loading={importCsv.isPending}>导入为草稿</Button>
-            </Space>
+            <Space className="section-gap"><Button onClick={() => setImporting(false)}>取消</Button><Button type="primary" htmlType="submit" loading={importCsv.isPending}>导入为草稿</Button></Space>
           </Form>
         ) : selected ? (
           <Space orientation="vertical" size={16} style={{ width: '100%' }}>
             <Descriptions bordered size="small" column={2}>
               <Descriptions.Item label="函数 ID">{selected.function_id}</Descriptions.Item>
-              <Descriptions.Item label="类型">{selected.function_type}</Descriptions.Item>
+              <Descriptions.Item label="类型">{functionTypeText(selected.function_type)}</Descriptions.Item>
               <Descriptions.Item label="校验状态"><Tag color={validationColor(selected.validation_status)}>{validationText(selected.validation_status)}</Tag></Descriptions.Item>
-              <Descriptions.Item label="定义域">{selected.domain?.x_min ?? '-'} .. {selected.domain?.x_max ?? '-'}</Descriptions.Item>
-              <Descriptions.Item label="求解策略">{selected.solve_strategy}</Descriptions.Item>
-              <Descriptions.Item label="单调性">{selected.monotonicity || '-'}</Descriptions.Item>
-              <Descriptions.Item label="凸性">{selected.convexity || String(selected.diagnostics?.convexity || '-')}</Descriptions.Item>
+              <Descriptions.Item label="求解策略">{solveStrategyText(selected.solve_strategy)}</Descriptions.Item>
               <Descriptions.Item label="引用数">{(selected.referenced_by || []).length}</Descriptions.Item>
+              <Descriptions.Item label="错误 / 警告">{(selected.validation_errors || []).length} / {(selected.validation_warnings || []).length}</Descriptions.Item>
             </Descriptions>
-            <Card size="small" title="曲线诊断">
-              <Descriptions size="small" column={3} items={[
-                { key: 'count', label: '断点数量', children: selected.domain?.breakpoint_count ?? selected.points?.length ?? '-' },
-                { key: 'domain', label: '定义域', children: `${selected.domain?.x_min ?? '-'} .. ${selected.domain?.x_max ?? '-'}` },
-                { key: 'range', label: '值域', children: `${selected.domain?.y_min ?? '-'} .. ${selected.domain?.y_max ?? '-'}` },
-                { key: 'monotonicity', label: '单调性', children: selected.monotonicity || '-' },
-                { key: 'convexity', label: '凸性', children: selected.convexity || String(selected.diagnostics?.convexity || '-') },
-                { key: 'strategy', label: '推荐策略', children: selected.solve_strategy || 'display_only' },
-              ]} />
-              {['unknown', 'nonconvex'].includes(String(selected.convexity || selected.diagnostics?.convexity || '')) && (
-                <Alert className="section-gap" type="warning" showIcon title="凸组合风险" description="当前曲线可能存在凸包松弛风险，结果可能不严格落在原始折线上。" />
-              )}
-            </Card>
-            {(selected.validation_errors || []).length > 0 && <Alert type="error" title="校验错误" description={validationList(selected.validation_errors)} />}
-            {(selected.validation_warnings || []).length > 0 && <Alert type="warning" title="校验警告" description={validationList(selected.validation_warnings)} />}
-            {validation && <Alert type={validation.valid ? 'success' : 'error'} showIcon title={validation.valid ? '校验通过' : '校验失败'} description={validation.valid ? '函数/曲线资产可用于模型绑定。' : validationList(validation.errors)} />}
-            {selected.validation_status !== 'invalid' && (selected.points || []).length > 0 && (
-              <Card size="small" title="曲线图预览">
-                <ReactECharts option={curveChartOption(selected, preview)} style={{ height: 280 }} />
+
+            {selected.function_type === 'piecewise_2d' ? (
+              <Card size="small" title="二维曲面诊断">
+                <Descriptions size="small" column={3} items={[
+                  { key: 'points', label: '点数量', children: String(selected.domain?.point_count ?? selected.points_2d?.length ?? '-') },
+                  { key: 'triangles', label: '三角形数量', children: String(surfaceDiagnostics.triangle_count ?? selected.triangles?.length ?? '-') },
+                  { key: 'x', label: 'x 定义域', children: `${selected.domain?.x_min ?? '-'} .. ${selected.domain?.x_max ?? '-'}` },
+                  { key: 'y', label: 'y 定义域', children: `${selected.domain?.y_min ?? '-'} .. ${selected.domain?.y_max ?? '-'}` },
+                  { key: 'z', label: 'z 值域', children: `${selected.domain?.z_min ?? '-'} .. ${selected.domain?.z_max ?? '-'}` },
+                  { key: 'grid', label: '是否规则网格', children: String(surfaceDiagnostics.is_regular_grid ?? '-') },
+                  { key: 'status', label: '三角化状态', children: String(selected.triangulation_status || surfaceDiagnostics.triangulation_status || '-') },
+                  { key: 'degenerate', label: '退化三角形数量', children: String(surfaceDiagnostics.degenerate_triangle_count ?? 0) },
+                  { key: 'recommended', label: '推荐求解策略', children: solveStrategyText(String(surfaceDiagnostics.recommended_solve_strategy || selected.solve_strategy || '')) },
+                ]} />
+              </Card>
+            ) : (
+              <Card size="small" title="曲线诊断">
+                <Descriptions size="small" column={3} items={[
+                  { key: 'count', label: '断点数量', children: selected.domain?.breakpoint_count ?? selected.points?.length ?? '-' },
+                  { key: 'domain', label: '定义域', children: `${selected.domain?.x_min ?? '-'} .. ${selected.domain?.x_max ?? '-'}` },
+                  { key: 'range', label: '值域', children: `${selected.domain?.y_min ?? '-'} .. ${selected.domain?.y_max ?? '-'}` },
+                  { key: 'monotonicity', label: '单调性', children: String(selected.monotonicity || '-') },
+                  { key: 'convexity', label: '凸性', children: String(selected.convexity || selected.diagnostics?.convexity || '-') },
+                ]} />
               </Card>
             )}
-            {selected.validation_status !== 'invalid' && preview && <Table rowKey="x" size="small" pagination={false} dataSource={preview.values} columns={previewColumns} />}
+            {(selected.validation_errors || []).length > 0 && <Alert type="error" title="校验错误" description={validationList(selected.validation_errors)} />}
+            {(selected.validation_warnings || []).length > 0 && <Alert type="warning" title="校验警告" description={validationList(selected.validation_warnings)} />}
+            {validation && <Alert type={validation.valid ? 'success' : 'error'} showIcon title={validation.valid ? '校验通过' : '校验失败'} description={validation.valid ? '函数资产可用于模型绑定。' : validationList(validation.errors)} />}
+
+            {selected.validation_status !== 'invalid' && selected.function_type === 'piecewise_2d' && (
+              <Card size="small" title="二维曲面预览">
+                <ReactECharts option={surfaceChartOption(selected)} style={{ height: 320 }} />
+                <Space className="section-gap" wrap>
+                  <InputNumber value={previewInput.x} onChange={value => setPreviewInput(current => ({ ...current, x: Number(value) }))} addonBefore="x" />
+                  <InputNumber value={previewInput.y} onChange={value => setPreviewInput(current => ({ ...current, y: Number(value) }))} addonBefore="y" />
+                  <Button onClick={() => runPreview.mutate(selected)}>计算 z</Button>
+                </Space>
+                {preview && preview.status && (
+                  <Descriptions className="section-gap" size="small" column={4} items={[
+                    { key: 'status', label: '状态', children: preview.status },
+                    { key: 'z', label: 'z', children: preview.z ?? '-' },
+                    { key: 'triangle', label: 'triangle', children: JSON.stringify(preview.triangle || []) },
+                    { key: 'lambda', label: 'lambda', children: JSON.stringify(preview.lambda || []) },
+                  ]} />
+                )}
+              </Card>
+            )}
+            {selected.validation_status !== 'invalid' && selected.function_type !== 'piecewise_2d' && (selected.points || []).length > 0 && <Card size="small" title="曲线图预览"><ReactECharts option={curveChartOption(selected, preview)} style={{ height: 280 }} /></Card>}
+            {selected.validation_status !== 'invalid' && preview?.values && <Table rowKey="x" size="small" pagination={false} dataSource={preview.values} columns={previewColumns} />}
+
             {(selected.referenced_by || []).length > 0 && (
               <Table
                 size="small"
@@ -492,13 +755,7 @@ export function FunctionAssetsPage() {
                 ]}
               />
             )}
-            <Collapse
-              items={[{
-                key: 'debug',
-                label: '高级调试',
-                children: <Typography.Text code>{JSON.stringify({ points: selected.points, validation, diagnostics: selected.diagnostics, metadata: selected.metadata }, null, 2)}</Typography.Text>,
-              }]}
-            />
+            <Collapse items={[{ key: 'debug', label: '高级调试', children: <Typography.Text code>{JSON.stringify({ points: selected.points, points_2d: selected.points_2d, triangles: selected.triangles, validation, diagnostics: selected.diagnostics, surface_diagnostics: selected.surface_diagnostics }, null, 2)}</Typography.Text> }]} />
             <Space>
               <Button aria-label="编辑" onClick={() => startEdit(selected)}>编辑</Button>
               <Button aria-label="校验" onClick={() => validate.mutate(selected)}>校验</Button>

@@ -12,6 +12,12 @@ class SolverRunResult(BaseModel):
     variable_values: dict[str, Any] = Field(default_factory=dict)
     solver_log: str = ""
     raw_termination_condition: str = ""
+    solver_type: str | None = None
+    local_optimum_warning: bool = False
+    termination_condition: str | None = None
+    constraint_violation_summary: dict[str, Any] = Field(default_factory=dict)
+    solver_available: bool | None = None
+    solver_message: str = ""
 
 
 class SolveResult(BaseModel):

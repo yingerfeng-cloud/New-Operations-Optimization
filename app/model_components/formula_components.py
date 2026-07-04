@@ -48,6 +48,8 @@ def validate_component_definition(component: dict[str, Any]) -> dict[str, Any]:
     symbols = _symbol_table(component)
     for section, rows in (("constraints", component.get("constraints") or component.get("generated_constraints") or []), ("objective_terms", component.get("objective_terms") or component.get("generated_objective_terms") or [])):
         for index, item in enumerate(rows):
+            if _is_programmatic_generated(item):
+                continue
             expression = str(item.get("expression") or item.get("formula") or "").strip()
             if not expression:
                 continue
@@ -68,7 +70,7 @@ def validate_component_definition(component: dict[str, Any]) -> dict[str, Any]:
     errors.extend(_validate_piecewise_component(component))
     dependency_errors = _validate_dependencies(component)
     errors.extend(dependency_errors)
-    if not errors:
+    if not errors and not _component_uses_only_programmatic_constraints(component):
         errors.extend(validate_component_compiles(component))
     return {"valid": not errors, "errors": errors}
 
@@ -765,6 +767,15 @@ def _node_variable_base(node: ast.AST) -> str:
 def _contains_unsafe_text(expression: str) -> bool:
     lowered = expression.lower()
     return any(token in lowered for token in ("__", "import", "eval", "exec", "open(", "os.", "sys.", "subprocess", "socket", "requests"))
+
+
+def _is_programmatic_generated(item: dict[str, Any]) -> bool:
+    return bool(item.get("programmatic") or str(item.get("generation_mode") or "").lower() in {"programmatic", "generated"})
+
+
+def _component_uses_only_programmatic_constraints(component: dict[str, Any]) -> bool:
+    rows = list(component.get("constraints") or component.get("generated_constraints") or [])
+    return bool(rows) and all(isinstance(item, dict) and _is_programmatic_generated(item) for item in rows)
 
 
 def _contains_nonlinear_product(tree: ast.AST, variable_names: set[str]) -> bool:

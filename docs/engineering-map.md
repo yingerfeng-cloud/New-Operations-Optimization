@@ -1,6 +1,6 @@
 # Engineering Map
 
-本文件是后续迭代的代码入口索引。正式前端位于 `frontend/`；`prototype.html` 和 `static/js/` 仅作为 legacy 维护。
+本文件是后续迭代的代码入口索引。正式前端唯一位于 `frontend/`；`HTML 原型入口`、`Agent 控制台入口` 和 `static/` legacy 前端已下线并删除。
 
 ## React 应用框架
 
@@ -80,14 +80,12 @@
 - 业务解释：`app/explain/result_formatter.py`
 - React 页面：`frontend/src/pages/ModelCenter/`、`TaskCenter/`、`ResultCenter/`
 
-## 静态托管与 legacy
+## 静态托管
 
-- React/legacy 挂载：`app/frontend.py`
+- React 挂载：`app/frontend.py`
 - 应用工厂：`app/main.py`、`app/platform_main.py`
-- legacy 页面：`prototype.html`、`agent_console.html`
-- legacy 模块：`static/js/`
 
-生产构建存在时，FastAPI 在 `/` 提供 React SPA，并在 `/legacy`、`/prototype.html` 提供旧页面。
+生产构建存在时，FastAPI 在 `/` 提供 React SPA；`/legacy`、HTML 原型入口 与 `/static/*` 旧前端路径返回 404。
 
 ## Agent
 

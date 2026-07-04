@@ -6,20 +6,16 @@ import threading
 import uuid
 
 import pytest
-from fastapi.testclient import TestClient
 
 from app.builders.component_model_builder import ComponentModelBuilder
-from app.main import app
 from app.model_draft import build_component_spec_from_draft, create_model_draft_from_template
 from app.problem_type_diagnosis import infer_problem_type_from_component_spec
 from app.solvers.solver_router import SolverRouteError, solver_router
 from app.storage.memory_store import STORE
 from app.templates.power_templates import get_template
 
-client = TestClient(app)
 
-
-def test_function_asset_api_validate_and_preview() -> None:
+def test_function_asset_api_validate_and_preview(client) -> None:
     function_id = "level_volume_curve_test"
     payload = {
         "function_id": function_id,
@@ -46,7 +42,7 @@ def test_function_asset_api_validate_and_preview() -> None:
     assert preview["values"][1]["y"] == 32.5
 
 
-def test_function_asset_list_api_returns_references_without_deadlock() -> None:
+def test_function_asset_list_api_returns_references_without_deadlock(client) -> None:
     function_id = f"list_deadlock_curve_{uuid.uuid4().hex[:8]}"
     created = client.post(
         "/api/function-assets",
@@ -77,7 +73,7 @@ def test_function_asset_list_api_returns_references_without_deadlock() -> None:
     assert isinstance(asset["referenced_by"], list)
 
 
-def test_function_asset_list_api_returns_valid_warning_and_invalid_assets() -> None:
+def test_function_asset_list_api_returns_valid_warning_and_invalid_assets(client) -> None:
     suffix = uuid.uuid4().hex[:8]
     assets = [
         (f"list_valid_{suffix}", [[0, 0], [10, 10], [20, 20]]),
@@ -100,7 +96,7 @@ def test_function_asset_list_api_returns_valid_warning_and_invalid_assets() -> N
     assert all("referenced_by" in rows[function_id] for function_id, _ in assets)
 
 
-def test_function_asset_rejects_duplicate_breakpoints() -> None:
+def test_function_asset_rejects_duplicate_breakpoints(client) -> None:
     response = client.post(
         "/api/function-assets/bad_curve/validate",
         json={"function_id": "bad_curve", "name": "Bad", "points": [[0, 0], [0, 1]]},
@@ -112,7 +108,7 @@ def test_function_asset_rejects_duplicate_breakpoints() -> None:
     assert any("strictly increasing" in item["message"] for item in result["errors"])
 
 
-def test_invalid_function_asset_draft_saved_but_published_rejected_and_preview_blocked() -> None:
+def test_invalid_function_asset_draft_saved_but_published_rejected_and_preview_blocked(client) -> None:
     draft = client.post(
         "/api/function-assets",
         json={"function_id": "bad_curve_draft", "name": "Bad draft", "status": "draft", "points": [[0, 0], [0, 1]]},
@@ -131,7 +127,7 @@ def test_invalid_function_asset_draft_saved_but_published_rejected_and_preview_b
     assert preview.status_code == 422
 
 
-def test_csv_import_creates_valid_draft_curve() -> None:
+def test_csv_import_creates_valid_draft_curve(client) -> None:
     response = client.post(
         "/api/function-assets/import-csv",
         json={
@@ -150,7 +146,7 @@ def test_csv_import_creates_valid_draft_curve() -> None:
     assert body["domain"]["breakpoint_count"] == 3
 
 
-def test_csv_import_group_field_marks_first_group_for_solving() -> None:
+def test_csv_import_group_field_marks_first_group_for_solving(client) -> None:
     response = client.post(
         "/api/function-assets/import-csv",
         json={
@@ -283,7 +279,7 @@ def test_model_draft_preserves_function_mapping_fields() -> None:
     assert component["solve_strategy"] == "convex_combination_lp"
 
 
-def test_function_asset_referenced_by_tracks_model_component() -> None:
+def test_function_asset_referenced_by_tracks_model_component(client) -> None:
     asset_id = f"ref_curve_{uuid.uuid4().hex[:8]}"
     created_asset = client.post(
         "/api/function-assets",
@@ -328,7 +324,7 @@ def test_function_asset_referenced_by_tracks_model_component() -> None:
     assert any(ref["model_id"] == created_model.json()["id"] and ref["component_id"] == "function_mapping_component" for ref in refs)
 
 
-def test_model_create_prefers_model_draft_components_over_stale_component_spec() -> None:
+def test_model_create_prefers_model_draft_components_over_stale_component_spec(client) -> None:
     draft = create_model_draft_from_template(get_template("cascade_hydro_dispatch"))
     stale_component_spec = {
         **draft["advanced"]["component_spec"],
@@ -369,7 +365,7 @@ def test_model_create_prefers_model_draft_components_over_stale_component_spec()
     assert mapping["y"] == "level[S1,t]"
 
 
-def test_invalid_function_asset_publish_blocks_solver_dry_run_noise() -> None:
+def test_invalid_function_asset_publish_blocks_solver_dry_run_noise(client) -> None:
     asset_id = f"bad_publish_curve_{uuid.uuid4().hex[:8]}"
     created_asset = client.post(
         "/api/function-assets",
@@ -424,7 +420,7 @@ def test_invalid_function_asset_publish_blocks_solver_dry_run_noise() -> None:
     assert not body.get("dry_run_result")
 
 
-def test_function_mapping_publish_rejects_missing_y_variable_before_solver() -> None:
+def test_function_mapping_publish_rejects_missing_y_variable_before_solver(client) -> None:
     asset_id = f"missing_y_curve_{uuid.uuid4().hex[:8]}"
     created_asset = client.post(
         "/api/function-assets",
@@ -471,7 +467,7 @@ def test_function_mapping_publish_rejects_missing_y_variable_before_solver() -> 
     assert not body.get("dry_run_result")
 
 
-def test_function_mapping_dry_run_error_is_classified_to_component() -> None:
+def test_function_mapping_dry_run_error_is_classified_to_component(client) -> None:
     asset_id = f"classify_curve_{uuid.uuid4().hex[:8]}"
     created_asset = client.post(
         "/api/function-assets",

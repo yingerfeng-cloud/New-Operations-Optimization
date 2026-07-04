@@ -7,7 +7,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
-from app.api import components, demo, invocations, jobs, models, optimize, reports, results, rolling, tasks, templates
+from app.api import components, demo, function_assets, invocations, jobs, models, optimize, reports, results, rolling, tasks, templates
 from app.security import platform_token_middleware
 from app.services.model_service import model_service
 from app.frontend import mount_frontends
@@ -33,6 +33,13 @@ def create_platform_app(*, enforce_token: bool = True) -> FastAPI:
             "ok": True,
             "service": "optimization-platform",
             "solver": "HiGHS",
+            "dev_ports": {"fastapi": 8000, "vite": 5173},
+            "api_versions": {
+                "function_assets": {
+                    "base_path": "/api/function-assets",
+                    "supports": ["POST create", "POST import-csv", "piecewise_1d", "piecewise_2d"],
+                }
+            },
             "pyomo_installed": has_pyomo(),
             "highspy_installed": has_highspy(),
             "capabilities": [
@@ -54,6 +61,7 @@ def create_platform_app(*, enforce_token: bool = True) -> FastAPI:
     app.include_router(models.router)
     app.include_router(templates.router)
     app.include_router(components.router)
+    app.include_router(function_assets.router)
     app.include_router(jobs.router)
     app.include_router(rolling.router)
     app.include_router(demo.router)

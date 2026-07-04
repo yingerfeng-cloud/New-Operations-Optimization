@@ -1,4 +1,4 @@
-import { Button, Card, Col, Empty, Input, Row, Select, Space, Spin, Tag, Typography, message } from 'antd';
+import { Button, Card, Empty, Input, Select, Space, Spin, Tag, Typography, message } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
 import {
@@ -143,8 +143,8 @@ export function AgentWorkbenchPage() {
         status={<Space wrap><Tag color={llmReady ? 'green' : 'orange'}>{llmReady ? '大模型服务已配置' : '当前未配置大模型服务，将使用规则引擎完成基础意图识别'}</Tag><Tag color={platformReachable ? 'green' : 'red'}>{platformReachable ? '平台服务可用' : 'Agent 服务暂不可用，请检查后端服务状态'}</Tag></Space>}
         extra={<Button onClick={() => createConversation.mutate()} loading={createConversation.isPending}>新建会话</Button>}
       />
-      <Row gutter={[14, 14]} align="stretch" className="agent-workbench-grid">
-        <Col xs={24} lg={5}>
+      <div className="agent-workbench-layout">
+        <div>
           <Card className="content-card agent-session-card" title="会话">
             <Button block type="primary" onClick={() => createConversation.mutate()} loading={createConversation.isPending}>新建会话</Button>
             <Input allowClear className="section-gap" placeholder="搜索会话" />
@@ -157,8 +157,8 @@ export function AgentWorkbenchPage() {
               )) : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无历史会话" />}
             </div>
           </Card>
-        </Col>
-        <Col xs={24} lg={12}>
+        </div>
+        <div>
           <Card
             className="content-card agent-chat-card"
             title="Agent 对话"
@@ -195,8 +195,8 @@ export function AgentWorkbenchPage() {
               </Space>
             </div>
           </Card>
-        </Col>
-        <Col xs={24} lg={7}>
+        </div>
+        <div>
           <Card className="content-card" title="调用上下文">
             <div className="field">
               <label>当前 Skill</label>
@@ -232,8 +232,8 @@ export function AgentWorkbenchPage() {
               <AgentMessageTimeline conversation={conversation.data} fallback={lastResponse} />
             </div>
           </Card>
-        </Col>
-      </Row>
+        </div>
+      </div>
     </>
   );
 }

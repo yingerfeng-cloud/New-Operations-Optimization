@@ -18,6 +18,7 @@ test('shows productized time and time_volume rules', () => {
 test('can add structured sets, parameters, and variables into semantic draft', () => {
   render(<Step2Harness />);
 
+  fireEvent.click(screen.getByText('高级明细'));
   fireEvent.click(screen.getByTestId('add-set'));
   expect(screen.getByDisplayValue('set_3')).toBeInTheDocument();
   expect(screen.getByDisplayValue('业务集合 3')).toBeInTheDocument();
@@ -45,6 +46,15 @@ test('validates duplicate semantic codes', () => {
   expect(screen.getByText(/参数编码重复：load/)).toBeInTheDocument();
 });
 
+test('opens semantic item editor from overview card', () => {
+  render(<Step2Harness />);
+
+  fireEvent.click(screen.getByRole('button', { name: '编辑 调度时段' }));
+
+  expect(screen.getByText('编辑集合')).toBeInTheDocument();
+  expect(screen.getByDisplayValue('time')).toBeInTheDocument();
+});
+
 test('renders component builder writeback without raw JSON block', () => {
   const draft = createInitialDraft();
   draft.basic_info.builder_mode = 'component_based';
@@ -59,9 +69,30 @@ test('renders component builder writeback without raw JSON block', () => {
   }];
 
   render(<Step2Harness initial={draft} />);
-  expect(screen.getByText('组件化 Builder 回写')).toBeInTheDocument();
+  expect(screen.getByText('组件生成内容预览')).toBeInTheDocument();
+  fireEvent.click(screen.getByText('组件生成内容预览'));
   expect(screen.getByText('储能 SOC 组件')).toBeInTheDocument();
   expect(screen.getAllByText('time_volume').length).toBeGreaterThan(0);
-  fireEvent.click(screen.getByText('dependencies'));
+  fireEvent.click(screen.getByText('组件依赖'));
   expect(screen.getByText('storage_power_limit')).toBeInTheDocument();
+});
+
+test('opens parameter binding drawer from missing component dependency', () => {
+  const draft = createInitialDraft();
+  draft.basic_info.builder_mode = 'component_based';
+  draft.components = [{
+    component_id: 'startup_logic',
+    name: '启停逻辑组件',
+    parameters: [{ code: 'startup_cost', name: '启动成本', unit: '元/次', required: true }],
+  }];
+
+  render(<Step2Harness initial={draft} />);
+
+  expect(screen.getByText('组件与依赖')).toBeInTheDocument();
+  expect(screen.getByText('startup_cost')).toBeInTheDocument();
+  fireEvent.click(screen.getAllByRole('button', { name: /绑定/ }).at(-1)!);
+
+  expect(screen.getByText('编辑参数绑定')).toBeInTheDocument();
+  expect(screen.getByText('启停逻辑组件 / startup_cost')).toBeInTheDocument();
+  expect(screen.getByText('仍缺少 startup_cost 的必填映射')).toBeInTheDocument();
 });

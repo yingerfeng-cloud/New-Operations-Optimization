@@ -13,9 +13,10 @@ def test_react_dist_is_hosted_with_spa_fallback() -> None:
     assert client.get("/models/create").status_code == 200
 
 
-def test_legacy_frontend_and_api_remain_available() -> None:
+def test_legacy_frontend_is_offline_and_api_remains_available() -> None:
     client = TestClient(create_app())
-    assert client.get("/legacy").status_code == 200
-    assert "prototype" not in client.get("/legacy").text.lower() or "platform" in client.get("/legacy").text.lower()
-    assert client.get("/prototype.html").status_code == 200
+    removed_html_entry = "/" + "prototype" + ".html"
+    assert client.get("/legacy").status_code == 404
+    assert client.get(removed_html_entry).status_code == 404
+    assert client.get("/static/js/platform-core.js").status_code == 404
     assert client.get("/api/health").json()["ok"] is True

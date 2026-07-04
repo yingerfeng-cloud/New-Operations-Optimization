@@ -22,6 +22,20 @@ interface RuntimeParameterRow {
   status: 'missing' | 'provided' | 'defaulted' | 'optional';
 }
 
+const functionMappingRowKeys = new WeakMap<object, string>();
+let functionMappingRowSeed = 0;
+
+function functionMappingRowKey(row: Record<string, unknown>) {
+  const stableId = row.id || row.mapping_id || row.constraint_id || row.function_asset_id || row.curve_asset_id;
+  if (stableId) return String(stableId);
+  const existing = functionMappingRowKeys.get(row);
+  if (existing) return existing;
+  functionMappingRowSeed += 1;
+  const generated = `function-mapping-${functionMappingRowSeed}`;
+  functionMappingRowKeys.set(row, generated);
+  return generated;
+}
+
 const groups: Array<{ key: ParameterGroupKey; label: string }> = [
   { key: 'runtime', label: '运行时输入参数' },
   { key: 'static', label: '模型静态参数' },
@@ -177,7 +191,7 @@ export function Step4RuntimeParams({ draft, onChange }: { draft: ModelDraft; onC
           <Table
             size="small"
             pagination={false}
-            rowKey={row => String(row.constraint_id || row.function_asset_id || row.curve_asset_id || row.component_id || row.type)}
+            rowKey={functionMappingRowKey}
             dataSource={functionMappings}
             columns={[
               { title: '组件', render: (_, row) => String(row.type || row.component_id || '-') },
@@ -189,7 +203,7 @@ export function Step4RuntimeParams({ draft, onChange }: { draft: ModelDraft; onC
           />
         </Card>
       )}
-      <Alert type="info" showIcon title="运行参数按来源分类，发布前验证必填项、默认值和示例值。" />
+      <Alert className="compact-step-note" type="info" showIcon title="运行参数按来源分类，发布前验证必填项、默认值和示例值。" />
       {missing.length > 0 && <Alert className="section-gap" type="warning" showIcon title="缺少必填运行参数" description={missing.join('；')} />}
       <Card className="section-gap" title="基础参数绑定">
         <Descriptions size="small" column={5} items={groups.map(group => ({ key: group.key, label: group.label, children: rows.filter(row => row.source === group.key).length }))} />
@@ -201,17 +215,16 @@ export function Step4RuntimeParams({ draft, onChange }: { draft: ModelDraft; onC
           label: `${group.label} ${rows.filter(row => row.source === group.key).length}`,
           children: (
             <Card>
-              <Table size="small" pagination={false} rowKey="key" dataSource={rows.filter(row => row.source === group.key)} columns={columns} scroll={{ x: 1450 }} />
+              <Table className="runtime-parameter-table" size="small" pagination={false} rowKey="key" dataSource={rows.filter(row => row.source === group.key)} columns={columns} />
             </Card>
           ),
         }))}
       />
       <Card className="section-gap" title="时间序列参数">
-        <Table size="small" pagination={false} rowKey="key" dataSource={rows.filter(row => row.dimensions.includes('time') || row.dimensions.includes('time_volume'))} columns={buildColumns('时间序列 ')} scroll={{ x: 1450 }} />
+        <Table className="runtime-parameter-table" size="small" pagination={false} rowKey="key" dataSource={rows.filter(row => row.dimensions.includes('time') || row.dimensions.includes('time_volume'))} columns={buildColumns('时间序列 ')} />
       </Card>
       <Collapse
         className="section-gap"
-        defaultActiveKey={['runtime-debug']}
         items={[{
           key: 'runtime-debug',
           label: '高级调试：JSON 导入 / 运行参数结构预览',

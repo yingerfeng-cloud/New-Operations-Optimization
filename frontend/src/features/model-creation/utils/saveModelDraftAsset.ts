@@ -37,8 +37,8 @@ function componentSpecItemFromDraft(component: Record<string, unknown>) {
   const componentType = component.type || component.component_id || component.code;
   const config = component.config && typeof component.config === 'object' ? { ...(component.config as Record<string, unknown>) } : {};
   const row: Record<string, unknown> = { type: componentType };
-  const configFields = ['function_asset_id', 'curve_asset_id', 'x', 'y', 'indices', 'solve_strategy', 'constraint_id', 'generated_constraints', 'metadata'];
-  if (componentType === 'function_mapping_component' || componentType === 'piecewise_linear_curve') {
+  const configFields = ['function_asset_id', 'curve_asset_id', 'x', 'y', 'z', 'indices', 'solve_strategy', 'constraint_id', 'generated_constraints', 'metadata'];
+  if (componentType === 'function_mapping_component' || componentType === 'piecewise_linear_curve' || componentType === 'function_mapping_2d_component') {
     configFields.forEach(field => {
       if (field in component) row[field] = component[field];
       else if (field in config) row[field] = config[field];

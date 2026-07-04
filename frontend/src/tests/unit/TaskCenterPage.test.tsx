@@ -1,4 +1,4 @@
-import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { vi } from 'vitest';
 import { TaskCenterPage } from '../../pages/TaskCenter/TaskCenterPage';
 import type { SolveResult } from '../../types/result';
@@ -94,6 +94,8 @@ test('renders task center metrics and structured task detail', async () => {
 test('retries failed task from list', async () => {
   renderPage();
   expect(await screen.findByText('OPT-FAILED')).toBeInTheDocument();
-  fireEvent.click(screen.getByRole('button', { name: '重试' }));
+  const failedRow = screen.getByText('OPT-FAILED').closest('tr')!;
+  fireEvent.click(within(failedRow).getByRole('button', { name: /更多/ }));
+  fireEvent.click(await screen.findByText('重试任务'));
   await waitFor(() => expect(testState.retryTask.mock.calls[0]?.[0]).toBe('OPT-FAILED'));
 }, 10000);

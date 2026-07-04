@@ -424,6 +424,7 @@ class ModelService:
         problem_errors, problem_warnings = validate_problem_type_override(diagnosis)
         if require_publish_ready:
             errors.extend(problem_errors)
+            errors.extend(self._validate_nonlinear_publish_readiness(diagnosis))
         warnings.extend(problem_warnings)
         if require_publish_ready:
             component_spec = model.component_spec or semantic_spec.get("component_spec") or {}
@@ -491,6 +492,35 @@ class ModelService:
                 )
         return errors
 
+    def _validate_nonlinear_publish_readiness(self, diagnosis: dict[str, Any]) -> list[dict[str, Any]]:
+        report = diagnosis.get("nonlinear_diagnostics") or {}
+        errors: list[dict[str, Any]] = []
+        for index, item in enumerate(report.get("blocking_items") or []):
+            errors.append(
+                {
+                    "field": item.get("source") or f"nonlinear_diagnostics.relationships[{index}]",
+                    "error": item.get("message") or "unconverted nonlinear expression blocks publish",
+                    "actual": item.get("expression"),
+                    "expected": ", ".join(item.get("recommended_strategy") or []),
+                    "suggestion": "请选择 McCormick 松弛、1D/2D PWL，或标记为 NLP/MINLP 预留；不要交给 HiGHS 静默求解。",
+                    "nonlinear_type": item.get("nonlinear_type"),
+                    "involved_variables": item.get("involved_variables"),
+                }
+            )
+        for index, item in enumerate(report.get("relationships") or []):
+            if item.get("nonlinear_type") == "bilinear" and not item.get("supported_by_current_solver") and item.get("converted") is False:
+                continue
+            if item.get("nonlinear_type") == "bilinear" and item.get("converted") is False and "mccormick" in " ".join(item.get("recommended_strategy") or []):
+                errors.append(
+                    {
+                        "field": item.get("source") or f"nonlinear_diagnostics.relationships[{index}]",
+                        "error": "McCormick relaxation requires finite lower/upper bounds for x and y",
+                        "actual": item.get("expression"),
+                        "suggestion": "补齐 x_lower/x_upper/y_lower/y_upper 后再发布。",
+                    }
+                )
+        return errors
+
     def _validate_generic_formula_compile_status(self, generic_spec: dict[str, Any]) -> list[dict[str, Any]]:
         errors: list[dict[str, Any]] = []
         if not generic_spec:
@@ -536,6 +566,7 @@ class ModelService:
             "warnings": [],
             "function_assets_used": [],
             "linearization_strategy": [],
+            "nonlinear_diagnostics": {"count": 0, "relationships": [], "blocking_items": [], "warning_items": [], "has_blocking_nonlinearity": False, "converted_count": 0},
             "publish_valid": True,
         }
 
@@ -812,7 +843,7 @@ class ModelService:
         for index, component in enumerate(component_spec.get("components") or []):
             config = component.get("config") if isinstance(component.get("config"), dict) else {}
             component_type = str(component.get("type") or component.get("component_id") or config.get("type") or config.get("component_id") or "")
-            if component_type in {"function_mapping_component", "piecewise_linear_curve"}:
+            if component_type in {"function_mapping_component", "piecewise_linear_curve", "function_mapping_2d_component"}:
                 return index
         return None
 
@@ -825,7 +856,7 @@ class ModelService:
         }
         for index, component in enumerate(component_spec.get("components") or []):
             component_type = str(component.get("type") or component.get("component_id") or "")
-            if component_type not in {"function_mapping_component", "piecewise_linear_curve"}:
+            if component_type not in {"function_mapping_component", "piecewise_linear_curve", "function_mapping_2d_component"}:
                 continue
             config = component.get("config") if isinstance(component.get("config"), dict) else {}
             cfg = {**config, **component}
@@ -850,13 +881,20 @@ class ModelService:
                     }
                 )
                 continue
-            strategy = str(cfg.get("solve_strategy") or asset.get("solve_strategy") or "convex_combination_lp")
+            is_2d = component_type == "function_mapping_2d_component" or asset.get("function_type") == "piecewise_2d"
+            strategy = str(cfg.get("solve_strategy") or asset.get("solve_strategy") or ("triangulated_milp_exact" if is_2d else "convex_combination_lp"))
             if not cfg.get("x"):
                 errors.append({"field": f"component_spec.components[{index}].x", "error": "x is required"})
             if not cfg.get("y"):
                 errors.append({"field": f"component_spec.components[{index}].y", "error": "y is required"})
-            if strategy not in {"display_only", "convex_combination_lp", "binary_segment_milp"}:
+            if is_2d and not cfg.get("z"):
+                errors.append({"field": f"component_spec.components[{index}].z", "error": "z is required"})
+            supported_strategies = {"display_only", "triangulated_milp_exact", "convex_hull_lp_approx"} if is_2d else {"display_only", "convex_combination_lp", "binary_segment_milp"}
+            if strategy not in supported_strategies:
                 errors.append({"field": f"component_spec.components[{index}].solve_strategy", "error": "unsupported solve_strategy", "actual": strategy})
+                continue
+            if is_2d and asset.get("function_type") != "piecewise_2d":
+                errors.append({"field": field, "error": "function_mapping_2d_component requires a piecewise_2d asset", "actual": asset.get("function_type")})
                 continue
             y_var = self._base_variable_name(str(cfg.get("y") or ""))
             if y_var and y_var not in variables:
@@ -880,6 +918,31 @@ class ModelService:
                         "suggestion": "Use convex_combination_lp for the current LP approximation or display_only for diagnostics.",
                     }
                 )
+            if is_2d and strategy == "display_only":
+                errors.append(
+                    {
+                        "field": f"component_spec.components[{index}].solve_strategy",
+                        "error": "display_only cannot be published as a solve-active 2D function mapping",
+                        "actual": strategy,
+                        "suggestion": "Use triangulated_milp_exact for exact MILP solving, or remove the mapping from the published model.",
+                    }
+                )
+            if is_2d and strategy == "convex_hull_lp_approx":
+                warnings.append(
+                    {
+                        "field": f"component_spec.components[{index}].solve_strategy",
+                        "level": "warning",
+                        "message": "convex_hull_lp_approx is not exact for general 2D surfaces",
+                        "actual": strategy,
+                    }
+                )
+            if is_2d and strategy == "triangulated_milp_exact":
+                triangle_count = int(validation["diagnostics"].get("triangle_count") or 0)
+                if triangle_count > 400:
+                    warnings.append({"field": f"component_spec.components[{index}].triangles", "level": "warning", "message": "2D PWL triangle count exceeds the default recommended limit", "actual": triangle_count, "expected": "<= 400"})
+                z_var = self._base_variable_name(str(cfg.get("z") or ""))
+                if z_var and z_var not in variables:
+                    errors.append({"field": f"component_spec.components[{index}].z", "error": f"z variable {z_var} is not defined in component_spec.variables", "actual": str(cfg.get("z") or "")})
             if strategy == "convex_combination_lp" and validation["diagnostics"].get("convexity") in {"nonconvex", "unknown"}:
                 warnings.append(
                     {

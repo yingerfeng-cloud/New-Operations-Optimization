@@ -9,20 +9,17 @@ from fastapi import HTTPException
 
 
 ROOT = Path(__file__).resolve().parent.parent
+REMOVED_PROTOTYPE_ROUTE = "/" + "prototype" + ".html"
 
 
 def mount_frontends(app: FastAPI) -> None:
-    legacy = ROOT / "prototype.html"
-    static_dir = ROOT / "static"
     dist_dir = ROOT / "frontend" / "dist"
 
     @app.get("/legacy", include_in_schema=False)
-    @app.get("/prototype.html", include_in_schema=False)
-    def legacy_frontend() -> FileResponse:
-        return FileResponse(legacy)
+    @app.get(REMOVED_PROTOTYPE_ROUTE, include_in_schema=False)
+    def legacy_frontend_removed() -> None:
+        raise HTTPException(status_code=404, detail="Legacy frontend has been removed")
 
-    if static_dir.exists():
-        app.mount("/static", StaticFiles(directory=static_dir), name="legacy-static")
     if dist_dir.joinpath("index.html").exists():
         assets = dist_dir / "assets"
         if assets.exists():

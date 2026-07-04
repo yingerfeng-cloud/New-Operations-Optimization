@@ -22,7 +22,7 @@
 2. `/api/optimize/run` 可直接运行 `cascade_hydro_dispatch`。
 3. `/api/skills/run_cascade_hydro_dispatch/run` 可同步返回求解结果和中文解释。
 4. `/api/models/{model_id}/invoke` 可调用组件化水电模型。
-5. `prototype.html` 在模型创建页提供组件化 Builder 模式和水电样例加载。
+5. React 前端在模型创建页提供组件化 Builder 模式和水电样例加载。
 6. 模型资产中心提供“调用模型”入口，并能把模型运行时参数带入任务页。
 7. 水电组件校验抛出中文错误。
 8. 弃水统计使用体积单位，输出 `total_spill_million_m3` 和 `spill_volume_million_m3`。
@@ -123,7 +123,7 @@ weights
 
 ### 5.4 前端能力
 
-`prototype.html` 已支持：
+React 前端已支持：
 
 - 模型创建页加载组件化水电样例
 - 第 3 步显示“组件化 Builder”
@@ -334,7 +334,7 @@ station_summary[].spill_volume_million_m3
 - `-Restart` 停止目标端口上的旧进程后重启。
 - 启动后检查 `/api/health`。
 - 平台能力缺少组件化 Builder 或梯级水电模板时，提示使用 `-Restart` 清理旧进程。
-- 默认通过 `http://127.0.0.1:{UiPort}/prototype.html?apiBase=...` 打开页面，不再依赖 `file://`。
+- 默认通过 React/Vite 或 FastAPI 托管入口打开页面，不再依赖 `file://`。
 
 停止脚本要求：
 

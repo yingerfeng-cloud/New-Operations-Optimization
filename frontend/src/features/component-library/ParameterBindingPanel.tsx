@@ -5,9 +5,23 @@ type BindingRow = SchemaItem & Record<string, unknown> & {
   binding_status: string;
 };
 
+const bindingRowKeys = new WeakMap<object, string>();
+let bindingRowSeed = 0;
+
 function text(value: unknown) {
   if (value === undefined || value === null || value === '') return '-';
   return typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean' ? String(value) : JSON.stringify(value);
+}
+
+function bindingRowKey(row: BindingRow) {
+  const stableId = row.id || row.parameter_id || row.binding_id;
+  if (stableId) return String(stableId);
+  const existing = bindingRowKeys.get(row);
+  if (existing) return existing;
+  bindingRowSeed += 1;
+  const generated = `binding-${bindingRowSeed}`;
+  bindingRowKeys.set(row, generated);
+  return generated;
 }
 
 function sameParameter(binding: Record<string, unknown>, code: string) {
@@ -24,7 +38,7 @@ export function ParameterBindingPanel({ component }: { component: ComponentDef }
   });
   return (
     <Table
-      rowKey={row => String(row.code || row.parameter || row.component_parameter)}
+      rowKey={bindingRowKey}
       pagination={false}
       dataSource={rows}
       columns={[

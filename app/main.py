@@ -31,6 +31,13 @@ def create_app() -> FastAPI:
             "service": "Power Semantic OR Platform",
             "architecture": ["business_semantics", "model_template", "pyomo_builder", "highs_solver", "business_result"],
             "solver": "HiGHS",
+            "dev_ports": {"fastapi": 8000, "vite": 5173},
+            "api_versions": {
+                "function_assets": {
+                    "base_path": "/api/function-assets",
+                    "supports": ["POST create", "POST import-csv", "piecewise_1d", "piecewise_2d"],
+                }
+            },
             "pyomo_installed": has_pyomo(),
             "highspy_installed": has_highspy(),
             "capabilities": [

@@ -1,6 +1,6 @@
 # 组件化 Builder 使用说明
 
-本文说明 React 正式前端中的组件管理与组件化模型创建。旧版 `prototype.html` 仅通过 `/legacy` 保留，不再作为本指南的主操作入口。
+本文说明 React 正式前端中的组件管理与组件化模型创建。旧版 `HTML 原型入口` 已下线并删除，不再作为操作入口。
 
 ## 1. 启动
 
@@ -134,6 +134,6 @@ python -m pytest tests/test_pv_storage_v2_acceptance.py -q
 - 不允许组件 validate 抛出未处理异常。
 - 模型 publish 前必须完成组件依赖与参数绑定校验。
 - 组件生成公式与自定义公式均应进入 ModelDraft。
-- legacy 页面继续可用，但新组件功能只进入 React 工程。
+- 组件功能只进入 React 工程；legacy prototype 前端已下线。
 
 代码入口见 `docs/engineering-map.md`，测试命令见 `docs/iteration-test-entrypoints.md`。

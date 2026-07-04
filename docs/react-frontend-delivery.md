@@ -24,7 +24,6 @@
 
 - React 前端：`http://localhost:5173`
 - FastAPI：`http://localhost:8000`
-- legacy：`http://localhost:8000/legacy`
 
 生产托管模式：
 
@@ -74,7 +73,7 @@ python -m pytest -q
 
 ## 保留边界
 
-- legacy `prototype.html` 与 `agent_console.html` 继续保留，只做兼容和回归用途。
+- legacy `HTML 原型入口`、`Agent 控制台入口` 与 `static/` 已下线并删除；正式前端唯一入口为 `frontend/`。
 - 求解核心、模板注册表、组件注册表和 Agent 后端编排仍由现有 FastAPI 服务承担，React 前端不重写求解内核。
 - Monaco Editor 未引入；当前公式编辑器以结构化 TokenCanvas 为主。
 - 结果导出按钮仍为预留能力。

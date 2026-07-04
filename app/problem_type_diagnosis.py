@@ -6,15 +6,17 @@ import sys
 from copy import deepcopy
 from typing import Any
 
+from app.services.nonlinear_analyzer import analyze_component_spec, analyze_draft, analyze_expression, build_nonlinear_report
+
 
 INTEGER_DOMAINS = {"BINARY", "BOOL", "BOOLEAN", "INTEGER", "INTEGERS", "INT", "NONNEGATIVEINTEGERS"}
 SOLVER_CAPABILITIES = {
     "highs": ["LP", "MILP", "QP", "MIQP"],
     "appsi_highs": ["LP", "MILP", "QP", "MIQP"],
     "ipopt": ["NLP"],
-    "scip": ["MINLP"],
-    "scip/bonmin": ["MINLP"],
-    "bonmin": ["MINLP"],
+    "scip": [],
+    "scip/bonmin": [],
+    "bonmin": [],
 }
 
 RECOMMENDED_SOLVERS = {
@@ -23,13 +25,17 @@ RECOMMENDED_SOLVERS = {
     "QP": "HiGHS",
     "MIQP": "HiGHS",
     "NLP": "Ipopt",
-    "MINLP": "SCIP/Bonmin",
+    "MINLP_RESERVED": None,
 }
 
 
 def normalize_problem_type(problem_type: str | None) -> str:
     value = str(problem_type or "LP").strip().upper()
-    return "MILP" if value == "MIP" else value or "LP"
+    if value == "MIP":
+        return "MILP"
+    if value == "MINLP":
+        return "MINLP_RESERVED"
+    return value or "LP"
 
 
 def solver_supports_problem_type(solver_name: str | None, problem_type: str | None) -> bool:
@@ -64,6 +70,8 @@ def infer_problem_type_from_draft(draft: dict[str, Any], solver_name: str | None
         solver_name=solver_name or (draft.get("basic_info") or {}).get("solver"),
         requested_problem_type=requested,
     )
+    nonlinear_report = analyze_draft(draft, solver_name=solver_name or (draft.get("basic_info") or {}).get("solver"))
+    diagnosis = _apply_nonlinear_diagnosis(diagnosis, nonlinear_report)
     draft["inferred_problem_type"] = diagnosis["inferred_problem_type"]
     draft["problem_type_diagnosis"] = diagnosis
     return diagnosis
@@ -85,7 +93,7 @@ def infer_problem_type_from_component_spec(
         for variable in definition.get("variables") or []:
             variables.append(variable)
             variable_details.append(_variable_detail(variable, component_id, component_name))
-    return infer_problem_type(
+    diagnosis = infer_problem_type(
         variables=variables,
         constraints=[item for item in list(component_spec.get("additional_custom_constraints") or []) if _constraint_affects_problem_type(item)],
         objective_terms=list((component_spec.get("objective") or {}).get("terms") or []),
@@ -94,6 +102,8 @@ def infer_problem_type_from_component_spec(
         solver_name=solver_name,
         requested_problem_type=requested_problem_type or component_spec.get("model_problem_type"),
     )
+    nonlinear_report = analyze_component_spec(component_spec, solver_name=solver_name)
+    return _apply_nonlinear_diagnosis(diagnosis, nonlinear_report)
 
 
 def infer_problem_type(
@@ -115,11 +125,32 @@ def infer_problem_type(
         + [_expression_class(item, variable_names) for item in objective_terms]
         + _component_field_values(components or [], "expression_class")
     )
+    raw_nonlinear_report = build_nonlinear_report(
+        [
+            *[
+                finding
+                for item in constraints
+                for finding in _analyze_problem_type_expression(item, variable_names, solver_name, has_integer)
+            ],
+            *[
+                finding
+                for item in objective_terms
+                for finding in _analyze_problem_type_expression(item, variable_names, solver_name, has_integer)
+            ],
+        ]
+    )
+    if any(
+        item.get("nonlinear_type") in {"bilinear", "division", "function_1d", "function_2d", "general_nonlinear_function", "high_order_power"}
+        and not item.get("converted")
+        and not item.get("supported_by_current_solver")
+        for item in raw_nonlinear_report.get("relationships") or []
+    ):
+        expression_class = "nonlinear"
     active_piecewise = [item for item in constraints if _is_active_piecewise(item)]
-    if any(str(item.get("piecewise_method") or item.get("compiler") or "").lower() in {"binary_segment", "dcc", "sos2", "milp"} for item in active_piecewise):
+    if any(str(item.get("piecewise_method") or item.get("compiler") or "").lower() in {"binary_segment", "dcc", "sos2", "milp", "triangulated_milp_exact"} for item in active_piecewise):
         has_integer = True
     if expression_class == "nonlinear":
-        inferred = "MINLP" if has_integer else "NLP"
+        inferred = "MINLP_RESERVED" if has_integer else "NLP"
     elif expression_class == "quadratic":
         inferred = "MIQP" if has_integer else "QP"
     else:
@@ -130,7 +161,7 @@ def infer_problem_type(
     supported = solver_supports_problem_type(effective_solver, requested)
     warnings = _risk_lines(inferred, requested, solver_name, supported)
     function_usage = _function_asset_usage(components or [])
-    return {
+    result = {
         "inferred_problem_type": inferred,
         "recommended_problem_type": inferred,
         "recommended_solver": RECOMMENDED_SOLVERS.get(inferred, "HiGHS"),
@@ -147,8 +178,17 @@ def infer_problem_type(
         "warnings": warnings,
         "function_assets_used": function_usage["function_assets_used"],
         "linearization_strategy": function_usage["linearization_strategy"],
-        "publish_valid": is_problem_type_override_valid(inferred, requested) and supported,
+        "nonlinear_diagnostics": raw_nonlinear_report,
+        "publish_valid": is_problem_type_override_valid(inferred, requested) and supported and not raw_nonlinear_report.get("has_blocking_nonlinearity", False),
     }
+    if inferred == "NLP":
+        result["local_optimum_warning"] = True
+        result["nlp_pilot"] = True
+    if inferred == "MINLP_RESERVED":
+        result["minlp_reserved"] = True
+        result["publish_valid"] = False
+        result["warnings"] = list(result["warnings"]) + ["当前平台暂不支持生产级 MINLP 求解，请选择线性化策略或简化模型。"]
+    return result
 
 
 def validate_problem_type_override(diagnosis: dict[str, Any]) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
@@ -212,10 +252,10 @@ def component_problem_type_fields(payload: dict[str, Any]) -> dict[str, Any]:
         for item in constraints
         if _is_active_piecewise(item)
     ]
-    if any(str(item.get("piecewise_method") or item.get("compiler") or "").lower() in {"binary_segment", "dcc", "sos2", "milp"} for item in active_piecewise):
+    if any(str(item.get("piecewise_method") or item.get("compiler") or "").lower() in {"binary_segment", "dcc", "sos2", "milp", "triangulated_milp_exact"} for item in active_piecewise):
         has_integer = True
     if expression_class == "nonlinear":
-        effect = "MINLP" if has_integer else "NLP"
+        effect = "MINLP_RESERVED" if has_integer else "NLP"
     elif expression_class == "quadratic":
         effect = "MIQP" if has_integer else "QP"
     else:
@@ -231,6 +271,54 @@ def component_problem_type_fields(payload: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _analyze_problem_type_expression(item: dict[str, Any] | str, variable_names: set[str], solver_name: str | None, has_integer: bool) -> list[dict[str, Any]]:
+    if isinstance(item, dict):
+        expression = str(item.get("expression") or item.get("formula") or item.get("math_constraint") or "")
+        if not _constraint_affects_problem_type(item):
+            return []
+    else:
+        expression = str(item or "")
+    return analyze_expression(expression, variables=variable_names, solver_name=solver_name, has_integer_variables=has_integer)
+
+
+def _apply_nonlinear_diagnosis(diagnosis: dict[str, Any], nonlinear_report: dict[str, Any]) -> dict[str, Any]:
+    result = deepcopy(diagnosis)
+    result["nonlinear_diagnostics"] = nonlinear_report
+    blocking = bool(nonlinear_report.get("has_blocking_nonlinearity"))
+    if blocking:
+        has_integer = bool(result.get("has_integer_variables"))
+        inferred = "MINLP_RESERVED" if has_integer else "NLP"
+        result["inferred_problem_type"] = inferred
+        result["recommended_problem_type"] = inferred
+        result["recommended_solver"] = RECOMMENDED_SOLVERS.get(inferred, "Ipopt")
+        result["expression_class"] = "nonlinear"
+        requested = normalize_problem_type(result.get("requested_problem_type") or result.get("effective_problem_type") or inferred)
+        result["publish_valid"] = False
+        result.setdefault("warnings", [])
+        result["warnings"] = list(result["warnings"]) + [
+            "存在未转换的非线性表达式，必须先选择 McCormick、PWL 或 NLP/MINLP 预留策略，不能静默交给 HiGHS。"
+        ]
+        result["solver_supported"] = solver_supports_problem_type(result.get("solver"), requested)
+        if inferred == "NLP":
+            result["local_optimum_warning"] = True
+            result["nlp_pilot"] = True
+        if inferred == "MINLP_RESERVED":
+            result["minlp_reserved"] = True
+            result["publish_valid"] = False
+            result["warnings"] = list(result["warnings"]) + ["当前平台暂不支持生产级 MINLP 求解，请选择线性化策略或简化模型。"]
+    else:
+        if not nonlinear_report.get("count") and not nonlinear_report.get("blocking_items") and result.get("expression_class") == "nonlinear":
+            inferred = "MILP" if result.get("has_integer_variables") else "LP"
+            result["inferred_problem_type"] = inferred
+            result["recommended_problem_type"] = inferred
+            result["recommended_solver"] = RECOMMENDED_SOLVERS.get(inferred, "HiGHS")
+            result["expression_class"] = "linear"
+            requested = normalize_problem_type(result.get("requested_problem_type") or result.get("effective_problem_type") or inferred)
+            result["publish_valid"] = is_problem_type_override_valid(inferred, requested) and solver_supports_problem_type(result.get("solver"), requested)
+        result["publish_valid"] = bool(result.get("publish_valid", True))
+    return result
+
+
 def _is_active_piecewise(item: dict[str, Any]) -> bool:
     if not isinstance(item, dict) or item.get("enabled", True) is False:
         return False
@@ -239,7 +327,7 @@ def _is_active_piecewise(item: dict[str, Any]) -> bool:
     if str(item.get("solve_participation") or "solve_active") in {"display_only", "remark_only", "none"}:
         return False
     expression = str(item.get("expression") or item.get("formula") or "").lower()
-    return str(item.get("type") or "").lower() == "piecewise" or "piecewise(" in expression
+    return str(item.get("type") or "").lower() in {"piecewise", "piecewise_2d"} or "piecewise(" in expression or "piecewise_2d(" in expression
 
 
 def _constraint_affects_problem_type(item: dict[str, Any]) -> bool:
@@ -288,6 +376,22 @@ def _resolve_component_definition(component: dict[str, Any]) -> dict[str, Any]:
             definition["linearization_strategy"] = strategy
             if cfg.get("function_asset_id") or cfg.get("curve_asset_id"):
                 definition["function_asset_id"] = cfg.get("function_asset_id") or cfg.get("curve_asset_id")
+        if component_id == "function_mapping_2d_component":
+            strategy = str(cfg.get("solve_strategy") or definition.get("linearization_strategy") or "triangulated_milp_exact")
+            definition["linearization_strategy"] = strategy
+            definition["function_asset_id"] = cfg.get("function_asset_id") or definition.get("function_asset_id")
+            if strategy == "triangulated_milp_exact":
+                definition["variable_types"] = ["continuous", "binary"]
+                definition["problem_type"] = "MILP"
+                definition["problem_types"] = ["MILP"]
+                definition["solver_capabilities"] = ["MILP"]
+            else:
+                definition["variable_types"] = ["continuous"]
+                definition["problem_type"] = "LP"
+                definition["problem_types"] = ["LP"]
+                definition["solver_capabilities"] = ["LP"]
+                if strategy == "convex_hull_lp_approx":
+                    definition.setdefault("warnings", []).append("2D surface uses LP convex hull approximation; it is not exact for general surfaces.")
         problem_fields = component_problem_type_fields(definition)
         definition = {**definition, **problem_fields}
     return {**deepcopy(component), "component_id": component_id, "type": component_id, "definition": definition}

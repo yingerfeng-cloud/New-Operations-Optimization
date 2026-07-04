@@ -20,7 +20,7 @@ vi.mock('../../api/tasks', () => ({
   getTasks: async () => [{ id: 'T-1', model: '模型一', scene: '日前调度', solver: 'HiGHS', status: 'SUCCESS', progress: 100, created_at: '2026-06-23' }],
 }));
 
-test('dashboard restores prototype-style platform entries', async () => {
+test('dashboard renders React platform entries', async () => {
   renderWithQueryClient(
     <MemoryRouter>
       <DashboardPage />
@@ -29,9 +29,8 @@ test('dashboard restores prototype-style platform entries', async () => {
 
   expect(await screen.findByText('集团级运筹优化底座总览')).toBeInTheDocument();
   expect(await screen.findByText('模型资产数')).toBeInTheDocument();
-  expect(await screen.findByText('快捷入口')).toBeInTheDocument();
-  expect(await screen.findByText('业务场景库')).toBeInTheDocument();
-  expect(await screen.findByText('Agent 工作台')).toBeInTheDocument();
-  expect(screen.queryByText('legacy 待迁移')).not.toBeInTheDocument();
-  expect(await screen.findByText('近期求解任务')).toBeInTheDocument();
+  expect(await screen.findByText('主流程入口')).toBeInTheDocument();
+  expect(await screen.findByText('选择业务场景')).toBeInTheDocument();
+  expect(await screen.findByText('查看结果报告')).toBeInTheDocument();
+  expect(await screen.findByText('最近求解任务')).toBeInTheDocument();
 });

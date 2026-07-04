@@ -1,7 +1,10 @@
-import { Alert, Button, Card, Drawer, Empty, Form, Input, InputNumber, Popconfirm, Select, Space, Switch, Table, Tabs, Tag, Typography } from 'antd';
+import { Alert, Button, Card, Collapse, Drawer, Empty, Form, Input, InputNumber, Popconfirm, Select, Space, Switch, Table, Tabs, Tag, Typography } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { useState } from 'react';
 import type { ModelDraft } from '../stores/modelCreationStore';
+import { SemanticOverviewCard } from '../components/SemanticOverviewCard';
+import { ComponentDependencyCard, type BindingTarget } from '../components/ComponentDependencyCard';
+import { ParameterBindingDrawer } from '../components/ParameterBindingDrawer';
 
 type SemanticKind = 'sets' | 'parameters' | 'variables';
 type SetRow = ModelDraft['semantic']['sets'][number];
@@ -54,17 +57,26 @@ function getComponentRows(component: Record<string, unknown>, key: string) {
   return Array.isArray(value) ? value as Array<Record<string, unknown>> : [];
 }
 
-function rowKey(row: { code?: string; name?: string }) {
-  return String(row.code || row.name || crypto.randomUUID());
+const tableRowIds = new WeakMap<object, string>();
+let tableRowSeq = 0;
+
+function stableRowKey(row: { code?: string; name?: string }) {
+  if (!tableRowIds.has(row)) {
+    tableRowIds.set(row, `${String(row.code || row.name || 'row')}-${tableRowSeq}`);
+    tableRowSeq += 1;
+  }
+  return tableRowIds.get(row)!;
 }
 
 export function Step2SemanticModel({ draft, onChange }: { draft: ModelDraft; onChange: (d: ModelDraft) => void }) {
   const [editing, setEditing] = useState<{ kind: SemanticKind; index?: number; row: SemanticRow }>();
+  const [bindingTarget, setBindingTarget] = useState<BindingTarget>();
   const [form] = Form.useForm<Record<string, unknown>>();
 
   const setRows = <K extends SemanticKind>(kind: K, rows: ModelDraft['semantic'][K]) => {
     onChange({ ...draft, semantic: { ...draft.semantic, [kind]: rows } });
   };
+
   const openEdit = (kind: SemanticKind, row?: SemanticRow, index?: number) => {
     const defaults = {
       sets: { code: `set_${draft.semantic.sets.length + 1}`, name: `业务集合 ${draft.semantic.sets.length + 1}`, sourceType: 'runtime', defaultSize: 1 },
@@ -80,9 +92,25 @@ export function Step2SemanticModel({ draft, onChange }: { draft: ModelDraft; onC
       exampleText: 'exampleValue' in next ? String((next as ParameterRow).exampleValue ?? '') : '',
     });
   };
+
   const removeRow = (kind: SemanticKind, index: number) => {
     setRows(kind, draft.semantic[kind].filter((_, rowIndex) => rowIndex !== index) as never);
   };
+
+  const saveBinding = (target: BindingTarget, binding: Record<string, unknown>) => {
+    const components = draft.components.map((component, index) => {
+      if (index !== target.componentIndex) return component;
+      const currentBindings = Array.isArray(component.parameter_bindings) ? component.parameter_bindings as Array<Record<string, unknown>> : [];
+      const targetCode = String(target.parameterCode || binding.component_parameter || binding.parameter || binding.code || '');
+      const existingIndex = currentBindings.findIndex(row => String(row.component_parameter || row.parameter || row.parameter_code || row.code || '') === targetCode);
+      const nextBindings = [...currentBindings];
+      if (existingIndex >= 0) nextBindings[existingIndex] = binding;
+      else nextBindings.push(binding);
+      return { ...component, parameter_bindings: nextBindings };
+    });
+    onChange({ ...draft, components });
+  };
+
   const saveEditing = () => {
     if (!editing) return;
     const values = form.getFieldsValue();
@@ -115,18 +143,18 @@ export function Step2SemanticModel({ draft, onChange }: { draft: ModelDraft; onC
       };
     } else {
       const dimension = parseList(values.dimensionText as string);
-      const variableType = (values.variableType || 'continuous') as VariableRow['variableType'];
+      const variableType = (values.variableType || 'continuous') as keyof typeof variableDomainMap;
       row = {
         code: String(values.code || ''),
         name: String(values.name || ''),
-        variableType,
+        variableType: variableType as VariableRow['variableType'],
         indices: dimension,
         dimension,
         lowerBound: values.lowerBound as string | number,
         upperBound: values.upperBound as string | number,
         unit: String(values.unit || ''),
         description: String(values.description || ''),
-        domain: variableType ? variableDomainMap[variableType] : variableDomainMap.continuous,
+        domain: variableDomainMap[variableType],
       };
     }
     const rows = [...draft.semantic[editing.kind]] as SemanticRow[];
@@ -192,52 +220,86 @@ export function Step2SemanticModel({ draft, onChange }: { draft: ModelDraft; onC
   const renderComponentPanel = () => {
     if (draft.basic_info.builder_mode !== 'component_based') return null;
     return (
-      <Card title="组件化 Builder 回写" className="section-gap">
-        {draft.components.length ? (
-          <Space orientation="vertical" size={16} style={{ width: '100%' }}>
-            {draft.components.map(component => {
-              const name = String(component.display_name || component.name || component.code || component.component_id || rowKey({ code: String(component.component_id || '') }));
-              const dependencies = [...new Set([...(Array.isArray(component.dependencies) ? component.dependencies as string[] : []), ...(Array.isArray(component.depends_on) ? component.depends_on as string[] : [])])];
-              return (
-                <Card key={name} size="small" title={name}>
-                  <Tabs
-                    size="small"
-                    items={[
-                      { key: 'required_sets', label: 'required_sets', children: <Table size="small" pagination={false} rowKey={row => String(row.code || row.name)} dataSource={getComponentRows(component, 'required_sets')} columns={[{ title: '编码', dataIndex: 'code' }, { title: '名称', dataIndex: 'name' }, { title: '维度', dataIndex: 'dimension', render: value => formatList(value) }]} /> },
-                      { key: 'parameters', label: 'parameters', children: <Table size="small" pagination={false} rowKey={row => String(row.code || row.name)} dataSource={getComponentRows(component, 'parameters')} columns={[{ title: '编码', dataIndex: 'code' }, { title: '名称', dataIndex: 'name' }, { title: '单位', dataIndex: 'unit' }, { title: '来源', dataIndex: 'source_system' }]} /> },
-                      { key: 'variables', label: 'variables', children: <Table size="small" pagination={false} rowKey={row => String(row.code || row.name)} dataSource={getComponentRows(component, 'variables')} columns={[{ title: '编码', dataIndex: 'code' }, { title: '名称', dataIndex: 'name' }, { title: '维度', dataIndex: 'dimension', render: value => formatList(value) }]} /> },
-                      { key: 'dependencies', label: 'dependencies', children: dependencies.length ? <Space wrap>{dependencies.map(item => <Tag key={item}>{item}</Tag>)}</Space> : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="无组件依赖" /> },
-                    ]}
-                  />
-                </Card>
-              );
-            })}
-          </Space>
-        ) : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="尚未选择组件" />}
-      </Card>
+      <Collapse
+        className="section-gap"
+        items={[{
+          key: 'component-preview',
+          label: '组件生成内容预览',
+          children: (
+            <Card>
+              {draft.components.length ? (
+                <Space orientation="vertical" size={16} style={{ width: '100%' }}>
+                  {draft.components.map((component, componentIndex) => {
+                    const name = String(component.display_name || component.name || component.code || component.component_id || `${String(component.component_id || 'component')}-${componentIndex}`);
+                    const dependencies = [...new Set([...(Array.isArray(component.dependencies) ? component.dependencies as string[] : []), ...(Array.isArray(component.depends_on) ? component.depends_on as string[] : [])])];
+                    return (
+                      <Card key={`${name}-${componentIndex}`} size="small" title={name}>
+                        <Tabs
+                          size="small"
+                          items={[
+                            { key: 'required_sets', label: '必需集合', children: <Table size="small" pagination={false} rowKey={stableRowKey} dataSource={getComponentRows(component, 'required_sets')} columns={[{ title: '编码', dataIndex: 'code' }, { title: '名称', dataIndex: 'name' }, { title: '维度', dataIndex: 'dimension', render: value => formatList(value) }]} /> },
+                            { key: 'parameters', label: '组件参数', children: <Table size="small" pagination={false} rowKey={stableRowKey} dataSource={getComponentRows(component, 'parameters')} columns={[{ title: '编码', dataIndex: 'code' }, { title: '名称', dataIndex: 'name' }, { title: '单位', dataIndex: 'unit' }, { title: '来源', dataIndex: 'source_system' }]} /> },
+                            { key: 'variables', label: '生成变量', children: <Table size="small" pagination={false} rowKey={stableRowKey} dataSource={getComponentRows(component, 'variables')} columns={[{ title: '编码', dataIndex: 'code' }, { title: '名称', dataIndex: 'name' }, { title: '维度', dataIndex: 'dimension', render: value => formatList(value) }]} /> },
+                            { key: 'dependencies', label: '组件依赖', children: dependencies.length ? <Space wrap>{dependencies.map((item, depIndex) => <Tag key={`${item}-${depIndex}`}>{item}</Tag>)}</Space> : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="无组件依赖" /> },
+                          ]}
+                        />
+                      </Card>
+                    );
+                  })}
+                </Space>
+              ) : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="尚未选择组件" />}
+            </Card>
+          ),
+        }]}
+      />
     );
   };
 
   return (
     <>
-      <Alert type="info" showIcon title="时间集合约定" description="time = 调度时段，长度 horizon；time_volume = 状态时点，长度 horizon + 1。储能 SOC、水库库容等状态变量应使用 time_volume。" />
-      <Card title="结构化时间集合" className="section-gap">
-        <Space orientation="vertical" size={6}>
-          <Typography.Text><Tag color="blue">time</Tag> 调度时段，长度 horizon，用于出力、负荷、价格等逐时变量和参数。</Typography.Text>
-          <Typography.Text><Tag color="geekblue">time_volume</Tag> 状态时点，长度 horizon + 1，用于 SOC、库容等跨时段状态变量。</Typography.Text>
-        </Space>
-      </Card>
+      <div className="semantic-time-strip">
+        <Typography.Text strong>时间集合约定</Typography.Text>
+        <span><Tag color="blue">time</Tag> 调度时段，长度 horizon，用于出力、负荷、价格等逐时变量和参数。</span>
+        <span><Tag color="geekblue">time_volume</Tag> 状态时点，长度 horizon + 1，用于 SOC、库容等跨时段状态变量。</span>
+      </div>
       {duplicateMessages.length > 0 && <Alert className="section-gap" type="error" showIcon title="编码唯一性校验失败" description={duplicateMessages.join('；')} />}
-      <Tabs
+      <div className="semantic-workbench section-gap">
+        <SemanticOverviewCard
+          draft={draft}
+          onAddSet={() => openEdit('sets')}
+          onAddParameter={() => openEdit('parameters')}
+          onAddVariable={() => openEdit('variables')}
+          onEditSet={index => openEdit('sets', draft.semantic.sets[index], index)}
+          onEditParameter={index => openEdit('parameters', draft.semantic.parameters[index], index)}
+          onEditVariable={index => openEdit('variables', draft.semantic.variables[index], index)}
+        />
+        <ComponentDependencyCard draft={draft} onEditBinding={setBindingTarget} />
+      </div>
+      <Collapse
         className="section-gap"
-        items={[
-          { key: 'sets', label: `集合 ${draft.semantic.sets.length}`, children: <Card extra={<Button data-testid="add-set" onClick={() => openEdit('sets')}>新增集合</Button>}><Table size="small" pagination={false} rowKey="code" dataSource={draft.semantic.sets} columns={setColumns} scroll={{ x: 1050 }} /></Card> },
-          { key: 'parameters', label: `参数 ${draft.semantic.parameters.length}`, children: <Card extra={<Button data-testid="add-parameter" onClick={() => openEdit('parameters')}>新增参数</Button>}><Table size="small" pagination={false} rowKey="code" dataSource={draft.semantic.parameters} columns={parameterColumns} scroll={{ x: 1200 }} /></Card> },
-          { key: 'variables', label: `变量 ${draft.semantic.variables.length}`, children: <Card extra={<Button data-testid="add-variable" onClick={() => openEdit('variables')}>新增变量</Button>}><Table size="small" pagination={false} rowKey="code" dataSource={draft.semantic.variables} columns={variableColumns} scroll={{ x: 1200 }} /></Card> },
-          { key: 'rules', label: '业务规则', children: <Card><Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="业务规则用于描述边界、守恒、启停等约束口径，后续可转换为组件或公式。" /></Card> },
-        ]}
+        items={[{
+          key: 'advanced-detail',
+          label: '高级明细',
+          children: (
+            <Tabs
+              items={[
+                { key: 'sets', label: `集合 ${draft.semantic.sets.length}`, children: <Card extra={<Button data-testid="add-set" onClick={() => openEdit('sets')}>新增集合</Button>}><Table className="semantic-detail-table" size="small" pagination={false} rowKey={stableRowKey} dataSource={draft.semantic.sets} columns={setColumns} /></Card> },
+                { key: 'parameters', label: `参数 ${draft.semantic.parameters.length}`, children: <Card extra={<Button data-testid="add-parameter" onClick={() => openEdit('parameters')}>新增参数</Button>}><Table className="semantic-detail-table" size="small" pagination={false} rowKey={stableRowKey} dataSource={draft.semantic.parameters} columns={parameterColumns} /></Card> },
+                { key: 'variables', label: `变量 ${draft.semantic.variables.length}`, children: <Card extra={<Button data-testid="add-variable" onClick={() => openEdit('variables')}>新增变量</Button>}><Table className="semantic-detail-table" size="small" pagination={false} rowKey={stableRowKey} dataSource={draft.semantic.variables} columns={variableColumns} /></Card> },
+                { key: 'rules', label: '业务规则', children: <Card><Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="业务规则用于描述边界、守恒、启停等约束口径，后续可转换为组件或公式。" /></Card> },
+              ]}
+            />
+          ),
+        }]}
       />
       {renderComponentPanel()}
+      <ParameterBindingDrawer
+        draft={draft}
+        target={bindingTarget}
+        open={!!bindingTarget}
+        onClose={() => setBindingTarget(undefined)}
+        onSave={saveBinding}
+      />
       <Drawer
         size="large"
         title={editing ? `${editing.index === undefined ? '新增' : '编辑'}${editing.kind === 'sets' ? '集合' : editing.kind === 'parameters' ? '参数' : '变量'}` : ''}

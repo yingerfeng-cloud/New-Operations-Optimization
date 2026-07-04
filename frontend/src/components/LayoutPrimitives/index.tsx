@@ -31,10 +31,12 @@ export function ActionFooter({
   );
 }
 
-export function DetailDrawer({ footer, bodyStyle, ...props }: DrawerProps) {
+export function DetailDrawer({ footer, bodyStyle, width, size, ...props }: DrawerProps) {
+  const derivedSize = size ?? (width ? 'large' : undefined);
   return (
     <Drawer
       {...props}
+      size={derivedSize}
       bodyStyle={bodyStyle}
       footer={footer ? <div className="detail-drawer-footer">{footer}</div> : undefined}
     />
@@ -66,15 +68,63 @@ export function StepNavigator({
   );
 }
 
-export function StepBody({ children, title, description }: { children: ReactNode; title?: ReactNode; description?: ReactNode }) {
+export function ProgressStepper({
+  current,
+  items,
+  onChange,
+  className = '',
+}: {
+  current: number;
+  items: Array<{ title: ReactNode; description?: ReactNode; status?: 'wait' | 'process' | 'finish' | 'error' }>;
+  onChange?: (step: number) => void;
+  className?: string;
+}) {
+  return (
+    <div className={`progress-stepper ${className}`.trim()}>
+      <Steps
+        type="navigation"
+        current={current}
+        items={items.map(item => ({
+          title: item.title,
+          content: item.description,
+          status: item.status,
+        }))}
+        onChange={onChange}
+      />
+    </div>
+  );
+}
+
+export function StepBody({
+  children,
+  title,
+  description,
+  status,
+  extra,
+  guidance,
+}: {
+  children: ReactNode;
+  title?: ReactNode;
+  description?: ReactNode;
+  status?: ReactNode;
+  extra?: ReactNode;
+  guidance?: ReactNode;
+}) {
   return (
     <section className="step-body">
       {(title || description) && (
         <div className="step-body-head">
-          {title && <h3>{title}</h3>}
-          {description && <p>{description}</p>}
+          <div>
+            <Space size={10} wrap>
+              {title && <h3>{title}</h3>}
+              {status}
+            </Space>
+            {description && <p>{description}</p>}
+          </div>
+          {extra && <div className="step-body-extra">{extra}</div>}
         </div>
       )}
+      {guidance && <div className="step-guidance-panel">{guidance}</div>}
       <div className="step-body-content">{children}</div>
     </section>
   );

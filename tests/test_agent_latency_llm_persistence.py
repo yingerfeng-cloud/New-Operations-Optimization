@@ -127,22 +127,6 @@ def test_package_excludes_runtime_store() -> None:
     assert "__pycache__" in script
     assert "reports" in script
 
-
-def test_frontend_has_abort_controller() -> None:
-    html = Path("agent_console.html").read_text(encoding="utf-8")
-    assert "AbortController" in html
-    assert "timeoutMs=15000" in html
-    assert "本轮响应超时" in html
-
-
-def test_frontend_single_active_loading() -> None:
-    html = Path("agent_console.html").read_text(encoding="utf-8")
-    assert "isSending" in html
-    assert "activeRequestId" in html
-    assert "clearLoadingMessages()" in html
-    assert "上一轮请求仍在处理中" in html
-
-
 def test_missing_required_state_priority() -> None:
     res = client.post("/api/agent/analyze", json={"conversation_id": _cid("STATE"), "message": "帮我做储能调度"})
     assert res.status_code == 200, res.text

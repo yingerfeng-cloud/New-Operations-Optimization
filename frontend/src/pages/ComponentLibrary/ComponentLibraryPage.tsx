@@ -1,5 +1,5 @@
 import { MoreOutlined } from '@ant-design/icons';
-import { Button, Card, Col, Descriptions, Drawer, Dropdown, Row, Select, Space, Tabs, Tag, message } from 'antd';
+import { Button, Card, Descriptions, Drawer, Dropdown, Select, Space, Tabs, Tag, message } from 'antd';
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useParams } from 'react-router-dom';
@@ -7,6 +7,7 @@ import { copyComponentVersion, createComponent, getComponent, getComponents, off
 import { DataTable } from '../../components/DataTable';
 import { PageHeader } from '../../components/PageHeader';
 import { StatusTag } from '../../components/StatusTag';
+import { MetricCard, MetricGrid } from '../../components/WorkspaceUI';
 import { ComponentDependencyPanel } from '../../features/component-library/ComponentDependencyPanel';
 import { ComponentBusinessView, ComponentMathDefinition } from '../../features/component-library/ComponentSchemaTables';
 import { ParameterBindingPanel } from '../../features/component-library/ParameterBindingPanel';
@@ -71,12 +72,12 @@ export function ComponentLibraryPage() {
         description="可复用约束组件、参数绑定、依赖校验与版本发布。"
         extra={<Button type="primary" onClick={() => { setViewId(undefined); setEditing(true); setValidation(undefined); }}>新建组件</Button>}
       />
-      <Row gutter={[14, 14]}>
-        <Col xs={24} md={6}><div className="card metric blue"><span>组件总数</span><b>{rows.length}</b><span>组件注册表</span></div></Col>
-        <Col xs={24} md={6}><div className="card metric green"><span>启用组件</span><b>{enabledCount}</b><span>参与模型装配</span></div></Col>
-        <Col xs={24} md={6}><div className="card metric amber"><span>已实现</span><b>{implementedCount}</b><span>已有后端实现</span></div></Col>
-        <Col xs={24} md={6}><div className="card metric red"><span>依赖缺失</span><b>{missingDeps}</b><span>阻止发布风险</span></div></Col>
-      </Row>
+      <MetricGrid>
+        <MetricCard title="组件总数" value={rows.length} description="组件注册表" tone="blue" />
+        <MetricCard title="启用组件" value={enabledCount} description="参与模型装配" tone="green" />
+        <MetricCard title="已实现" value={implementedCount} description="已有后端实现" tone="amber" />
+        <MetricCard title="依赖缺失" value={missingDeps} description="阻止发布风险" tone={missingDeps ? 'red' : 'neutral'} />
+      </MetricGrid>
       <Card className="content-card section-gap" title={`组件清单 · 已发布 ${publishedCount}`}>
         <Space wrap className="full-width">
           <Select allowClear placeholder="分类" style={{ width: 140 }} value={filters.category} onChange={category => setFilters({ ...filters, category })} options={[...new Set(allRows.map(item => String(item.category || '')).filter(Boolean))].map(value => ({ value, label: value }))} />

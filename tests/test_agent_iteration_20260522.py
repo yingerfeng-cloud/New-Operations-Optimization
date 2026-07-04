@@ -1,8 +1,6 @@
 from __future__ import annotations
 
 import uuid
-from pathlib import Path
-
 from fastapi.testclient import TestClient
 
 from app.main import app
@@ -96,13 +94,3 @@ def test_dynamic_skill_list_display_names() -> None:
     for expected in ["经济调度", "日前机组组合", "储能调度", "风光储协同", "电热协同", "梯级水电调度"]:
         assert expected in names
     assert all("Agent Skill" not in name for name in names)
-
-
-def test_frontend_status_copy_and_task_panel_static() -> None:
-    html = Path("agent_console.html").read_text(encoding="utf-8")
-    assert "Agent 服务未连接，请检查 Agent 服务是否启动以及 API Base 是否正确。" in html
-    assert "Agent 服务在线，但无法连接运筹优化平台，请检查 Platform 服务和 OPTIMIZATION_PLATFORM_BASE_URL。" in html
-    assert "state.health={loading:true};state.agentStatus=null;render();checkHealth(false)" in html
-    assert "a.agent_skill_name||a.api_skill_name||a.resolved_skill_name" in html
-    assert "可开始该场景" in html
-

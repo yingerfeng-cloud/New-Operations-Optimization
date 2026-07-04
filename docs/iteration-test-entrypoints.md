@@ -83,7 +83,6 @@ python -m pytest tests/test_react_frontend_hosting.py -q
 ```powershell
 python -m pytest `
   tests/test_20260605_acceptance_round.py `
-  tests/test_model_creation_acceptance_fixes.py::test_cascade_hydro_clone_publish_invoke_sample_success `
   tests/test_pv_storage_v2_acceptance.py `
   tests/test_component_based_hydro_model.py -q
 ```
@@ -92,13 +91,7 @@ python -m pytest `
 
 ## Legacy 前端
 
-只在修改 `prototype.html` 或 `static/js/` 时运行：
-
-```powershell
-python -m pytest `
-  tests/test_component_builder_frontend_static.py `
-  tests/test_unified_formula_editor_acceptance.py -q
-```
+legacy prototype 前端已下线并删除；旧静态前端 pytest 已迁移到 `frontend/src/tests/unit/` 与 `frontend/src/tests/e2e/` 的 React/Vite 测试体系。
 
 ## Agent
 
@@ -133,7 +126,7 @@ cd ..
 python -m pytest -q
 ```
 
-`test:phase` 聚合 React 迁移阶段的核心页面测试：`DashboardPage.test.tsx`、`ModelCreationPage.test.tsx`、`Step2SemanticModel.test.tsx`、`Step3MathExpansion.test.tsx`、`Step4RuntimeParams.test.tsx`、`Step5ReviewPublish.test.tsx`、`ModelCenterPage.test.tsx`、`ComponentLibraryPage.test.tsx`、`TaskCenterPage.test.tsx`、`ResultCenterPage.test.tsx`、`AgentWorkbenchPage.test.tsx`。
+`test:phase` 聚合 React 迁移阶段的核心页面测试：`DashboardPage.test.tsx`、`ModelCreationPage.test.tsx`、`Step2SemanticModel.test.tsx`、`Step3MathExpansion.test.tsx`、`Step4RuntimeParams.test.tsx`、`Step5ReviewPublish.test.tsx`、`ModelCenterPage.test.tsx`、`ComponentLibraryPage.test.tsx`、`TaskCenterPage.test.tsx`、`ResultCenterPage.test.tsx`、`AgentWorkbenchPage.test.tsx`、`OfficialFrontendOnly.test.tsx`。
 
 `python scripts/verify_test_matrix.py` 不替代 Vitest、Playwright 或 pytest；它只检查测试文件、前端脚本和本文档入口是否齐全，适合在 Vite/Vitest 因本机沙箱或 esbuild 子进程权限失败时先做静态收口检查。阶段十一的收口说明见 `docs/frontend-migration-test-closure.md`。
 

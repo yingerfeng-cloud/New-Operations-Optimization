@@ -1,4 +1,4 @@
-import { Alert, Card, Col, Collapse, Descriptions, Form, Input, Radio, Row, Select, Space, Statistic, Tag, Typography } from 'antd';
+import { Alert, Card, Col, Collapse, Descriptions, Form, Input, Radio, Row, Select, Space, Tag, Typography } from 'antd';
 import type { ModelTemplate } from '../../../types/template';
 import { BLANK_MODEL_ID, getScenarioById, getScenarioModelById, scenarioCatalog } from '../data/scenarioCatalog';
 import type { ModelDraft } from '../stores/modelCreationStore';
@@ -30,6 +30,7 @@ export function Step1BasicInfo({
   const set = (p: Partial<typeof b>) => onChange({ ...draft, basic_info: { ...b, ...p } });
   const createMode = selectedModelId === BLANK_MODEL_ID ? 'blank' : 'template';
   const autoCode = b.model_code || `${scenario.id}_${Date.now().toString().slice(-4)}`;
+  const objectiveCount = draft.formulas.filter(formula => formula.kind === 'objective').length;
 
   return (
     <>
@@ -134,13 +135,26 @@ export function Step1BasicInfo({
         </Space>
       </Card>
 
-      <Alert
-        showIcon
-        type="info"
-        title="模型范式诊断"
-        description={`${b.builder_mode === 'generic_linear' ? 'LP/MILP 线性范式' : '组件能力自动汇总'} · 求解器 HiGHS`}
-      />
-      <Statistic title="目标策略" value={draft.formulas.filter(f => f.kind === 'objective').length} suffix="个目标项" />
+      <Card className="section-gap" title="目标策略">
+        <div className="model-diagnosis-strip">
+          <span className="info-dot">i</span>
+          <div>
+            <strong>模型范式诊断</strong>
+            <p>{`${b.builder_mode === 'generic_linear' ? 'LP/MILP 线性范式' : '组件能力自动汇总'} · 求解器 HiGHS`}</p>
+          </div>
+        </div>
+        {objectiveCount > 0 ? (
+          <div className="objective-summary">
+            <strong>{objectiveCount} 个目标函数</strong>
+            <span>已配置目标策略，可在数学展开步骤继续维护目标函数和约束。</span>
+          </div>
+        ) : (
+          <div className="business-empty-card">
+            <strong>暂未配置目标函数</strong>
+            <span>完成基础信息后，在“数学展开”步骤定义成本最小化、收益最大化或多目标权重策略。</span>
+          </div>
+        )}
+      </Card>
     </>
   );
 }

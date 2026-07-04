@@ -317,7 +317,7 @@ class SkillRegistry:
             "output_schema": schema["output_schema"],
             "endpoint": f"/api/skills/{skill_name}/run",
             "method": "POST",
-            "allowed_callers": ["agent", "api", "platform", "agent_console"],
+            "allowed_callers": ["agent", "api", "platform", "react_frontend"],
             "safety": (
                 "仅提供辅助决策建议；不会自动下发生产控制指令。"
             ),

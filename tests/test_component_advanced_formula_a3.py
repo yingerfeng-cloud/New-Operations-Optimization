@@ -129,7 +129,8 @@ def test_expression_type_parameter_variable_quadratic_and_nonlinear() -> None:
     )
 
     assert linear["expression_class"] == "linear"
-    assert quadratic["inferred_problem_type"] == "QP"
+    assert quadratic["inferred_problem_type"] == "NLP"
+    assert quadratic["nonlinear_diagnostics"]["has_blocking_nonlinearity"] is True
     assert nonlinear["inferred_problem_type"] == "NLP"
 
 

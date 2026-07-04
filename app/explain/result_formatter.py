@@ -15,6 +15,8 @@ class SolveResultFormatter:
     def format(self, model_code: str, solver_result: Any, context: dict[str, Any]) -> dict[str, Any]:
         if model_code == "unit_commitment_day_ahead":
             return self._format_unit_commitment(solver_result, context)
+        if model_code == "cascade_hydro_dispatch_v1":
+            return self._format_cascade_hydro_dispatch_v1(solver_result, context)
         if model_code == "cascade_hydro_dispatch":
             return self._format_cascade_hydro_dispatch(solver_result, context)
         if model_code == "storage_dispatch":
@@ -22,12 +24,12 @@ class SolveResultFormatter:
         if model_code.startswith("pv_storage_"):
             return self._format_pv_storage(model_code, solver_result, context)
         if model_code == "economic_dispatch":
-            return self._generic(model_code, solver_result, "经济调度已完成，系统在满足负荷和机组边界约束下最小化发电成本。")
+            return self._generic(model_code, solver_result, "经济调度已完成，系统在满足负荷和机组边界约束下最小化发电成本。", context)
         if model_code == "renewable_storage_dispatch":
-            return self._generic(model_code, solver_result, "风光储协同优化已完成，系统在满足并网和储能约束下提升新能源消纳。")
+            return self._generic(model_code, solver_result, "风光储协同优化已完成，系统在满足并网和储能约束下提升新能源消纳。", context)
         if model_code == "chp_dispatch":
-            return self._generic(model_code, solver_result, "电热协同优化已完成，系统在电热可行域内同时满足电负荷和热负荷。")
-        return self._generic(model_code, solver_result, "模型已通过统一 Pyomo 建模引擎和 HiGHS 求解链路完成求解。")
+            return self._generic(model_code, solver_result, "电热协同优化已完成，系统在电热可行域内同时满足电负荷和热负荷。", context)
+        return self._generic(model_code, solver_result, "模型已通过统一 Pyomo 建模引擎和 HiGHS 求解链路完成求解。", context)
 
     def _format_unit_commitment(self, solver_result: Any, context: dict[str, Any]) -> dict[str, Any]:
         units = context["units"]
@@ -358,6 +360,169 @@ class SolveResultFormatter:
             "business_explanation": explanation,
         }
 
+    def _format_cascade_hydro_dispatch_v1(self, solver_result: Any, context: dict[str, Any]) -> dict[str, Any]:
+        params = context.get("runtime_parameters", {})
+        sets = context.get("sets", {})
+        reservoirs = list(sets.get("reservoir") or sets.get("station") or params.get("reservoir") or [])
+        times = list(sets.get("time") or params.get("time") or [])
+        values = solver_result.variable_values
+        delta_t = float(params.get("delta_t", 1.0) or 1.0)
+        delta_storage = float(context.get("delta_storage_million_m3_per_m3s") or delta_t * 3600 / 1_000_000)
+
+        rows = []
+        storage_curve = []
+        outflow_curve = []
+        power_curve = []
+        spill_curve = []
+        water_balance = []
+        interpolation = []
+        total_generation = 0.0
+        total_spill_flow = 0.0
+        total_spill_volume = 0.0
+        max_balance_error = 0.0
+
+        for t_index, t in enumerate(times):
+            for reservoir in reservoirs:
+                storage = self._value(values, "storage", reservoir, t)
+                outflow = self._value(values, "outflow", reservoir, t)
+                spill = self._value(values, "spill", reservoir, t)
+                level = self._value(values, "level", reservoir, t)
+                tailwater = self._value(values, "tailwater", reservoir, t)
+                head = self._value(values, "head", reservoir, t)
+                power = self._value(values, "power", reservoir, t)
+                generation = self._value(values, "generation", reservoir, t)
+                natural = self._series_value(params.get("inflow"), reservoir, t_index, t)
+                upstream = self._upstream_release_value(values, params, reservoir, t, times, t_index)
+                previous_storage = float((params.get("initial_storage") or {}).get(reservoir, 0.0)) if t_index == 0 else self._value(values, "storage", reservoir, times[t_index - 1])
+                expected_storage = previous_storage + (natural + upstream - outflow - spill) * delta_storage
+                balance_error = storage - expected_storage
+                max_balance_error = max(max_balance_error, abs(balance_error))
+                total_generation += generation
+                total_spill_flow += spill
+                total_spill_volume += spill * delta_t * 3600
+                row = {
+                    "time": t,
+                    "reservoir": reservoir,
+                    "storage": round(storage, 6),
+                    "outflow": round(outflow, 6),
+                    "spill": round(spill, 6),
+                    "level": round(level, 6),
+                    "tailwater": round(tailwater, 6),
+                    "head": round(head, 6),
+                    "power": round(power, 6),
+                    "generation": round(generation, 6),
+                }
+                rows.append(row)
+                storage_curve.append({"time": t, "reservoir": reservoir, "storage": round(storage, 6)})
+                outflow_curve.append({"time": t, "reservoir": reservoir, "outflow": round(outflow, 6)})
+                power_curve.append({"time": t, "reservoir": reservoir, "power": round(power, 6)})
+                spill_curve.append({"time": t, "reservoir": reservoir, "spill": round(spill, 6)})
+                water_balance.append(
+                    {
+                        "time": t,
+                        "reservoir": reservoir,
+                        "previous_storage": round(previous_storage, 6),
+                        "natural_inflow": round(natural, 6),
+                        "upstream_release": round(upstream, 6),
+                        "outflow": round(outflow, 6),
+                        "spill": round(spill, 6),
+                        "expected_storage": round(expected_storage, 6),
+                        "actual_storage": round(storage, 6),
+                        "balance_error": round(balance_error, 8),
+                    }
+                )
+                interpolation.append(
+                    {
+                        "time": t,
+                        "reservoir": reservoir,
+                        "level_storage": {"x_storage": round(storage, 6), "y_level": round(level, 6), "function_asset_id": context.get("function_assets", {}).get("level_storage", {}).get("function_asset_id")},
+                        "tailwater_outflow": {"x_outflow": round(outflow, 6), "y_tailwater": round(tailwater, 6), "function_asset_id": context.get("function_assets", {}).get("tailwater_outflow", {}).get("function_asset_id")},
+                        "power_surface": {
+                            "x_outflow": round(outflow, 6),
+                            "y_head": round(head, 6),
+                            "z_power": round(power, 6),
+                            "function_asset_id": context.get("function_assets", {}).get("power_surface", {}).get("function_asset_id"),
+                            **self._selected_power_triangle(values, context, reservoir, t),
+                        },
+                    }
+                )
+
+        station_summary = []
+        for reservoir in reservoirs:
+            first_t = times[0]
+            last_t = times[-1]
+            initial = float((params.get("initial_storage") or {}).get(reservoir, 0.0))
+            terminal = self._value(values, "storage", reservoir, last_t)
+            target = float((params.get("target_final_storage") or {}).get(reservoir, 0.0))
+            deviation = self._value(values, "final_storage_deviation", reservoir)
+            station_summary.append(
+                {
+                    "reservoir": reservoir,
+                    "initial_storage": round(initial, 6),
+                    "first_period_storage": round(self._value(values, "storage", reservoir, first_t), 6),
+                    "final_storage": round(terminal, 6),
+                    "target_final_storage": round(target, 6),
+                    "final_storage_deviation": round(deviation, 6),
+                    "generation": round(sum(self._value(values, "generation", reservoir, t) for t in times), 6),
+                    "spill": round(sum(self._value(values, "spill", reservoir, t) for t in times), 6),
+                }
+            )
+
+        model_size = context.get("model_size") or {}
+        metrics = {
+            "objective_value": round(float(solver_result.objective_value or 0.0), 6),
+            "total_generation": round(total_generation, 6),
+            "total_generation_MWh": round(total_generation, 6),
+            "total_spill": round(total_spill_flow, 6),
+            "total_spill_volume_m3": round(total_spill_volume, 6),
+            "total_spill_volume_million_m3": round(total_spill_volume / 1_000_000, 6),
+            "total_spill_million_m3": round(total_spill_volume / 1_000_000, 6),
+            "max_water_balance_error": round(max_balance_error, 8),
+            "variable_count": int(model_size.get("variables", 0)),
+            "binary_variable_count": int(model_size.get("binary_variables", 0)),
+            "constraint_count": int(model_size.get("constraints", 0)),
+            "risk": "medium" if int(model_size.get("binary_variables", 0)) else "low",
+        }
+        labels = [str(t) for t in times]
+        chart = {
+            "labels": labels,
+            "storage": {r: [item["storage"] for item in storage_curve if item["reservoir"] == r] for r in reservoirs},
+            "outflow": {r: [item["outflow"] for item in outflow_curve if item["reservoir"] == r] for r in reservoirs},
+            "power": {r: [item["power"] for item in power_curve if item["reservoir"] == r] for r in reservoirs},
+            "spill": {r: [item["spill"] for item in spill_curve if item["reservoir"] == r] for r in reservoirs},
+        }
+        return {
+            "series": rows,
+            "metrics": metrics,
+            "chart": chart,
+            "station_summary": station_summary,
+            "storage_curve": storage_curve,
+            "outflow_curve": outflow_curve,
+            "power_curve": power_curve,
+            "spill_curve": spill_curve,
+            "water_balance_check": water_balance,
+            "function_asset_interpolation": interpolation,
+            "milp_size": model_size,
+            "business_output": {
+                "overview": metrics,
+                "station_summary": station_summary,
+                "storage_curve": storage_curve,
+                "outflow_curve": outflow_curve,
+                "power_curve": power_curve,
+                "spill_curve": spill_curve,
+                "water_balance_check": water_balance,
+                "function_asset_interpolation": interpolation,
+                "milp_size": model_size,
+                "variable_values": values,
+            },
+            "business_explanation": {
+                "summary": "梯级水电调度 v1 已完成求解，结果包含总发电量、总弃水量、库容过程、出库流量、出力曲线、水量平衡校验和函数资产插值解释。",
+                "function_assets": context.get("metadata", {}).get("function_assets_used", []),
+                "milp_size": model_size,
+                "advisory": "v1 使用 1D PWL 曲线和 2D PWL 出力曲面，不含机组启停、生态流量和复杂时滞。结果需人工复核后用于调度。",
+            },
+        }
+
     def _format_pv_storage(self, model_code: str, solver_result: Any, context: dict[str, Any]) -> dict[str, Any]:
         values = solver_result.variable_values
         params = context.get("runtime_parameters", {})
@@ -479,14 +644,17 @@ class SolveResultFormatter:
             "business_explanation": {"summary": "光储优化已完成，结果包含光伏消纳、弃光、储能充放电、计划偏差和收益/成本指标。", "model_code": model_code},
         }
 
-    def _generic(self, model_code: str, solver_result: Any, summary: str) -> dict[str, Any]:
+    def _generic(self, model_code: str, solver_result: Any, summary: str, context: dict[str, Any] | None = None) -> dict[str, Any]:
         objective = float(solver_result.objective_value or 0.0)
+        metadata = (context or {}).get("metadata", {}) if isinstance(context, dict) else {}
+        mccormick = metadata.get("mccormick_relaxations") or []
+        advisory = "McCormick 松弛不是精确等价表达，双线性项结果存在松弛误差风险。" if mccormick else None
         return {
             "series": [],
             "chart": {},
-            "metrics": {"objective_value": round(objective, 3), "total_cost": round(objective, 3), "gap": "0.00%", "risk": "low"},
-            "business_output": {"variable_values": solver_result.variable_values, "constraint_check": {}},
-            "business_explanation": {"summary": summary, "model_code": model_code},
+            "metrics": {"objective_value": round(objective, 3), "total_cost": round(objective, 3), "gap": "0.00%", "risk": "medium" if mccormick else "low"},
+            "business_output": {"variable_values": solver_result.variable_values, "constraint_check": {}, "mccormick_relaxations": mccormick},
+            "business_explanation": {"summary": summary, "model_code": model_code, "relaxation_advisory": advisory},
         }
 
     def _value(self, variable_values: dict[str, Any], name: str, *indices: Any) -> float:
@@ -494,6 +662,57 @@ class SolveResultFormatter:
         label = f"{name}[{','.join(map(str, indices))}]"
         value = values.get(label, 0.0) if isinstance(values, dict) else 0.0
         return float(value or 0.0)
+
+    def _series_value(self, data: Any, reservoir: Any, index: int, time_label: Any) -> float:
+        if isinstance(data, dict):
+            raw = data.get(reservoir, data.get(str(reservoir)))
+            if isinstance(raw, list):
+                return float(raw[index] if index < len(raw) else 0.0)
+            if isinstance(raw, dict):
+                return float(raw.get(time_label, raw.get(str(time_label), 0.0)) or 0.0)
+            if raw is not None:
+                return float(raw)
+        if isinstance(data, list):
+            return float(data[index] if index < len(data) else 0.0)
+        return float(data or 0.0)
+
+    def _upstream_release_value(self, values: dict[str, Any], params: dict[str, Any], reservoir: Any, time_label: Any, times: list[Any], time_index: int) -> float:
+        upstream_map = params.get("upstream_station") or {}
+        upstream = upstream_map.get(reservoir, upstream_map.get(str(reservoir)))
+        if not upstream:
+            return 0.0
+        delay_raw = params.get("cascade_delay") or {}
+        delay = int(delay_raw.get(reservoir, delay_raw.get(str(reservoir), 0)) if isinstance(delay_raw, dict) else delay_raw or 0)
+        shifted = time_index - delay
+        if shifted < 0:
+            initial = params.get("initial_upstream_outflow") or {}
+            return float(initial.get(reservoir, initial.get(str(reservoir), 0.0)) or 0.0)
+        shifted_time = times[shifted]
+        return self._value(values, "outflow", upstream, shifted_time) + self._value(values, "spill", upstream, shifted_time)
+
+    def _selected_power_triangle(self, values: dict[str, Any], context: dict[str, Any], reservoir: Any, time_label: Any) -> dict[str, Any]:
+        surface_meta = (context.get("function_assets") or {}).get("power_surface") or {}
+        binary_name = surface_meta.get("binary_variable")
+        lambda_name = surface_meta.get("lambda_variable")
+        if not binary_name or not lambda_name:
+            return {}
+        selected_triangle = None
+        binary_values = values.get(str(binary_name), {})
+        lambda_values = values.get(str(lambda_name), {})
+        if isinstance(binary_values, dict):
+            prefix = f"{binary_name}[{reservoir},{time_label},"
+            for key, value in binary_values.items():
+                if key.startswith(prefix) and float(value or 0.0) >= 0.5:
+                    selected_triangle = int(str(key).split(",")[-1].rstrip("]"))
+                    break
+        if selected_triangle is None:
+            return {}
+        lambdas = []
+        if isinstance(lambda_values, dict):
+            for vertex in range(3):
+                key = f"{lambda_name}[{reservoir},{time_label},{selected_triangle},{vertex}]"
+                lambdas.append(round(float(lambda_values.get(key, 0.0) or 0.0), 6))
+        return {"selected_triangle": selected_triangle, "lambda_weights": lambdas}
 
     def _uc_summary(self, period_output: list[dict[str, Any]], tightness: dict[str, list[dict[str, Any]]]) -> str:
         peak = max(period_output, key=lambda row: row["load_forecast"]) if period_output else None

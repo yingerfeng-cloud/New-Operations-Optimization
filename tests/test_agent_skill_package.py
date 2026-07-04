@@ -33,7 +33,7 @@ def test_agent_skill_binds_existing_api_skill() -> None:
     assert detail["api_skill_available"] is True
 
 
-def test_legacy_agent_skill_parameter_example_reuses_new_agent_skill_service() -> None:
+def test_agent_skill_parameter_example_compatibility_route_reuses_agent_skill_service() -> None:
     response = client.get("/api/agent/skills/run_cascade_hydro_dispatch/parameter-example")
     assert response.status_code == 200, response.text
     body = response.json()
@@ -119,10 +119,3 @@ def test_agent_skill_validation_detects_missing_required_parameter() -> None:
     result = client.post("/api/agent/agent-skills/economic_dispatch/dry-run", json={"parameter_draft": {"load_forecast": [100]}}).json()
     assert result["ok"] is False
     assert set(result["missing_parameters"]) == {"unit_max_output", "fuel_cost"}
-
-
-def test_agent_skill_management_page_renders_skill_structure() -> None:
-    html = Path("agent_console.html").read_text(encoding="utf-8")
-    assert "Agent Skill 管理" in html
-    assert "Agent Skill Package" in html
-    assert "/agent/agent-skills" in html

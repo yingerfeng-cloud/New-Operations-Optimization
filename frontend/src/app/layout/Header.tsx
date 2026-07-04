@@ -21,8 +21,6 @@ export function Header({ pathname }: { pathname: string }) {
     queryFn: () => unwrap<HealthResponse>(apiClient.get('/api/health')),
     refetchInterval,
   });
-  const legacyBaseUrl = import.meta.env.VITE_API_BASE_URL?.replace(/\/$/, '') || '';
-  const legacyHref = `${legacyBaseUrl}/legacy`;
   const backendOnline = Boolean(data?.ok);
   const current = titleForPath(pathname);
 
@@ -45,7 +43,6 @@ export function Header({ pathname }: { pathname: string }) {
           <span className={`status-pill ${data?.highspy_installed === false ? 'status-pill-red' : 'status-pill-blue'}`}>
             当前求解器：{data?.solver || 'HiGHS'}
           </span>
-          <Button href={legacyHref} target="_blank">Legacy</Button>
           <Button type="primary" icon={<PlusOutlined />} onClick={() => nav('/models/create')}>新建模型</Button>
         </Space>
       </div>

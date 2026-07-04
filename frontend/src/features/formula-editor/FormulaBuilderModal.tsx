@@ -6,6 +6,7 @@ import { collectReferences, renderFormulaReadable, tokensToDisplay } from './for
 import { getFormulaSymbolDictionary } from './formulaDictionary';
 import { parseFormulaDsl, type FormulaSymbols } from './formulaParser';
 import { validateFormula } from './formulaValidator';
+import { analyzeFormulaText } from '../model-creation/utils/nonlinearDiagnostics';
 
 const newFormula = (kind: 'constraint' | 'objective'): FormulaDef => ({
   formula_id: crypto.randomUUID(),
@@ -79,6 +80,10 @@ export function FormulaBuilder({
   const check = useMemo(
     () => validateFormula(formula.dsl_formula, formula.kind, formula.tokens, symbols, formula.foreach),
     [formula, symbols],
+  );
+  const nonlinearDiagnostics = useMemo(
+    () => analyzeFormulaText(formula.dsl_formula, Object.keys(symbols.variables || {}), 'formula_builder'),
+    [formula.dsl_formula, symbols],
   );
 
   const commit = (next: FormulaDef) => {
@@ -198,6 +203,15 @@ export function FormulaBuilder({
               description={<ul className="compact-list">{check.warnings.map(warning => <li key={warning}>{warning}</li>)}</ul>}
             />
           )}
+          {nonlinearDiagnostics.length > 0 && (
+            <Alert
+              className="section-gap"
+              type={nonlinearDiagnostics.some(item => item.blocking) ? 'error' : 'warning'}
+              showIcon
+              title="非线性转换建议"
+              description={<ul className="compact-list">{nonlinearDiagnostics.map(item => <li key={`${item.nonlinear_type}-${item.involved_variables.join('-')}`}>{item.message}</li>)}</ul>}
+            />
+          )}
           <Collapse
             className="section-gap"
             items={[
@@ -248,7 +262,7 @@ export function FormulaBuilderModal({
       open={open}
       footer={null}
       destroyOnHidden
-      title="Formula Builder"
+      title="公式编辑器"
       onCancel={onCancel}
     >
       {open && <FormulaBuilder value={value} symbols={symbols} onApply={onApply} onCancel={onCancel} onDelete={onDelete} />}

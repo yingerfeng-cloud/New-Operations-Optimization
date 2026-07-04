@@ -1,8 +1,6 @@
 from __future__ import annotations
 
 import uuid
-from pathlib import Path
-
 from fastapi.testclient import TestClient
 
 from app.main import app
@@ -110,13 +108,3 @@ def test_ready_to_invoke_only_after_missing_empty_and_defaults_confirmed() -> No
     confirmed = client.post("/api/agent/confirm-defaults", json={"conversation_id": cid, "task_session_id": collecting["task_session"]["task_session_id"]}).json()
     assert confirmed["task_session"]["workflow_state"] == "READY_TO_INVOKE"
     assert confirmed["task_session"]["ready_to_invoke"] is True
-
-
-def test_frontend_task_session_and_example_controls() -> None:
-    html = Path("agent_console.html").read_text(encoding="utf-8")
-    assert "currentTaskSession()" in html
-    assert "state.taskSession" in html
-    assert "使用示例参数创建任务" in html
-    assert "/agent/apply-sample-parameters" in html
-    assert "task.workflow_state!=='DEFAULT_CONFIRMING'" in html
-    assert "规则模式 · API Key 已配置但未启用" in html
