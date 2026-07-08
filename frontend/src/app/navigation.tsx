@@ -32,6 +32,7 @@ export const navEntries: NavEntry[] = [
   { key: '/tasks', label: '任务调度中心', description: '提交、监控、取消和查看求解任务', icon: <ScheduleOutlined />, group: '工具与运行' },
   { key: '/results', label: '结果报告库', description: '关键指标、变量曲线、业务解释和 JSON 结果', icon: <BarChartOutlined />, group: '分析与接口' },
   { key: '/services', label: '模型服务接口', description: '已发布模型服务、接口契约、调用示例和调用记录', icon: <ApiOutlined />, group: '分析与接口' },
+  { key: '/skills', label: 'Skill 服务中心', description: 'Skill 启停、Schema 同步、Agent 绑定、在线测试和调用记录', icon: <ApiOutlined />, group: '分析与接口' },
   { key: '/agents', label: 'Agent 工作台', description: '对话式建模、意图识别、参数抽取和调用日志', icon: <RobotOutlined />, group: '分析与接口' },
   { key: '/settings', label: '系统配置', description: 'API 连接、求解器、环境和 React 前端托管状态', icon: <SettingOutlined />, group: '系统' },
 ];

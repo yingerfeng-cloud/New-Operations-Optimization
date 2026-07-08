@@ -185,6 +185,12 @@ def reset_runtime_store(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
         except Exception:
             pass
         with STORE.lock:
+            for task in list(STORE.tasks.values()):
+                if getattr(task, "status", None) in {"PENDING", "VALIDATING", "BUILDING_MODEL", "SOLVING", "FORMATTING_RESULT"}:
+                    task.status = "CANCELLED"
+                    task.progress = 100
+                    task.finished_at = getattr(task, "finished_at", None) or "pytest teardown"
+                    task.error = "cancelled by pytest fixture teardown"
             for key, value in _BASE_STORE_SNAPSHOT.items():
                 target = getattr(STORE, key)
                 if isinstance(target, dict):
@@ -193,6 +199,7 @@ def reset_runtime_store(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
                 else:
                     setattr(STORE, key, deepcopy(value))
             STORE._persistence_path = original_path
+            STORE.scheduler = threading.Semaphore(4)
         for key, value in _BASE_REGISTRY_SNAPSHOT.items():
             target = getattr(component_registry, key)
             if isinstance(target, dict):

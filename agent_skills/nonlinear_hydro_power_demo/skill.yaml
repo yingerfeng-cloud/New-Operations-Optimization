@@ -1,0 +1,17 @@
+name: nonlinear_hydro_power_demo
+display_name: 非线性水电出力 NLP 试点
+canonical_api_skill_name: run_nonlinear_hydro_power_demo
+enabled: true
+confirmation_required: true
+execution_policy:
+  mode: advisory_only
+required_parameters:
+  - k
+  - flow_min
+  - flow_max
+  - head_min
+  - head_max
+  - power_max
+optional_parameters:
+trigger_intents:
+  - nonlinear_hydro_power_demo

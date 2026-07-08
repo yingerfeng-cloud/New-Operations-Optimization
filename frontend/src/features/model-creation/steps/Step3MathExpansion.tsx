@@ -442,7 +442,14 @@ export function Step3MathExpansion({ draft, onChange }: { draft: ModelDraft; onC
 
   if (draft.basic_info.builder_mode !== 'generic_linear') return (
     <>
-      <Alert className="compact-step-note" type="info" title="组件化数学展开" description="约束和目标项由已选组件生成；自定义公式仍通过统一公式编辑器维护。" />
+      <Alert
+        className="compact-step-note"
+        type="info"
+        title={draft.basic_info.builder_mode === 'template_based' ? '模板数学展开' : '组件化数学展开'}
+        description={draft.basic_info.builder_mode === 'template_based'
+          ? '约束和目标项来自内置模板资产；可继续添加自定义公式或保存为新的草稿资产。'
+          : '约束和目标项由已选组件生成；自定义公式仍通过统一公式编辑器维护。'}
+      />
       <Space wrap className="section-gap">
         <Button onClick={() => setEditing(newFormula('constraint'))}>添加自定义公式</Button>
         <Button type="primary" onClick={openFunctionMapping}>添加函数映射</Button>
@@ -460,6 +467,7 @@ export function Step3MathExpansion({ draft, onChange }: { draft: ModelDraft; onC
         />
       )}
       {formulaBusinessCards(draft.formulas, setEditing)}
+      {draft.basic_info.builder_mode === 'component_based' && renderComponentSummaryList()}
       <Collapse className="section-gap" items={[{ key: 'debug', label: '高级调试', children: renderComponentWorkbench() }]} />
       <Modal width={720} open={mappingOpen} destroyOnHidden onCancel={() => setMappingOpen(false)} title="添加函数映射" footer={null}>
         <Form form={mappingForm} layout="vertical" onFinish={addFunctionMappingComponent}>

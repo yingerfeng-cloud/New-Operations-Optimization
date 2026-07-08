@@ -1,0 +1,428 @@
+[
+  {
+    "key": "horizon",
+    "name": "调度时段数",
+    "dimension": [],
+    "type": "integer",
+    "unit": "period",
+    "required": true,
+    "description": "",
+    "default_value": null,
+    "sample_value": 4,
+    "default_policy": "sample_only",
+    "sets": {},
+    "validation": {
+      "type": "integer",
+      "min": 1
+    }
+  },
+  {
+    "key": "time",
+    "name": "调度时段",
+    "dimension": [
+      "time"
+    ],
+    "type": "array",
+    "unit": "",
+    "required": true,
+    "description": "",
+    "default_value": null,
+    "sample_value": [
+      0,
+      1,
+      2,
+      3
+    ],
+    "default_policy": "sample_only",
+    "sets": {
+      "time": [
+        0,
+        1,
+        2,
+        3
+      ]
+    },
+    "validation": {
+      "type": "array"
+    }
+  },
+  {
+    "key": "time_volume",
+    "name": "SOC时点",
+    "dimension": [
+      "time_volume"
+    ],
+    "type": "array",
+    "unit": "",
+    "required": true,
+    "description": "",
+    "default_value": null,
+    "sample_value": [
+      0,
+      1,
+      2,
+      3,
+      4
+    ],
+    "default_policy": "sample_only",
+    "sets": {
+      "time_volume": [
+        0,
+        1,
+        2,
+        3,
+        4
+      ]
+    },
+    "validation": {
+      "type": "array"
+    }
+  },
+  {
+    "key": "pv_forecast",
+    "name": "光伏预测出力",
+    "dimension": [
+      "time"
+    ],
+    "type": "array",
+    "unit": "MW",
+    "required": true,
+    "description": "",
+    "default_value": null,
+    "sample_value": [
+      20,
+      100,
+      80,
+      10
+    ],
+    "default_policy": "sample_only",
+    "sets": {
+      "time": [
+        0,
+        1,
+        2,
+        3
+      ]
+    },
+    "validation": {
+      "type": "array",
+      "min": 0
+    }
+  },
+  {
+    "key": "grid_limit",
+    "name": "并网限制",
+    "dimension": [
+      "time"
+    ],
+    "type": "array",
+    "unit": "MW",
+    "required": true,
+    "description": "",
+    "default_value": null,
+    "sample_value": [
+      70,
+      70,
+      70,
+      70
+    ],
+    "default_policy": "sample_only",
+    "sets": {
+      "time": [
+        0,
+        1,
+        2,
+        3
+      ]
+    },
+    "validation": {
+      "type": "array",
+      "min": 0
+    }
+  },
+  {
+    "key": "schedule",
+    "name": "计划曲线",
+    "dimension": [
+      "time"
+    ],
+    "type": "array",
+    "unit": "MW",
+    "required": true,
+    "description": "",
+    "default_value": null,
+    "sample_value": [
+      40,
+      80,
+      70,
+      30
+    ],
+    "default_policy": "sample_only",
+    "sets": {
+      "time": [
+        0,
+        1,
+        2,
+        3
+      ]
+    },
+    "validation": {
+      "type": "array",
+      "min": 0
+    }
+  },
+  {
+    "key": "price",
+    "name": "电价",
+    "dimension": [
+      "time"
+    ],
+    "type": "array",
+    "unit": "元/MWh",
+    "required": true,
+    "description": "",
+    "default_value": null,
+    "sample_value": [
+      300,
+      300,
+      450,
+      500
+    ],
+    "default_policy": "sample_only",
+    "sets": {
+      "time": [
+        0,
+        1,
+        2,
+        3
+      ]
+    },
+    "validation": {
+      "type": "array"
+    }
+  },
+  {
+    "key": "initial_soc",
+    "name": "初始SOC",
+    "dimension": [],
+    "type": "number",
+    "unit": "MWh",
+    "required": true,
+    "description": "",
+    "default_value": 0,
+    "sample_value": 0,
+    "default_policy": "default_allowed",
+    "sets": {},
+    "validation": {
+      "type": "number",
+      "min": 0
+    }
+  },
+  {
+    "key": "terminal_time",
+    "name": "期末时点",
+    "dimension": [],
+    "type": "integer",
+    "unit": "",
+    "required": true,
+    "description": "",
+    "default_value": null,
+    "sample_value": 4,
+    "default_policy": "sample_only",
+    "sets": {},
+    "validation": {
+      "type": "integer",
+      "min": 0
+    }
+  },
+  {
+    "key": "terminal_soc_target",
+    "name": "期末SOC目标",
+    "dimension": [],
+    "type": "number",
+    "unit": "MWh",
+    "required": true,
+    "description": "",
+    "default_value": null,
+    "sample_value": 0,
+    "default_policy": "sample_only",
+    "sets": {},
+    "validation": {
+      "type": "number",
+      "min": 0
+    }
+  },
+  {
+    "key": "capex_power",
+    "name": "功率投资成本",
+    "dimension": [],
+    "type": "number",
+    "unit": "元/MW",
+    "required": true,
+    "description": "",
+    "default_value": null,
+    "sample_value": 1000,
+    "default_policy": "sample_only",
+    "sets": {},
+    "validation": {
+      "type": "number",
+      "min": 0
+    }
+  },
+  {
+    "key": "capex_energy",
+    "name": "容量投资成本",
+    "dimension": [],
+    "type": "number",
+    "unit": "元/MWh",
+    "required": true,
+    "description": "",
+    "default_value": null,
+    "sample_value": 500,
+    "default_policy": "sample_only",
+    "sets": {},
+    "validation": {
+      "type": "number",
+      "min": 0
+    }
+  },
+  {
+    "key": "curtailment_penalty",
+    "name": "弃光惩罚",
+    "dimension": [],
+    "type": "number",
+    "unit": "元/MWh",
+    "required": true,
+    "description": "",
+    "default_value": null,
+    "sample_value": 100,
+    "default_policy": "sample_only",
+    "sets": {},
+    "validation": {
+      "type": "number",
+      "min": 0
+    }
+  },
+  {
+    "key": "storage_cycle_cost",
+    "name": "充放电循环成本",
+    "dimension": [],
+    "type": "number",
+    "unit": "yuan/MWh",
+    "required": true,
+    "description": "",
+    "default_value": null,
+    "sample_value": 1,
+    "default_policy": "sample_only",
+    "sets": {},
+    "validation": {
+      "type": "number",
+      "min": 0
+    }
+  },
+  {
+    "key": "eta_ch",
+    "name": "充电效率",
+    "dimension": [],
+    "type": "number",
+    "unit": "p.u.",
+    "required": true,
+    "description": "",
+    "default_value": null,
+    "sample_value": 0.95,
+    "default_policy": "sample_only",
+    "sets": {},
+    "validation": {
+      "type": "number",
+      "min": 0,
+      "max": 1
+    }
+  },
+  {
+    "key": "eta_dis",
+    "name": "放电效率",
+    "dimension": [],
+    "type": "number",
+    "unit": "p.u.",
+    "required": true,
+    "description": "",
+    "default_value": null,
+    "sample_value": 0.95,
+    "default_policy": "sample_only",
+    "sets": {},
+    "validation": {
+      "type": "number",
+      "min": 0,
+      "max": 1
+    }
+  },
+  {
+    "key": "delta_t",
+    "name": "时间步长",
+    "dimension": [],
+    "type": "number",
+    "unit": "h",
+    "required": true,
+    "description": "",
+    "default_value": null,
+    "sample_value": 1,
+    "default_policy": "sample_only",
+    "sets": {},
+    "validation": {
+      "type": "number",
+      "min": 0
+    }
+  },
+  {
+    "key": "soc_min",
+    "name": "SOC下限比例",
+    "dimension": [],
+    "type": "number",
+    "unit": "p.u.",
+    "required": true,
+    "description": "",
+    "default_value": 0,
+    "sample_value": 0,
+    "default_policy": "default_allowed",
+    "sets": {},
+    "validation": {
+      "type": "number",
+      "min": 0,
+      "max": 1
+    }
+  },
+  {
+    "key": "max_storage_power_capacity",
+    "name": "Max storage power capacity",
+    "dimension": [],
+    "type": "number",
+    "unit": "MW",
+    "required": true,
+    "description": "",
+    "default_value": null,
+    "sample_value": 80,
+    "default_policy": "sample_only",
+    "sets": {},
+    "validation": {
+      "type": "number",
+      "min": 0
+    }
+  },
+  {
+    "key": "max_storage_energy_capacity",
+    "name": "Max storage energy capacity",
+    "dimension": [],
+    "type": "number",
+    "unit": "MWh",
+    "required": true,
+    "description": "",
+    "default_value": null,
+    "sample_value": 160,
+    "default_policy": "sample_only",
+    "sets": {},
+    "validation": {
+      "type": "number",
+      "min": 0
+    }
+  }
+]

@@ -4,6 +4,7 @@ import { JsonViewer } from '../../components/JsonViewer';
 import { StatusTag } from '../../components/StatusTag';
 import { FormulaDisplay } from '../formula-editor/FormulaDisplay';
 import type { ModelAsset } from '../../types/model';
+import { demoCapabilityFor } from '../demo/demoCapabilities';
 
 type Detail = Record<string, unknown>;
 type Row = Record<string, unknown> & { __row_key?: string };
@@ -38,6 +39,21 @@ function componentSpecFrom(model: ModelAsset, detail: Detail) {
 
 function genericSpecFrom(model: ModelAsset, detail: Detail) {
   return objectValue(detail.generic_spec || model.generic_spec || nested(objectValue(model.semantic_spec), 'generic_spec'));
+}
+
+function mathConstraintsFrom(model: ModelAsset, detail: Detail, spec: Record<string, unknown>) {
+  const expansion = objectValue(detail.mathematical_expansion || model.mathematical_expansion || nested(objectValue(model.semantic_spec), 'mathematical_expansion'));
+  const sectionConstraints = arrayValue(expansion.sections).filter(section => String(section.type || 'constraint') === 'constraint');
+  return arrayValue(spec.constraints).length
+    ? arrayValue(spec.constraints)
+    : arrayValue(detail.constraints).length
+      ? arrayValue(detail.constraints)
+      : sectionConstraints;
+}
+
+function mathObjectiveFrom(model: ModelAsset, detail: Detail, spec: Record<string, unknown>) {
+  const expansion = objectValue(detail.mathematical_expansion || model.mathematical_expansion || nested(objectValue(model.semantic_spec), 'mathematical_expansion'));
+  return objectValue(spec.objective || detail.objective || model.objective_config || expansion.objective);
 }
 
 function withKeys(rows: Row[], prefix: string) {
@@ -121,8 +137,9 @@ export function ModelSemanticPanel({ model, detail = {} }: { model: ModelAsset; 
 export function ModelGenericPanel({ model, detail = {} }: { model: ModelAsset; detail?: Detail }) {
   const spec = genericSpecFrom(model, detail);
   const setRows = Object.entries(objectValue(spec.sets)).map(([name, value]) => ({ name, value: Array.isArray(value) ? value.join(', ') : value }));
-  const objective = objectValue(spec.objective);
+  const objective = mathObjectiveFrom(model, detail, spec);
   const termRows = arrayValue(objective.terms);
+  const constraintRows = mathConstraintsFrom(model, detail, spec);
   return (
     <Space orientation="vertical" size={14} style={{ width: '100%' }}>
       <Card size="small" title="generic_spec 集合">
@@ -138,11 +155,11 @@ export function ModelGenericPanel({ model, detail = {} }: { model: ModelAsset; d
         ]} empty="暂无 generic_spec.variables" />
       </Card>
       <Card size="small" title="generic_spec 约束">
-        <SmallTable rows={arrayValue(spec.constraints)} columns={[
+        <SmallTable rows={constraintRows} columns={[
           { title: '约束', dataIndex: 'name', render: (value, row) => text(value || row.constraint_id) },
           { title: '公式', render: (_value, row) => <FormulaDisplay row={row} /> },
           { title: '编译状态', dataIndex: 'compile_status' },
-        ]} empty="暂无 generic_spec.constraints" />
+        ]} empty="暂无约束定义" />
       </Card>
       <Card size="small" title={`目标函数 ${text(objective.sense || spec.sense)}`}>
         <SmallTable rows={termRows} columns={[
@@ -273,6 +290,42 @@ export function ModelHistoryPanel({ detail = {} }: { detail?: Detail }) {
           { title: '错误', dataIndex: 'error' },
         ]} empty="暂无任务日志" />
       </Card>
+    </Space>
+  );
+}
+
+export function ModelDemoPanel({ model }: { model: ModelAsset }) {
+  const capability = demoCapabilityFor(model);
+  if (!capability) {
+    return <Alert showIcon type="info" title="暂无专属演示说明" description="该模型暂未配置 P4 标杆演示说明，可查看基本信息、语义和运行参数。"/>;
+  }
+  return (
+    <Space orientation="vertical" size={14} style={{ width: '100%' }}>
+      <Card size="small" title={capability.displayName}>
+        <Descriptions bordered size="small" column={2}>
+          <Descriptions.Item label="问题类型">{capability.problemType}</Descriptions.Item>
+          <Descriptions.Item label="求解器">{capability.solver}</Descriptions.Item>
+          <Descriptions.Item label="建模方式">{capability.buildMode}</Descriptions.Item>
+          <Descriptions.Item label="函数资产类型">{capability.functionAssets}</Descriptions.Item>
+          <Descriptions.Item label="非线性处理方式" span={2}>{capability.nonlinearHandling}</Descriptions.Item>
+          <Descriptions.Item label="是否可在线调试">{capability.onlineDebug ? '是' : '否'}</Descriptions.Item>
+          <Descriptions.Item label="演示标签">{capability.tags.map(tag => <Tag key={tag}>{tag}</Tag>)}</Descriptions.Item>
+        </Descriptions>
+      </Card>
+      <Card size="small" title="演示说明">
+        <SmallTable
+          rows={capability.demoNotes.map(item => ({ ...item }))}
+          columns={[
+            { title: '项目', dataIndex: 'label' },
+            { title: '说明', dataIndex: 'value' },
+          ]}
+          empty="暂无演示说明"
+        />
+      </Card>
+      <Card size="small" title="关键能力">
+        <Space wrap>{capability.keyCapabilities.map(item => <Tag color="blue" key={item}>{item}</Tag>)}</Space>
+      </Card>
+      <Alert showIcon type={capability.problemType === 'NLP' ? 'warning' : 'info'} title="能力边界" description={capability.risk} />
     </Space>
   );
 }

@@ -80,6 +80,19 @@ function functionTypeText(type?: string) {
   return type || '-';
 }
 
+function hydroAssetLabel(id?: string, name?: string) {
+  const map: Record<string, string> = {
+    cascade_hydro_level_storage_v1: '水位库容曲线',
+    cascade_hydro_tailwater_outflow_v1: '尾水位流量曲线',
+    cascade_hydro_power_surface_v1: '水电出力二维曲面',
+  };
+  return map[String(id || '')] || name || id || '-';
+}
+
+function isHydroDemoAsset(asset?: FunctionAsset) {
+  return ['cascade_hydro_level_storage_v1', 'cascade_hydro_tailwater_outflow_v1', 'cascade_hydro_power_surface_v1'].includes(String(asset?.function_id || ''));
+}
+
 function solveStrategyText(strategy?: string) {
   const map: Record<string, string> = {
     display_only: '仅展示',
@@ -94,8 +107,8 @@ function solveStrategyText(strategy?: string) {
 function validationList(items?: Array<Record<string, unknown>>) {
   const rows = (items || []).map((item, index) => ({
     key: `${String(item.field || 'item')}-${index}`,
-    field: String(item.field || '字段'),
-    message: String(item.message || item.error || '请检查该字段配置'),
+    field: validationFieldText(item.field),
+    message: validationMessageText(item.message || item.error),
     actual: item.actual,
     expected: item.expected,
   }));
@@ -106,12 +119,45 @@ function validationList(items?: Array<Record<string, unknown>>) {
         <li key={row.key}>
           <Typography.Text strong>{row.field}</Typography.Text>
           <span>：{row.message}</span>
-          {row.actual !== undefined && <span>；当前值 {String(row.actual)}</span>}
-          {row.expected !== undefined && <span>；期望 {String(row.expected)}</span>}
+          {row.actual !== undefined && <span>；当前值 {formatValidationActual(row.actual)}</span>}
+          {row.expected !== undefined && <span>；期望 {formatValidationActual(row.expected)}</span>}
         </li>
       ))}
     </ul>
   );
+}
+
+function validationFieldText(value: unknown) {
+  const map: Record<string, string> = {
+    points: '曲线点',
+    points_2d: '二维曲面点',
+    triangles: '三角剖分',
+    solve_strategy: '求解策略',
+    monotonicity: '单调性',
+  };
+  const text = String(value || '字段');
+  return map[text] || text;
+}
+
+function validationMessageText(value: unknown) {
+  const map: Record<string, string> = {
+    'regular grid has missing points': '规则网格点不完整。当前二维曲面仍可按已提供三角形参与求解；如果想按完整规则网格自动三角剖分，请补齐缺失的 x/y 组合。',
+    'non-grid scattered 2D points require user-provided triangles for solve participation': '非规则散点需要提供三角形索引，才能参与求解。',
+    'piecewise_2d requires at least three [x, y, z] points': '二维曲面至少需要 3 个 [x, y, z] 点。',
+    'duplicate (x,y) point is not allowed': '不允许重复的 (x, y) 点。',
+    'convex_hull_lp_approx is not an exact representation for general 2D surfaces': '凸包 LP 近似不能精确表示一般二维曲面。',
+    '2D PWL point count exceeds the default recommended limit of 200': '二维 PWL 点数超过默认建议上限 200。',
+    '2D PWL triangle count exceeds the default recommended limit of 400': '二维 PWL 三角形数量超过默认建议上限 400。',
+  };
+  const text = String(value || '请检查该字段配置');
+  return map[text] || text;
+}
+
+function formatValidationActual(value: unknown) {
+  if (Array.isArray(value)) {
+    return value.map(item => Array.isArray(item) ? `(${item.join(', ')})` : String(item)).join('、');
+  }
+  return String(value);
 }
 
 function schemaName(asset: FunctionAsset, kind: 'input' | 'output', index = 0) {
@@ -169,6 +215,23 @@ function is2d(asset?: FunctionAsset) {
   return asset?.function_type === 'piecewise_2d';
 }
 
+function boolText(value: unknown) {
+  if (value === true || value === 'true') return '是';
+  if (value === false || value === 'false') return '否';
+  return String(value ?? '-');
+}
+
+function triangulationStatusText(value: unknown) {
+  const map: Record<string, string> = {
+    provided: '已提供三角剖分',
+    auto_grid_triangulated: '规则网格自动三角剖分',
+    missing: '缺少三角剖分',
+    failed: '三角剖分失败',
+  };
+  const text = String(value || '-');
+  return map[text] || text;
+}
+
 function generatedId(type: FunctionAsset['function_type']) {
   const prefix = type === 'piecewise_2d' ? 'surface' : 'curve';
   return `${prefix}_${Date.now()}`;
@@ -191,6 +254,7 @@ export function FunctionAssetsPage() {
   const [importForm] = Form.useForm();
   const list = useQuery({ queryKey: ['function-assets'], queryFn: getFunctionAssets });
   const rows = list.data || [];
+  const sortedRows = useMemo(() => [...rows].sort((a, b) => Number(isHydroDemoAsset(b)) - Number(isHydroDemoAsset(a))), [rows]);
   const importPreview = useMemo(() => parseCsvRows(importCsvText), [importCsvText]);
 
   const usedCount = rows.filter(item => (item.referenced_by || []).length > 0).length;
@@ -481,10 +545,10 @@ export function FunctionAssetsPage() {
         <Table<FunctionAsset>
           rowKey="function_id"
           loading={list.isLoading}
-          dataSource={rows}
+          dataSource={sortedRows}
           pagination={false}
           columns={[
-            { title: '名称', render: (_, row) => <Space orientation="vertical" size={0}><Typography.Text strong>{row.name}</Typography.Text><Typography.Text type="secondary">{row.function_id}</Typography.Text></Space> },
+            { title: '名称', render: (_, row) => <Space orientation="vertical" size={0}><Typography.Text strong>{hydroAssetLabel(row.function_id, row.name)}</Typography.Text><Typography.Text type="secondary">{row.function_id}</Typography.Text>{isHydroDemoAsset(row) && <Tag color="geekblue">水电调度演示资产</Tag>}</Space> },
             { title: '类型', render: (_, row) => functionTypeText(row.function_type) },
             { title: '校验状态', render: (_, row) => <Tag color={validationColor(row.validation_status)}>{validationText(row.validation_status)}</Tag> },
             { title: '求解策略', render: (_, row) => solveStrategyText(row.solve_strategy) },
@@ -684,6 +748,7 @@ export function FunctionAssetsPage() {
           <Space orientation="vertical" size={16} style={{ width: '100%' }}>
             <Descriptions bordered size="small" column={2}>
               <Descriptions.Item label="函数 ID">{selected.function_id}</Descriptions.Item>
+              <Descriptions.Item label="业务展示名">{hydroAssetLabel(selected.function_id, selected.name)}</Descriptions.Item>
               <Descriptions.Item label="类型">{functionTypeText(selected.function_type)}</Descriptions.Item>
               <Descriptions.Item label="校验状态"><Tag color={validationColor(selected.validation_status)}>{validationText(selected.validation_status)}</Tag></Descriptions.Item>
               <Descriptions.Item label="求解策略">{solveStrategyText(selected.solve_strategy)}</Descriptions.Item>
@@ -692,18 +757,27 @@ export function FunctionAssetsPage() {
             </Descriptions>
 
             {selected.function_type === 'piecewise_2d' ? (
-              <Card size="small" title="二维曲面诊断">
+              <Card size="small" title="二维曲面诊断" className="function-surface-diagnostics">
                 <Descriptions size="small" column={3} items={[
+                  { key: 'x_dim', label: 'x 维度', children: `${schemaName(selected, 'input', 0)} / outflow` },
+                  { key: 'y_dim', label: 'y 维度', children: `${schemaName(selected, 'input', 1)} / head` },
+                  { key: 'z_dim', label: 'z 输出', children: `${schemaName(selected, 'output')} / power` },
                   { key: 'points', label: '点数量', children: String(selected.domain?.point_count ?? selected.points_2d?.length ?? '-') },
                   { key: 'triangles', label: '三角形数量', children: String(surfaceDiagnostics.triangle_count ?? selected.triangles?.length ?? '-') },
                   { key: 'x', label: 'x 定义域', children: `${selected.domain?.x_min ?? '-'} .. ${selected.domain?.x_max ?? '-'}` },
                   { key: 'y', label: 'y 定义域', children: `${selected.domain?.y_min ?? '-'} .. ${selected.domain?.y_max ?? '-'}` },
                   { key: 'z', label: 'z 值域', children: `${selected.domain?.z_min ?? '-'} .. ${selected.domain?.z_max ?? '-'}` },
-                  { key: 'grid', label: '是否规则网格', children: String(surfaceDiagnostics.is_regular_grid ?? '-') },
-                  { key: 'status', label: '三角化状态', children: String(selected.triangulation_status || surfaceDiagnostics.triangulation_status || '-') },
+                  { key: 'grid', label: '是否规则网格', children: boolText(surfaceDiagnostics.is_regular_grid ?? '-') },
+                  { key: 'triangulable', label: '是否可三角剖分', children: boolText(surfaceDiagnostics.triangulable ?? selected.triangulation_status !== 'failed') },
+                  { key: 'duplicates', label: '是否存在重复点', children: boolText(Number(surfaceDiagnostics.duplicate_point_count ?? 0) > 0) },
+                  { key: 'status', label: '三角化状态', children: triangulationStatusText(selected.triangulation_status || surfaceDiagnostics.triangulation_status || '-') },
                   { key: 'degenerate', label: '退化三角形数量', children: String(surfaceDiagnostics.degenerate_triangle_count ?? 0) },
                   { key: 'recommended', label: '推荐求解策略', children: solveStrategyText(String(surfaceDiagnostics.recommended_solve_strategy || selected.solve_strategy || '')) },
                 ]} />
+                <div className="function-surface-impact">
+                  <Typography.Text type="secondary">预计 MILP 二进制变量影响</Typography.Text>
+                  <span>每个曲面命中点约增加 {Math.max(1, Number(surfaceDiagnostics.triangle_count ?? selected.triangles?.length ?? 1))} 个三角选择变量，规模会随时段数和电站数放大。</span>
+                </div>
               </Card>
             ) : (
               <Card size="small" title="曲线诊断">
@@ -722,6 +796,12 @@ export function FunctionAssetsPage() {
 
             {selected.validation_status !== 'invalid' && selected.function_type === 'piecewise_2d' && (
               <Card size="small" title="二维曲面预览">
+                <Alert
+                  showIcon
+                  type="info"
+                  title="输入 x/y 后，平台返回插值 z、命中的三角形 triangle 和插值权重 lambda。"
+                  description="triangle 表示当前点落在哪个二维曲面三角面片；lambda 表示当前点在三角形三个顶点上的插值权重。后端未返回时显示当前未返回该项。"
+                />
                 <ReactECharts option={surfaceChartOption(selected)} style={{ height: 320 }} />
                 <Space className="section-gap" wrap>
                   <InputNumber value={previewInput.x} onChange={value => setPreviewInput(current => ({ ...current, x: Number(value) }))} addonBefore="x" />
@@ -731,9 +811,9 @@ export function FunctionAssetsPage() {
                 {preview && preview.status && (
                   <Descriptions className="section-gap" size="small" column={4} items={[
                     { key: 'status', label: '状态', children: preview.status },
-                    { key: 'z', label: 'z', children: preview.z ?? '-' },
-                    { key: 'triangle', label: 'triangle', children: JSON.stringify(preview.triangle || []) },
-                    { key: 'lambda', label: 'lambda', children: JSON.stringify(preview.lambda || []) },
+                    { key: 'z', label: '插值 z', children: preview.z ?? '当前未返回该项' },
+                    { key: 'triangle', label: 'triangle', children: preview.triangle ? JSON.stringify(preview.triangle) : '当前未返回该项' },
+                    { key: 'lambda', label: 'lambda', children: preview.lambda ? JSON.stringify(preview.lambda) : '当前未返回该项' },
                   ]} />
                 )}
               </Card>

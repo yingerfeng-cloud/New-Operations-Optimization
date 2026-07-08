@@ -66,7 +66,11 @@ function problemTypeErrors(draft: ModelDraft) {
   const variableTypes = draft.semantic.variables.map(variable => variable.variableType || (variable.domain === 'Binary' ? 'binary' : variable.domain === 'Integers' ? 'integer' : 'continuous'));
   const hasInteger = variableTypes.some(type => type === 'binary' || type === 'integer');
   const requested = String(draft.basic_info.solver || 'HiGHS');
-  if (requested !== 'HiGHS') return [`当前求解器 ${requested} 尚未在前端兼容性矩阵中声明`];
+  if (!['HiGHS', 'Ipopt'].includes(requested)) return [`当前求解器 ${requested} 尚未在前端兼容性矩阵中声明`];
+  if (requested === 'Ipopt') {
+    if (hasInteger) return ['当前模型被识别为 MINLP，平台当前未开放生产级 MINLP 求解。请改用 McCormick、1D/2D PWL 等线性化策略。'];
+    return functionMappingErrors(draft);
+  }
   if (hasInteger && draft.formulas.some(formula => /piecewise|abs\(/i.test(formula.dsl_formula))) return ['整数变量与 piecewise/abs 组合需要后端特殊线性化确认'];
   const nonlinear = analyzeDraftNonlinear(draft);
   return [...functionMappingErrors(draft), ...nonlinear.blocking_items.map(item => item.message)];
@@ -91,7 +95,7 @@ export function validateModelDraft(d: ModelDraft): DraftValidation {
   const parameterErrors = parameterBindingErrors(d);
   const runtimeErrors = runtimeParameterErrors(d);
   const problemErrors = problemTypeErrors(d);
-  const solverErrors = d.basic_info.solver === 'HiGHS' ? [] : [`求解器 ${d.basic_info.solver} 暂未声明兼容`];
+  const solverErrors = ['HiGHS', 'Ipopt'].includes(d.basic_info.solver) ? [] : [`求解器 ${d.basic_info.solver} 暂未声明兼容`];
 
   const sections = {
     basic_info: { valid: basicInfoErrors.length === 0, errors: basicInfoErrors },

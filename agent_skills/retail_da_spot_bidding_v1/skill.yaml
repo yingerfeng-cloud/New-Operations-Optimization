@@ -1,0 +1,39 @@
+name: retail_da_spot_bidding_v1
+display_name: 售电公司日前现货申报优化模型
+canonical_api_skill_name: run_retail_da_spot_bidding_v1
+enabled: true
+confirmation_required: true
+execution_policy:
+  mode: advisory_only
+required_parameters:
+  - horizon
+  - time
+  - time_volume
+  - time_labels
+  - delta_t
+  - load_forecast
+  - spot_price_forecast
+  - contract_energy
+  - contract_price
+  - bid_min
+  - bid_max
+  - deviation_penalty
+  - storage_capacity
+  - storage_soc_init
+  - storage_soc_min
+  - storage_soc_max
+  - terminal_soc_target
+  - terminal_soc_penalty
+  - charge_max
+  - discharge_max
+  - charge_efficiency
+  - discharge_efficiency
+  - storage_cycle_cost
+  - flex_up
+  - flex_down
+  - cut_limit
+  - shift_cost
+  - cut_cost
+optional_parameters:
+trigger_intents:
+  - retail_da_spot_bidding_v1

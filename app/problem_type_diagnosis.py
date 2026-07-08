@@ -293,15 +293,16 @@ def _apply_nonlinear_diagnosis(diagnosis: dict[str, Any], nonlinear_report: dict
         result["recommended_solver"] = RECOMMENDED_SOLVERS.get(inferred, "Ipopt")
         result["expression_class"] = "nonlinear"
         requested = normalize_problem_type(result.get("requested_problem_type") or result.get("effective_problem_type") or inferred)
-        result["publish_valid"] = False
+        result["publish_valid"] = inferred == "NLP" and requested == "NLP" and solver_supports_problem_type(result.get("solver") or "Ipopt", requested)
         result.setdefault("warnings", [])
         result["warnings"] = list(result["warnings"]) + [
             "存在未转换的非线性表达式，必须先选择 McCormick、PWL 或 NLP/MINLP 预留策略，不能静默交给 HiGHS。"
         ]
-        result["solver_supported"] = solver_supports_problem_type(result.get("solver"), requested)
+        result["solver_supported"] = solver_supports_problem_type(result.get("solver") or ("Ipopt" if inferred == "NLP" else None), requested)
         if inferred == "NLP":
             result["local_optimum_warning"] = True
             result["nlp_pilot"] = True
+            result["warnings"] = list(result["warnings"]) + ["NLP 使用 Ipopt 求解时只承诺求解器返回状态或局部最优，不承诺全局最优。"]
         if inferred == "MINLP_RESERVED":
             result["minlp_reserved"] = True
             result["publish_valid"] = False

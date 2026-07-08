@@ -1,0 +1,29 @@
+{
+  "positive_examples": [
+    {
+      "user": "做非线性水电出力 NLP 试点",
+      "intent": "optimization_request",
+      "expected_skill": "nonlinear_hydro_power_demo"
+    }
+  ],
+  "help_examples": [
+    {
+      "intent": "parameter_example",
+      "text": "show parameter example"
+    }
+  ],
+  "negative_examples": [
+    {
+      "user": "你好",
+      "intent": "casual_chat"
+    }
+  ],
+  "sample_parameters": {
+    "k": 0.9,
+    "flow_min": 10,
+    "flow_max": 100,
+    "head_min": 20,
+    "head_max": 80,
+    "power_max": 5000
+  }
+}

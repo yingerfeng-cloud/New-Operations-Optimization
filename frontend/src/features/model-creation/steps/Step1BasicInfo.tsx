@@ -2,12 +2,14 @@ import { Alert, Card, Col, Collapse, Descriptions, Form, Input, Radio, Row, Sele
 import type { ModelTemplate } from '../../../types/template';
 import { BLANK_MODEL_ID, getScenarioById, getScenarioModelById, scenarioCatalog } from '../data/scenarioCatalog';
 import type { ModelDraft } from '../stores/modelCreationStore';
+import type { ScenarioCatalogItem } from '../../../types/scenario';
 
 export function Step1BasicInfo({
   draft,
   templates,
   selectedScenarioId,
   selectedModelId,
+  scenarios,
   onChange,
   onCatalogSelection,
   onTemplate,
@@ -16,13 +18,15 @@ export function Step1BasicInfo({
   templates: ModelTemplate[];
   selectedScenarioId: string;
   selectedModelId: string;
+  scenarios?: ScenarioCatalogItem[];
   onChange: (d: ModelDraft) => void;
   onCatalogSelection: (scenarioId: string, modelId?: string) => void;
   onTemplate: (code: string) => void;
 }) {
   const b = draft.basic_info;
-  const scenario = getScenarioById(selectedScenarioId) || scenarioCatalog[0];
-  const selectedModel = selectedModelId === BLANK_MODEL_ID ? undefined : getScenarioModelById(scenario.id, selectedModelId);
+  const scenarioOptions = scenarios?.length ? scenarios : scenarioCatalog;
+  const scenario = scenarioOptions.find(item => item.id === selectedScenarioId) || getScenarioById(selectedScenarioId) || scenarioOptions[0] || scenarioCatalog[0];
+  const selectedModel = selectedModelId === BLANK_MODEL_ID ? undefined : scenario.models.find(model => model.id === selectedModelId) || getScenarioModelById(scenario.id, selectedModelId);
   const modelOptions = [
     ...scenario.models.map(model => ({ value: model.id, label: model.name })),
     { value: BLANK_MODEL_ID, label: '+ 在当前场景下创建空白模型' },
@@ -58,7 +62,7 @@ export function Step1BasicInfo({
           <Col xs={24} lg={8}>
             <Card title="模型定位" className="model-step-block">
               <Form.Item label="业务场景" required>
-                <Select data-testid="scenario-select" aria-label="当前场景" value={scenario.id} options={scenarioCatalog.map(item => ({ value: item.id, label: item.name }))} onChange={value => onCatalogSelection(value)} />
+                <Select data-testid="scenario-select" aria-label="当前场景" value={scenario.id} options={scenarioOptions.map(item => ({ value: item.id, label: item.name }))} onChange={value => onCatalogSelection(value)} />
               </Form.Item>
               <Form.Item label="建模骨架">
                 <Select
@@ -79,7 +83,7 @@ export function Step1BasicInfo({
                   data-testid="builder-mode-select"
                   aria-label="建模模式"
                   value={b.builder_mode}
-                  options={[{ label: '通用线性 Builder', value: 'generic_linear' }, { label: '组件化 Builder', value: 'component_based' }]}
+                  options={[{ label: '通用线性 Builder', value: 'generic_linear' }, { label: '组件化 Builder', value: 'component_based' }, { label: '模板 Builder', value: 'template_based' }]}
                   onChange={value => set({ builder_mode: value })}
                 />
               </Form.Item>

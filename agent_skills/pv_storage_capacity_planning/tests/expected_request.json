@@ -1,0 +1,63 @@
+{
+  "ok": true,
+  "api_skill_name": "run_pv_storage_capacity_planning",
+  "request": {
+    "parameters": {
+      "horizon": 4,
+      "time": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "time_volume": [
+        0,
+        1,
+        2,
+        3,
+        4
+      ],
+      "pv_forecast": [
+        20,
+        100,
+        80,
+        10
+      ],
+      "grid_limit": [
+        70,
+        70,
+        70,
+        70
+      ],
+      "schedule": [
+        40,
+        80,
+        70,
+        30
+      ],
+      "price": [
+        300,
+        300,
+        450,
+        500
+      ],
+      "initial_soc": 0,
+      "terminal_time": 4,
+      "terminal_soc_target": 0,
+      "capex_power": 1000,
+      "capex_energy": 500,
+      "curtailment_penalty": 100,
+      "storage_cycle_cost": 1,
+      "eta_ch": 0.95,
+      "eta_dis": 0.95,
+      "delta_t": 1,
+      "soc_min": 0,
+      "max_storage_power_capacity": 80,
+      "max_storage_energy_capacity": 160
+    },
+    "options": {
+      "mode": "sync",
+      "explain": true
+    }
+  }
+}

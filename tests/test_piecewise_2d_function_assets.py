@@ -83,6 +83,30 @@ def test_piecewise_2d_asset_auto_triangulates_and_previews_plane() -> None:
     assert len(body["lambda"]) == 3
 
 
+def test_piecewise_2d_scattered_surface_with_triangles_is_valid_without_grid_warning() -> None:
+    function_id = f"scattered_surface_{uuid.uuid4().hex[:8]}"
+    response = client.post(
+        "/api/function-assets",
+        json={
+            "function_id": function_id,
+            "name": "Scattered surface",
+            "function_type": "piecewise_2d",
+            "input_schema": [{"code": "flow"}, {"code": "head"}],
+            "output_schema": {"code": "power"},
+            "points_2d": [[40, 35, 11.9], [160, 35, 47.6], [160, 65, 88.4]],
+            "triangles": [[0, 1, 2]],
+            "solve_strategy": "triangulated_milp_exact",
+            "status": "draft",
+        },
+    )
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["validation_status"] == "valid"
+    assert body["triangulation_status"] == "provided"
+    assert body["validation_warnings"] == []
+    assert body["surface_diagnostics"]["can_triangulate"] is True
+
+
 def test_piecewise_2d_rejects_duplicate_xy_and_degenerate_triangle() -> None:
     duplicate = client.post(
         "/api/function-assets/bad_2d/validate",

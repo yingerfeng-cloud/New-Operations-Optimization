@@ -1,0 +1,72 @@
+{
+  "ok": true,
+  "api_skill_name": "run_pv_storage_dispatch_v2",
+  "request": {
+    "parameters": {
+      "horizon": 4,
+      "time": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "time_volume": [
+        0,
+        1,
+        2,
+        3,
+        4
+      ],
+      "pv_forecast": [
+        20,
+        100,
+        80,
+        10
+      ],
+      "grid_limit": [
+        90,
+        90,
+        90,
+        90
+      ],
+      "schedule": [
+        40,
+        80,
+        70,
+        30
+      ],
+      "price": [
+        300,
+        300,
+        450,
+        500
+      ],
+      "storage_power_capacity": 30,
+      "storage_energy_capacity": 60,
+      "initial_soc": 20,
+      "terminal_time": 4,
+      "terminal_soc_target": 20,
+      "capex_power": 1000,
+      "capex_energy": 500,
+      "curtailment_penalty": 100,
+      "storage_cycle_cost": 1,
+      "eta_ch": 0.95,
+      "eta_dis": 0.95,
+      "delta_t": 1,
+      "soc_min": 0.2,
+      "deviation_limit": [
+        2,
+        2,
+        2,
+        2
+      ],
+      "deviation_penalty_price": 500,
+      "soc_max": 0.9,
+      "degradation_cost_yuan_per_mwh": 2
+    },
+    "options": {
+      "mode": "sync",
+      "explain": true
+    }
+  }
+}

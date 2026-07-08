@@ -1,0 +1,8 @@
+{
+  "k": 0.9,
+  "flow_min": 10,
+  "flow_max": 100,
+  "head_min": 20,
+  "head_max": 80,
+  "power_max": 5000
+}

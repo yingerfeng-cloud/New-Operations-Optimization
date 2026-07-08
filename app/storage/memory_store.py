@@ -22,13 +22,15 @@ class MemoryStore:
         self.skills: dict[str, dict[str, Any]] = {}
         self.conversations: dict[str, dict[str, Any]] = {}
         self.llm_config: dict[str, Any] = {}
+        self.system_config: dict[str, Any] = {}
         self.template_status: dict[str, str] = {}
         self.rolling_jobs: dict[str, Any] = {}
         self.custom_components: dict[str, dict[str, Any]] = {}
         self.function_assets: dict[str, dict[str, Any]] = {}
         self.model_versions: dict[str, list[dict[str, Any]]] = {}
         root = Path(__file__).resolve().parents[2]
-        self._persistence_path = Path(os.getenv("RUNTIME_STORE_PATH", str(root / "data" / "runtime_store.json")))
+        runtime_store = os.getenv("COPT_RUNTIME_STORE") or os.getenv("RUNTIME_STORE_PATH") or str(root / "data" / "runtime_store.json")
+        self._persistence_path = Path(runtime_store)
         self._load_runtime()
 
     @property
@@ -36,11 +38,14 @@ class MemoryStore:
         return self._persistence_path
 
     def save_runtime(self) -> None:
+        llm_config = dict(self.llm_config)
+        llm_config.pop("api_key", None)
         payload = {
             "invocations": self.invocations,
             "skills": self.skills,
             "conversations": self.conversations,
-            "llm_config": self.llm_config,
+            "llm_config": llm_config,
+            "system_config": self.system_config,
             "custom_components": self.custom_components,
             "function_assets": self.function_assets,
         }
@@ -59,6 +64,7 @@ class MemoryStore:
             self.skills.update(payload.get("skills") or {})
             self.conversations.update(payload.get("conversations") or {})
             self.llm_config.update(payload.get("llm_config") or {})
+            self.system_config.update(payload.get("system_config") or {})
             self.custom_components.update(payload.get("custom_components") or {})
             self.function_assets.update(payload.get("function_assets") or {})
         except Exception:

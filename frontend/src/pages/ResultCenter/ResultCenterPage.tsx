@@ -14,6 +14,7 @@ import {
   ResultExplanationPanel,
   ResultKpiStrip,
   ResultMetricsPanel,
+  ResultNlpPanel,
   ResultVariablesPanel,
 } from '../../features/result-center/ResultPanels';
 import type { SolveResult } from '../../types/result';
@@ -30,7 +31,7 @@ export function ResultCenterPage() {
 
   return (
     <>
-      <PageHeader title="结果报告库" description="查看求解结果、关键指标、变量曲线、业务解释和 JSON 结果。" />
+      <PageHeader title="结果报告库" description="查看求解结果、关键指标、变量曲线、业务解释和 JSON 结果。导出报告（预留）位于结果详情高级操作，不作为主流程按钮开放。" />
       <MetricGrid>
         <MetricCard title="结果总数" value={rows.length} description="任务结果归档" tone="blue" />
         <MetricCard title="成功结果" value={success} description="可生成报告" tone="green" />
@@ -60,7 +61,7 @@ export function ResultCenterPage() {
         open={!!id}
         onClose={() => setId(undefined)}
         title={`结果报告 ${id || ''}`}
-        footer={<Space style={{ width: '100%', justifyContent: 'flex-end' }}><Button onClick={() => setId(undefined)}>关闭</Button><Button disabled>导出报告</Button></Space>}
+        footer={<Space style={{ width: '100%', justifyContent: 'flex-end' }}><span className="muted">高级操作：导出报告预留，未作为主流程能力开放。</span><Button onClick={() => setId(undefined)}>关闭</Button></Space>}
       >
         <ResultKpiStrip result={detail.data} />
         <Tabs className="section-gap" items={[
@@ -68,6 +69,7 @@ export function ResultCenterPage() {
           { key: 'metrics', label: '关键指标', children: <div className="panel"><ResultMetricsPanel result={detail.data} /></div> },
           { key: 'chart', label: '变量曲线', children: <div className="panel"><ResultChartPanel result={detail.data} /></div> },
           { key: 'hydro', label: '水电结果解释', children: <div className="panel"><ResultCascadeHydroPanel result={detail.data} /></div> },
+          { key: 'nlp', label: 'NLP 结果解释', children: <div className="panel"><ResultNlpPanel result={detail.data} /></div> },
           { key: 'variables', label: '变量表', children: <div className="panel"><ResultVariablesPanel result={detail.data} /></div> },
           { key: 'constraints', label: '约束检查', children: <div className="panel"><ResultConstraintsPanel result={detail.data} /></div> },
           { key: 'json', label: 'JSON 原始结果', children: <div className="panel"><JsonViewer value={detail.data} /></div> },

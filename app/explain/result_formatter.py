@@ -1,5 +1,6 @@
 ﻿from __future__ import annotations
 
+import ast
 from typing import Any
 
 
@@ -13,6 +14,9 @@ def _metric_series(raw: Any, times: list[Any], default: float = 0.0) -> dict[Any
 
 class SolveResultFormatter:
     def format(self, model_code: str, solver_result: Any, context: dict[str, Any]) -> dict[str, Any]:
+        configured = self._format_configured_result(model_code, solver_result, context)
+        if configured is not None:
+            return configured
         if model_code == "unit_commitment_day_ahead":
             return self._format_unit_commitment(solver_result, context)
         if model_code == "cascade_hydro_dispatch_v1":
@@ -29,7 +33,310 @@ class SolveResultFormatter:
             return self._generic(model_code, solver_result, "风光储协同优化已完成，系统在满足并网和储能约束下提升新能源消纳。", context)
         if model_code == "chp_dispatch":
             return self._generic(model_code, solver_result, "电热协同优化已完成，系统在电热可行域内同时满足电负荷和热负荷。", context)
-        return self._generic(model_code, solver_result, "模型已通过统一 Pyomo 建模引擎和 HiGHS 求解链路完成求解。", context)
+        solver_name = getattr(solver_result, "solver_name", None) or (context or {}).get("solver") or "路由求解器"
+        return self._generic(model_code, solver_result, f"模型已通过统一 Pyomo 建模引擎和 {solver_name} 求解链路完成求解。", context)
+
+    def _format_configured_result(self, model_code: str, solver_result: Any, context: dict[str, Any]) -> dict[str, Any] | None:
+        model_spec = (context or {}).get("model_spec") or {}
+        output_contract = model_spec.get("output_contract") or {}
+        metrics_config = model_spec.get("metrics_config") or {}
+        explanation_config = model_spec.get("explanation_config") or {}
+        constraint_check_config = model_spec.get("constraint_check_config") or {}
+        if not output_contract and not metrics_config and not explanation_config:
+            return None
+
+        sets = (context or {}).get("sets") or {}
+        params = (context or {}).get("runtime_parameters") or {}
+        values = getattr(solver_result, "variable_values", {}) or {}
+        metrics: dict[str, Any] = {
+            "objective_value": round(float(getattr(solver_result, "objective_value", 0.0) or 0.0), 6),
+            "gap": "0.00%",
+        }
+        lists: dict[str, list[dict[str, Any]]] = {}
+        series_pack = self._configured_series(output_contract, sets, params, values, metrics)
+
+        for item in metrics_config.get("metrics") or []:
+            key = str(item.get("key") or "")
+            expression = str(item.get("expression") or "").strip()
+            if not key:
+                continue
+            value = metrics["objective_value"] if expression == "objective_value" else self._eval_output_expression(expression, sets, params, values, metrics, {})
+            metrics[key] = self._round_value(value, int(item.get("precision", 6)))
+
+        for item in metrics_config.get("lists") or []:
+            key = str(item.get("key") or "")
+            foreach = str(item.get("foreach") or "time")
+            if not key:
+                continue
+            rows = []
+            for index, label in enumerate(list(sets.get(foreach) or params.get(foreach) or [])):
+                local = {foreach: label, "t": label, "index": index}
+                conditions = item.get("where_all") or ([item.get("where")] if item.get("where") else [])
+                if conditions and not all(bool(self._eval_output_expression(str(expr), sets, params, values, metrics, local)) for expr in conditions):
+                    continue
+                row = {"time": label} if foreach == "time" else {foreach: label}
+                for field, expression in (item.get("fields") or {}).items():
+                    row[str(field)] = self._round_value(self._eval_output_expression(str(expression), sets, params, values, metrics, local), 6)
+                rows.append(row)
+            lists[key] = rows
+
+        metrics.setdefault("risk", "medium" if any(lists.values()) else "low")
+        constraint_check = self._configured_constraint_check(constraint_check_config, sets, params, values, metrics)
+        business_output = self._configured_business_output(output_contract, metrics_config, explanation_config, metrics, lists, series_pack, constraint_check)
+        chart = {"labels": [str(row.get("time_label", row.get("time"))) for row in series_pack["rows"] if "time" in row or "time_label" in row]}
+        for field in output_contract.get("chart_fields") or []:
+            chart[str(field)] = [row.get(str(field), 0.0) for row in series_pack["rows"]]
+        return {
+            "series": series_pack["rows"],
+            "chart": chart,
+            "metrics": metrics,
+            **business_output,
+            "business_output": business_output,
+            "business_explanation": {
+                "summary": explanation_config.get("summary", "模型已通过通用公式建模能力完成求解，结果按输出契约生成。"),
+                "strategy_explanation": business_output.get("strategy_explanation", []),
+                "advisory": explanation_config.get("advisory", "平台只生成策略建议，不替代外部业务系统、不自动执行。"),
+                "model_code": model_code,
+            },
+        }
+
+    def _configured_business_output(
+        self,
+        output_contract: dict[str, Any],
+        metrics_config: dict[str, Any],
+        explanation_config: dict[str, Any],
+        metrics: dict[str, Any],
+        lists: dict[str, list[dict[str, Any]]],
+        series_pack: dict[str, Any],
+        constraint_check: dict[str, Any],
+    ) -> dict[str, Any]:
+        business_output: dict[str, Any] = {}
+        business_output.update(series_pack["curves"])
+        business_output.update(lists)
+        for key in metrics_config.get("business_metrics") or []:
+            if str(key) in metrics:
+                business_output[str(key)] = metrics[str(key)]
+        for item in metrics_config.get("objects") or []:
+            key = str(item.get("key") or "")
+            source = str(item.get("source") or "")
+            if not key:
+                continue
+            if source == "series":
+                business_output[key] = series_pack["rows"]
+            elif source in {"metrics", "cost_breakdown"}:
+                business_output[key] = {str(field): metrics.get(str(field)) for field in item.get("fields") or []}
+            elif source == "list":
+                business_output[key] = lists.get(str(item.get("list_key") or ""), [])
+            elif source == "risk_summary":
+                business_output[key] = {
+                    **{f"{list_key}_count": len(rows) for list_key, rows in lists.items()},
+                    **{str(field): metrics.get(str(field)) for field in item.get("metric_fields") or []},
+                    **(item.get("static") or {}),
+                }
+            else:
+                business_output[key] = item.get("value", {})
+        if constraint_check:
+            business_output["constraint_check"] = constraint_check
+        business_output.update(output_contract.get("static_business_output") or {})
+        strategy_explanation = self._configured_explanations(explanation_config, metrics, lists)
+        if strategy_explanation:
+            business_output["strategy_explanation"] = strategy_explanation
+        if explanation_config.get("approval_items"):
+            business_output["approval_items"] = list(explanation_config.get("approval_items") or [])
+        business_output["execution_policy"] = explanation_config.get("execution_policy", output_contract.get("execution_policy", "advisory_only"))
+        business_output["requires_human_review"] = bool(explanation_config.get("requires_human_review", output_contract.get("requires_human_review", True)))
+        return business_output
+
+    def _configured_series(self, output_contract: dict[str, Any], sets: dict[str, Any], params: dict[str, Any], values: dict[str, Any], metrics: dict[str, Any]) -> dict[str, Any]:
+        index_set = str(output_contract.get("series_index_set") or "time")
+        labels = list(sets.get(index_set) or params.get(index_set) or [])
+        rows = []
+        curves = {str(item.get("key")): [] for item in output_contract.get("curves") or [] if item.get("key")}
+        for index, label in enumerate(labels):
+            local = {index_set: label, "t": label, "index": index}
+            row = {"time": label} if index_set == "time" else {index_set: label}
+            for field in output_contract.get("series_fields") or []:
+                key = str(field.get("key") or "")
+                expression = str(field.get("expression") or key)
+                if key:
+                    row[key] = self._round_value(self._eval_output_expression(expression, sets, params, values, metrics, local), 6)
+            rows.append(row)
+            for curve in output_contract.get("curves") or []:
+                curve_key = str(curve.get("key") or "")
+                if not curve_key:
+                    continue
+                curve_row = {"time": label} if index_set == "time" else {index_set: label}
+                if "time_label" in row:
+                    curve_row["time_label"] = row["time_label"]
+                for field, expression in (curve.get("fields") or {}).items():
+                    curve_row[str(field)] = self._round_value(self._eval_output_expression(str(expression), sets, params, values, metrics, local), 6)
+                curves[curve_key].append(curve_row)
+        return {"rows": rows, "curves": curves}
+
+    def _configured_constraint_check(self, config: dict[str, Any], sets: dict[str, Any], params: dict[str, Any], values: dict[str, Any], metrics: dict[str, Any]) -> dict[str, Any]:
+        checks = {}
+        tolerance = float(config.get("tolerance", 1e-6) or 1e-6)
+        for key in config.get("include_metrics") or []:
+            if str(key) in metrics:
+                checks[str(key)] = metrics[str(key)]
+        for item in config.get("checks") or []:
+            key = str(item.get("key") or "")
+            expression = str(item.get("expression") or "").strip()
+            if not key or not expression:
+                continue
+            checks[key] = bool(self._eval_output_expression(expression, sets, params, values, {**metrics, "tolerance": tolerance}, {}))
+        return checks
+
+    def _configured_explanations(self, config: dict[str, Any], metrics: dict[str, Any], lists: dict[str, Any]) -> list[str]:
+        data = {**metrics}
+        for key, rows in lists.items():
+            data[f"{key}_count"] = len(rows)
+        result = []
+        for template in config.get("strategy_templates") or []:
+            try:
+                result.append(str(template).format(**data))
+            except KeyError:
+                result.append(str(template))
+        return result
+
+    def _eval_output_expression(self, expression: str, sets: dict[str, Any], params: dict[str, Any], values: dict[str, Any], metrics: dict[str, Any], local: dict[str, Any]) -> Any:
+        return self._eval_output_node(ast.parse(expression, mode="eval").body, sets, params, values, metrics, local)
+
+    def _eval_output_node(self, node: ast.AST, sets: dict[str, Any], params: dict[str, Any], values: dict[str, Any], metrics: dict[str, Any], local: dict[str, Any]) -> Any:
+        if isinstance(node, ast.Constant):
+            return node.value
+        if isinstance(node, ast.Name):
+            if node.id in local:
+                return local[node.id]
+            if node.id in metrics:
+                return metrics[node.id]
+            if node.id in values:
+                return self._scalar_variable_value(values, node.id)
+            if node.id in params:
+                return params[node.id]
+            if node.id in sets:
+                return sets[node.id]
+            return 0.0
+        if isinstance(node, ast.UnaryOp):
+            value = self._eval_output_node(node.operand, sets, params, values, metrics, local)
+            return -value if isinstance(node.op, ast.USub) else value
+        if isinstance(node, ast.BinOp):
+            left = self._eval_output_node(node.left, sets, params, values, metrics, local)
+            right = self._eval_output_node(node.right, sets, params, values, metrics, local)
+            if isinstance(node.op, ast.Add):
+                return left + right
+            if isinstance(node.op, ast.Sub):
+                return left - right
+            if isinstance(node.op, ast.Mult):
+                return left * right
+            if isinstance(node.op, ast.Div):
+                return left / right if right else 0.0
+            if isinstance(node.op, ast.Pow):
+                return left**right
+        if isinstance(node, ast.Compare):
+            left = self._eval_output_node(node.left, sets, params, values, metrics, local)
+            right = self._eval_output_node(node.comparators[0], sets, params, values, metrics, local)
+            op = node.ops[0]
+            if isinstance(op, ast.Eq):
+                return left == right
+            if isinstance(op, ast.LtE):
+                return left <= right
+            if isinstance(op, ast.GtE):
+                return left >= right
+            if isinstance(op, ast.Lt):
+                return left < right
+            if isinstance(op, ast.Gt):
+                return left > right
+        if isinstance(node, ast.BoolOp):
+            results = [bool(self._eval_output_node(item, sets, params, values, metrics, local)) for item in node.values]
+            return all(results) if isinstance(node.op, ast.And) else any(results)
+        if isinstance(node, ast.Subscript):
+            base = node.value.id if isinstance(node.value, ast.Name) else ""
+            indices = self._output_indices(node.slice, sets, params, values, metrics, local)
+            if base in values:
+                return self._variable_value(values, base, indices)
+            return self._parameter_value(params.get(base, metrics.get(base, [])), indices, sets)
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name):
+            if node.func.id in {"sum", "max", "min"}:
+                return self._eval_output_aggregate(node, sets, params, values, metrics, local)
+            if node.func.id == "avg":
+                raw = self._eval_output_node(node.args[0], sets, params, values, metrics, local)
+                seq = list(raw.values()) if isinstance(raw, dict) else list(raw or [])
+                return sum(float(item) for item in seq) / len(seq) if seq else 0.0
+            if node.func.id == "abs":
+                return abs(self._eval_output_node(node.args[0], sets, params, values, metrics, local))
+        raise RuntimeError(f"Unsupported output expression: {ast.dump(node)}")
+
+    def _eval_output_aggregate(self, node: ast.Call, sets: dict[str, Any], params: dict[str, Any], values: dict[str, Any], metrics: dict[str, Any], local: dict[str, Any]) -> Any:
+        generator = node.args[0]
+        if not isinstance(generator, ast.GeneratorExp) or len(generator.generators) != 1:
+            raise RuntimeError("output aggregate only supports fn(expr for t in time)")
+        comp = generator.generators[0]
+        if not isinstance(comp.target, ast.Name) or not isinstance(comp.iter, ast.Name):
+            raise RuntimeError("output aggregate iterator must be a named set")
+        rows = [
+            self._eval_output_node(generator.elt, sets, params, values, metrics, {**local, comp.target.id: label, comp.iter.id: label})
+            for label in list(sets.get(comp.iter.id) or params.get(comp.iter.id) or [])
+        ]
+        if node.func.id == "max":
+            return max(rows) if rows else 0.0
+        if node.func.id == "min":
+            return min(rows) if rows else 0.0
+        return sum(rows)
+
+    def _output_indices(self, node: ast.AST, sets: dict[str, Any], params: dict[str, Any], values: dict[str, Any], metrics: dict[str, Any], local: dict[str, Any]) -> list[Any]:
+        if isinstance(node, ast.Tuple):
+            return [self._eval_output_node(item, sets, params, values, metrics, local) for item in node.elts]
+        return [self._eval_output_node(node, sets, params, values, metrics, local)]
+
+    def _variable_value(self, values: dict[str, Any], name: str, indices: list[Any]) -> float:
+        raw = values.get(name, {})
+        if not isinstance(raw, dict):
+            return 0.0
+        label = f"{name}[{','.join(map(str, indices))}]" if len(indices) > 1 else f"{name}[{indices[0]}]"
+        return float(raw.get(label, 0.0) or 0.0)
+
+    def _scalar_variable_value(self, values: dict[str, Any], name: str) -> float:
+        raw = values.get(name, {})
+        if isinstance(raw, dict):
+            return float(raw.get(name, next(iter(raw.values()), 0.0)) or 0.0)
+        return float(raw or 0.0)
+
+    def _parameter_value(self, raw: Any, indices: list[Any], sets: dict[str, Any]) -> Any:
+        current = raw
+        if isinstance(current, list) and len(indices) == 1:
+            idx = indices[0]
+            if isinstance(idx, int):
+                return self._coerce_output_value(current[idx] if idx < len(current) else 0.0)
+            for set_values in sets.values():
+                if idx in set_values:
+                    pos = list(set_values).index(idx)
+                    return self._coerce_output_value(current[pos] if pos < len(current) else 0.0)
+        for index in indices:
+            if isinstance(current, dict):
+                current = current.get(index, current.get(str(index), 0.0))
+            elif isinstance(current, list):
+                current = current[int(index)] if int(index) < len(current) else 0.0
+            else:
+                break
+        return self._coerce_output_value(current or 0.0)
+
+    def _coerce_output_value(self, value: Any) -> Any:
+        if isinstance(value, bool):
+            return value
+        if isinstance(value, (int, float)):
+            return float(value)
+        try:
+            return float(value)
+        except (TypeError, ValueError):
+            return value
+
+    def _round_value(self, value: Any, precision: int) -> Any:
+        if isinstance(value, bool):
+            return value
+        if isinstance(value, (int, float)):
+            return round(float(value), precision)
+        return value
 
     def _format_unit_commitment(self, solver_result: Any, context: dict[str, Any]) -> dict[str, Any]:
         units = context["units"]
@@ -327,7 +634,7 @@ class SolveResultFormatter:
             "risk": "low",
         }
         explanation = {
-            "summary": "梯级水电调度优化已完成，结果包含各电站分时出力、发电流量、弃水、下泄流量和库容过程。",
+            "summary": f"梯级水电调度优化已完成，总弃水量 {metrics['total_spill_million_m3']} 百万立方米，结果包含各电站分时出力、发电流量、弃水、下泄流量和库容过程。",
             "maintenance": "检修可用容量组件已按 availability 折算电站分时最大出力。",
             "cascade_delay": "上游下泄已按 edges 中的 delay_periods 通过传播时滞影响下游入库。",
             "spill": "出现弃水的电站：" + ("、".join(spill_stations) if spill_stations else "无明显弃水"),

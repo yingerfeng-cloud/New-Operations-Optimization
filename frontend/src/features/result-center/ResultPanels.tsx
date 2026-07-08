@@ -1,4 +1,4 @@
-import { Alert, Card, Col, Empty, Row, Space, Statistic, Table } from 'antd';
+import { Alert, Card, Col, Descriptions, Empty, Row, Space, Statistic, Table, Tag } from 'antd';
 import ReactECharts from 'echarts-for-react';
 import { JsonViewer } from '../../components/JsonViewer';
 import type { SolveResult } from '../../types/result';
@@ -178,16 +178,32 @@ export function ResultCascadeHydroPanel({ result }: { result?: SolveResult }) {
   const spillRows = hydroRows(result, 'spill_curve');
   const balanceRows = hydroRows(result, 'water_balance_check');
   const interpolationRows = hydroRows(result, 'function_asset_interpolation');
+  const metrics = objectValue(result?.metrics || result?.summary);
+  const functionAssetSummary = objectValue(output.function_asset_summary || output.function_assets);
+  const hasLoadCompare = Boolean(output.load_power_curve || output.load_forecast_vs_total_power);
 
   return (
     <Space orientation="vertical" size={16} style={{ width: '100%' }}>
       <ResultKpiStrip result={result} />
+      <Card title="水电调度关键指标">
+        <Descriptions size="small" column={3} items={[
+          { key: 'generation', label: '总发电量', children: text(metrics.total_generation_MWh ?? metrics.total_generation ?? metrics.generation) },
+          { key: 'spill', label: '总弃水量', children: text(metrics.total_spill_million_m3 ?? metrics.total_spill ?? metrics.total_spill_m3s_sum) },
+          { key: 'loadDeviation', label: '负荷跟踪偏差', children: text(metrics.total_abs_load_deviation_MW ?? metrics.load_tracking_deviation) },
+          { key: 'terminalDeviation', label: '期末库容偏差', children: text(metrics.terminal_storage_deviation ?? metrics.total_terminal_volume_deviation) },
+          { key: 'objective', label: '目标函数值', children: text(result?.objective_value ?? metrics.objective_value) },
+          { key: 'solver', label: '求解器', children: text(result?.solver || result?.solver_name || 'HiGHS') },
+          { key: 'problem', label: '问题类型', children: text(result?.problem_type || 'MILP') },
+          { key: 'runtime', label: '运行耗时', children: text(result?.runtime || result?.solve_time) },
+        ]} />
+      </Card>
       <Row gutter={[14, 14]}>
         <Col xs={24} lg={12}><Card title="库容过程曲线"><ReactECharts style={{ height: 300 }} option={hydroChartOption('库容过程曲线', storageRows, 'storage')} /></Card></Col>
         <Col xs={24} lg={12}><Card title="出库流量曲线"><ReactECharts style={{ height: 300 }} option={hydroChartOption('出库流量曲线', outflowRows, 'outflow')} /></Card></Col>
         <Col xs={24} lg={12}><Card title="出力曲线"><ReactECharts style={{ height: 300 }} option={hydroChartOption('出力曲线', powerRows, 'power')} /></Card></Col>
         <Col xs={24} lg={12}><Card title="弃水曲线"><ReactECharts style={{ height: 300 }} option={hydroChartOption('弃水曲线', spillRows, 'spill')} /></Card></Col>
       </Row>
+      {!hasLoadCompare && <Alert showIcon type="info" title="负荷预测 vs 总出力曲线" description="当前结果未返回 load_forecast 或总出力对比数据，因此不编造曲线。" />}
       <Card title="水量平衡校验表">
         <Table
           size="small"
@@ -202,6 +218,14 @@ export function ResultCascadeHydroPanel({ result }: { result?: SolveResult }) {
         />
       </Card>
       <Card title="函数资产插值解释">
+        <Descriptions className="section-gap-tight" size="small" column={3} items={[
+          { key: 'curves1d', label: '使用的 1D 曲线', children: text(functionAssetSummary.curves_1d || functionAssetSummary.piecewise_1d || '水位库容曲线、尾水位流量曲线') },
+          { key: 'surfaces2d', label: '使用的 2D 曲面', children: text(functionAssetSummary.surfaces_2d || functionAssetSummary.piecewise_2d || '水电出力二维曲面') },
+          { key: 'triangles', label: '2D 曲面三角形数量', children: text(functionAssetSummary.triangle_count ?? objectValue(output.function_assets).triangle_count ?? '-') },
+          { key: 'extrapolation', label: '外推风险', children: text(functionAssetSummary.extrapolation_risk ?? '未返回外推风险明细') },
+          { key: 'points', label: '插值点数量', children: text(functionAssetSummary.interpolation_point_count ?? interpolationRows.length) },
+          { key: 'lambda', label: 'triangle / lambda 示例', children: text(interpolationRows.find(row => objectValue(row.power_surface).selected_triangle || objectValue(row.power_surface).lambda) ? objectValue(interpolationRows.find(row => objectValue(row.power_surface).selected_triangle || objectValue(row.power_surface).lambda)?.power_surface) : '当前结果未返回三角形插值明细，可在高级求解日志中开启。') },
+        ]} />
         <Table
           size="small"
           pagination={{ pageSize: 6 }}
@@ -213,6 +237,50 @@ export function ResultCascadeHydroPanel({ result }: { result?: SolveResult }) {
             { title: '1D 水位库容', dataIndex: 'level_storage', render: text },
             { title: '1D 尾水位流量', dataIndex: 'tailwater_outflow', render: text },
             { title: '2D 出力曲面', dataIndex: 'power_surface', render: text },
+          ]}
+        />
+      </Card>
+    </Space>
+  );
+}
+
+export function ResultNlpPanel({ result }: { result?: SolveResult }) {
+  if (!result) return <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="请选择结果" />;
+  const solver = String(result.solver || result.solver_name || '');
+  const problem = String(result.problem_type || result.solver_type || '');
+  const isNlp = problem.toUpperCase() === 'NLP' || solver.toLowerCase().includes('ipopt');
+  if (!isNlp) return <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="当前结果不是 NLP / Ipopt 结果" />;
+  const variables = result.variables || result.variable_values || result.business_variables || {};
+  return (
+    <Space orientation="vertical" size={16} style={{ width: '100%' }}>
+      <Alert
+        showIcon
+        type="warning"
+        title="该结果来自 Ipopt 原生非线性求解"
+        description="Ipopt 通常返回局部最优或求解器终止状态，不承诺全局最优。请关注初值、变量上下界、模型尺度和约束违反摘要。"
+      />
+      <Card title="NLP 求解摘要">
+        <Descriptions bordered size="small" column={2}>
+          <Descriptions.Item label="求解器"><Tag color="geekblue">{solver || 'Ipopt'}</Tag></Descriptions.Item>
+          <Descriptions.Item label="问题类型"><Tag color="purple">{problem || 'NLP'}</Tag></Descriptions.Item>
+          <Descriptions.Item label="终止状态">{text(result.termination_condition || result.raw_termination_condition)}</Descriptions.Item>
+          <Descriptions.Item label="目标值">{text(result.objective_value)}</Descriptions.Item>
+          <Descriptions.Item label="运行耗时">{text(result.runtime || result.solve_time)}</Descriptions.Item>
+          <Descriptions.Item label="局部最优提示">{text(result.local_optimum_warning || 'NLP 结果不承诺全局最优。')}</Descriptions.Item>
+          <Descriptions.Item label="约束违反摘要" span={2}>{text(result.constraint_violation_summary || '未返回约束违反摘要')}</Descriptions.Item>
+          <Descriptions.Item label="初值敏感性提示" span={2}>建议复核初值、上下界和变量尺度；不同初值可能得到不同局部解。</Descriptions.Item>
+          <Descriptions.Item label="变量上下界提示" span={2}>连续变量 NLP 应提供明确上下界，避免无界或尺度过大的求解问题。</Descriptions.Item>
+        </Descriptions>
+      </Card>
+      <Card title="变量结果">
+        <Table
+          size="small"
+          pagination={{ pageSize: 8 }}
+          rowKey="__row_key"
+          dataSource={rowsFrom(variables, 'nlp-variable')}
+          columns={[
+            { title: '变量', dataIndex: 'key', render: (value, row) => text(value || row.name || row.variable || row.item) },
+            { title: '结果', dataIndex: 'value', render: (value, row) => text(value ?? row.result ?? row.amount ?? row.output ?? row.rows) },
           ]}
         />
       </Card>

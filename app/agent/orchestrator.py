@@ -11,8 +11,11 @@ from app.agent.parameter_extractor import parameter_extractor
 from app.agent.platform_client import platform_client
 from app.agent.skill_router import agent_skill_router
 from app.services.agent_skill_service import agent_skill_service
+from app.services.function_asset_service import function_asset_service
 from app.services.invocation_service import invocation_service
 from app.services.llm_service import llm_service
+from app.solvers.status import solver_status
+from app.templates.power_templates import get_power_templates
 
 
 PARAMETER_DISPLAY_NAMES = {
@@ -80,6 +83,9 @@ class AgentOrchestrator:
         conversation_id = body.get("conversation_id")
         message = str(body.get("message") or "")
         existing = self._existing_conversation(conversation_id)
+        demo_response = self._demo_question_response(conversation_id, existing, message)
+        if demo_response:
+            return self._finalize_analyze_response(demo_response, timing, started_at)
         manual_skill = body.get("skill_name")
         router_started = time.perf_counter()
         available_agent_skills = agent_skill_service.list_skills()
@@ -180,6 +186,9 @@ class AgentOrchestrator:
             extracted = extract_meta["parameters"]
         else:
             extracted = {}
+        sample_run_requested = self._is_sample_run_request(message, intent)
+        if sample_run_requested and input_schema and not extracted:
+            extracted = self._sample_parameters({"input_schema": input_schema})
         timing["parameter_extract_ms"] = self._elapsed_ms(extract_started)
         timing["llm_extract_ms"] = int(extract_meta.get("llm_extract_ms") or 0)
         extracted = self._broadcast_scalars(extracted, input_schema, previous_draft)
@@ -187,9 +196,14 @@ class AgentOrchestrator:
         analyze_started = time.perf_counter()
         analysis = invocation_service.analyze_parameters(input_schema, parameter_draft) if local_analysis_only else platform_client.analyze_input(resolved_skill_name, parameter_draft)
         timing["analyze_input_ms"] += self._elapsed_ms(analyze_started)
+        if sample_run_requested and parameter_draft:
+            analysis = self._mark_sample_values_pending_confirmation(analysis, input_schema, parameter_draft)
 
         analysis = self._normalize_analysis_labels(analysis, input_schema)
         parameter_sources = self._merge_sources(existing.get("parameter_sources") or {}, extracted, analysis)
+        if sample_run_requested:
+            for key in extracted:
+                parameter_sources[key] = "SAMPLE_VALUE"
         if default_confirmed:
             parameter_draft, parameter_sources = self._apply_confirmed_defaults(parameter_draft, parameter_sources, analysis)
             analyze_started = time.perf_counter()
@@ -360,6 +374,8 @@ class AgentOrchestrator:
         skill = agent_skill_service.get_skill_local(str(agent_skill_name))
         api_skill_name = str(skill.get("canonical_api_skill_name") or f"run_{agent_skill_name}")
         input_schema = skill.get("input_schema") or []
+        if not sample_parameters:
+            sample_parameters = self._sample_parameters({"input_schema": input_schema})
         parameter_sources = {key: "sample_only" for key in sample_parameters}
         return self._save_task_analysis(
             conversation_id,
@@ -524,11 +540,11 @@ class AgentOrchestrator:
             return "result_explanation"
         if any(marker in compact for marker in ["参数示例", "样例参数", "示例参数"]):
             return "parameter_example"
-        if any(marker in compact for marker in ["切换到", "换成", "改成"]):
+        if any(marker in compact for marker in ["切换到", "换成"]):
             return "switch_skill"
         if any(marker in compact for marker in ["有没有", "支持吗", "能不能做", "是否支持"]):
             return "skill_availability_query"
-        if self._select_skill(message) and any(marker in compact for marker in ["帮我", "运行", "求解", "优化", "调度", "dispatch"]):
+        if self._select_skill(message) and any(marker in compact for marker in ["帮我", "做", "运行", "求解", "优化", "调度", "dispatch"]):
             return "optimization_request"
         if self._is_casual_chat(message):
             return "casual_chat"
@@ -903,9 +919,33 @@ class AgentOrchestrator:
 
     def _select_skill(self, message: str) -> str | None:
         compact = "".join(str(message or "").lower().split())
+        if any(key in compact for key in ["售电公司日前现货申报", "售电日前现货申报", "日前现货申报", "日前现货"]):
+            return "run_retail_da_spot_bidding_v1"
+        if any(key in compact for key in ["合约现货暴露控制", "合约现货暴露", "现货暴露控制", "中长期合约分解"]):
+            return "run_contract_spot_exposure_v1"
+        if any(key in compact for key in ["光储日前调度", "光伏储能日前"]):
+            return "run_pv_storage_day_ahead_dispatch"
+        if any(
+            key in compact
+            for key in [
+                "光储日内滚动调度",
+                "光储日内滚动优化",
+                "光储实时滚动调度",
+                "光储协同日内调度",
+                "光储日内滚动",
+                "光储实时滚动",
+                "光储日内调度",
+                "光伏储能日内",
+            ]
+        ):
+            return "run_pv_storage_intraday_dispatch"
+        if any(key in compact for key in ["光储调度v2", "光储v2"]):
+            return "run_pv_storage_dispatch_v2"
+        if any(key in compact for key in ["非线性水电", "nlp水电", "ipopt水电"]):
+            return "run_nonlinear_hydro_power_demo"
         if any(key in compact for key in ["经济", "economic"]):
             return "run_economic_dispatch"
-        if any(key in compact for key in ["机组", "日前", "unitcommitment"]):
+        if any(key in compact for key in ["日前机组组合", "机组组合", "机组启停", "unitcommitment"]):
             return "run_unit_commitment_day_ahead"
         if any(key in compact for key in ["储能", "峰谷", "storage"]):
             return "run_storage_dispatch"
@@ -988,6 +1028,94 @@ class AgentOrchestrator:
             return "我可以通过 Skill 帮你完成经济调度、储能调度、机组组合等优化任务。"
         return "你好，我是运筹优化 Agent。你可以描述要优化的业务场景、参数和目标。"
 
+    def _demo_question_response(self, conversation_id: str | None, existing: dict[str, Any], message: str) -> dict[str, Any] | None:
+        compact = "".join(str(message or "").strip().lower().split())
+        if not compact:
+            return None
+        hydro_keys = ["水电", "梯级", "milp", "弃水", "库容", "出力最高", "三角形", "函数资产", "水量平衡"]
+        nlp_keys = ["nlp", "ipopt", "全局最优", "局部最优", "minlp", "piecewise", "mccormick", "非线性"]
+        if not any(key in compact for key in hydro_keys + nlp_keys):
+            return None
+        if any(marker in compact for marker in ["帮我", "运行", "开始求解", "执行优化", "优化一下", "调度计划"]):
+            return None
+        if compact.startswith("没有") or ("没有" in compact and "吗" in compact):
+            return None
+        if any(key in compact for key in nlp_keys):
+            agent_text = self._answer_nlp_demo_question(compact, existing)
+        else:
+            agent_text = self._answer_hydro_demo_question(compact, existing)
+        conversation = conversation_store.upsert(
+            conversation_id,
+            {
+                "status": "HELP",
+                "messages": self._append_messages(existing.get("messages") or [], message, agent_text, False),
+                "recent_turns": self._recent_turns(existing, message, "demo_question", "demo_answer", agent_text),
+            },
+        )
+        response = self._chat_response(conversation, agent_text, preserve_task=True)
+        response.update({"response_type": "demo_answer", "intent": "demo_question", "workflow_state": "HELP", "status": "HELP"})
+        return response
+
+    def _answer_hydro_demo_question(self, compact: str, existing: dict[str, Any]) -> str:
+        templates = get_power_templates()
+        hydro_models = [templates[key] for key in ["cascade_hydro_dispatch", "cascade_hydro_dispatch_v1"] if key in templates]
+        assets = {asset.function_id: asset for asset in function_asset_service.list_assets()}
+        last_result = existing.get("last_result") or {}
+        business_output = last_result.get("business_output") or {}
+        metrics = last_result.get("metrics") or {}
+        if "哪些" in compact and "模型" in compact:
+            return "当前水电调度模型包括：" + "；".join(f"{item.get('code')}（{item.get('name')}，{item.get('model_problem_type') or item.get('problem_type')} / {item.get('solver', 'HiGHS')}）" for item in hydro_models)
+        if "为什么" in compact and "milp" in compact:
+            return "水电 PWL 标杆模型是 MILP，因为水量平衡等主体约束为线性，1D/2D PWL 曲线通过 piecewise_1d、piecewise_2d 和 triangulated_milp_exact 转换为线性约束，并引入二进制三角选择变量；因此交给 HiGHS 求解。"
+        if "函数资产" in compact:
+            names = [f"{key}（{assets[key].name}）" for key in ["cascade_hydro_level_storage_v1", "cascade_hydro_tailwater_outflow_v1", "cascade_hydro_power_surface_v1"] if key in assets]
+            return "水电演示使用的函数资产包括：" + ("；".join(names) if names else "当前函数资产中心未返回水电演示资产。")
+        if "三角形" in compact:
+            asset = assets.get("cascade_hydro_power_surface_v1")
+            count = len(asset.triangles or []) if asset else None
+            return f"二维出力曲面 cascade_hydro_power_surface_v1 当前三角形数量为 {count}。" if count is not None else "当前函数资产中心未返回二维出力曲面的三角形数量。"
+        if any(key in compact for key in ["总发电量", "弃水", "出力最高", "期末库容", "水量平衡", "外推"]):
+            if not last_result:
+                return "当前尚未选择任务或该任务尚未产生结果。"
+            if "总发电量" in compact:
+                return f"当前任务总发电量为 {metrics.get('total_generation_MWh', '结果未返回该指标')}。"
+            if "弃水" in compact:
+                spill_rows = business_output.get("spill_curve") or []
+                periods = [str(row.get("time")) for row in spill_rows if isinstance(row, dict) and float(row.get("spill") or 0) > 1e-6]
+                return "出现弃水的时段：" + ("、".join(periods) if periods else "当前结果未返回弃水时段或无明显弃水。")
+            if "期末库容" in compact:
+                return f"期末库容偏差为 {metrics.get('terminal_storage_deviation', metrics.get('total_terminal_volume_deviation', '结果未返回该指标'))}。"
+            if "水量平衡" in compact:
+                rows = business_output.get("water_balance_check") or []
+                bad = [row for row in rows if isinstance(row, dict) and abs(float(row.get("balance_error") or 0)) > 1e-5]
+                return "水量平衡满足。" if rows and not bad else "当前结果未返回水量平衡明细，或存在需要复核的 balance_error。"
+        return "梯级水电演示基于真实模板、函数资产诊断和任务结果回答；没有任务结果时，我会明确说明当前尚未选择任务或该任务尚未产生结果。"
+
+    def _answer_nlp_demo_question(self, compact: str, existing: dict[str, Any]) -> str:
+        templates = get_power_templates()
+        nlp_template = templates.get("nonlinear_hydro_power_demo") or {}
+        status = solver_status()
+        ipopt = status.get("ipopt") or {}
+        if "minlp" in compact or "整数变量" in compact:
+            return "当前平台不把 MINLP_RESERVED 作为生产级能力开放。含整数变量的非线性模型不能直接用 Ipopt，因为 Ipopt 面向连续变量 NLP；建议改用 PWL 或 McCormick 线性化。"
+        if "是否支持" in compact and "nlp" in compact:
+            return "当前平台 NLP / Ipopt 已支持真实求解接入，适用于连续变量非线性模型；结果不承诺全局最优。"
+        if "ipopt" in compact and "可用" in compact:
+            return f"Ipopt 当前{'可用' if ipopt.get('available') else '不可用'}；路径：{ipopt.get('path') or '-'}；版本：{ipopt.get('version') or '-'}；提示：{ipopt.get('message') or '-'}。"
+        if "nonlinear_hydro_power_demo" in compact or ("什么" in compact and "模型" in compact):
+            return f"nonlinear_hydro_power_demo 是 {nlp_template.get('name', '非线性水电出力 NLP 演示模型')}，问题类型 NLP，求解器 Ipopt，核心关系是 power = k * flow * head。"
+        if "为什么" in compact and "ipopt" in compact:
+            return "该模型包含 power = k * flow * head 这类连续变量乘积关系，未通过 PWL/McCormick 线性化，因此需要 Ipopt 处理原生非线性 NLP。"
+        if "全局最优" in compact or "局部最优" in compact:
+            return "Ipopt 求解结果不是全局最优承诺。平台口径是：NLP / Ipopt 已支持真实求解，但通常返回局部最优或求解器终止状态，需要关注初值、上下界和约束违反摘要。"
+        if "2dpwl" in compact or "piecewise" in compact:
+            return "NLP 是原生非线性求解，保留 power = k * flow * head 等表达式并使用 Ipopt；2D PWL 是把二维曲面离散为三角面片并转成 MILP，通常交给 HiGHS。"
+        if "mccormick" in compact or "不用nlp" in compact:
+            return "如果不用 NLP，可以根据关系形态改用 piecewise_1d、piecewise_2d 或 McCormick 线性化，把问题转成 LP/MILP 后用 HiGHS；这会带来近似、松弛或规模上的边界。"
+        if "失败" in compact or "排查" in compact:
+            return "NLP 求解失败通常检查：Ipopt 是否可用、变量上下界是否完整、初值是否合理、模型尺度是否过大、约束违反摘要和 termination_condition。"
+        return "NLP / Ipopt 已支持真实求解；结果不承诺全局最优；MINLP_RESERVED 不作为生产级能力开放。"
+
     def _no_active_task_response(self, conversation_id: str | None, existing: dict[str, Any], message: str, intent: str) -> dict[str, Any]:
         agent_text = "当前没有待确认默认值的优化任务。" if intent == "confirm_defaults" else "当前会话没有可调用的优化任务。"
         conversation = conversation_store.upsert(conversation_id, {"status": "NO_OPTIMIZATION_TASK", "messages": self._append_messages(existing.get("messages") or [], message, agent_text, False)})
@@ -1000,6 +1128,25 @@ class AgentOrchestrator:
             if value is not None and item.get("key"):
                 params[item["key"]] = value
         return params
+
+    def _is_sample_run_request(self, message: str, intent: str) -> bool:
+        compact = "".join(str(message or "").strip().lower().split())
+        if intent != "optimization_request":
+            return False
+        return any(key in compact for key in ["示例参数", "样例参数", "sample"]) and any(key in compact for key in ["跑", "运行", "调用", "求解", "优化", "run"])
+
+    def _mark_sample_values_pending_confirmation(self, analysis: dict[str, Any], input_schema: list[dict[str, Any]], parameter_draft: dict[str, Any]) -> dict[str, Any]:
+        result = dict(analysis or {})
+        schema_by_key = {str(item.get("key")): item for item in input_schema or [] if item.get("key")}
+        candidates = []
+        for key, value in parameter_draft.items():
+            item = schema_by_key.get(str(key), {})
+            candidates.append({"key": key, "name": item.get("name") or key, "value": value, "source": "SAMPLE_VALUE"})
+        existing = result.get("can_use_default") or []
+        result["can_use_default"] = existing or candidates
+        result["requires_default_confirmation"] = True
+        result["ready"] = False
+        return result
 
     def _existing_conversation(self, conversation_id: str | None) -> dict[str, Any]:
         if not conversation_id:
@@ -1079,7 +1226,23 @@ class AgentOrchestrator:
         raw = str(api_skill_name)
         if raw.startswith("run_"):
             raw = raw[4:]
-        for base in ["economic_dispatch", "storage_dispatch", "unit_commitment_day_ahead", "cascade_hydro_dispatch", "renewable_storage_dispatch", "chp_dispatch"]:
+        for base in [
+            "economic_dispatch",
+            "storage_dispatch",
+            "unit_commitment_day_ahead",
+            "cascade_hydro_dispatch_v1",
+            "cascade_hydro_dispatch",
+            "renewable_storage_dispatch",
+            "chp_dispatch",
+            "pv_storage_day_ahead_dispatch_v2",
+            "pv_storage_intraday_dispatch_v2",
+            "pv_storage_dispatch_v2",
+            "pv_storage_day_ahead_dispatch",
+            "pv_storage_intraday_dispatch",
+            "nonlinear_hydro_power_demo",
+            "contract_spot_exposure_v1",
+            "retail_da_spot_bidding_v1",
+        ]:
             if raw == base or raw.startswith(f"{base}_"):
                 return base
         return raw

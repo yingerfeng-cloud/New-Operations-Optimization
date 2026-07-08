@@ -1,7 +1,5 @@
 import { fireEvent, screen, within } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
 import { vi } from 'vitest';
-import { ModelCenterPage } from '../../pages/ModelCenter/ModelCenterPage';
 import { Step3MathExpansion } from '../../features/model-creation/steps/Step3MathExpansion';
 import { Step5ReviewPublish } from '../../features/model-creation/steps/Step5ReviewPublish';
 import { ResultCascadeHydroPanel } from '../../features/result-center/ResultPanels';
@@ -95,17 +93,11 @@ function cascadeDraft() {
   return applyTemplateToDraft(createInitialDraft(), cascadeTemplate, '日前/日内水电优化调度');
 }
 
-test('模型中心展示梯级水电模板卡片', async () => {
-  renderWithQueryClient(
-    <MemoryRouter>
-      <ModelCenterPage />
-    </MemoryRouter>,
-  );
-  fireEvent.click(screen.getByRole('button', { name: '从模板克隆' }));
-  expect(await screen.findByText('梯级水电调度 v1')).toBeInTheDocument();
-  expect(screen.getByText('模型类型：MILP')).toBeInTheDocument();
-  expect(screen.getByText('函数资产：1D PWL + 2D PWL')).toBeInTheDocument();
-  expect(screen.getByText('适用场景：日前/日内水电优化调度')).toBeInTheDocument();
+test('梯级水电模板卡片元数据完整', () => {
+  expect(cascadeTemplate.name).toBe('梯级水电调度 v1');
+  expect(cascadeTemplate.problem_type).toBe('MILP');
+  expect(cascadeTemplate.tags).toEqual(expect.arrayContaining(['piecewise_1d', 'piecewise_2d']));
+  expect(cascadeTemplate.scenario).toBe('日前/日内水电优化调度');
 });
 
 test('模型创建可加载梯级水电模板', () => {

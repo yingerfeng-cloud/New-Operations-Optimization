@@ -1,0 +1,169 @@
+{
+  "positive_examples": [
+    {
+      "user": "做梯级水电调度 v1",
+      "intent": "optimization_request",
+      "expected_skill": "cascade_hydro_dispatch_v1"
+    }
+  ],
+  "help_examples": [
+    {
+      "intent": "parameter_example",
+      "text": "show parameter example"
+    }
+  ],
+  "negative_examples": [
+    {
+      "user": "你好",
+      "intent": "casual_chat"
+    }
+  ],
+  "sample_parameters": {
+    "horizon": 24,
+    "time": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15,
+      16,
+      17,
+      18,
+      19,
+      20,
+      21,
+      22,
+      23
+    ],
+    "inflow": {
+      "R1": [
+        92,
+        95,
+        98,
+        102,
+        108,
+        112,
+        116,
+        120,
+        118,
+        114,
+        110,
+        106,
+        104,
+        102,
+        100,
+        98,
+        96,
+        94,
+        92,
+        90,
+        88,
+        90,
+        92,
+        94
+      ],
+      "R2": [
+        24,
+        24,
+        25,
+        26,
+        28,
+        30,
+        32,
+        34,
+        33,
+        31,
+        30,
+        29,
+        28,
+        27,
+        26,
+        26,
+        25,
+        25,
+        24,
+        24,
+        23,
+        23,
+        24,
+        24
+      ]
+    },
+    "initial_storage": {
+      "R1": 122,
+      "R2": 108
+    },
+    "target_final_storage": {
+      "R1": 120,
+      "R2": 108
+    },
+    "storage_min": {
+      "R1": 90,
+      "R2": 85
+    },
+    "storage_max": {
+      "R1": 160,
+      "R2": 150
+    },
+    "outflow_min": {
+      "R1": 45,
+      "R2": 50
+    },
+    "outflow_max": {
+      "R1": 155,
+      "R2": 155
+    },
+    "power_min": {
+      "R1": 0,
+      "R2": 0
+    },
+    "power_max": {
+      "R1": 95,
+      "R2": 95
+    },
+    "load_forecast": [
+      82,
+      80,
+      78,
+      76,
+      78,
+      82,
+      90,
+      98,
+      110,
+      116,
+      120,
+      118,
+      112,
+      108,
+      104,
+      106,
+      114,
+      122,
+      128,
+      124,
+      116,
+      104,
+      94,
+      88
+    ],
+    "delta_t": 1.0,
+    "cascade_delay": {
+      "R1": 0,
+      "R2": 0
+    },
+    "penalty_spill": 10.0,
+    "penalty_storage_deviation": 500.0
+  }
+}

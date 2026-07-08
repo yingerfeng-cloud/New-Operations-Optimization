@@ -1,10 +1,11 @@
-import { Button, Card, Col, Progress, Row, Space, Tag, Typography } from 'antd';
+import { Alert, Button, Card, Col, Descriptions, Progress, Row, Space, Table, Tag, Typography } from 'antd';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { getModels } from '../../api/models';
 import { getComponents } from '../../api/components';
 import { getTemplates } from '../../api/templates';
 import { getTasks } from '../../api/tasks';
+import { getSolverStatus } from '../../api/solvers';
 import { PageHeader } from '../../components/PageHeader';
 import { StatusTag } from '../../components/StatusTag';
 import { EmptyActionState, MetricCard, MetricGrid } from '../../components/WorkspaceUI';
@@ -27,6 +28,7 @@ export function DashboardPage() {
   const components = useQuery({ queryKey: ['components'], queryFn: getComponents });
   const templates = useQuery({ queryKey: ['templates'], queryFn: getTemplates });
   const tasks = useQuery({ queryKey: ['tasks'], queryFn: getTasks, refetchInterval });
+  const solverStatus = useQuery({ queryKey: ['solver-status'], queryFn: getSolverStatus, refetchInterval });
 
   const taskRows = tasks.data || [];
   const success = taskRows.filter(task => normalizeStatus(task) === 'SUCCESS').length;
@@ -49,6 +51,17 @@ export function DashboardPage() {
     { title: '创建优化模型', desc: '维护语义、公式、组件和运行参数。', path: '/models/create' },
     { title: '发起求解任务', desc: '选择模型并提交运行参数。', path: '/tasks' },
     { title: '查看结果报告', desc: '查看关键指标、变量曲线和业务解释。', path: '/results' },
+  ];
+  const ipopt = solverStatus.data?.ipopt;
+  const highs = solverStatus.data?.highs;
+  const capabilityRows = [
+    { key: 'LP', capability: 'LP', status: highs?.available ? '可用' : '待确认', solver: 'HiGHS', scene: '线性经济调度、线性资源分配', risk: '需保证模型为线性。' },
+    { key: 'MILP', capability: 'MILP', status: highs?.available ? '可用' : '待确认', solver: 'HiGHS', scene: '机组组合、含二进制变量的调度', risk: '模型规模影响求解时间。' },
+    { key: '1D PWL', capability: '1D PWL', status: '已接入', solver: 'HiGHS', scene: 'piecewise_1d 曲线映射', risk: '需检查定义域，避免外推。' },
+    { key: '2D PWL', capability: '2D PWL', status: '已接入', solver: 'HiGHS', scene: 'piecewise_2d + triangulated_milp_exact', risk: '三角剖分会引入二进制变量。' },
+    { key: 'McCormick', capability: 'McCormick', status: '已接入', solver: 'HiGHS', scene: '双线性松弛线性化', risk: '松弛结果需结合边界解释。' },
+    { key: 'NLP', capability: 'NLP', status: ipopt?.available ? 'Ipopt 可用' : 'Ipopt 不可用', solver: 'Ipopt', scene: '连续变量原生非线性模型', risk: '局部最优风险，不承诺全局最优。' },
+    { key: 'MINLP', capability: 'MINLP', status: 'MINLP_RESERVED', solver: '未开放生产级求解', scene: '含整数变量和非线性表达式', risk: '建议改用 PWL 或 McCormick 线性化。' },
   ];
 
   return (
@@ -78,6 +91,59 @@ export function DashboardPage() {
         </div>
       </Card>
 
+      <Card title="平台能力矩阵" className="section-gap">
+        <Table
+          size="small"
+          pagination={false}
+          rowKey="key"
+          dataSource={capabilityRows}
+          columns={[
+            { title: '能力名称', dataIndex: 'capability' },
+            { title: '当前状态', dataIndex: 'status', render: value => <Tag color={String(value).includes('不可用') || String(value).includes('RESERVED') ? 'orange' : 'green'}>{String(value)}</Tag> },
+            { title: '求解器', dataIndex: 'solver' },
+            { title: '适用场景', dataIndex: 'scene' },
+            { title: '风险提示', dataIndex: 'risk' },
+          ]}
+        />
+        <Alert
+          className="section-gap-tight"
+          showIcon
+          type={ipopt?.available ? 'success' : 'warning'}
+          title={ipopt?.available ? 'Ipopt 可用：NLP 真实求解链路已接入' : 'Ipopt 不可用：NLP 页面会显示明确不可用提示'}
+          description={ipopt?.available ? `路径：${ipopt.path || '-'}；版本：${ipopt.version || '-'}` : ipopt?.message || '请检查 Ipopt 可执行文件和 Pyomo 求解器配置。'}
+        />
+      </Card>
+
+      <Row gutter={[16, 16]} className="section-gap">
+        <Col xs={24} lg={12}>
+          <Card title="梯级水电优化调度">
+            <Space direction="vertical" size="middle" style={{ width: '100%' }}>
+              <Space wrap><Tag color="purple">MILP</Tag><Tag>1D PWL</Tag><Tag>2D PWL</Tag><Tag>函数资产</Tag><Tag color="blue">HiGHS</Tag></Space>
+              <Typography.Paragraph>基于水位库容曲线、尾水位流量曲线、出力二维曲面完成日前调度优化。</Typography.Paragraph>
+              <Space wrap>
+                <Button onClick={() => nav('/models/cascade_hydro_dispatch_v1')}>查看模型</Button>
+                <Button onClick={() => nav('/models/create')}>进入模型创建</Button>
+                <Button onClick={() => nav('/services')}>在线调试</Button>
+                <Button onClick={() => nav('/results')}>查看结果</Button>
+              </Space>
+            </Space>
+          </Card>
+        </Col>
+        <Col xs={24} lg={12}>
+          <Card title="非线性水电出力 NLP 演示">
+            <Space direction="vertical" size="middle" style={{ width: '100%' }}>
+              <Space wrap><Tag color="geekblue">NLP</Tag><Tag color={ipopt?.available ? 'green' : 'orange'}>Ipopt</Tag><Tag>power = k * flow * head</Tag></Space>
+              <Typography.Paragraph>使用 Ipopt 对连续变量非线性出力模型进行真实求解；结果不承诺全局最优。</Typography.Paragraph>
+              <Space wrap>
+                <Button onClick={() => nav('/models/nonlinear_hydro_power_demo')}>查看模型</Button>
+                <Button onClick={() => nav('/services')}>在线调试</Button>
+                <Button onClick={() => nav('/results')}>查看 NLP 结果解释</Button>
+              </Space>
+            </Space>
+          </Card>
+        </Col>
+      </Row>
+
       <Row gutter={[16, 16]} className="section-gap">
         <Col xs={24} lg={8}>
           <Card title="求解运行状态">
@@ -85,10 +151,16 @@ export function DashboardPage() {
               <div className="status-chip-row">
                 <Tag color="green">Pyomo 可用</Tag>
                 <Tag color="blue">HiGHS / highspy</Tag>
+                <Tag color={ipopt?.available ? 'green' : 'orange'}>{ipopt?.available ? 'Ipopt 可用' : 'Ipopt 不可用'}</Tag>
                 <Tag color={models.isError || components.isError || tasks.isError ? 'red' : 'green'}>
                   {models.isError || components.isError || tasks.isError ? '后端异常' : '真实 API'}
                 </Tag>
               </div>
+              <Descriptions size="small" column={1} items={[
+                { key: 'highs', label: 'HiGHS', children: highs?.available ? '可用，用于 LP/MILP' : '待确认，用于 LP/MILP' },
+                { key: 'ipopt', label: 'Ipopt', children: ipopt?.available ? `可用，用于连续变量 NLP：${ipopt.path || '-'}` : `不可用：${ipopt?.message || '未检测到 Ipopt'}` },
+                { key: 'minlp', label: 'MINLP', children: 'MINLP_RESERVED 未开放生产级求解，建议使用 PWL/McCormick 线性化。' },
+              ]} />
               <Progress percent={successRate} status={failed ? 'exception' : 'active'} />
               <Row gutter={8}>
                 <Col span={8}><MetricCard title="成功" value={success} tone="green" /></Col>

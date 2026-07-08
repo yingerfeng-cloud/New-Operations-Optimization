@@ -20,6 +20,7 @@ import {
   isRunningStatus,
 } from '../../features/task-center/TaskPanels';
 import type { SolveTask } from '../../types/task';
+import { capabilityOrFallback } from '../../features/demo/demoCapabilities';
 
 interface RuntimeField {
   code: string;
@@ -109,6 +110,8 @@ export function TaskCenterPage() {
   const tasks = useQuery({ queryKey: ['tasks'], queryFn: getTasks, refetchInterval });
   const models = useQuery({ queryKey: ['models'], queryFn: getModels });
   const selectedModelId = Form.useWatch('model_id', form);
+  const selectedModel = useMemo(() => (models.data || []).find(model => model.id === selectedModelId), [models.data, selectedModelId]);
+  const selectedCapability = capabilityOrFallback(selectedModel || {});
   const schema = useQuery({ queryKey: ['model-schema', selectedModelId], queryFn: () => getModelSchema(selectedModelId), enabled: !!selectedModelId });
   const assetDetail = useQuery({ queryKey: ['model-asset-detail', selectedModelId], queryFn: () => getModelAssetDetail(selectedModelId), enabled: !!selectedModelId });
   const runtimeFields = useMemo(() => runtimeFieldsFromContracts(schema.data, assetDetail.data), [schema.data, assetDetail.data]);
@@ -134,7 +137,8 @@ export function TaskCenterPage() {
     const defaults = Object.fromEntries(runtimeFields.map(field => [field.code, field.defaultValue ?? field.exampleValue]).filter(([, value]) => value !== undefined));
     form.setFieldValue('parameters', defaults);
     setParameterValidation(undefined);
-  }, [form, runtimeFields, selectedModelId]);
+    form.setFieldValue('solver', selectedCapability.problemType === 'NLP' ? 'Ipopt' : 'HiGHS');
+  }, [form, runtimeFields, selectedCapability.problemType, selectedModelId]);
 
   const importRuntimeJson = () => {
     try {
@@ -160,7 +164,11 @@ export function TaskCenterPage() {
     const validation = validateRuntimeParameters(runtimeFields, runtimeParameters);
     setParameterValidation(validation);
     if (!validation.valid) return;
-    create.mutate({ ...value, model: value.model_id, scene: 'power optimization', runtime_parameters: runtimeParameters, parameters: runtimeParameters, async_run: true });
+    if (selectedCapability.problemType === 'MINLP_RESERVED') {
+      setParameterValidation({ valid: false, title: '当前模型属于 MINLP_RESERVED，平台未开放生产级 MINLP 求解；建议改用 PWL 或 McCormick 线性化。' });
+      return;
+    }
+    create.mutate({ ...value, model: value.model_id, scene: 'power optimization', solver: value.solver || selectedCapability.solver, runtime_parameters: runtimeParameters, parameters: runtimeParameters, async_run: true });
   };
 
   return (
@@ -235,7 +243,10 @@ export function TaskCenterPage() {
             </Card>
             <Card size="small" title="运行配置">
               <Form.Item name="horizon" label="调度时段" initialValue={24}><InputNumber min={1} /></Form.Item>
-              <Form.Item name="solver" label="求解器" initialValue="HiGHS"><Select options={[{ value: 'HiGHS' }]} /></Form.Item>
+              <Form.Item name="solver" label="求解器" initialValue="HiGHS">
+                <Select options={selectedCapability.problemType === 'NLP' ? [{ value: 'Ipopt', label: 'Ipopt' }] : [{ value: 'HiGHS', label: 'HiGHS' }]} />
+              </Form.Item>
+              <Alert showIcon type={selectedCapability.problemType === 'NLP' ? 'warning' : 'info'} title={`当前问题类型：${selectedCapability.problemType || '-'}`} description={selectedCapability.problemType === 'NLP' ? '求解方式：原生非线性求解；风险：可能为局部最优，依赖初值、变量上下界和模型尺度。' : selectedCapability.nonlinearHandling !== '-' ? `非线性处理：${selectedCapability.nonlinearHandling}；求解器：HiGHS。` : 'LP/MILP 默认使用 HiGHS。'} />
             </Card>
             <Card size="small" title="参数契约" loading={schema.isFetching || assetDetail.isFetching}>
               <Table<RuntimeField>

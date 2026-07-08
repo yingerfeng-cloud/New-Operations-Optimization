@@ -7,7 +7,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
-from app.api import components, demo, function_assets, invocations, jobs, models, optimize, reports, results, rolling, tasks, templates
+from app.api import components, demo, function_assets, invocations, jobs, llm, models, optimize, reports, results, rolling, solvers, system_config, tasks, templates
 from app.security import platform_token_middleware
 from app.services.model_service import model_service
 from app.frontend import mount_frontends
@@ -70,6 +70,9 @@ def create_platform_app(*, enforce_token: bool = True) -> FastAPI:
     app.include_router(tasks.router)
     app.include_router(optimize.router)
     app.include_router(results.router)
+    app.include_router(solvers.router)
+    app.include_router(system_config.router)
+    app.include_router(llm.router)
     Path("reports").mkdir(exist_ok=True)
     app.mount("/reports", StaticFiles(directory="reports"), name="reports")
     model_service.seed_default_templates()

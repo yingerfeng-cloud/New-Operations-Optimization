@@ -5,10 +5,12 @@ import { useEffect, useState } from 'react';
 import { FormulaBuilderModal } from '../formula-editor/FormulaBuilderModal';
 import type { ComponentDef, SchemaItem } from '../../types/component';
 import type { FormulaDef } from '../../types/formula';
+import type { DictionaryItem, SystemDictionaries } from '../../types/systemConfig';
 
 type EditorProps = {
   component?: ComponentDef;
   availableIds?: string[];
+  dictionaries?: SystemDictionaries;
   onSave: (value: Partial<ComponentDef>) => void;
 };
 
@@ -76,6 +78,19 @@ function symbolsFromSchema(sets?: SchemaItem[], parameters?: SchemaItem[], varia
   };
 }
 
+function dictionaryOptions(items?: DictionaryItem[], current?: unknown) {
+  const values = new Map<string, string>();
+  (items || []).filter(item => item.enabled !== false).forEach(item => values.set(item.label, item.label));
+  const currentText = String(current || '').trim();
+  if (currentText && !values.has(currentText)) values.set(currentText, currentText);
+  return [...values.entries()].map(([value, label]) => ({ value, label }));
+}
+
+function domainCodeFromLabel(items: DictionaryItem[] | undefined, label: unknown) {
+  const text = String(label || '').trim();
+  return (items || []).find(item => item.label === text || item.code === text)?.code || '';
+}
+
 function FormulaList({ name, title, form, component }: { name: 'generated_constraints' | 'generated_objective_terms'; title: string; form: FormInstance<Partial<ComponentDef>>; component?: ComponentDef }) {
   const kind = name === 'generated_constraints' ? 'constraint' : 'objective';
   const rows = Form.useWatch(name, form) as Array<Record<string, unknown>> | undefined;
@@ -130,34 +145,44 @@ function FormulaList({ name, title, form, component }: { name: 'generated_constr
     setRows([...currentRows, clone]);
   };
   const removeFormula = (index: number) => setRows(currentRows.filter((_, itemIndex) => itemIndex !== index));
+  const table = currentRows.length ? (
+    <Table
+      className="component-formula-table"
+      size="small"
+      pagination={false}
+      tableLayout="fixed"
+      scroll={{ x: 820 }}
+      rowKey={row => String(row.constraint_id || row.term_id || row.name || row.formula)}
+      dataSource={currentRows}
+      columns={[
+        { title: '名称', dataIndex: 'name', width: 140, ellipsis: true },
+        { title: '编码', width: 170, ellipsis: true, render: (_, row) => String(row.constraint_id || row.term_id || '-') },
+        { title: '类型', width: 82, render: () => <Tag color={kind === 'constraint' ? 'blue' : 'purple'}>{kind === 'constraint' ? '约束' : '目标'}</Tag> },
+        { title: '公式', width: 210, ellipsis: true, render: (_, row) => String(row.display_formula || row.dsl_formula || row.formula || '-') },
+        { title: '求解', width: 92, render: (_, row) => String(row.solve_participation || 'solve_active') === 'preview_only' ? '仅预览' : '参与' },
+        { title: '状态', width: 86, render: (_, row) => <Tag color={String(row.compile_status || row.formula || row.dsl_formula) ? 'green' : 'orange'}>{String(row.compile_status || row.formula || row.dsl_formula) ? '已配置' : '待配置'}</Tag> },
+        {
+          title: '操作',
+          fixed: 'right' as const,
+          width: 140,
+          render: (_, _row, index) => (
+            <Space size={4}>
+              <Button type="link" onClick={() => setEditing({ index, formula: formulaFromRow(currentRows[index], kind) })}>编辑</Button>
+              <Button type="link" onClick={() => copyFormula(index)}>复制</Button>
+              <Button danger type="link" onClick={() => removeFormula(index)}>删除</Button>
+            </Space>
+          ),
+        },
+      ]}
+    />
+  ) : (
+    <div className="component-formula-empty">
+      <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={`暂无${title}`} />
+    </div>
+  );
   return (
     <Space orientation="vertical" size={12} style={{ width: '100%' }}>
-      <Table
-        size="small"
-        pagination={false}
-        rowKey={row => String(row.constraint_id || row.term_id || row.name || row.formula)}
-        dataSource={currentRows}
-        columns={[
-          { title: '名称', dataIndex: 'name' },
-          { title: '编码', render: (_, row) => String(row.constraint_id || row.term_id || '-') },
-          { title: '类型', render: () => <Tag color={kind === 'constraint' ? 'blue' : 'purple'}>{kind === 'constraint' ? '约束' : '目标'}</Tag> },
-          { title: '公式摘要', ellipsis: true, render: (_, row) => String(row.display_formula || row.dsl_formula || row.formula || '-') },
-          { title: '参与求解', render: (_, row) => String(row.solve_participation || 'solve_active') === 'preview_only' ? '仅预览' : '参与求解' },
-          { title: '状态', render: (_, row) => <Tag color={String(row.compile_status || row.formula || row.dsl_formula) ? 'green' : 'orange'}>{String(row.compile_status || row.formula || row.dsl_formula) ? '已配置' : '待配置'}</Tag> },
-          {
-            title: '操作',
-            fixed: 'right' as const,
-            width: 180,
-            render: (_, _row, index) => (
-              <Space>
-                <Button type="link" onClick={() => setEditing({ index, formula: formulaFromRow(currentRows[index], kind) })}>编辑</Button>
-                <Button type="link" onClick={() => copyFormula(index)}>复制</Button>
-                <Button danger type="link" onClick={() => removeFormula(index)}>删除</Button>
-              </Space>
-            ),
-          },
-        ]}
-      />
+      {table}
       <Button icon={<PlusOutlined />} onClick={addFormula}>新增{title}</Button>
       <FormulaBuilderModal
         open={!!editing}
@@ -245,18 +270,35 @@ function DependencyEditor({ form, component, availableIds = [] }: { form: FormIn
   );
 }
 
-export function ComponentEditor({ component, availableIds = [], onSave }: EditorProps) {
+export function ComponentEditor({ component, availableIds = [], dictionaries, onSave }: EditorProps) {
   const [form] = Form.useForm<Partial<ComponentDef>>();
   const [activeSection, setActiveSection] = useState('basic');
   useEffect(() => {
     if (component) form.setFieldsValue(component);
   }, [component, form]);
+  const selectedDomain = Form.useWatch('domain', form) || component?.domain;
+  const selectedCategory = Form.useWatch('category', form) || component?.category;
+  const selectedDomainCode = domainCodeFromLabel(dictionaries?.component_domains, selectedDomain);
+  const domainOptions = dictionaryOptions(dictionaries?.component_domains, component?.domain);
+  const categoryOptions = dictionaryOptions(
+    selectedDomainCode
+      ? (dictionaries?.component_categories || []).filter(item => !item.parent_code || item.parent_code === selectedDomainCode)
+      : dictionaries?.component_categories,
+    selectedCategory,
+  );
+  const isImplemented = component ? component.implemented !== false : false;
+  const implementationStatus = isImplemented
+    ? '已实现，可参与后端求解'
+    : component?.status === 'reserved' || component?.status === 'planned'
+      ? '预留/仅展示'
+      : '草稿保存后需校验并发布，发布成功后自动标记为已实现';
   const handleSave = (value: Partial<ComponentDef>) => {
     const deps = [...new Set([...(value.depends_on || []), ...(value.dependencies || [])])];
     const currentId = String(value.component_id || component?.component_id || '');
     const missing = deps.filter(dep => dep !== currentId && !availableIds.includes(dep));
     onSave({
       ...value,
+      implemented: value.implemented ?? component?.implemented ?? false,
       depends_on: deps,
       dependencies: deps,
       validation_result: {
@@ -275,11 +317,12 @@ export function ComponentEditor({ component, availableIds = [], onSave }: Editor
           <Col xs={24} md={12}><Form.Item name="display_name" label="展示名称"><Input /></Form.Item></Col>
           <Col xs={24} md={12}><Form.Item name="component_id" label="组件编码" rules={[{ required: true }]}><Input disabled={!!component} /></Form.Item></Col>
           <Col xs={24} md={12}><Form.Item name="version" label="版本"><Input /></Form.Item></Col>
-          <Col xs={24} md={8}><Form.Item name="category" label="分类"><Input /></Form.Item></Col>
-          <Col xs={24} md={8}><Form.Item name="domain" label="领域"><Input /></Form.Item></Col>
+          <Col xs={24} md={8}><Form.Item name="category" label="分类"><Select showSearch options={categoryOptions} placeholder="选择分类" /></Form.Item></Col>
+          <Col xs={24} md={8}><Form.Item name="domain" label="领域"><Select showSearch options={domainOptions} placeholder="选择领域" onChange={() => form.setFieldValue('category', undefined)} /></Form.Item></Col>
           <Col xs={24} md={8}><Form.Item name="status" label="状态"><Select options={statusOptions} /></Form.Item></Col>
           <Col xs={24} md={8}><Form.Item name="enabled" label="启用" valuePropName="checked"><Switch /></Form.Item></Col>
-          <Col xs={24} md={8}><Form.Item name="implemented" label="后端已实现" valuePropName="checked"><Switch /></Form.Item></Col>
+          <Form.Item name="implemented" valuePropName="checked" hidden><Switch /></Form.Item>
+          <Col xs={24} md={16}><Form.Item label="实现状态"><Tag color={isImplemented ? 'green' : 'orange'}>{implementationStatus}</Tag></Form.Item></Col>
           <Col span={24}><Form.Item name="description" label="组件说明"><Input.TextArea autoSize={{ minRows: 2, maxRows: 5 }} /></Form.Item></Col>
         </Row>
       ),
@@ -294,7 +337,7 @@ export function ComponentEditor({ component, availableIds = [], onSave }: Editor
   ];
   const currentSection = sections.find(section => section.key === activeSection) || sections[0];
   return (
-    <Form id="component-editor-form" form={form} layout="vertical" initialValues={component || { enabled: true, implemented: true, status: 'draft', version: '1.0.0' }} onFinish={handleSave}>
+    <Form id="component-editor-form" form={form} layout="vertical" initialValues={component || { enabled: true, implemented: false, status: 'draft', version: '1.0.0' }} onFinish={handleSave}>
       <div className="component-editor-layout">
         <nav className="component-editor-nav" aria-label="组件编辑分区">
           {sections.map(section => (

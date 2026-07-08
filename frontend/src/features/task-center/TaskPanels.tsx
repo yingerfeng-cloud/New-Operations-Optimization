@@ -50,10 +50,14 @@ function statusColor(status: string, current: string) {
 export function TaskOverviewPanel({ task }: { task?: SolveTask }) {
   if (!task) return <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="请选择任务" />;
   const status = String(task.status || '').toUpperCase();
+  const trace = task.trace || {};
+  const problemType = task.problem_type || trace.problem_type || (String(task.solver || '').toLowerCase().includes('ipopt') ? 'NLP' : '-');
+  const isNlp = String(problemType).toUpperCase() === 'NLP' || String(task.solver || '').toLowerCase().includes('ipopt');
   return (
     <>
       {task.resolution_warning && <Alert showIcon type="warning" title="模型解析提示" description={task.resolution_warning} className="section-gap" />}
       {task.error && <Alert showIcon type="error" title="任务错误" description={task.error} className="section-gap" />}
+      {isNlp && <Alert showIcon type="warning" title="NLP 结果不承诺全局最优" description="Ipopt 用于连续变量 NLP，通常返回局部最优或求解器终止状态；请关注初值、上下界和约束违反摘要。" className="section-gap" />}
       <Descriptions bordered size="small" column={2}>
         <Descriptions.Item label="任务编号">{task.id}</Descriptions.Item>
         <Descriptions.Item label="状态"><StatusTag status={task.status} /></Descriptions.Item>
@@ -61,12 +65,17 @@ export function TaskOverviewPanel({ task }: { task?: SolveTask }) {
         <Descriptions.Item label="模型ID">{task.resolved_model_id || task.model_id || '-'}</Descriptions.Item>
         <Descriptions.Item label="场景">{task.scene}</Descriptions.Item>
         <Descriptions.Item label="求解器">{task.solver || 'HiGHS'}</Descriptions.Item>
+        <Descriptions.Item label="问题类型">{text(problemType)}</Descriptions.Item>
+        <Descriptions.Item label="求解器可用性">{text(task.solver_available ?? trace.solver_available)}</Descriptions.Item>
+        <Descriptions.Item label="终止状态">{text(task.termination_condition ?? trace.termination_condition)}</Descriptions.Item>
         <Descriptions.Item label="目标值">{text(task.cost)}</Descriptions.Item>
         <Descriptions.Item label="Gap">{text(task.gap)}</Descriptions.Item>
         <Descriptions.Item label="风险">{text(task.risk)}</Descriptions.Item>
         <Descriptions.Item label="重试次数">{text(task.retry_count || 0)}</Descriptions.Item>
         <Descriptions.Item label="创建时间">{task.created_at}</Descriptions.Item>
         <Descriptions.Item label="耗时">{task.duration_seconds === undefined ? '-' : `${task.duration_seconds}s`}</Descriptions.Item>
+        <Descriptions.Item label="约束违反摘要">{text(task.constraint_violation_summary ?? trace.constraint_violation_summary)}</Descriptions.Item>
+        <Descriptions.Item label="局部最优提示">{text(task.local_optimum_warning ?? trace.local_optimum_warning)}</Descriptions.Item>
       </Descriptions>
       <Card size="small" title="任务进度" className="section-gap">
         <Progress percent={Math.max(0, Math.min(100, Number(task.progress || 0)))} status={status === 'SUCCESS' ? 'success' : ['FAILED', 'TIMEOUT', 'CANCELLED', 'INFEASIBLE'].includes(status) ? 'exception' : 'active'} />

@@ -8,16 +8,20 @@ from pydantic import BaseModel, Field
 class SolverRunResult(BaseModel):
     status: str
     objective_value: float | None = None
+    objective: float | None = None
     solve_time: float = 0.0
     variable_values: dict[str, Any] = Field(default_factory=dict)
+    variables: dict[str, Any] = Field(default_factory=dict)
     solver_log: str = ""
     raw_termination_condition: str = ""
     solver_type: str | None = None
+    solver_name: str | None = None
     local_optimum_warning: bool = False
     termination_condition: str | None = None
     constraint_violation_summary: dict[str, Any] = Field(default_factory=dict)
     solver_available: bool | None = None
     solver_message: str = ""
+    message: str = ""
 
 
 class SolveResult(BaseModel):

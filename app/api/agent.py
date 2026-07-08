@@ -5,6 +5,7 @@ from fastapi import APIRouter
 from app.agent.conversation_store import conversation_store
 from app.agent.orchestrator import agent_orchestrator
 from app.agent.platform_client import platform_client
+from app.agent.platform_gateway import service_mode
 from app.services.agent_service import AgentOptimizeRequest
 from app.services.agent_skill_service import agent_skill_service
 from app.services.llm_service import llm_service
@@ -75,13 +76,14 @@ def agent_list_skills() -> list[dict]:
 @router.get("/status")
 def agent_status() -> dict:
     platform = {
-        "base_url": platform_client.base_url,
+        "base_url": getattr(platform_client, "effective_base_url", getattr(platform_client, "base_url", "internal")),
         "reachable": False,
         "health_ok": False,
         "skill_registry_ok": False,
         "skill_count": 0,
         "last_error": None,
     }
+    skills: list[dict] = []
     try:
         health = platform_client.health()
         platform["reachable"] = True
@@ -95,13 +97,31 @@ def agent_status() -> dict:
         platform["skill_count"] = len(skills)
     except Exception as exc:
         platform["last_error"] = str(getattr(exc, "detail", exc))
+    try:
+        agent_skills = agent_skill_service.list_skills()
+    except Exception:
+        agent_skills = []
     llm = llm_service.config()
+    mode = service_mode()
+    access_mode = getattr(platform_client, "platform_access_mode", "http")
     return {
-        "agent": {"ok": True, "service": "optimization-agent"},
+        "agent": {
+            "ok": True,
+            "available": mode in {"combined", "agent"},
+            "service": "optimization-agent",
+            "service_mode": mode,
+            "platform_access_mode": access_mode,
+        },
         "platform": platform,
+        "skills": {
+            "platform_skill_count": len(skills),
+            "agent_skill_count": len(agent_skills),
+            "enabled_skill_count": len([item for item in skills if item.get("skill_status") == "enabled"]),
+        },
         "llm": {
             "enabled": llm["enabled"],
             "api_key_configured": llm["api_key_configured"],
+            "configured": llm["api_key_configured"],
             "provider": llm["provider"],
             "model": llm["model"],
             "fallback_mode": "llm" if llm["enabled"] else "rule_based",

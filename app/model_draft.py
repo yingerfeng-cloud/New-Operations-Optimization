@@ -32,7 +32,9 @@ def create_model_draft_from_template(template: dict[str, Any]) -> dict[str, Any]
     components = []
     for item in component_spec.get("components", []) or []:
         component_type = str(item.get("type") or item.get("code") or item.get("component_id"))
-        definition = _component_definition_or_metadata(component_type)
+        definition = deepcopy(item.get("definition") or {}) or _component_definition_or_metadata(component_type)
+        if definition:
+            definition = normalize_component_payload({**definition, "component_id": definition.get("component_id") or component_type})
         components.append(
             {
                 "component_id": component_type,
@@ -443,6 +445,12 @@ def _component_spec_item_from_draft(item: dict[str, Any]) -> dict[str, Any]:
     component_type = item.get("type") or item.get("component_id")
     row: dict[str, Any] = {"type": component_type}
     config = deepcopy(item.get("config") or {})
+    if item.get("definition"):
+        row["definition"] = deepcopy(item["definition"])
+    if item.get("generated_constraints"):
+        row["generated_constraints"] = deepcopy(item["generated_constraints"])
+    if item.get("generated_objective_terms"):
+        row["generated_objective_terms"] = deepcopy(item["generated_objective_terms"])
     if component_type in COMPONENT_CONFIG_COMPONENTS:
         for field in COMPONENT_CONFIG_FIELDS:
             if field == "config":
@@ -736,7 +744,9 @@ def _draft_components_from_component_spec(component_spec: dict[str, Any]) -> lis
         component_type = str(item.get("type") or item.get("code") or item.get("component_id") or "")
         if not component_type:
             continue
-        definition = _component_definition_or_metadata(component_type)
+        definition = deepcopy(item.get("definition") or {}) or _component_definition_or_metadata(component_type)
+        if definition:
+            definition = normalize_component_payload({**definition, "component_id": definition.get("component_id") or component_type})
         config = deepcopy(item.get("config") or {})
         draft_item = {
             "component_id": component_type,
@@ -854,7 +864,7 @@ def _generic_objective(template: dict[str, Any]) -> dict[str, Any]:
         "terms": [
             {
                 "term_id": first.get("code") or "objective",
-                "name": first.get("name") or first.get("code") or "鐩爣鍑芥暟",
+                "name": first.get("name") or first.get("code") or "目标函数",
                 "source": "template",
                 "expression": first.get("expression") or first.get("business_goal") or "",
                 "weight": 1,

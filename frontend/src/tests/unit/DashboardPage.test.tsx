@@ -20,6 +20,14 @@ vi.mock('../../api/tasks', () => ({
   getTasks: async () => [{ id: 'T-1', model: '模型一', scene: '日前调度', solver: 'HiGHS', status: 'SUCCESS', progress: 100, created_at: '2026-06-23' }],
 }));
 
+vi.mock('../../api/solvers', () => ({
+  getSolverStatus: async () => ({
+    highs: { available: true, version: '1.0' },
+    ipopt: { available: true, path: '/usr/bin/ipopt', version: 'Ipopt 3.x' },
+    status: 'OK',
+  }),
+}));
+
 test('dashboard renders React platform entries', async () => {
   renderWithQueryClient(
     <MemoryRouter>
@@ -33,4 +41,7 @@ test('dashboard renders React platform entries', async () => {
   expect(await screen.findByText('选择业务场景')).toBeInTheDocument();
   expect(await screen.findByText('查看结果报告')).toBeInTheDocument();
   expect(await screen.findByText('最近求解任务')).toBeInTheDocument();
+  expect(await screen.findByText('平台能力矩阵')).toBeInTheDocument();
+  expect(await screen.findByText('梯级水电优化调度')).toBeInTheDocument();
+  expect(await screen.findByText('非线性水电出力 NLP 演示')).toBeInTheDocument();
 });

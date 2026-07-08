@@ -13,6 +13,7 @@ const FunctionAssets = lazy(() => import('../pages/FunctionAssets/FunctionAssets
 const TaskCenter = lazy(() => import('../pages/TaskCenter/TaskCenterPage').then(m => ({ default: m.TaskCenterPage })));
 const ResultCenter = lazy(() => import('../pages/ResultCenter/ResultCenterPage').then(m => ({ default: m.ResultCenterPage })));
 const ModelServices = lazy(() => import('../pages/ModelServices/ModelServicesPage').then(m => ({ default: m.ModelServicesPage })));
+const SkillCenter = lazy(() => import('../pages/SkillCenter/SkillCenterPage').then(m => ({ default: m.SkillCenterPage })));
 const ModelCreation = lazy(() => import('../features/model-creation/ModelCreationPage').then(m => ({ default: m.ModelCreationPage })));
 const load = (node: React.ReactNode) => <Suspense fallback={<Spin fullscreen />}>{node}</Suspense>;
 
@@ -34,6 +35,7 @@ export const router = createBrowserRouter([
       { path: 'results', element: load(<ResultCenter />) },
       { path: 'services', element: load(<ModelServices />) },
       { path: 'model-services', element: load(<ModelServices />) },
+      { path: 'skills', element: load(<SkillCenter />) },
       { path: 'agents', element: <AgentWorkbenchPage /> },
       { path: 'settings', element: <SettingsPage variant="settings" /> },
     ],

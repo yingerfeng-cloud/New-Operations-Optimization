@@ -564,7 +564,7 @@ def _validate_name(name: str, symbols: dict[str, set[str]], field: str, errors: 
 def _refresh_formula_function_suggestions(errors: list[dict[str, Any]]) -> None:
     allowed = ", ".join(f"{name}(...)" for name in sorted(ALLOWED_FUNCTIONS))
     for error in errors:
-        if "函数调用" in str(error.get("message") or "") or "鍑芥暟璋冪敤" in str(error.get("message") or ""):
+        if "函数调用" in str(error.get("message") or "") or "非法函数" in str(error.get("message") or ""):
             error["message"] = "公式包含非法函数调用"
             error["suggestion"] = f"当前仅允许 {allowed}。"
 
@@ -895,7 +895,11 @@ def _compile_test_runtime_parameters(component: dict[str, Any], model_spec: dict
         if str(param.get("type") or param.get("param_type") or "").lower() in {"piecewise_curve", "curve"}:
             params[code] = param.get("points") or [[0, 0], [1, 1]]
             continue
-        default = param.get("default", param.get("default_value", 1))
+        default = param.get("default")
+        if default is None:
+            default = param.get("default_value")
+        if default is None:
+            default = param.get("sample", 1)
         params[code] = _default_value_for_dimensions(list(param.get("dimension") or []), params, default)
     return params
 

@@ -1,0 +1,35 @@
+name: pv_storage_dispatch_v2
+display_name: 光储一体化调度 V2
+canonical_api_skill_name: run_pv_storage_dispatch_v2
+enabled: true
+confirmation_required: true
+execution_policy:
+  mode: advisory_only
+required_parameters:
+  - horizon
+  - time
+  - time_volume
+  - pv_forecast
+  - grid_limit
+  - schedule
+  - price
+  - storage_power_capacity
+  - storage_energy_capacity
+  - initial_soc
+  - terminal_time
+  - terminal_soc_target
+  - capex_power
+  - capex_energy
+  - curtailment_penalty
+  - storage_cycle_cost
+  - eta_ch
+  - eta_dis
+  - delta_t
+  - soc_min
+  - deviation_limit
+  - deviation_penalty_price
+  - soc_max
+  - degradation_cost_yuan_per_mwh
+optional_parameters:
+trigger_intents:
+  - pv_storage_dispatch_v2

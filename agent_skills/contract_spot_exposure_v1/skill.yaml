@@ -1,0 +1,21 @@
+name: contract_spot_exposure_v1
+display_name: 中长期合约分解与现货暴露控制模型
+canonical_api_skill_name: run_contract_spot_exposure_v1
+enabled: true
+confirmation_required: true
+execution_policy:
+  mode: advisory_only
+required_parameters:
+  - horizon
+  - time
+  - time_labels
+  - delta_t
+  - load_forecast
+  - contract_total
+  - contract_price
+  - spot_price_forecast
+  - max_exposure_ratio
+  - deviation_penalty
+optional_parameters:
+trigger_intents:
+  - contract_spot_exposure_v1

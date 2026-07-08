@@ -1,4 +1,4 @@
-import { screen } from '@testing-library/react';
+import { fireEvent, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { vi } from 'vitest';
 import { Header } from '../../app/layout/Header';
@@ -30,6 +30,7 @@ test('settings page documents frontend as React-only', () => {
   renderWithQueryClient(<SettingsPage />);
   const removedHtmlEntry = '/' + 'prototype' + '.html';
 
+  fireEvent.click(screen.getByRole('button', { name: /部署信息/ }));
   expect(screen.getByText('正式前端')).toBeInTheDocument();
   expect(screen.getAllByText('frontend/').length).toBeGreaterThan(0);
   expect(screen.queryByText('/legacy')).not.toBeInTheDocument();

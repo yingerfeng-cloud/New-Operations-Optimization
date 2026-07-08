@@ -1,0 +1,52 @@
+{
+  "time": [
+    0,
+    1,
+    2,
+    3
+  ],
+  "time_volume": [
+    0,
+    1,
+    2,
+    3,
+    4
+  ],
+  "pv_forecast": [
+    60,
+    85,
+    45,
+    20
+  ],
+  "grid_limit": [
+    80,
+    80,
+    80,
+    80
+  ],
+  "schedule": [
+    55,
+    75,
+    50,
+    25
+  ],
+  "price": [
+    320,
+    500,
+    420,
+    300
+  ],
+  "storage_power_capacity": 25,
+  "storage_energy_capacity": 50,
+  "initial_soc": 18,
+  "terminal_time": 4,
+  "terminal_soc_target": 18,
+  "capex_power": 1000,
+  "capex_energy": 500,
+  "curtailment_penalty": 100,
+  "storage_cycle_cost": 1,
+  "eta_ch": 0.95,
+  "eta_dis": 0.95,
+  "delta_t": 1,
+  "soc_min": 0.1
+}

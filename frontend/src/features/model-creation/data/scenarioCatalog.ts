@@ -1,4 +1,5 @@
 import type { ScenarioCatalogItem, ScenarioModelItem } from '../../../types/scenario';
+import type { DictionaryItem } from '../../../types/systemConfig';
 
 export const BLANK_MODEL_ID = '__blank_model__';
 export const DEFAULT_SCENARIO_ID = 'day_ahead_unit_commitment';
@@ -167,6 +168,24 @@ export const scenarioCatalog: ScenarioCatalogItem[] = [
 
 export function getScenarioById(id: string) {
   return scenarioCatalog.find(item => item.id === id);
+}
+
+export function scenariosFromDictionary(items?: DictionaryItem[]) {
+  if (!items?.length) return scenarioCatalog;
+  const dictByCode = new Map(items.map(item => [item.code, item]));
+  const enabledCodes = new Set(items.filter(item => item.enabled !== false).map(item => item.code));
+  return scenarioCatalog
+    .filter(item => enabledCodes.has(item.id) || !dictByCode.has(item.id))
+    .map(item => {
+      const dict = dictByCode.get(item.id);
+      return { ...item, name: dict?.label || item.name, sortOrder: dict?.sort_order ?? 9999 };
+    })
+    .sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name))
+    .map(({ sortOrder: _sortOrder, ...item }) => item);
+}
+
+export function scenarioNameFromDictionary(id: string, items?: DictionaryItem[]) {
+  return items?.find(item => item.code === id && item.enabled !== false)?.label || getScenarioById(id)?.name || '';
 }
 
 export function getScenarioModelById(scenarioId: string, modelId: string): ScenarioModelItem | undefined {

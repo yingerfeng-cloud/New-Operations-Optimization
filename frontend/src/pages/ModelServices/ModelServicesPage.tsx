@@ -1,13 +1,16 @@
-import { CopyOutlined } from '@ant-design/icons';
+import { CopyOutlined, SearchOutlined } from '@ant-design/icons';
 import { Alert, Button, Card, Collapse, Descriptions, Form, Input, Select, Space, Table, Tabs, Tag, Typography, message } from 'antd';
 import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
 import { getModelAssetDetail, getModels } from '../../api/models';
 import { createTask } from '../../api/tasks';
 import { JsonViewer } from '../../components/JsonViewer';
 import { PageHeader } from '../../components/PageHeader';
+import { StatusTag } from '../../components/StatusTag';
 import { EmptyActionState, FilterBar } from '../../components/WorkspaceUI';
 import type { ModelAsset } from '../../types/model';
+import { capabilityOrFallback, demoCapabilityFor } from '../../features/demo/demoCapabilities';
 
 function asRecords(value: unknown): Record<string, unknown>[] {
   return Array.isArray(value) ? value.filter((item): item is Record<string, unknown> => !!item && typeof item === 'object' && !Array.isArray(item)) : [];
@@ -66,11 +69,42 @@ function samplePayload(rows: Record<string, unknown>[]) {
   return Object.fromEntries(rows.map(row => [row.code, row.example ?? null]));
 }
 
+function objectValue(value: unknown): Record<string, unknown> {
+  return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {};
+}
+
+function samplePayloadFor(model?: ModelAsset, detail?: Record<string, unknown>, rows: Record<string, unknown>[] = []) {
+  const sample = objectValue(detail?.sample_runtime_parameters || model?.sample_runtime_parameters);
+  if (Object.keys(sample).length) return sample;
+  const code = String(model?.template_id || model?.id || '');
+  if (code === 'nonlinear_hydro_power_demo') {
+    return { horizon: 3, time: [0, 1, 2], k: 0.9, flow_min: 10, flow_max: 100, head_min: 20, head_max: 80, power_max: 5000 };
+  }
+  return samplePayload(rows);
+}
+
 function buildModeText(value?: unknown) {
-  return value === 'component_based' ? '组件化 Builder' : value === 'generic_linear' ? '通用线性 Builder' : String(value || '-');
+  return value === 'component_based' ? '组件化 Builder' : value === 'generic_linear' ? '通用线性 Builder' : value === 'template_based' ? '模板 Builder' : String(value || '-');
+}
+
+function statusText(value?: unknown) {
+  const text = String(value || '-');
+  const map: Record<string, string> = {
+    published: '已发布',
+    trial: '试运行',
+    tested: '已测试',
+    draft: '草稿',
+    developing: '开发中',
+    offline: '已下线',
+    已发布: '已发布',
+    试运行: '试运行',
+    已测试: '已测试',
+  };
+  return map[text] || text;
 }
 
 export function ModelServicesPage() {
+  const nav = useNavigate();
   const models = useQuery({ queryKey: ['models'], queryFn: getModels });
   const services = useMemo(() => (models.data || []).filter(model => ['published', 'trial', 'tested', '已发布', '试运行', '已测试'].includes(String(model.status))), [models.data]);
   const [keyword, setKeyword] = useState('');
@@ -90,10 +124,12 @@ export function ModelServicesPage() {
   const selected = filteredServices.find(model => model.id === selectedId) || filteredServices[0];
   const detail = useQuery({ queryKey: ['model-service-detail', selected?.id], queryFn: () => getModelAssetDetail(selected!.id), enabled: !!selected?.id });
   const parameters = useMemo(() => parameterRows(selected, detail.data), [selected, detail.data]);
+  const selectedCapability = capabilityOrFallback(selected || {});
+  const selectedSamplePayload = useMemo(() => samplePayloadFor(selected, detail.data, parameters), [detail.data, parameters, selected]);
   const endpoint = selected ? '/api/tasks' : '';
   const example = selected ? `curl -X POST http://localhost:8000/api/tasks \\
   -H "Content-Type: application/json" \\
-  -d '${JSON.stringify({ model_id: selected.id, runtime_parameters: samplePayload(parameters), async_run: false }, null, 2)}'` : '';
+  -d '${JSON.stringify({ model_id: selected.id, model_code: selected.template_id || selected.id, problem_type: selectedCapability.problemType, solver: selectedCapability.solver, runtime_parameters: selectedSamplePayload, async_run: false }, null, 2)}'` : '';
 
   useEffect(() => {
     if (!selectedId && filteredServices[0]) setSelectedId(filteredServices[0].id);
@@ -101,10 +137,10 @@ export function ModelServicesPage() {
 
   useEffect(() => {
     if (selected) {
-      setDebugPayload(JSON.stringify(samplePayload(parameters), null, 2));
+      setDebugPayload(JSON.stringify(selectedSamplePayload, null, 2));
       setDebugResult(undefined);
     }
-  }, [parameters, selected]);
+  }, [selected, selectedSamplePayload]);
 
   const copyExample = async () => {
     await navigator.clipboard.writeText(example);
@@ -122,13 +158,36 @@ export function ModelServicesPage() {
         throw new Error(`运行参数 JSON 格式错误：${text}`);
       }
       if (!runtime_parameters || typeof runtime_parameters !== 'object' || Array.isArray(runtime_parameters)) throw new Error('运行参数 JSON 必须是对象');
-      return createTask({ model_id: selected.id, model: selected.id, runtime_parameters, parameters: runtime_parameters, async_run: false });
+      const capability = capabilityOrFallback(selected);
+      return createTask({ model_id: selected.id, model: selected.id, model_code: selected.template_id || selected.id, solver: capability.solver, runtime_parameters, parameters: runtime_parameters, async_run: false });
     },
     onSuccess: task => {
       const row = task as Record<string, unknown>;
-      setDebugResult({ task_id: row.id || row.task_id, status: row.status, objective: row.cost ?? row.objective_value, error: row.error || row.message || null });
+      const result = objectValue(row.result);
+      const trace = objectValue(row.trace);
+      setDebugResult({
+        task_id: row.id || row.task_id,
+        status: row.status,
+        model_code: selected.template_id || selected.id,
+        problem_type: result.problem_type || selectedCapability.problemType,
+        solver: result.solver || row.solver || selectedCapability.solver,
+        solver_available: result.solver_available ?? trace.solver_available ?? '按后端状态为准',
+        termination_condition: result.termination_condition || result.raw_termination_condition || trace.termination_condition || '-',
+        objective: row.cost ?? row.objective_value ?? result.objective_value,
+        runtime: row.duration_seconds ?? result.solve_time ?? trace.solve_seconds ?? '-',
+        constraint_violation_summary: result.constraint_violation_summary || '未返回约束违反摘要',
+        local_optimum_warning: result.local_optimum_warning ?? (selectedCapability.problemType === 'NLP' ? 'NLP/Ipopt 结果不承诺全局最优。' : undefined),
+        gap: row.gap || result.gap,
+        error: row.error || row.message || result.error || null,
+      });
     },
-    onError: error => setDebugResult({ status: 'ERROR', error: error instanceof Error ? error.message : String(error) }),
+    onError: error => {
+      const messageText = error instanceof Error ? error.message : String(error);
+      const businessHint = messageText.includes('Ipopt') ? 'Ipopt 不可用，请检查 NLP 求解器环境。'
+        : messageText.includes('JSON') ? messageText
+        : '调用失败：请检查必填运行参数、参数维度和函数资产引用。';
+      setDebugResult({ status: 'ERROR', error: businessHint, raw_error: messageText });
+    },
   });
 
   return (
@@ -138,8 +197,8 @@ export function ModelServicesPage() {
         <Card className="content-card service-list-card" title="服务列表">
           <div className="service-filter-bar">
             <FilterBar onReset={() => { setKeyword(''); setStatusFilter(undefined); setProblemFilter(undefined); }}>
-              <Input allowClear placeholder="搜索服务名称或编码" value={keyword} onChange={event => setKeyword(event.target.value)} />
-              <Select allowClear placeholder="状态" value={statusFilter} onChange={setStatusFilter} options={[...new Set(services.map(item => String(item.status)))].map(value => ({ value, label: value }))} />
+              <Input allowClear prefix={<SearchOutlined />} placeholder="搜索服务名称或编码" value={keyword} onChange={event => setKeyword(event.target.value)} />
+              <Select allowClear placeholder="状态" value={statusFilter} onChange={setStatusFilter} options={[...new Set(services.map(item => String(item.status)))].map(value => ({ value, label: statusText(value) }))} />
               <Select allowClear placeholder="问题类型" value={problemFilter} onChange={setProblemFilter} options={[...new Set(services.map(item => String(item.problem_type || item.model_problem_type || '')).filter(Boolean))].map(value => ({ value, label: value }))} />
             </FilterBar>
           </div>
@@ -148,7 +207,7 @@ export function ModelServicesPage() {
               <button type="button" className={`service-list-item ${model.id === selected?.id ? 'active' : ''}`} key={model.id} onClick={() => setSelectedId(model.id)}>
                 <span className="service-list-title">{model.name}</span>
                 <span className="service-list-code">{model.id}</span>
-                <span className="service-list-meta"><Tag color="green">{String(model.status)}</Tag><Tag>{model.solver || 'HiGHS'}</Tag></span>
+                <span className="service-list-meta"><StatusTag status={String(model.status)} /><Tag>{capabilityOrFallback(model).solver || 'HiGHS'}</Tag></span>
               </button>
             ))}
           </div>
@@ -171,7 +230,10 @@ export function ModelServicesPage() {
                         { key: 'method', label: '方法', children: 'POST' },
                         { key: 'mode', label: '建模模式', children: buildModeText(selected.build_mode) },
                         { key: 'problem', label: '问题类型', children: selected.problem_type || selected.model_problem_type || '-' },
+                        { key: 'solver', label: '推荐求解器', children: selectedCapability.solver },
+                        { key: 'nonlinear', label: '非线性处理方式', children: selectedCapability.nonlinearHandling },
                       ]} />
+                      {demoCapabilityFor(selected) && <Alert className="section-gap" showIcon type="info" title={demoCapabilityFor(selected)?.displayName} description={`演示标签：${selectedCapability.tags.join(' / ') || '-'}`} />}
                       <Table
                         className="section-gap"
                         loading={detail.isFetching}
@@ -202,6 +264,12 @@ export function ModelServicesPage() {
                         <Typography.Text type="secondary">调用现有任务接口并回显任务状态。</Typography.Text>
                       </Space>
                       {debugResult && <Card className="section-gap" size="small" title="调试返回"><JsonViewer value={debugResult} /></Card>}
+                      {debugResult && (
+                        <Space className="section-gap" wrap>
+                          <Button onClick={() => nav('/tasks')}>跳转任务中心</Button>
+                          <Button onClick={() => nav('/results')}>跳转结果中心</Button>
+                        </Space>
+                      )}
                     </Form>
                   ),
                 },
@@ -231,7 +299,7 @@ export function ModelServicesPage() {
                 children: (
                   <Space orientation="vertical" size={12} style={{ width: '100%' }}>
                     <Card size="small" title="示例请求" extra={<Button icon={<CopyOutlined />} onClick={copyExample}>复制</Button>}><Typography.Paragraph code style={{ whiteSpace: 'pre-wrap' }}>{example}</Typography.Paragraph></Card>
-                    <Card size="small" title="示例响应"><JsonViewer value={{ task_id: 'task_xxx', status: 'SUCCESS', objective_value: 0, result_summary: '求解完成后返回业务指标、关键变量和报告入口。' }} /></Card>
+                    <Card size="small" title="示例响应"><JsonViewer value={{ task_id: 'task_xxx', status: 'SUCCESS', model_code: selected.template_id || selected.id, problem_type: selectedCapability.problemType, solver: selectedCapability.solver, solver_available: true, termination_condition: selectedCapability.problemType === 'NLP' ? 'locallyOptimal / optimal' : 'optimal', objective: 0, runtime: 0.1, constraint_violation_summary: {}, local_optimum_warning: selectedCapability.problemType === 'NLP' ? 'Ipopt 结果不承诺全局最优。' : undefined }} /></Card>
                     <Card size="small" title="高级契约"><JsonViewer value={{ input_contract: selected.input_contract, output_contract: selected.output_contract, parameter_schema: selected.parameter_schema }} /></Card>
                   </Space>
                 ),

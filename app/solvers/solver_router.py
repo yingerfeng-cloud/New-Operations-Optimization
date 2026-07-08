@@ -52,7 +52,7 @@ class SolverRouter:
                 "supported_problem_types": [],
                 "available": False,
                 "error_code": "MINLP_RESERVED_UNSUPPORTED",
-                "message": "当前平台暂不支持生产级 MINLP 求解，请选择线性化策略或简化模型。",
+                "message": "当前模型被识别为 MINLP，平台当前未开放生产级 MINLP 求解。请改用线性化策略，或移除整数变量后使用 NLP。",
             }
         recommended = PROBLEM_SOLVER_ROUTE.get(normalized_type)
         if not recommended and not requested_solver:

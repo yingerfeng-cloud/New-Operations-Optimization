@@ -2,7 +2,9 @@ import type { ModelDraft } from '../stores/modelCreationStore';
 
 function normalizeProblemType(value: unknown) {
   const text = String(value || '').toUpperCase();
+  if (text.includes('MINLP')) return 'MINLP_RESERVED';
   if (text.includes('MILP') || text.includes('MIP') || text.includes('INTEGER')) return 'MILP';
+  if (text.includes('NLP')) return 'NLP';
   if (text.includes('LP') || text.includes('LINEAR')) return 'LP';
   return undefined;
 }
@@ -17,7 +19,7 @@ function metadataProblemType(value: Record<string, unknown>) {
   );
 }
 
-export function inferModelProblemType(draft: ModelDraft): 'LP' | 'MILP' {
+export function inferModelProblemType(draft: ModelDraft): 'LP' | 'MILP' | 'NLP' | 'MINLP_RESERVED' {
   const componentTypes = draft.components.map(component => metadataProblemType(component)).filter(Boolean);
   if (componentTypes.includes('MILP')) return 'MILP';
 
@@ -32,7 +34,11 @@ export function inferModelProblemType(draft: ModelDraft): 'LP' | 'MILP' {
     const type = String(variable.variableType || variable.domain || '').toLowerCase();
     return type.includes('binary') || type.includes('integer') || type === 'bool';
   });
+  const solver = String(draft.basic_info.solver || '').toLowerCase();
+  const hasNlpHint = solver === 'ipopt' || draft.formulas.some(formula => /(\w+\[[^\]]+\]|\w+)\s*(\*|\/|\*\*|\^)\s*(\w+\[[^\]]+\]|\w+)/.test(formula.dsl_formula));
+  if (hasNlpHint && hasIntegerVariable) return 'MINLP_RESERVED';
+  if (hasNlpHint) return 'NLP';
   if (hasIntegerVariable) return 'MILP';
 
-  return (componentTypes[0] as 'LP' | undefined) || draftMetadataType || 'LP';
+  return (componentTypes[0] as 'LP' | 'MILP' | 'NLP' | 'MINLP_RESERVED' | undefined) || draftMetadataType || 'LP';
 }

@@ -7,13 +7,11 @@ from typing import Any
 import pyomo.environ as pyo
 
 from app.schemas.result import SolverRunResult
+from app.solvers.status import IPOPT_UNAVAILABLE_MESSAGE
 
 
 LOCAL_OPTIMUM_WARNING = "NLP solve is a local optimum search; results depend on initial values, bounds, and model scaling."
-IPOPT_INSTALL_HINT = (
-    "Ipopt is not available through Pyomo SolverFactory('ipopt'). "
-    "Install Ipopt and ensure the ipopt executable is on PATH before enabling NLP solves."
-)
+IPOPT_INSTALL_HINT = f"{IPOPT_UNAVAILABLE_MESSAGE} Install Ipopt and ensure the ipopt executable is on PATH before enabling NLP solves."
 
 
 class NLPSolverAdapter:
@@ -36,19 +34,28 @@ class NLPSolverAdapter:
         mip_gap: float = 0.001,
         time_limit_seconds: int = 300,
         threads: int | None = None,
+        nlp_tolerance: float | None = None,
+        max_cpu_time: float | None = None,
+        max_iter: int | None = None,
+        acceptable_tol: float | None = None,
     ) -> SolverRunResult:
         if self._has_integer_variables(model):
             return self._failed_result(
-                "integer_variables_not_supported",
-                "NLP adapter only supports continuous-variable NLP. MINLP is reserved and not production-supported.",
+                "MINLP_RESERVED",
+                "当前模型被识别为 MINLP，平台当前未开放生产级 MINLP 求解。请改用线性化策略，或移除整数变量后使用 NLP。",
+                solver_available=self.available(),
             )
         if not self.available():
             return self._failed_result("solver_unavailable", IPOPT_INSTALL_HINT)
 
         self._initialize_unset_variables(model)
         solver = pyo.SolverFactory("ipopt")
-        solver.options["max_cpu_time"] = float(time_limit_seconds)
-        solver.options["tol"] = float(max(mip_gap, 1e-8))
+        solver.options["max_cpu_time"] = float(max_cpu_time if max_cpu_time is not None else time_limit_seconds)
+        solver.options["tol"] = float(max(nlp_tolerance if nlp_tolerance is not None else mip_gap, 1e-8))
+        if max_iter is not None:
+            solver.options["max_iter"] = int(max_iter)
+        if acceptable_tol is not None:
+            solver.options["acceptable_tol"] = float(acceptable_tol)
 
         started = time.monotonic()
         try:
@@ -60,37 +67,46 @@ class NLPSolverAdapter:
         termination = str(result.solver.termination_condition)
         status = self._status_from_termination(termination)
         objective_value = self._objective_value(model)
+        variables = self.extract_variables(model)
         violations = self.constraint_violations(model)
         message = f"Ipopt termination_condition={termination}. {LOCAL_OPTIMUM_WARNING}"
         return SolverRunResult(
             status=status,
             objective_value=objective_value,
+            objective=objective_value,
             solve_time=round(solve_time, 4),
-            variable_values=self.extract_variables(model),
+            variable_values=variables,
+            variables=variables,
             solver_log=message,
             raw_termination_condition=termination,
             solver_type="NLP",
+            solver_name=self.name,
             local_optimum_warning=True,
             termination_condition=termination,
             constraint_violation_summary=violations,
             solver_available=True,
             solver_message=message,
+            message=message,
         )
 
-    def _failed_result(self, status: str, message: str) -> SolverRunResult:
+    def _failed_result(self, status: str, message: str, *, solver_available: bool = False) -> SolverRunResult:
         return SolverRunResult(
             status=status,
             objective_value=None,
+            objective=None,
             solve_time=0.0,
             variable_values={},
+            variables={},
             solver_log=message,
             raw_termination_condition=status,
             solver_type="NLP",
+            solver_name=self.name,
             local_optimum_warning=True,
             termination_condition=status,
             constraint_violation_summary={"max_violation": None, "violated_count": None, "violations": []},
-            solver_available=False,
+            solver_available=solver_available,
             solver_message=message,
+            message=message,
         )
 
     def _has_integer_variables(self, model: Any) -> bool:
@@ -171,6 +187,8 @@ class NLPSolverAdapter:
         lowered = termination.lower()
         if "optimal" in lowered or "locallyoptimal" in lowered:
             return "local_optimal"
+        if "acceptable" in lowered:
+            return "feasible"
         if "infeasible" in lowered:
             return "infeasible"
         if "unbounded" in lowered:

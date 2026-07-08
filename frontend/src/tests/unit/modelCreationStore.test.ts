@@ -3,6 +3,7 @@ import { initialDraft, useModelCreationStore } from '../../features/model-creati
 import { BLANK_MODEL_ID } from '../../features/model-creation/data/scenarioCatalog';
 import { applyTemplateToDraft } from '../../features/model-creation/utils/applyTemplateToDraft';
 import { inferModelProblemType } from '../../features/model-creation/utils/inferModelProblemType';
+import { modelAssetToDraft } from '../../features/model-creation/utils/modelAssetToDraft';
 import { normalizeModelDraft } from '../../features/model-creation/utils/normalizeModelDraft';
 import { buildModelDraftPayload, saveModelDraftAsset } from '../../features/model-creation/utils/saveModelDraftAsset';
 
@@ -131,6 +132,192 @@ test('saving an existing draft asset updates instead of creating a duplicate', a
   expect(createModel).toHaveBeenCalledTimes(1);
   expect(updateModel).toHaveBeenCalledTimes(1);
   expect(updateModel).toHaveBeenCalledWith('MODEL-1', expect.objectContaining({ model_problem_type: 'LP' }));
+});
+
+test('model asset edit restores saved model draft fields', () => {
+  const draft = normalizeModelDraft({
+    ...initialDraft,
+    basic_info: {
+      ...initialDraft.basic_info,
+      name: '已保存模型',
+      model_code: 'saved_model',
+      scenario: '资产中心场景',
+      builder_mode: 'component_based',
+      solver: 'Ipopt',
+    },
+    semantic: {
+      sets: [{ code: 'time', name: '调度时段', values: [0, 1] }],
+      parameters: [{ code: 'load', name: '负荷', indices: ['time'], required: true }],
+      variables: [{ code: 'p', name: '出力', variableType: 'continuous', indices: ['time'] }],
+    },
+    components: [{ component_id: 'function_mapping_component', enabled: true, function_asset_id: 'curve_1' }],
+    runtime_parameters: { horizon: 2, load: [1, 2] },
+    advanced: { component_spec: { components: [{ type: 'function_mapping_component' }] } },
+  });
+
+  const restored = modelAssetToDraft({
+    id: 'MODEL-SAVED',
+    name: '已保存模型',
+    scene: '资产中心场景',
+    version: 'v1',
+    status: 'developing',
+    solver: 'Ipopt',
+    problem_type: 'NLP',
+    model_problem_type: 'NLP',
+    build_mode: 'component_based',
+    updated_at: '2026-07-07',
+    template_id: 'saved_model',
+    model_draft: draft as unknown as Record<string, unknown>,
+  });
+
+  expect(restored.basic_info.name).toBe('已保存模型');
+  expect(restored.basic_info.model_code).toBe('saved_model');
+  expect(restored.basic_info.solver).toBe('Ipopt');
+  expect(restored.semantic.variables).toEqual(expect.arrayContaining([expect.objectContaining({ code: 'p' })]));
+  expect(restored.components).toEqual(expect.arrayContaining([expect.objectContaining({ component_id: 'function_mapping_component' })]));
+  expect(restored.runtime_parameters.horizon).toBe(2);
+});
+
+test('model asset edit falls back to asset specs when model_draft is absent', () => {
+  const restored = modelAssetToDraft({
+    id: 'MODEL-LEGACY',
+    name: '旧资产',
+    scene: '旧场景',
+    version: 'v1',
+    status: 'developing',
+    solver: 'HiGHS',
+    problem_type: 'LP',
+    build_mode: 'generic_linear',
+    updated_at: '2026-07-07',
+    template_id: 'legacy_model',
+    semantic_spec: {
+      sets: [{ code: 'time', name: '时段', values: [0, 1, 2] }],
+      parameters: [{ code: 'price', name: '电价', dimension: ['time'] }],
+      variables: [{ code: 'p', name: '出力', domain: 'NonNegativeReals', dimension: ['time'] }],
+    },
+    generic_spec: {
+      variables: [{ name: 'p', indices: ['time'] }],
+      objective: { terms: [{ var: 'p', key: ['time'] }] },
+      constraints: [{ name: '出力上限', formula: 'p[t] <= p_max[t]' }],
+    },
+    parameters: { horizon: 3 },
+  });
+
+  expect(restored.basic_info.model_code).toBe('legacy_model');
+  expect(restored.semantic.sets.find(item => item.code === 'time')?.values).toHaveLength(3);
+  expect(restored.semantic.parameters[0].code).toBe('price');
+  expect(restored.semantic.variables[0].code).toBe('p');
+  expect(restored.advanced.generic_spec).toEqual(expect.objectContaining({ variables: [expect.objectContaining({ name: 'p' })] }));
+  expect(restored.formulas).toEqual(expect.arrayContaining([
+    expect.objectContaining({ kind: 'objective', dsl_formula: 'p[time]' }),
+  ]));
+  expect(restored.formulas).toEqual(expect.arrayContaining([
+    expect.objectContaining({ kind: 'constraint' }),
+  ]));
+});
+
+test('model asset edit falls back to component spec and mathematical expansion for Step3', () => {
+  const restored = modelAssetToDraft({
+    id: 'MODEL-COMPONENT',
+    name: '组件资产',
+    scene: '组件场景',
+    version: 'v1',
+    status: 'developing',
+    solver: 'HiGHS',
+    problem_type: 'LP',
+    build_mode: 'component_based',
+    updated_at: '2026-07-07',
+    template_id: 'component_model',
+    semantic_spec: {
+      sets: [{ code: 'time', name: '时段', values: [0, 1] }],
+      variables: [{ code: 'p', name: '出力', dimension: ['time'] }],
+    },
+    component_spec: {
+      components: [{ type: 'power_balance', name: '功率平衡' }],
+      objective: {
+        terms: [{ term_id: 'cost', name: '运行成本', expression: 'sum(price[t] * p[t] for t in time)', source_component: 'power_balance' }],
+      },
+    },
+    mathematical_expansion: {
+      sections: [{ type: 'constraint', title: '功率平衡约束', formula: 'p[t] == load[t]', source_component: 'power_balance' }],
+    },
+    model_draft: {
+      basic_info: { name: '组件资产', model_code: 'component_model', scenario: '组件场景', builder_mode: 'component_based', solver: 'HiGHS' },
+      semantic: {
+        sets: [{ code: 'time', name: '时段', values: [0, 1] }],
+        parameters: [],
+        variables: [{ code: 'p', name: '出力', dimension: ['time'] }],
+      },
+      components: [],
+      formulas: [],
+      runtime_parameters: { horizon: 2 },
+      parameter_groups: {},
+      advanced: {},
+    },
+  });
+
+  expect(restored.components).toEqual(expect.arrayContaining([
+    expect.objectContaining({
+      component_id: 'power_balance',
+      generated_constraints: [expect.objectContaining({ expression: 'p[t] == load[t]' })],
+      generated_objective_terms: [expect.objectContaining({ expression: 'sum(price[t] * p[t] for t in time)' })],
+    }),
+  ]));
+});
+
+test('unit commitment template asset restores Step3 formulas from template draft', () => {
+  const restored = modelAssetToDraft({
+    id: 'MODEL-POWER-UNIT-COMMITMENT-DAY-AHEAD',
+    name: '日前机组组合优化 Unit Commitment',
+    scene: '日前机组组合优化',
+    version: 'v1',
+    status: 'published',
+    solver: 'HiGHS',
+    problem_type: 'MILP',
+    model_problem_type: 'MILP',
+    build_mode: 'template_based',
+    updated_at: '2026-07-07',
+    template_id: 'unit_commitment_day_ahead',
+    semantic_spec: {
+      sets: [{ code: 'unit', name: '机组' }, { code: 'time', name: '时段' }],
+      parameters: [{ code: 'load_forecast', name: '负荷预测', dimension: ['time'] }],
+      variables: [{ code: 'unit_output', name: '机组出力', dimension: ['unit', 'time'] }],
+    },
+    model_draft: {
+      basic_info: {
+        name: '日前机组组合优化 Unit Commitment',
+        model_code: 'unit_commitment_day_ahead',
+        scenario: '日前机组组合优化',
+        builder_mode: 'template_based',
+        solver: 'HiGHS',
+      },
+      semantic: {
+        sets: [{ code: 'unit', name: '机组' }, { code: 'time', name: '时段' }],
+        parameters: [{ code: 'load_forecast', name: '负荷预测', dimension: ['time'] }],
+        variables: [{ code: 'unit_output', name: '机组出力', dimension: ['unit', 'time'] }],
+      },
+      constraints: [
+        { constraint_id: 'power_balance', name: '功率平衡', expression: 'sum(unit_output[unit,time]) >= load_forecast[time]' },
+        { constraint_id: 'reserve_margin', name: '备用约束', expression: 'sum(unit_max_output[unit]*unit_on[unit,time]) >= load_forecast[time]*(1+reserve_ratio)' },
+      ],
+      objective: {
+        sense: 'minimize',
+        terms: [{ term_id: 'total_cost_min', name: '总成本最小', expression: 'sum(fuel_cost[unit]*unit_output[unit,time] + startup_cost[unit]*unit_startup[unit,time])' }],
+      },
+      components: [],
+      formulas: [],
+      runtime_parameters: { horizon: 24 },
+      parameter_groups: {},
+      advanced: {},
+    },
+  });
+
+  expect(restored.basic_info.builder_mode).toBe('template_based');
+  expect(restored.formulas).toEqual(expect.arrayContaining([
+    expect.objectContaining({ kind: 'objective', name: '总成本最小', solve_participation: 'preview_only' }),
+    expect.objectContaining({ kind: 'constraint', name: '功率平衡', solve_participation: 'preview_only' }),
+    expect.objectContaining({ kind: 'constraint', name: '备用约束' }),
+  ]));
 });
 
 test('buildModelDraftPayload keeps Step3 function mapping components from template drafts', () => {

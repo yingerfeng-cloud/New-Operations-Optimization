@@ -1,0 +1,22 @@
+{
+  "objective_value": "number",
+  "variables": [
+    {
+      "key": "contract_use",
+      "name": "中长期合约使用电量",
+      "dimension": [
+        "time"
+      ],
+      "unit": "MWh"
+    },
+    {
+      "key": "spot_exposure",
+      "name": "现货暴露电量",
+      "dimension": [
+        "time"
+      ],
+      "unit": "MWh"
+    }
+  ],
+  "explanation": "string"
+}

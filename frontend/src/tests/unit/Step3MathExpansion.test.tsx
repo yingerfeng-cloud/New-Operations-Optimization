@@ -134,9 +134,9 @@ test('Step3 component builder renders generated constraints and dependencies', (
   expect(screen.getByText('组件化数学展开')).toBeInTheDocument();
   fireEvent.click(screen.getByText('高级调试'));
   expect(screen.getAllByText('功率平衡组件').length).toBeGreaterThan(0);
-  expect(screen.getByText('p_grid[t] == load[t]')).toBeInTheDocument();
-  expect(screen.getByText('network_limit')).toBeInTheDocument();
-  expect(screen.getByText('load_forecast')).toBeInTheDocument();
+  expect(screen.getAllByText('p_grid[t] == load[t]').length).toBeGreaterThan(0);
+  expect(screen.getAllByText('network_limit').length).toBeGreaterThan(0);
+  expect(screen.getAllByText('load_forecast').length).toBeGreaterThan(0);
 });
 
 test('Step3 opens Add Function Mapping modal and saves complete component config', async () => {

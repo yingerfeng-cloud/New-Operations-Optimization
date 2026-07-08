@@ -7,7 +7,8 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
-from app.api import components, demo, function_assets, invocations, jobs, llm, models, optimize, pv_storage, reports, results, rolling, tasks, templates
+from app.api import components, demo, function_assets, invocations, jobs, llm, models, optimize, pv_storage, reports, results, rolling, solvers, system_config, tasks, templates
+from app.agent.platform_gateway import service_mode
 from app.services.model_service import model_service
 from app.frontend import mount_frontends
 from app.utils import has_highspy, has_pyomo
@@ -72,30 +73,37 @@ def create_app() -> FastAPI:
             ],
         }
 
-    app.include_router(models.router)
-    app.include_router(templates.router)
-    app.include_router(components.router)
-    app.include_router(function_assets.router)
-    app.include_router(jobs.router)
-    app.include_router(rolling.router)
-    app.include_router(pv_storage.router)
-    try:
-        from app.api import agent, agent_skills
+    mode = service_mode()
+    if mode in {"combined", "platform"}:
+        app.include_router(models.router)
+        app.include_router(templates.router)
+        app.include_router(components.router)
+        app.include_router(function_assets.router)
+        app.include_router(jobs.router)
+        app.include_router(rolling.router)
+        app.include_router(pv_storage.router)
+    if mode in {"combined", "agent"}:
+        try:
+            from app.api import agent, agent_skills
 
-        app.include_router(agent.router)
-        app.include_router(agent_skills.router)
-    except SyntaxError:
-        pass
+            app.include_router(agent.router)
+            app.include_router(agent_skills.router)
+        except SyntaxError:
+            pass
     app.include_router(llm.router)
-    app.include_router(demo.router)
-    app.include_router(reports.router)
-    app.include_router(invocations.router)
-    app.include_router(tasks.router)
-    app.include_router(optimize.router)
-    app.include_router(results.router)
+    if mode in {"combined", "platform"}:
+        app.include_router(demo.router)
+        app.include_router(reports.router)
+        app.include_router(invocations.router)
+        app.include_router(tasks.router)
+        app.include_router(optimize.router)
+        app.include_router(results.router)
+        app.include_router(solvers.router)
+        app.include_router(system_config.router)
     Path("reports").mkdir(exist_ok=True)
     app.mount("/reports", StaticFiles(directory="reports"), name="reports")
-    model_service.seed_default_templates()
+    if mode in {"combined", "platform"}:
+        model_service.seed_default_templates()
     mount_frontends(app)
     return app
 

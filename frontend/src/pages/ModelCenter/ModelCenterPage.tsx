@@ -1,5 +1,5 @@
 import { MoreOutlined } from '@ant-design/icons';
-import { Button, Card, Drawer, Dropdown, Input, Modal, Select, Space, Tabs, Tag, message } from 'antd';
+import { Button, Card, Drawer, Dropdown, Input, Modal, Select, Space, Tabs, Tag, Tooltip, message } from 'antd';
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate, useParams } from 'react-router-dom';
@@ -15,15 +15,17 @@ import {
   ModelGenericPanel,
   ModelGovernancePanel,
   ModelHistoryPanel,
+  ModelDemoPanel,
   ModelRuntimePanel,
   ModelSemanticPanel,
 } from '../../features/model-center/ModelAssetPanels';
+import { capabilityOrFallback } from '../../features/demo/demoCapabilities';
 import type { ModelAsset } from '../../types/model';
 
 const callableStatuses = new Set(['published', 'trial', 'tested', '已发布', '试运行', '已测试']);
 
 function buildModeText(value: unknown) {
-  return value === 'component_based' ? '组件化 Builder' : value === 'generic_linear' ? '通用线性 Builder' : String(value || '-');
+  return value === 'component_based' ? '组件化 Builder' : value === 'generic_linear' ? '通用线性 Builder' : value === 'template_based' ? '模板 Builder' : String(value || '-');
 }
 
 function statusText(value: unknown) {
@@ -36,22 +38,34 @@ function problemType(model: ModelAsset) {
   return model.model_problem_type || model.problem_type || '-';
 }
 
+function displayText(value: unknown, fallback = '未配置') {
+  const text = String(value || '').trim();
+  return text && text !== '-' ? text : fallback;
+}
+
+function renderDate(value: unknown) {
+  const text = String(value || '').trim();
+  if (!text) return '-';
+  const [date, time] = text.replace('T', ' ').split(' ');
+  return (
+    <div className="model-asset-date">
+      <span>{date}</span>
+      {time && <span>{time.slice(0, 5)}</span>}
+    </div>
+  );
+}
+
 function isCallable(model: ModelAsset) {
   return callableStatuses.has(String(model.status));
 }
 
 function templateCapability(template: { code?: string; problem_type?: string; tags?: string[]; scenario?: string; description?: string }) {
-  if (template.code === 'cascade_hydro_dispatch_v1') {
-    return {
-      problemType: 'MILP',
-      functionAssets: '1D PWL + 2D PWL',
-      useCase: '日前/日内水电优化调度',
-    };
-  }
+  const capability = capabilityOrFallback(template as Record<string, unknown>, template.problem_type || '-');
   return {
-    problemType: template.problem_type || '-',
-    functionAssets: (template.tags || []).some(tag => /piecewise|PWL/i.test(tag)) ? 'PWL' : '-',
-    useCase: template.scenario || template.description || '-',
+    problemType: capability.problemType,
+    solver: capability.solver,
+    functionAssets: capability.functionAssets,
+    useCase: capability.useCase,
   };
 }
 
@@ -103,6 +117,7 @@ export function ModelCenterPage() {
   const developingCount = rows.filter(model => ['developing', 'draft', '开发中', '草稿'].includes(String(model.status))).length;
   const componentBasedCount = rows.filter(model => model.build_mode === 'component_based').length;
   const genericCount = rows.filter(model => model.build_mode === 'generic_linear').length;
+  const templateCount = rows.filter(model => model.build_mode === 'template_based').length;
   const current = detail.data;
   const currentAssetDetail = assetDetail.data || {};
 
@@ -117,7 +132,7 @@ export function ModelCenterPage() {
         <MetricCard title="模型资产数" value={rows.length} description="真实后端资产" tone="blue" onClick={() => nav('/models/create')} />
         <MetricCard title="可调用模型" value={publishedCount} description="已发布 / 试运行 / 已测试" tone="green" />
         <MetricCard title="开发中" value={developingCount} description="草稿与待发布版本" tone="amber" />
-        <MetricCard title="Builder 覆盖" value={componentBasedCount + genericCount} description={`组件化 ${componentBasedCount} / 通用线性 ${genericCount}`} tone="purple" />
+        <MetricCard title="Builder 覆盖" value={componentBasedCount + genericCount + templateCount} description={`组件化 ${componentBasedCount} / 通用线性 ${genericCount} / 模板 ${templateCount}`} tone="purple" />
       </MetricGrid>
       <Card className="content-card section-gap" title="模型资产列表">
         <FilterBar onReset={() => setFilters({})}>
@@ -128,23 +143,79 @@ export function ModelCenterPage() {
           <Select allowClear placeholder="业务场景" style={{ width: 160 }} value={filters.scene} onChange={scene => setFilters({ ...filters, scene })} options={[...new Set(allRows.map(item => String(item.scene || '')).filter(Boolean))].map(value => ({ value, label: value }))} />
         </FilterBar>
         <DataTable<ModelAsset>
+          className="model-asset-table"
           loading={models.isLoading}
           dataSource={rows}
+          scroll={{ x: 1080 }}
           columns={[
-            { title: '模型名称', render: (_: unknown, model: ModelAsset) => <Space orientation="vertical" size={0}><strong>{model.name}</strong><span className="muted">{model.template_id || model.id}</span></Space> },
-            { title: '构建方式', dataIndex: 'build_mode', render: buildModeText },
-            { title: '问题类型', render: (_: unknown, model: ModelAsset) => problemType(model) },
-            { title: '业务场景', dataIndex: 'scene' },
-            { title: '状态', dataIndex: 'status', render: (status: string) => <StatusTag status={statusText(status)} /> },
-            { title: '求解器', dataIndex: 'solver', render: (solver: string) => <span className="pill blue">{solver || 'HiGHS'}</span> },
-            { title: '更新时间', dataIndex: 'updated_at' },
+            {
+              title: '模型资产',
+              width: 360,
+              render: (_: unknown, model: ModelAsset) => {
+                const capability = capabilityOrFallback(model);
+                const scene = displayText(capability.useCase || model.scene, '暂无业务场景说明');
+                return (
+                  <div className="model-asset-summary">
+                    <strong className="model-asset-name">{model.name}</strong>
+                    <span className="model-asset-code">{model.template_id || model.id}</span>
+                    <Tooltip title={scene}>
+                      <span className="model-asset-scene">{scene}</span>
+                    </Tooltip>
+                  </div>
+                );
+              },
+            },
+            {
+              title: '建模与求解',
+              width: 210,
+              render: (_: unknown, model: ModelAsset) => {
+                const capability = capabilityOrFallback(model);
+                return (
+                  <div className="model-asset-meta-stack">
+                    <Tag color="blue">{buildModeText(model.build_mode)}</Tag>
+                    <Space size={6} wrap>
+                      <Tag color={capability.problemType === 'NLP' ? 'magenta' : 'purple'}>{capability.problemType || '-'}</Tag>
+                      <span className="pill blue">{displayText(capability.solver, 'HiGHS')}</span>
+                    </Space>
+                  </div>
+                );
+              },
+            },
+            {
+              title: '能力摘要',
+              width: 300,
+              render: (_: unknown, model: ModelAsset) => {
+                const capability = capabilityOrFallback(model);
+                const tags = capability.tags.slice(0, 3);
+                return (
+                  <div className="model-asset-capability">
+                    <span>函数资产：{displayText(capability.functionAssets)}</span>
+                    <span>非线性：{displayText(capability.nonlinearHandling, problemType(model) === 'NLP' ? '原生非线性' : '线性/模板展开')}</span>
+                    {tags.length > 0 && <Space size={[4, 4]} wrap>{tags.map(tag => <Tag key={tag}>{tag}</Tag>)}</Space>}
+                  </div>
+                );
+              },
+            },
+            {
+              title: '状态',
+              width: 150,
+              render: (_: unknown, model: ModelAsset) => {
+                const capability = capabilityOrFallback(model);
+                return (
+                  <div className="model-asset-status-cell">
+                    <StatusTag status={statusText(model.status)} />
+                    {capability.onlineDebug ? <Tag color="green">可调试</Tag> : <Tag>未开放调试</Tag>}
+                  </div>
+                );
+              },
+            },
+            { title: '更新时间', width: 130, dataIndex: 'updated_at', render: renderDate },
             {
               title: '操作',
-              fixed: 'right' as const,
-              width: 120,
+              width: 140,
               render: (_: unknown, model: ModelAsset) => (
                 <Space className="asset-actions">
-                  <Button type="link" onClick={() => setViewId(model.id)}>查看</Button>
+                  <Button aria-label="查看" size="small" onClick={() => setViewId(model.id)}>查看</Button>
                   <Dropdown
                     trigger={['click']}
                     menu={{
@@ -162,7 +233,7 @@ export function ModelCenterPage() {
                       },
                     }}
                   >
-                    <Button type="link" icon={<MoreOutlined />}>更多</Button>
+                    <Button size="small" icon={<MoreOutlined />}>更多</Button>
                   </Dropdown>
                 </Space>
               ),
@@ -192,6 +263,7 @@ export function ModelCenterPage() {
               { key: 'generic', label: 'generic_spec', children: <ModelGenericPanel model={current} detail={currentAssetDetail} /> },
               { key: 'component', label: '组件装配', children: <ModelComponentPanel model={current} detail={currentAssetDetail} /> },
               { key: 'runtime', label: '运行参数', children: <ModelRuntimePanel model={current} detail={currentAssetDetail} /> },
+              { key: 'demo', label: '演示说明', children: <ModelDemoPanel model={current} /> },
               { key: 'governance', label: '发布治理', children: <ModelGovernancePanel model={current} detail={currentAssetDetail} /> },
               { key: 'history', label: '调用记录', children: <ModelHistoryPanel detail={currentAssetDetail} /> },
             ]}
@@ -214,6 +286,7 @@ export function ModelCenterPage() {
                   extra={<Tag color={capability.problemType === 'MILP' ? 'purple' : 'blue'}>模型类型：{capability.problemType}</Tag>}
                 >
                   <Space orientation="vertical" size={4}>
+                    <span>求解器：{capability.solver}</span>
                     <span>函数资产：{capability.functionAssets}</span>
                     <span>适用场景：{capability.useCase}</span>
                     <span className="muted">{item.code}</span>

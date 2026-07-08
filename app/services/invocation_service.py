@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import ast
 import time
 import uuid
 from typing import Any
@@ -138,6 +139,12 @@ class InvocationService:
                     "requires_human_review": True,
                 }
             current = self._wait(task.id)
+            if current.status in {"FAILED", "INFEASIBLE", "TIMEOUT", "CANCELLED"}:
+                error = self._structured_error(self._task_failure_message(current), error_type=current.status.lower())
+                response = self._failed_response(invocation_id, model.id, task.id, error, status=current.status)
+                record.update({"status": current.status, "finished_at": now_text(), "duration_seconds": round(time.monotonic() - started, 4), "error": error, "response": response})
+                self._save(record)
+                return response
             result = result_service.get_result(task.id)
             interpreted = result_interpreter.interpret(model.semantic_spec, result)
             response = {
@@ -151,8 +158,11 @@ class InvocationService:
                 "variable_values": result.get("variable_values", {}),
                 "result": result,
                 "business_result": result.get("business_output", {}),
+                "charts": result.get("charts", []),
+                "constraint_checks": result.get("constraint_checks", result.get("constraint_violation_summary", [])),
                 "business_variables": interpreted["business_variables"],
                 "explanation": interpreted["explanation"],
+                "explanation_structured": self._structured_explanation(interpreted["explanation"], result),
                 "warnings": result.get("warnings", result.get("diagnosis", [])),
                 "execution_policy": "advisory_only",
                 "requires_human_review": True,
@@ -266,8 +276,11 @@ class InvocationService:
                     "variable_values": result.get("variable_values", {}),
                     "result": result,
                     "business_result": result.get("business_output", {}),
+                    "charts": result.get("charts", []),
+                    "constraint_checks": result.get("constraint_checks", result.get("constraint_violation_summary", [])),
                     "business_variables": interpreted["business_variables"],
                     "explanation": interpreted["explanation"],
+                    "explanation_structured": self._structured_explanation(interpreted["explanation"], result),
                     "warnings": result.get("warnings", result.get("diagnosis", [])),
                     "execution_policy": "advisory_only",
                     "requires_human_review": True,
@@ -278,7 +291,7 @@ class InvocationService:
                 error = self._structured_error(exc)
                 record.update({"status": "FAILED", "error": error, "response": self._failed_response(record["invocation_id"], record.get("model_id"), task_id, error)})
         elif task.status in {"FAILED", "INFEASIBLE", "TIMEOUT", "CANCELLED"}:
-            error = self._structured_error(task.error or f"Task ended with status {task.status}", error_type=task.status.lower())
+            error = self._structured_error(self._task_failure_message(task), error_type=task.status.lower())
             record.update({"error": error, "response": self._failed_response(record["invocation_id"], record.get("model_id"), task_id, error, status=task.status)})
         self._save(record)
         return record
@@ -368,8 +381,38 @@ class InvocationService:
                 "http_status": exc.status_code,
             }
         if isinstance(exc, dict):
-            return {"type": error_type or str(exc.get("type") or "error"), "message": str(exc.get("message") or "Skill invocation failed"), "details": self._detail_list(exc.get("details", exc))}
-        return {"type": error_type or "runtime_error", "message": str(exc), "details": self._detail_list(str(exc))}
+            return {"type": error_type or str(exc.get("type") or "error"), "message": self._clean_error_message(exc), "details": self._detail_list(exc.get("details", exc))}
+        return {"type": error_type or "runtime_error", "message": self._clean_error_message(exc), "details": self._detail_list(self._clean_error_message(exc))}
+
+    def _task_failure_message(self, task: Any) -> str:
+        error = getattr(task, "error", None)
+        if error:
+            return self._clean_error_message(error)
+        trace = getattr(task, "trace", {}) or {}
+        if isinstance(trace, dict) and trace.get("exception_summary"):
+            return self._clean_error_message(trace["exception_summary"])
+        return f"Task ended with status {getattr(task, 'status', 'FAILED')}"
+
+    def _clean_error_message(self, raw: Any) -> str:
+        if isinstance(raw, dict):
+            if raw.get("message") is not None:
+                return str(raw["message"])
+            if raw.get("error") is not None:
+                return str(raw["error"])
+            return str(raw)
+        if isinstance(raw, list):
+            if raw and isinstance(raw[0], dict) and raw[0].get("message") is not None:
+                return str(raw[0]["message"])
+            return str(raw)
+        text = str(raw)
+        stripped = text.strip()
+        if stripped.startswith("{") or stripped.startswith("["):
+            try:
+                parsed = ast.literal_eval(stripped)
+            except (SyntaxError, ValueError):
+                return text
+            return self._clean_error_message(parsed)
+        return text
 
     def _detail_list(self, detail: Any) -> list[Any]:
         if isinstance(detail, list):
@@ -386,6 +429,8 @@ class InvocationService:
         return {409: "model_or_task_state_error", 422: "parameter_validation_error", 404: "not_found", 408: "timeout"}.get(status_code, "api_error")
 
     def _failed_response(self, invocation_id: str, model_id: str | None, task_id: str | None, error: dict[str, Any], status: str = "FAILED") -> dict[str, Any]:
+        error_message = str(error.get("message") or "Skill invocation failed")
+        explanation = self._failure_explanation(error)
         return {
             "invocation_id": invocation_id,
             "task_id": task_id,
@@ -393,9 +438,41 @@ class InvocationService:
             "resolved_model_id": model_id,
             "status": status,
             "error": error,
+            "explanation": explanation,
             "suggestion": self._suggestion_for_error(error),
+            "business_result": {},
+            "charts": [],
+            "constraint_checks": [],
+            "warnings": [error_message],
+            "explanation_structured": {
+                "summary": explanation,
+                "key_findings": [],
+                "risk_notes": [error_message, "结果未生成，不能用于生产调度。"],
+                "manual_review_points": ["检查 error.details、输入参数和模型状态。"],
+            },
             "execution_policy": "advisory_only",
             "requires_human_review": True,
+        }
+
+    def _failure_explanation(self, error: dict[str, Any]) -> str:
+        text = " ".join([str(error.get("message") or ""), str(error.get("details") or ""), str(error)])
+        lowered = text.lower()
+        if "ipopt" in lowered and ("solver_unavailable" in lowered or "unavailable" in lowered or "not found" in lowered):
+            return "本次非线性水电模型未完成求解，原因是 NLP 求解器 Ipopt 不可用，平台未启用替代求解器。当前结果不是有效优化方案。请安装 Ipopt，或切换为线性化 / 分段线性近似模型后重试。"
+        return "Skill 调用失败，需要先修正错误后重新求解。当前结果不是有效优化方案。"
+
+    def _structured_explanation(self, explanation: Any, result: dict[str, Any]) -> dict[str, Any]:
+        summary = str(explanation or "优化结果已生成。")
+        objective = result.get("objective_value")
+        key_findings = [f"目标值：{objective}"] if objective is not None else []
+        termination = result.get("termination_condition") or result.get("raw_termination_condition")
+        if termination:
+            key_findings.append(f"求解终止状态：{termination}")
+        return {
+            "summary": summary,
+            "key_findings": key_findings,
+            "risk_notes": ["本结果仅用于辅助分析，不构成自动控制指令。"],
+            "manual_review_points": ["复核运行参数、约束边界、求解状态和关键变量曲线后再用于生产调度。"],
         }
 
     def _suggestion_for_error(self, error: dict[str, Any]) -> str:

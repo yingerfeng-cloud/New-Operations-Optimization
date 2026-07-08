@@ -1,0 +1,30 @@
+{
+  "objective_value": "number",
+  "variables": [
+    {
+      "key": "flow",
+      "name": "流量",
+      "dimension": [
+        "time"
+      ],
+      "unit": "m3/s"
+    },
+    {
+      "key": "head",
+      "name": "水头",
+      "dimension": [
+        "time"
+      ],
+      "unit": "m"
+    },
+    {
+      "key": "power",
+      "name": "出力",
+      "dimension": [
+        "time"
+      ],
+      "unit": "MW"
+    }
+  ],
+  "explanation": "string"
+}

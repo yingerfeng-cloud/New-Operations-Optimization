@@ -75,7 +75,7 @@ def test_quadratic_and_nonlinear_rules() -> None:
         solver_name="HiGHS",
     )
     assert qp["inferred_problem_type"] == "QP"
-    assert minlp["inferred_problem_type"] == "MINLP"
+    assert minlp["inferred_problem_type"] == "MINLP_RESERVED"
     assert minlp["solver_supported"] is False
 
 

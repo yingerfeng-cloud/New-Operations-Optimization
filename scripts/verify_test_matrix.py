@@ -29,6 +29,12 @@ REQUIRED_FRONTEND_UNIT = [
     "ResultCenterPage.test.tsx",
     "AgentWorkbenchPage.test.tsx",
     "OfficialFrontendOnly.test.tsx",
+    "DemoDashboard.test.tsx",
+    "CascadeHydroResultExplanation.test.tsx",
+    "NlpResultExplanation.test.tsx",
+    "AgentCascadeHydroDemo.test.tsx",
+    "AgentNlpQuestions.test.tsx",
+    "ModelServicesDemoInvoke.test.tsx",
 ]
 
 REQUIRED_FRONTEND_E2E = [
@@ -38,6 +44,8 @@ REQUIRED_FRONTEND_E2E = [
     "component_create_validate_publish.spec.ts",
     "pv_storage_dispatch_flow.spec.ts",
     "cascade_hydro_dispatch_flow.spec.ts",
+    "demo_cascade_hydro_delivery.spec.ts",
+    "demo_nlp_ipopt_delivery.spec.ts",
 ]
 
 REQUIRED_BACKEND = [
@@ -52,6 +60,12 @@ REQUIRED_BACKEND = [
     "test_20260605_acceptance_round.py",
     "test_pv_storage_v2_acceptance.py",
     "test_component_based_hydro_model.py",
+    "test_demo_delivery.py",
+    "test_cascade_hydro_demo_result_explanation.py",
+    "test_nlp_demo_result_explanation.py",
+    "test_agent_cascade_hydro_demo_questions.py",
+    "test_agent_nlp_demo_questions.py",
+    "test_report_service_solver_metadata.py",
 ]
 
 REQUIRED_PACKAGE_SCRIPTS = [

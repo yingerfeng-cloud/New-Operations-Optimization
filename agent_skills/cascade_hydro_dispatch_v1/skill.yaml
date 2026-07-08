@@ -1,0 +1,27 @@
+name: cascade_hydro_dispatch_v1
+display_name: 梯级水电调度 v1
+canonical_api_skill_name: run_cascade_hydro_dispatch_v1
+enabled: true
+confirmation_required: true
+execution_policy:
+  mode: advisory_only
+required_parameters:
+  - horizon
+  - time
+  - inflow
+  - initial_storage
+  - target_final_storage
+  - storage_min
+  - storage_max
+  - outflow_min
+  - outflow_max
+  - power_min
+  - power_max
+  - load_forecast
+  - delta_t
+  - cascade_delay
+  - penalty_spill
+  - penalty_storage_deviation
+optional_parameters:
+trigger_intents:
+  - cascade_hydro_dispatch_v1

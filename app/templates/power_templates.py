@@ -23,6 +23,8 @@ TEMPLATE_DISPLAY_NAMES = {
     "pv_storage_day_ahead_dispatch_v2": ("光储协同日前调度 V2", "光储协同日前调度 V2，包含偏差考核、充放电互斥、SOC 边界和收益成本项。"),
     "pv_storage_intraday_dispatch_v2": ("光储协同日内滚动调度 V2", "光储协同日内滚动调度 V2，支持滚动窗口、SOC 传递和偏差考核。"),
     "nonlinear_hydro_power_demo": ("非线性水电出力 NLP 试点", "连续变量 NLP 样例：power[t] = k * flow[t] * head[t]，用于验证 Ipopt 接入和局部最优风险提示。"),
+    "contract_spot_exposure_v1": ("中长期合约分解与现货暴露控制模型", "面向售电公司和用电侧主体，生成中长期合约分解与现货暴露控制建议。"),
+    "retail_da_spot_bidding_v1": ("售电公司日前现货申报优化模型", "面向售电公司日前现货场景，生成可解释、可审批、可复盘的申报策略建议。"),
 }
 
 
@@ -42,6 +44,8 @@ def power_template_library() -> dict[str, dict[str, Any]]:
         "pv_storage_day_ahead_dispatch_v2": _pv_storage_day_ahead_dispatch_v2(),
         "pv_storage_intraday_dispatch_v2": _pv_storage_intraday_dispatch_v2(),
         "nonlinear_hydro_power_demo": _nonlinear_hydro_power_demo(),
+        "contract_spot_exposure_v1": _contract_spot_exposure_v1(),
+        "retail_da_spot_bidding_v1": _retail_da_spot_bidding_v1(),
     }
     for code, template in templates.items():
         template.setdefault("code", code)
@@ -651,7 +655,7 @@ def _cascade_hydro_dispatch() -> dict[str, Any]:
         },
         "ui_metadata": {
             "display_build_mode": "组件化自定义 Builder",
-            "display_problem_type": "绾挎€ц鍒?LP",
+            "display_problem_type": "线性规划 LP",
             "solver": "HiGHS",
             "component_catalog": component_catalog,
             "complex_components": {
@@ -745,55 +749,6 @@ def _cascade_hydro_dispatch_v1() -> dict[str, Any]:
         },
     }
 
-
-def _nonlinear_hydro_power_demo() -> dict[str, Any]:
-    sample = {
-        "horizon": 3,
-        "time": [0, 1, 2],
-        "k": 0.9,
-        "flow_min": 10,
-        "flow_max": 100,
-        "head_min": 20,
-        "head_max": 80,
-        "power_max": 5000,
-    }
-    template = _base("nonlinear_hydro_power_demo", "非线性水电出力 NLP 试点", "NLP pilot demo", ["power", "NLP", "Ipopt", "Pyomo"])
-    template.update(
-        {
-            "build_mode": "domain_builder",
-            "problem_type": "NLP",
-            "model_problem_type": "NLP",
-            "required_solver_capabilities": ["NLP"],
-            "solver": "Ipopt",
-            "description": "Continuous NLP demo. Ipopt is used only when available; the platform does not claim global optimality.",
-            "sets": [{"code": "time", "name": "时段", "values": sample["time"]}],
-            "parameters": [
-                _param("k", "出力系数", "MW/(m3/s*m)", [], "demo", sample["k"]),
-                _param("flow_min", "流量下限", "m3/s", [], "demo", sample["flow_min"]),
-                _param("flow_max", "流量上限", "m3/s", [], "demo", sample["flow_max"]),
-                _param("head_min", "水头下限", "m", [], "demo", sample["head_min"]),
-                _param("head_max", "水头上限", "m", [], "demo", sample["head_max"]),
-                _param("power_max", "出力上限", "MW", [], "demo", sample["power_max"]),
-            ],
-            "variables": [
-                _var("flow", "流量", "m3/s", ["time"]),
-                _var("head", "水头", "m", ["time"]),
-                _var("power", "出力", "MW", ["time"]),
-            ],
-            "constraints": [
-                _constraint("power_balance", "非线性出力关系", "power[t] == k * flow[t] * head[t]", ["time"]),
-                _constraint("power_upper", "出力上限", "power[t] <= power_max", ["time"]),
-            ],
-            "objectives": [_objective("max_power", "最大化总出力", "maximize", "sum(power[t] for t in time)")],
-            "sample_runtime_parameters": sample,
-            "ui_metadata": {
-                "solver_type": "NLP",
-                "local_optimum_warning": True,
-                "nlp_pilot": True,
-            },
-        }
-    )
-    return template
     function_components = [
         {
             "component_id": "cascade_hydro_v1_water_balance",
@@ -974,6 +929,617 @@ def _nonlinear_hydro_power_demo() -> dict[str, Any]:
     return t
 
 
+def _nonlinear_hydro_power_demo() -> dict[str, Any]:
+    sample = {
+        "horizon": 3,
+        "time": [0, 1, 2],
+        "k": 0.9,
+        "flow_min": 10,
+        "flow_max": 100,
+        "head_min": 20,
+        "head_max": 80,
+        "power_max": 5000,
+    }
+    template = _base("nonlinear_hydro_power_demo", "非线性水电出力 NLP 试点", "NLP pilot demo", ["power", "NLP", "Ipopt", "Pyomo"])
+    template.update(
+        {
+            "build_mode": "domain_builder",
+            "problem_type": "NLP",
+            "model_problem_type": "NLP",
+            "required_solver_capabilities": ["NLP"],
+            "solver": "Ipopt",
+            "description": "Continuous NLP demo. Ipopt is used only when available; the platform does not claim global optimality.",
+            "sets": [{"code": "time", "name": "时段", "values": sample["time"]}],
+            "parameters": [
+                _param("k", "出力系数", "MW/(m3/s*m)", [], "demo", sample["k"]),
+                _param("flow_min", "流量下限", "m3/s", [], "demo", sample["flow_min"]),
+                _param("flow_max", "流量上限", "m3/s", [], "demo", sample["flow_max"]),
+                _param("head_min", "水头下限", "m", [], "demo", sample["head_min"]),
+                _param("head_max", "水头上限", "m", [], "demo", sample["head_max"]),
+                _param("power_max", "出力上限", "MW", [], "demo", sample["power_max"]),
+            ],
+            "variables": [
+                _var("flow", "流量", "m3/s", ["time"]),
+                _var("head", "水头", "m", ["time"]),
+                _var("power", "出力", "MW", ["time"]),
+            ],
+            "constraints": [
+                _constraint("power_balance", "非线性出力关系", "power[t] == k * flow[t] * head[t]", ["time"]),
+                _constraint("power_upper", "出力上限", "power[t] <= power_max", ["time"]),
+            ],
+            "objectives": [_objective("max_power", "最大化总出力", "maximize", "sum(power[t] for t in time)")],
+            "sample_runtime_parameters": sample,
+            "ui_metadata": {
+                "solver_type": "NLP",
+                "local_optimum_warning": True,
+                "nlp_pilot": True,
+            },
+        }
+    )
+    return template
+
+
+def _quarter_hour_time_labels(horizon: int = 96) -> list[str]:
+    return [f"{(index * 15) // 60:02d}:{(index * 15) % 60:02d}" for index in range(horizon)]
+
+
+def _market_load_curve(horizon: int = 96) -> list[float]:
+    curve = []
+    for index in range(horizon):
+        hour = index / 4
+        if hour < 6:
+            value = 78 + 2.5 * hour
+        elif hour < 12:
+            value = 93 + 6.5 * (hour - 6)
+        elif hour < 17:
+            value = 132 - 1.2 * (hour - 12)
+        elif hour < 21:
+            value = 132 + 7.5 * (hour - 17)
+        else:
+            value = 162 - 13 * (hour - 21)
+        curve.append(round(value, 3))
+    return curve
+
+
+def _market_price_curve(horizon: int = 96) -> list[float]:
+    curve = []
+    for index in range(horizon):
+        hour = index / 4
+        if hour < 6:
+            value = 180 + 8 * hour
+        elif hour < 11:
+            value = 260 + 28 * (hour - 6)
+        elif hour < 17:
+            value = 420 + 10 * (hour - 11)
+        elif hour < 21:
+            value = 520 + 48 * (hour - 17)
+        else:
+            value = 520 - 38 * (hour - 21)
+        curve.append(round(value, 3))
+    return curve
+
+
+def _market_contract_spot_sample(horizon: int = 96) -> dict[str, Any]:
+    time = list(range(horizon))
+    load = _market_load_curve(horizon)
+    price = _market_price_curve(horizon)
+    contract_ratio = 0.76
+    return {
+        "horizon": horizon,
+        "time": time,
+        "time_labels": _quarter_hour_time_labels(horizon),
+        "delta_t": 0.25,
+        "load_forecast": load,
+        "contract_total": round(sum(load) * contract_ratio, 3),
+        "contract_price": 360,
+        "spot_price_forecast": price,
+        "max_exposure_ratio": [0.4 for _ in time],
+        "deviation_penalty": [round(45 + max(0.0, p - 420) * 0.18, 3) for p in price],
+    }
+
+
+def _market_retail_da_sample(horizon: int = 96) -> dict[str, Any]:
+    time = list(range(horizon))
+    load = _market_load_curve(horizon)
+    price = _market_price_curve(horizon)
+    contract_energy = [round(value * (0.74 + (0.04 if 8 <= index / 4 <= 20 else 0.0)), 3) for index, value in enumerate(load)]
+    flex_up = []
+    flex_down = []
+    for index, value in enumerate(load):
+        hour = index / 4
+        flex_up.append(round(value * (0.13 if hour < 6 or hour >= 22 else 0.06), 3))
+        flex_down.append(round(value * (0.14 if 17 <= hour < 21 else 0.05), 3))
+    return {
+        "horizon": horizon,
+        "time": time,
+        "time_volume": list(range(horizon + 1)),
+        "time_labels": _quarter_hour_time_labels(horizon),
+        "delta_t": 0.25,
+        "load_forecast": load,
+        "spot_price_forecast": price,
+        "contract_energy": contract_energy,
+        "contract_price": [360 for _ in time],
+        "bid_min": [0 for _ in time],
+        "bid_max": [round(value * 0.6, 3) for value in load],
+        "deviation_penalty": [round(420 + max(0.0, p - 450) * 0.5, 3) for p in price],
+        "storage_capacity": 180,
+        "storage_soc_init": 90,
+        "storage_soc_min": 30,
+        "storage_soc_max": 160,
+        "terminal_soc_target": 90,
+        "terminal_soc_penalty": 1200,
+        "charge_max": 80,
+        "discharge_max": 80,
+        "charge_efficiency": 0.95,
+        "discharge_efficiency": 0.92,
+        "storage_cycle_cost": 8,
+        "flex_up": flex_up,
+        "flex_down": flex_down,
+        "cut_limit": [0 for _ in time],
+        "shift_cost": [round(10 + (6 if 17 <= index / 4 < 21 else 0), 3) for index in time],
+        "cut_cost": [1000 for _ in time],
+    }
+
+
+def _contract_spot_exposure_v1() -> dict[str, Any]:
+    sample = _market_contract_spot_sample()
+    template = _base(
+        "contract_spot_exposure_v1",
+        "中长期合约分解与现货暴露控制模型",
+        "中长期合约分解与现货暴露控制，生成可审批的合约使用曲线和现货暴露建议。",
+        ["power", "market_trading", "spot", "contract", "LP", "HiGHS"],
+    )
+    sets = [{"code": "time", "name": "交易时段", "values": sample["time"]}]
+    parameters = [
+        _param("horizon", "优化时段数", "period", [], "trading_plan", sample["horizon"], {"type": "integer", "min": 1}),
+        _param("time", "交易时段", "", ["time"], "trading_plan", sample["time"], {"type": "array"}),
+        _param("time_labels", "交易时段标签", "", ["time"], "trading_plan", sample["time_labels"], {"type": "array"}),
+        _param("delta_t", "时间步长", "h", [], "trading_plan", sample["delta_t"], {"type": "number", "min": 0}),
+        _param("load_forecast", "负荷预测", "MWh", ["time"], "forecast", sample["load_forecast"], {"type": "array", "min": 0}),
+        _param("contract_total", "中长期合约总电量", "MWh", [], "contract", sample["contract_total"], {"type": "number", "min": 0}),
+        _param("contract_price", "中长期合约价格", "元/MWh", [], "contract", sample["contract_price"], {"type": "number", "min": 0}),
+        _param("spot_price_forecast", "现货价格预测", "元/MWh", ["time"], "market", sample["spot_price_forecast"], {"type": "array", "min": 0}),
+        _param("max_exposure_ratio", "最大现货暴露比例", "p.u.", ["time"], "risk_control", sample["max_exposure_ratio"], {"type": "array", "min": 0, "max": 1}),
+        _param("deviation_penalty", "暴露风险惩罚", "元/MWh", ["time"], "risk_control", sample["deviation_penalty"], {"type": "array", "min": 0}),
+    ]
+    variables = [
+        {**_var("contract_use", "中长期合约使用电量", "MWh", ["time"]), "lower_bound": 0},
+        {**_var("spot_exposure", "现货暴露电量", "MWh", ["time"]), "lower_bound": 0},
+    ]
+    component_definition = {
+        "component_id": "contract_spot_exposure_formula_block",
+        "type": "contract_spot_exposure_formula_block",
+        "name": "中长期合约现货暴露通用公式约束",
+        "status": "published",
+        "enabled": True,
+        "sets": sets,
+        "parameters": parameters,
+        "variables": variables,
+        "generated_constraints": [
+            {"constraint_id": "energy_balance", "name": "合约与现货暴露平衡", "indices": [{"set": "time", "alias": "t"}], "expression": "contract_use[t] + spot_exposure[t] == load_forecast[t]"},
+            {"constraint_id": "contract_total_balance", "name": "合约总电量一致", "indices": [], "expression": "sum(contract_use[t] for t in time) == contract_total"},
+            {"constraint_id": "spot_exposure_limit", "name": "现货暴露比例上限", "indices": [{"set": "time", "alias": "t"}], "expression": "spot_exposure[t] <= max_exposure_ratio[t] * load_forecast[t]"},
+        ],
+    }
+    objective_terms = [
+        {
+            "term_id": "total_expected_cost",
+            "name": "合约成本、现货预期成本与暴露风险惩罚",
+            "weight_key": "contract_spot_total_expected_cost",
+            "weight": 1,
+            "solve_participation": "solve_active",
+            "supported_by_backend": True,
+            "expression": "sum(contract_price * contract_use[t] + spot_price_forecast[t] * spot_exposure[t] + deviation_penalty[t] * spot_exposure[t] for t in time)",
+        }
+    ]
+    component_spec = {
+        "model_code": "contract_spot_exposure_v1",
+        "build_mode": "component_based",
+        "name": "中长期合约分解与现货暴露控制模型",
+        "model_problem_type": "LP",
+        "required_solver_capabilities": ["LP"],
+        "sets": sets,
+        "parameters": parameters,
+        "variables": variables,
+        "components": [{"type": "contract_spot_exposure_formula_block", "definition": component_definition}],
+        "objective": {"type": "weighted_sum", "sense": "minimize", "terms": objective_terms, "weights": {}},
+        "output_contract": {
+            "series_index_set": "time",
+            "execution_policy": "advisory_only",
+            "requires_human_review": True,
+            "series_fields": [
+                {"key": "time_label", "expression": "time_labels[t]"},
+                {"key": "load_forecast", "expression": "load_forecast[t]"},
+                {"key": "contract_use", "expression": "contract_use[t]"},
+                {"key": "spot_exposure", "expression": "spot_exposure[t]"},
+                {"key": "spot_exposure_ratio", "expression": "spot_exposure[t] / load_forecast[t]"},
+                {"key": "max_exposure_ratio", "expression": "max_exposure_ratio[t]"},
+                {"key": "contract_price", "expression": "contract_price"},
+                {"key": "spot_price_forecast", "expression": "spot_price_forecast[t]"},
+                {"key": "deviation_penalty", "expression": "deviation_penalty[t]"},
+            ],
+            "curves": [
+                {"key": "contract_use_curve", "fields": {"contract_use": "contract_use[t]"}},
+                {"key": "spot_exposure_curve", "fields": {"spot_exposure": "spot_exposure[t]"}},
+                {"key": "spot_exposure_ratio_curve", "fields": {"spot_exposure_ratio": "spot_exposure[t] / load_forecast[t]", "max_exposure_ratio": "max_exposure_ratio[t]"}},
+            ],
+            "chart_fields": ["load_forecast", "contract_use", "spot_exposure", "spot_exposure_ratio"],
+        },
+        "metrics_config": {
+            "metrics": [
+                {"key": "total_contract_cost", "expression": "sum(contract_price * contract_use[t] for t in time)"},
+                {"key": "total_spot_expected_cost", "expression": "sum(spot_price_forecast[t] * spot_exposure[t] for t in time)"},
+                {"key": "total_risk_penalty", "expression": "sum(deviation_penalty[t] * spot_exposure[t] for t in time)"},
+                {"key": "total_expected_cost", "expression": "total_contract_cost + total_spot_expected_cost + total_risk_penalty"},
+                {"key": "total_contract_energy", "expression": "sum(contract_use[t] for t in time)"},
+                {"key": "total_spot_exposure", "expression": "sum(spot_exposure[t] for t in time)"},
+                {"key": "contract_total_gap", "expression": "abs(sum(contract_use[t] for t in time) - contract_total)"},
+                {"key": "max_spot_exposure_violation", "expression": "max(spot_exposure[t] - max_exposure_ratio[t] * load_forecast[t] for t in time)"},
+            ],
+            "business_metrics": ["total_contract_cost", "total_spot_expected_cost", "total_risk_penalty", "total_expected_cost", "contract_total_gap", "max_spot_exposure_violation"],
+            "lists": [
+                {
+                    "key": "high_risk_periods",
+                    "foreach": "time",
+                    "where_all": ["spot_exposure[t] / load_forecast[t] >= max_exposure_ratio[t] * 0.9", "spot_exposure[t] > 0.000001"],
+                    "fields": {"spot_exposure": "spot_exposure[t]", "spot_exposure_ratio": "spot_exposure[t] / load_forecast[t]", "max_exposure_ratio": "max_exposure_ratio[t]"},
+                }
+            ],
+        },
+        "constraint_check_config": {
+            "tolerance": 1e-5,
+            "include_metrics": ["contract_total_gap", "max_spot_exposure_violation"],
+            "checks": [
+                {"key": "contract_total_satisfied", "expression": "contract_total_gap <= tolerance"},
+                {"key": "spot_exposure_within_limit", "expression": "max_spot_exposure_violation <= tolerance"},
+            ],
+        },
+        "precheck_config": {
+            "checks": [
+                {
+                    "key": "max_exposure_ratio_range",
+                    "expression": "all(0 <= max_exposure_ratio[t] <= 1 for t in time)",
+                    "error_message": "现货最大暴露比例必须全部位于 0 到 1 之间，请检查 max_exposure_ratio。",
+                },
+                {
+                    "key": "load_forecast_non_negative",
+                    "expression": "all(load_forecast[t] >= 0 for t in time)",
+                    "error_message": "负荷预测不能为负，请检查 load_forecast。",
+                },
+                {
+                    "key": "contract_total_not_exceed_load",
+                    "expression": "contract_total <= sum(load_forecast[t] for t in time)",
+                    "error_message": "中长期合约总电量不能超过预测总负荷，否则无法满足合约分解约束。",
+                },
+                {
+                    "key": "contract_total_covers_min_required_contract",
+                    "expression": "contract_total >= sum((1 - max_exposure_ratio[t]) * load_forecast[t] for t in time)",
+                    "error_message": "中长期合约总电量低于现货暴露上限约束要求的最低合约电量，模型不可行，请提高 contract_total 或放宽 max_exposure_ratio。",
+                },
+            ],
+        },
+        "explanation_config": {
+            "summary": "中长期合约分解与现货暴露控制模型已完成求解，结果包含合约使用曲线、现货暴露曲线、暴露比例和成本拆解。",
+            "advisory": "平台只生成策略建议，不替代电力交易平台、不执行申报、不自动下单。",
+            "execution_policy": "advisory_only",
+            "requires_human_review": True,
+            "strategy_templates": [
+                "合约总电量按约束分解为 {total_contract_energy} MWh，现货暴露合计 {total_spot_exposure} MWh。",
+                "预期总成本为 {total_expected_cost} 元，其中合约成本 {total_contract_cost} 元、现货预期成本 {total_spot_expected_cost} 元、风险惩罚 {total_risk_penalty} 元。",
+                "本结果仅作为中长期合约分解和现货暴露控制建议，需人工审批后再在外部交易系统处理。",
+            ],
+            "approval_items": [
+                "复核负荷预测、合约总电量和现货价格预测来源。",
+                "复核高风险时段的现货暴露比例是否符合公司风控策略。",
+                "确认平台不执行申报、不连接交易平台、不自动下单。",
+            ],
+        },
+    }
+    template.update(
+        {
+            "build_mode": "component_based",
+            "problem_type": "LP",
+            "model_problem_type": "LP",
+            "required_solver_capabilities": ["LP"],
+            "solver": "HiGHS",
+            "business_objects": [
+                {"code": "retailer", "name": "售电公司", "object_type": "market_participant", "source_system": "market_data"},
+                {"code": "time", "name": "交易时段", "object_type": "time", "source_system": "trading_plan"},
+            ],
+            "sets": sets,
+            "parameters": parameters,
+            "variables": variables,
+            "constraints": [
+                _constraint("energy_balance", "合约与现货暴露平衡", "contract_use[time] + spot_exposure[time] = load_forecast[time]", ["time"]),
+                _constraint("contract_total_balance", "合约总电量一致", "sum(contract_use[time]) = contract_total", ["time"]),
+                _constraint("spot_exposure_limit", "现货暴露比例上限", "spot_exposure[time] <= max_exposure_ratio[time] * load_forecast[time]", ["time"]),
+            ],
+            "objectives": [
+                _objective(
+                    "total_expected_cost_min",
+                    "最小化合约成本、现货预期成本与暴露风险惩罚",
+                    "minimize",
+                    "sum(contract_price*contract_use[t] + spot_price_forecast[t]*spot_exposure[t] + deviation_penalty[t]*spot_exposure[t])",
+                )
+            ],
+            "sample_runtime_parameters": sample,
+            "component_spec": component_spec,
+            "output_contract": component_spec["output_contract"],
+            "metrics_config": component_spec["metrics_config"],
+            "constraint_check_config": component_spec["constraint_check_config"],
+            "precheck_config": component_spec["precheck_config"],
+            "explanation_config": component_spec["explanation_config"],
+            "ui_metadata": {
+                "execution_policy": "advisory_only",
+                "requires_human_review": True,
+                "capability_boundary": "平台只生成合约分解和现货暴露控制建议，不连接交易平台、不执行申报、不自动下单。",
+                "generic_modeling_template": True,
+            },
+        }
+    )
+    return template
+
+
+def _retail_da_spot_bidding_v1() -> dict[str, Any]:
+    sample = _market_retail_da_sample()
+    template = _base(
+        "retail_da_spot_bidding_v1",
+        "售电公司日前现货申报优化模型",
+        "售电公司日前现货申报优化，协同合约电量、储能、可调负荷和偏差风险生成策略建议。",
+        ["power", "market_trading", "spot", "retail", "MILP", "HiGHS"],
+    )
+    sets = [
+        {"code": "time", "name": "日前交易时段", "values": sample["time"]},
+        {"code": "time_volume", "name": "储能SOC时点", "type": "state_time", "base_set": "time", "generation_rule": "horizon_plus_1", "values": sample["time_volume"]},
+    ]
+    parameters = [
+        _param("horizon", "优化时段数", "period", [], "trading_plan", sample["horizon"], {"type": "integer", "min": 1}),
+        _param("time", "日前交易时段", "", ["time"], "trading_plan", sample["time"], {"type": "array"}),
+        _param("time_volume", "储能SOC时点", "", ["time_volume"], "trading_plan", sample["time_volume"], {"type": "array"}),
+        _param("time_labels", "日前交易时段标签", "", ["time"], "trading_plan", sample["time_labels"], {"type": "array"}),
+        _param("delta_t", "时间步长", "h", [], "trading_plan", sample["delta_t"], {"type": "number", "min": 0}),
+        _param("load_forecast", "负荷预测", "MWh", ["time"], "forecast", sample["load_forecast"], {"type": "array", "min": 0}),
+        _param("spot_price_forecast", "日前现货价格预测", "元/MWh", ["time"], "market", sample["spot_price_forecast"], {"type": "array", "min": 0}),
+        _param("contract_energy", "中长期合约分时电量", "MWh", ["time"], "contract", sample["contract_energy"], {"type": "array", "min": 0}),
+        _param("contract_price", "中长期合约分时价格", "元/MWh", ["time"], "contract", sample["contract_price"], {"type": "array", "min": 0}),
+        _param("bid_min", "日前现货申报下限", "MWh", ["time"], "risk_control", sample["bid_min"], {"type": "array", "min": 0}),
+        _param("bid_max", "日前现货申报上限", "MWh", ["time"], "risk_control", sample["bid_max"], {"type": "array", "min": 0}),
+        _param("deviation_penalty", "偏差风险惩罚", "元/MWh", ["time"], "risk_control", sample["deviation_penalty"], {"type": "array", "min": 0}),
+        _param("storage_capacity", "储能容量", "MWh", [], "BMS", sample["storage_capacity"], {"type": "number", "min": 0}),
+        _param("storage_soc_init", "初始SOC", "MWh", [], "BMS", sample["storage_soc_init"], {"type": "number", "min": 0}),
+        _param("storage_soc_min", "SOC下限", "MWh", [], "BMS", sample["storage_soc_min"], {"type": "number", "min": 0}),
+        _param("storage_soc_max", "SOC上限", "MWh", [], "BMS", sample["storage_soc_max"], {"type": "number", "min": 0}),
+        _param("terminal_soc_target", "期末SOC目标", "MWh", [], "BMS", sample["terminal_soc_target"], {"type": "number", "min": 0}),
+        _param("terminal_soc_penalty", "期末SOC偏差惩罚", "元/MWh", [], "risk_control", sample["terminal_soc_penalty"], {"type": "number", "min": 0}),
+        _param("charge_max", "最大充电功率", "MW", [], "BMS", sample["charge_max"], {"type": "number", "min": 0}),
+        _param("discharge_max", "最大放电功率", "MW", [], "BMS", sample["discharge_max"], {"type": "number", "min": 0}),
+        _param("charge_efficiency", "充电效率", "p.u.", [], "BMS", sample["charge_efficiency"], {"type": "number", "min": 0, "max": 1}),
+        _param("discharge_efficiency", "放电效率", "p.u.", [], "BMS", sample["discharge_efficiency"], {"type": "number", "min": 0, "max": 1}),
+        _param("storage_cycle_cost", "储能循环成本", "元/MWh", [], "asset", sample["storage_cycle_cost"], {"type": "number", "min": 0}),
+        _param("flex_up", "负荷可上调空间", "MWh", ["time"], "load_flex", sample["flex_up"], {"type": "array", "min": 0}),
+        _param("flex_down", "负荷可下调空间", "MWh", ["time"], "load_flex", sample["flex_down"], {"type": "array", "min": 0}),
+        _param("cut_limit", "可削减负荷上限", "MWh", ["time"], "load_flex", sample["cut_limit"], {"type": "array", "min": 0}),
+        _param("shift_cost", "负荷转移成本", "元/MWh", ["time"], "load_flex", sample["shift_cost"], {"type": "array", "min": 0}),
+        _param("cut_cost", "负荷削减成本", "元/MWh", ["time"], "load_flex", sample["cut_cost"], {"type": "array", "min": 0}),
+    ]
+    variables = [
+        {**_var("spot_buy", "日前现货购电申报建议", "MWh", ["time"]), "lower_bound": "bid_min", "upper_bound": "bid_max"},
+        {**_var("charge", "储能充电功率", "MW", ["time"]), "lower_bound": 0, "upper_bound": "charge_max"},
+        {**_var("discharge", "储能放电功率", "MW", ["time"]), "lower_bound": 0, "upper_bound": "discharge_max"},
+        {**_var("soc", "储能SOC", "MWh", ["time_volume"]), "lower_bound": "storage_soc_min", "upper_bound": "storage_soc_max"},
+        {**_var("is_charging", "充电状态", "0/1", ["time"], "Binary")},
+        {**_var("is_discharging", "放电状态", "0/1", ["time"], "Binary")},
+        {**_var("load_shift_out", "负荷移出电量", "MWh", ["time"]), "lower_bound": 0, "upper_bound": "flex_down"},
+        {**_var("load_shift_in", "负荷移入电量", "MWh", ["time"]), "lower_bound": 0, "upper_bound": "flex_up"},
+        {**_var("load_cut", "负荷削减电量", "MWh", ["time"]), "lower_bound": 0, "upper_bound": "cut_limit"},
+        {**_var("deviation_short", "短缺偏差", "MWh", ["time"]), "lower_bound": 0},
+        {**_var("deviation_long", "多余偏差", "MWh", ["time"]), "lower_bound": 0},
+        {**_var("terminal_soc_dev_pos", "期末SOC正偏差", "MWh", []), "lower_bound": 0},
+        {**_var("terminal_soc_dev_neg", "期末SOC负偏差", "MWh", []), "lower_bound": 0},
+    ]
+    component_definition = {
+        "component_id": "retail_da_spot_bidding_formula_block",
+        "type": "retail_da_spot_bidding_formula_block",
+        "name": "日前现货申报通用公式约束",
+        "status": "published",
+        "enabled": True,
+        "sets": sets,
+        "parameters": parameters,
+        "variables": variables,
+        "generated_constraints": [
+            {"constraint_id": "energy_balance", "name": "电量平衡", "indices": [{"set": "time", "alias": "t"}], "expression": "contract_energy[t] + spot_buy[t] + discharge[t] * delta_t + deviation_short[t] == load_forecast[t] + load_shift_in[t] - load_shift_out[t] - load_cut[t] + charge[t] * delta_t + deviation_long[t]"},
+            {"constraint_id": "soc_initial", "name": "储能初始SOC", "indices": [], "expression": "soc[0] == storage_soc_init"},
+            {"constraint_id": "soc_transition", "name": "储能SOC递推", "indices": [{"set": "time", "alias": "t"}], "expression": "soc[t+1] == soc[t] + charge[t] * charge_efficiency * delta_t - discharge[t] / discharge_efficiency * delta_t", "boundary_strategy": "skip_out_of_range"},
+            {"constraint_id": "charge_binary_link", "name": "充电状态联动", "indices": [{"set": "time", "alias": "t"}], "expression": "charge[t] <= is_charging[t] * charge_max"},
+            {"constraint_id": "discharge_binary_link", "name": "放电状态联动", "indices": [{"set": "time", "alias": "t"}], "expression": "discharge[t] <= is_discharging[t] * discharge_max"},
+            {"constraint_id": "charge_discharge_mutex", "name": "充放电互斥", "indices": [{"set": "time", "alias": "t"}], "expression": "is_charging[t] + is_discharging[t] <= 1"},
+            {"constraint_id": "shift_energy_balance", "name": "负荷转移总量守恒", "indices": [], "expression": "sum(load_shift_out[t] for t in time) == sum(load_shift_in[t] for t in time)"},
+            {"constraint_id": "terminal_soc_tracking", "name": "期末SOC偏差约束", "indices": [], "expression": "soc[horizon] + terminal_soc_dev_pos - terminal_soc_dev_neg == terminal_soc_target"},
+        ],
+    }
+    objective_terms = [
+        {
+            "term_id": "total_expected_cost",
+            "name": "合约、现货、储能、可调负荷和偏差风险总成本",
+            "weight_key": "retail_da_total_expected_cost",
+            "weight": 1,
+            "solve_participation": "solve_active",
+            "supported_by_backend": True,
+            "expression": "sum(contract_price[t] * contract_energy[t] + spot_price_forecast[t] * spot_buy[t] + storage_cycle_cost * (charge[t] + discharge[t]) * delta_t + shift_cost[t] * (load_shift_in[t] + load_shift_out[t]) + cut_cost[t] * load_cut[t] + deviation_penalty[t] * (deviation_short[t] + deviation_long[t]) for t in time) + terminal_soc_penalty * (terminal_soc_dev_pos + terminal_soc_dev_neg)",
+        }
+    ]
+    component_spec = {
+        "model_code": "retail_da_spot_bidding_v1",
+        "build_mode": "component_based",
+        "name": "售电公司日前现货申报优化模型",
+        "model_problem_type": "MILP",
+        "required_solver_capabilities": ["MILP"],
+        "sets": sets,
+        "parameters": parameters,
+        "variables": variables,
+        "components": [{"type": "retail_da_spot_bidding_formula_block", "definition": component_definition}],
+        "objective": {"type": "weighted_sum", "sense": "minimize", "terms": objective_terms, "weights": {}},
+        "output_contract": {
+            "series_index_set": "time",
+            "execution_policy": "advisory_only",
+            "requires_human_review": True,
+            "series_fields": [
+                {"key": "time_label", "expression": "time_labels[t]"},
+                {"key": "spot_buy", "expression": "spot_buy[t]"},
+                {"key": "contract_energy", "expression": "contract_energy[t]"},
+                {"key": "load_forecast", "expression": "load_forecast[t]"},
+                {"key": "adjusted_load", "expression": "load_forecast[t] + load_shift_in[t] - load_shift_out[t] - load_cut[t]"},
+                {"key": "charge", "expression": "charge[t]"},
+                {"key": "discharge", "expression": "discharge[t]"},
+                {"key": "soc", "expression": "soc[t]"},
+                {"key": "load_shift_out", "expression": "load_shift_out[t]"},
+                {"key": "load_shift_in", "expression": "load_shift_in[t]"},
+                {"key": "load_cut", "expression": "load_cut[t]"},
+                {"key": "deviation_short", "expression": "deviation_short[t]"},
+                {"key": "deviation_long", "expression": "deviation_long[t]"},
+                {"key": "spot_price_forecast", "expression": "spot_price_forecast[t]"},
+            ],
+            "curves": [
+                {"key": "spot_buy_curve", "fields": {"spot_buy": "spot_buy[t]"}},
+                {"key": "contract_energy_curve", "fields": {"contract_energy": "contract_energy[t]"}},
+                {"key": "load_forecast_curve", "fields": {"load_forecast": "load_forecast[t]"}},
+                {"key": "adjusted_load_curve", "fields": {"adjusted_load": "load_forecast[t] + load_shift_in[t] - load_shift_out[t] - load_cut[t]"}},
+                {"key": "charge_curve", "fields": {"charge": "charge[t]"}},
+                {"key": "discharge_curve", "fields": {"discharge": "discharge[t]"}},
+                {"key": "soc_curve", "fields": {"soc": "soc[t]"}},
+                {"key": "load_shift_out_curve", "fields": {"load_shift_out": "load_shift_out[t]"}},
+                {"key": "load_shift_in_curve", "fields": {"load_shift_in": "load_shift_in[t]"}},
+                {"key": "load_cut_curve", "fields": {"load_cut": "load_cut[t]"}},
+                {"key": "deviation_short_curve", "fields": {"deviation_short": "deviation_short[t]"}},
+                {"key": "deviation_long_curve", "fields": {"deviation_long": "deviation_long[t]"}},
+            ],
+            "chart_fields": ["spot_buy", "contract_energy", "load_forecast", "adjusted_load", "soc"],
+        },
+        "metrics_config": {
+            "metrics": [
+                {"key": "average_spot_price", "expression": "avg(spot_price_forecast)"},
+                {"key": "contract_cost", "expression": "sum(contract_price[t] * contract_energy[t] for t in time)"},
+                {"key": "spot_purchase_cost", "expression": "sum(spot_price_forecast[t] * spot_buy[t] for t in time)"},
+                {"key": "storage_cycle_cost_total", "expression": "sum(storage_cycle_cost * (charge[t] + discharge[t]) * delta_t for t in time)"},
+                {"key": "flex_load_cost", "expression": "sum(shift_cost[t] * (load_shift_in[t] + load_shift_out[t]) for t in time)"},
+                {"key": "cut_load_cost", "expression": "sum(cut_cost[t] * load_cut[t] for t in time)"},
+                {"key": "deviation_risk_cost", "expression": "sum(deviation_penalty[t] * (deviation_short[t] + deviation_long[t]) for t in time)"},
+                {"key": "total_expected_cost", "expression": "contract_cost + spot_purchase_cost + storage_cycle_cost_total + flex_load_cost + cut_load_cost + deviation_risk_cost + terminal_soc_penalty * (terminal_soc_dev_pos + terminal_soc_dev_neg)"},
+                {"key": "total_spot_buy_energy", "expression": "sum(spot_buy[t] for t in time)"},
+                {"key": "total_load_cut", "expression": "sum(load_cut[t] for t in time)"},
+                {"key": "deviation_short_total", "expression": "sum(deviation_short[t] for t in time)"},
+                {"key": "deviation_long_total", "expression": "sum(deviation_long[t] for t in time)"},
+                {"key": "terminal_soc_penalty_cost", "expression": "terminal_soc_penalty * (terminal_soc_dev_pos + terminal_soc_dev_neg)"},
+                {"key": "shift_balance_gap", "expression": "abs(sum(load_shift_out[t] for t in time) - sum(load_shift_in[t] for t in time))"},
+                {"key": "soc_min_actual", "expression": "min(soc[tv] for tv in time_volume)"},
+                {"key": "soc_max_actual", "expression": "max(soc[tv] for tv in time_volume)"},
+                {"key": "charge_discharge_conflict_count", "expression": "sum(charge[t] > 0.000001 and discharge[t] > 0.000001 for t in time)"},
+                {"key": "terminal_soc_gap", "expression": "abs(soc[horizon] - terminal_soc_target)"},
+            ],
+            "business_metrics": [
+                "total_expected_cost",
+                "contract_cost",
+                "spot_purchase_cost",
+                "storage_cycle_cost_total",
+                "flex_load_cost",
+                "cut_load_cost",
+                "deviation_risk_cost",
+                "terminal_soc_penalty_cost",
+                "total_load_cut",
+                "shift_balance_gap",
+                "soc_min_actual",
+                "soc_max_actual",
+                "charge_discharge_conflict_count",
+                "terminal_soc_gap",
+            ],
+            "lists": [
+                {"key": "high_price_periods", "foreach": "time", "where": "spot_price_forecast[t] >= average_spot_price", "fields": {"spot_price_forecast": "spot_price_forecast[t]"}},
+                {"key": "high_exposure_periods", "foreach": "time", "where": "spot_buy[t] / load_forecast[t] >= 0.3 or deviation_short[t] > 0.000001 or deviation_long[t] > 0.000001", "fields": {"spot_buy": "spot_buy[t]", "exposure_ratio": "spot_buy[t] / load_forecast[t]", "deviation_short": "deviation_short[t]", "deviation_long": "deviation_long[t]"}},
+            ],
+            "objects": [
+                {"key": "risk_summary", "source": "risk_summary", "metric_fields": ["deviation_risk_cost"], "static": {"advisory_only": True}},
+                {"key": "day_ahead_bid_advice", "source": "series"},
+                {"key": "cost_breakdown", "source": "cost_breakdown", "fields": ["contract_cost", "spot_purchase_cost", "storage_cycle_cost_total", "flex_load_cost", "cut_load_cost", "deviation_risk_cost", "terminal_soc_penalty_cost", "total_expected_cost"]},
+                {"key": "imbalance_risk", "source": "metrics", "fields": ["deviation_short_total", "deviation_long_total", "deviation_risk_cost"]},
+            ],
+        },
+        "constraint_check_config": {
+            "tolerance": 1e-5,
+            "include_metrics": ["shift_balance_gap", "soc_min_actual", "soc_max_actual", "charge_discharge_conflict_count", "terminal_soc_gap"],
+            "checks": [
+                {"key": "load_shift_energy_balanced", "expression": "shift_balance_gap <= tolerance"},
+                {"key": "soc_within_bounds", "expression": "soc_min_actual >= storage_soc_min - tolerance and soc_max_actual <= storage_soc_max + tolerance"},
+                {"key": "charge_discharge_exclusive", "expression": "charge_discharge_conflict_count <= tolerance"},
+                {"key": "terminal_soc_satisfied", "expression": "terminal_soc_gap <= tolerance"},
+            ],
+        },
+        "explanation_config": {
+            "summary": "售电公司日前现货申报优化模型已完成求解，结果包含申报建议、合约电量、储能充放电、可调负荷调整、偏差风险和成本拆解。",
+            "advisory": "平台只生成策略建议，不替代电力交易平台、不执行申报、不自动下单。",
+            "execution_policy": "advisory_only",
+            "requires_human_review": True,
+            "strategy_templates": [
+                "日前现货建议申报电量合计 {total_spot_buy_energy} MWh，预期总成本 {total_expected_cost} 元。",
+                "成本拆分为合约成本 {contract_cost} 元、现货购电成本 {spot_purchase_cost} 元、储能循环成本 {storage_cycle_cost_total} 元、可调负荷转移成本 {flex_load_cost} 元、削减成本 {cut_load_cost} 元、偏差风险成本 {deviation_risk_cost} 元、期末SOC偏差成本 {terminal_soc_penalty_cost} 元。",
+                "本结果仅为售电公司日前现货申报优化建议，必须经人工审批后在外部交易系统处理。",
+            ],
+            "approval_items": [
+                "复核负荷预测、合约分时电量、日前价格预测和申报上下限。",
+                "复核储能 SOC、充放电互斥和可调负荷调整是否满足业务约束。",
+                "确认平台不执行申报、不连接交易平台、不自动下单。",
+            ],
+        },
+    }
+    template.update(
+        {
+            "build_mode": "component_based",
+            "problem_type": "MILP",
+            "model_problem_type": "MILP",
+            "required_solver_capabilities": ["MILP"],
+            "solver": "HiGHS",
+            "business_objects": [
+                {"code": "retailer", "name": "售电公司", "object_type": "market_participant", "source_system": "market_data"},
+                {"code": "storage", "name": "储能资源", "object_type": "storage", "source_system": "BMS"},
+                {"code": "time", "name": "日前交易时段", "object_type": "time", "source_system": "trading_plan"},
+            ],
+            "sets": sets,
+            "parameters": parameters,
+            "variables": variables,
+            "constraints": [
+                _constraint("energy_balance", "电量平衡", "contract_energy + spot_buy + discharge*delta_t + deviation_short = adjusted_load + charge*delta_t + deviation_long", ["time"]),
+                _constraint("bid_bounds", "现货申报上下限", "bid_min[time] <= spot_buy[time] <= bid_max[time]", ["time"]),
+                _constraint("soc_balance", "储能SOC递推", "soc[t] = soc[t-1] + charge*eta*delta_t - discharge/eta*delta_t", ["time"]),
+                _constraint("soc_bounds", "储能SOC上下限", "storage_soc_min <= soc[time] <= storage_soc_max", ["time"]),
+                _constraint("charge_discharge_exclusive", "储能充放电互斥", "is_charging[time] + is_discharging[time] <= 1", ["time"]),
+                _constraint("flex_load_bounds", "可调负荷边界", "load_shift_out <= flex_down, load_shift_in <= flex_up, load_cut <= cut_limit", ["time"]),
+                _constraint("shift_energy_balance", "负荷转移总量守恒", "sum(load_shift_out[time]) = sum(load_shift_in[time])", ["time"]),
+                _constraint("terminal_soc_tracking", "期末SOC偏差约束", "soc[horizon] + terminal_soc_dev_pos - terminal_soc_dev_neg = terminal_soc_target", []),
+            ],
+            "objectives": [
+                _objective(
+                    "total_expected_cost_min",
+                    "最小化合约成本、现货购电成本、储能循环成本、负荷调整成本和偏差风险成本",
+                    "minimize",
+                    "sum(contract_price[t]*contract_energy[t] + spot_price_forecast[t]*spot_buy[t] + storage_cycle_cost*(charge[t]+discharge[t])*delta_t + shift_cost[t]*(load_shift_in[t]+load_shift_out[t]) + cut_cost[t]*load_cut[t] + deviation_penalty[t]*(deviation_short[t]+deviation_long[t])) + terminal_soc_penalty*(terminal_soc_dev_pos+terminal_soc_dev_neg)",
+                )
+            ],
+            "sample_runtime_parameters": sample,
+            "component_spec": component_spec,
+            "output_contract": component_spec["output_contract"],
+            "metrics_config": component_spec["metrics_config"],
+            "constraint_check_config": component_spec["constraint_check_config"],
+            "explanation_config": component_spec["explanation_config"],
+            "ui_metadata": {
+                "execution_policy": "advisory_only",
+                "requires_human_review": True,
+                "capability_boundary": "平台只生成日前现货申报策略建议，不连接交易平台、不执行申报、不自动下单。",
+                "generic_modeling_template": True,
+            },
+        }
+    )
+    return template
+
+
 def _pv_storage_capacity_planning() -> dict[str, Any]:
     sample = _pv_storage_base_sample()
     sample.pop("storage_power_capacity", None)
@@ -1052,7 +1618,7 @@ def _pv_storage_component_template_v2(code: str, name: str, scenario: str, compo
         _param("time", "调度时段", "", ["time"], "dispatch_plan", sample["time"], {"type": "array"}),
         _param("time_volume", "SOC时点", "", ["time_volume"], "dispatch_plan", sample["time_volume"], {"type": "array"}),
         _param("pv_forecast", "光伏预测出力", "MW", ["time"], "forecast", sample["pv_forecast"], {"type": "array", "min": 0}),
-        _param("grid_limit", "并网闄愬埗", "MW", ["time"], "grid", sample["grid_limit"], {"type": "array", "min": 0}),
+        _param("grid_limit", "并网限制", "MW", ["time"], "grid", sample["grid_limit"], {"type": "array", "min": 0}),
         _param("schedule", "计划曲线", "MW", ["time"], "dispatch_plan", sample.get("schedule", sample["grid_limit"]), {"type": "array", "min": 0}),
         _param("price", "电价", "元/MWh", ["time"], "market", sample["price"], {"type": "array"}),
         _param("storage_power_capacity", "储能功率容量", "MW", [], "asset", sample.get("storage_power_capacity", 30), {"type": "number", "min": 0}),

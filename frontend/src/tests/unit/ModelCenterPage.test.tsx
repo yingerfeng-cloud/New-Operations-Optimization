@@ -140,6 +140,37 @@ test('renders semantic and generic model panels', () => {
   expect(screen.getByText('购电成本')).toBeInTheDocument();
 }, 30000);
 
+test('renders template-based unit commitment math from asset detail fallbacks', () => {
+  cleanup();
+  render(
+    <ModelGenericPanel
+      model={{
+        ...testState.modelSample,
+        id: 'MODEL-POWER-UNIT-COMMITMENT-DAY-AHEAD',
+        name: '日前机组组合优化 Unit Commitment',
+        template_id: 'unit_commitment_day_ahead',
+        build_mode: 'template_based',
+        problem_type: 'MILP',
+        model_problem_type: 'MILP',
+        generic_spec: {},
+      }}
+      detail={{
+        constraints: [
+          { constraint_id: 'power_balance', name: '功率平衡', expression: 'sum(unit_output[unit,time]) >= load_forecast[time]' },
+          { constraint_id: 'reserve_margin', name: '备用约束', expression: 'sum(unit_max_output[unit]*unit_on[unit,time]) >= load_forecast[time]*(1+reserve_ratio)' },
+        ],
+        objective: {
+          sense: 'minimize',
+          terms: [{ term_id: 'total_cost_min', name: '总成本最小', expression: 'sum(fuel_cost[unit]*unit_output[unit,time])' }],
+        },
+      }}
+    />,
+  );
+  expect(screen.getByText('功率平衡')).toBeInTheDocument();
+  expect(screen.getByText('备用约束')).toBeInTheDocument();
+  expect(screen.getByText('总成本最小')).toBeInTheDocument();
+}, 30000);
+
 test('renders component and runtime model panels', () => {
   cleanup();
   render(<ModelComponentPanel model={testState.modelSample} detail={testState.assetDetail} />);

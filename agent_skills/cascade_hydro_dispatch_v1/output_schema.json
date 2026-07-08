@@ -1,0 +1,86 @@
+{
+  "objective_value": "number",
+  "variables": [
+    {
+      "key": "storage",
+      "name": "库容",
+      "dimension": [
+        "reservoir",
+        "time"
+      ],
+      "unit": "million m3"
+    },
+    {
+      "key": "outflow",
+      "name": "出库流量",
+      "dimension": [
+        "reservoir",
+        "time"
+      ],
+      "unit": "m3/s"
+    },
+    {
+      "key": "spill",
+      "name": "弃水",
+      "dimension": [
+        "reservoir",
+        "time"
+      ],
+      "unit": "m3/s"
+    },
+    {
+      "key": "level",
+      "name": "上游水位",
+      "dimension": [
+        "reservoir",
+        "time"
+      ],
+      "unit": "m"
+    },
+    {
+      "key": "tailwater",
+      "name": "尾水位",
+      "dimension": [
+        "reservoir",
+        "time"
+      ],
+      "unit": "m"
+    },
+    {
+      "key": "head",
+      "name": "水头",
+      "dimension": [
+        "reservoir",
+        "time"
+      ],
+      "unit": "m"
+    },
+    {
+      "key": "power",
+      "name": "出力",
+      "dimension": [
+        "reservoir",
+        "time"
+      ],
+      "unit": "MW"
+    },
+    {
+      "key": "generation",
+      "name": "发电量",
+      "dimension": [
+        "reservoir",
+        "time"
+      ],
+      "unit": "MWh"
+    },
+    {
+      "key": "final_storage_deviation",
+      "name": "期末库容偏差",
+      "dimension": [
+        "reservoir"
+      ],
+      "unit": "million m3"
+    }
+  ],
+  "explanation": "string"
+}

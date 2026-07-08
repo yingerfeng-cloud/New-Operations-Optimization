@@ -54,7 +54,7 @@ CASCADE_HYDRO_SAMPLE_FUNCTION_ASSETS: list[dict[str, Any]] = [
         "triangles": [[0, 1, 2]],
         "solve_strategy": "triangulated_milp_exact",
         "status": "published",
-        "metadata": {"sample_asset": True, "model_code": "cascade_hydro_dispatch_v1", "asset_version": "2026-07-01-single-triangle"},
+        "metadata": {"sample_asset": True, "model_code": "cascade_hydro_dispatch_v1", "asset_version": "2026-07-07-scattered-triangle"},
     },
 ]
 
@@ -536,7 +536,7 @@ def _validate_piecewise_2d(asset: dict[str, Any]) -> dict[str, Any]:
                 continue
             if _triangle_area(normalized_points, triangle) <= 1e-10:
                 errors.append({"field": f"triangles[{tri_index}]", "message": "degenerate triangle: three points are collinear", "actual": triangle})
-        if grid.get("missing_grid_points"):
+        if grid.get("missing_grid_points") and diagnostics["surface_mode"] in {"regular_grid", "grid"}:
             warnings.append({"field": "points_2d", "message": "regular grid has missing points", "actual": grid["missing_grid_points"][:10]})
         if strategy == "convex_hull_lp_approx":
             warnings.append({"field": "solve_strategy", "message": "convex_hull_lp_approx is not an exact representation for general 2D surfaces"})

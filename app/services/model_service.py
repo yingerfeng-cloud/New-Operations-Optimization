@@ -495,6 +495,22 @@ class ModelService:
     def _validate_nonlinear_publish_readiness(self, diagnosis: dict[str, Any]) -> list[dict[str, Any]]:
         report = diagnosis.get("nonlinear_diagnostics") or {}
         errors: list[dict[str, Any]] = []
+        inferred = str(diagnosis.get("inferred_problem_type") or "").upper()
+        solver_name = str(diagnosis.get("recommended_solver") or diagnosis.get("solver") or "")
+        if inferred == "NLP" and solver_name.lower() == "ipopt":
+            from app.solvers.nlp_adapter import NLPSolverAdapter
+
+            if NLPSolverAdapter().available():
+                return []
+            return [
+                {
+                    "field": "solver.ipopt",
+                    "error": "Ipopt executable not found. NLP solving is unavailable.",
+                    "actual": "unavailable",
+                    "expected": "Pyomo SolverFactory('ipopt').available() == true",
+                    "suggestion": "请安装 Ipopt，或使用 McCormick、1D/2D PWL 等线性化策略。",
+                }
+            ]
         for index, item in enumerate(report.get("blocking_items") or []):
             errors.append(
                 {
@@ -687,6 +703,14 @@ class ModelService:
             component_type = str(component.get("type") or component.get("component_id") or "")
             if not component_type:
                 errors.append({"field": f"component_spec.components[{index}]", "error": "component type is required"})
+                continue
+            inline_definition = component.get("definition") or {}
+            if inline_definition:
+                definition = {**inline_definition, "component_id": inline_definition.get("component_id") or component_type}
+                validation = validate_component_definition(definition)
+                if not validation["valid"]:
+                    for item in validation["errors"]:
+                        errors.append({"field": f"component_spec.components[{index}].{item['field']}", "error": item["message"], "suggestion": item.get("suggestion")})
                 continue
             try:
                 from app.model_components.registry import component_definition
@@ -1222,6 +1246,27 @@ class ModelService:
             return float(validation.get("default", max(float(validation.get("min", 1)), 100)))
         return float(validation.get("default", validation.get("min", 1)))
 
+    def _template_time_granularity(self, template: dict[str, Any]) -> str | None:
+        sets = (
+            list(template.get("sets") or [])
+            + list((template.get("component_spec") or {}).get("sets") or [])
+            + list(((template.get("model_draft") or {}).get("semantic") or {}).get("sets") or [])
+        )
+        time_set = next((item for item in sets if (item.get("code") or item.get("key")) == "time" or item.get("type") == "time_period"), None)
+        if not time_set:
+            return None
+        granularity = time_set.get("time_granularity")
+        if granularity is None:
+            sample = template.get("sample_runtime_parameters") or {}
+            if sample.get("time_step_seconds") is not None:
+                granularity = float(sample["time_step_seconds"]) / 60
+            elif sample.get("delta_t") is not None:
+                granularity = float(sample["delta_t"]) * 60
+        if not granularity:
+            return None
+        value = float(granularity)
+        return f"{int(value) if value.is_integer() else value}min"
+
     def seed_default_templates(self) -> None:
         self._ensure_default_component_library()
         self._ensure_default_template_models_published()
@@ -1255,7 +1300,7 @@ class ModelService:
                     solver="HiGHS",
                     problem_type=template.get("problem_type", template.get("model_problem_type", "MILP")),
                     objective=((template.get("model_draft") or {}).get("objective_strategy") or {}).get("summary") or (template.get("objectives") or [{"code": "objective"}])[0]["code"],
-                    time_granularity="60min" if any((item.get("code") or item.get("key")) == "time" or item.get("type") == "time_period" for item in template.get("sets", []) + ((template.get("component_spec") or {}).get("sets") or []) + (((template.get("model_draft") or {}).get("semantic") or {}).get("sets") or [])) else None,
+                    time_granularity=self._template_time_granularity(template),
                     tags=template.get("tags", []),
                     semantic_spec=template,
                     build_mode=template.get("build_mode", "template_based"),
@@ -1267,7 +1312,11 @@ class ModelService:
                     mathematical_expansion=template.get("mathematical_expansion", {}),
                     model_problem_type=template.get("model_problem_type", template.get("problem_type", "MILP")),
                     required_solver_capabilities=template.get("required_solver_capabilities", ["LP"]),
-                    ui_metadata=template.get("ui_metadata", {}),
+                    ui_metadata={
+                        **(template.get("ui_metadata", {}) or {}),
+                        "managed_default_template": True,
+                        "managed_template_version": template.get("version", "v1.0"),
+                    },
                     parameters=params,
                     input_contract={"runtime_parameters": [p["code"] for p in template.get("parameters", [])]},
                     output_contract={"variables": [v["code"] for v in template.get("variables", [])]},
@@ -1280,9 +1329,6 @@ class ModelService:
             for model in models:
                 STORE.models[model.id] = model
                 skill_name = f"run_{str(model.template_id).lower().replace('-', '_').replace(' ', '_')}"
-                existing = STORE.skills.get(skill_name, {})
-                if existing.get("status") == "disabled":
-                    STORE.skills[skill_name] = {**existing, "status": "enabled", "updated_at": timestamp}
             STORE.save_runtime()
 
     def _ensure_default_template_skills_enabled(self) -> None:
@@ -1299,7 +1345,7 @@ class ModelService:
                     "skill_name": skill_name,
                     "model_id": default_model_id,
                     "model_version": existing.get("model_version", "v1.0"),
-                    "status": "enabled",
+                    "status": existing.get("status", "enabled"),
                     "updated_at": timestamp,
                 }
                 if existing != next_record:
@@ -1316,26 +1362,44 @@ class ModelService:
             changed = False
             for model_id, code in default_ids.items():
                 model = STORE.models.get(model_id)
+                template = templates[code]
                 if model:
-                    template = templates[code]
-                    updates = {
-                        "name": template.get("name", model.name),
-                        "scene": template.get("scenario", template.get("description", model.scene)),
-                        "semantic_spec": template,
-                        "component_spec": template.get("component_spec", {}),
-                        "component_schema": template.get("component_schema", {}),
-                        "model_draft": template.get("model_draft", {}),
-                        "objective_config": template.get("objective_config", {}),
-                        "draft_constraints": template.get("draft_constraints", []),
-                        "mathematical_expansion": template.get("mathematical_expansion", {}),
-                        "parameters": dict(template.get("sample_runtime_parameters", {})),
-                        "input_contract": {"runtime_parameters": [p["code"] for p in template.get("parameters", [])]},
-                        "output_contract": {"variables": [v["code"] for v in template.get("variables", [])]},
-                        "updated_at": timestamp,
-                    }
-                    if model.status == "offline":
-                        updates.update({"status": "published", "published_at": model.published_at or timestamp})
-                    STORE.models[model_id] = model.model_copy(update=updates)
+                    continue
+                else:
+                    STORE.models[model_id] = ModelView(
+                        id=model_id,
+                        template_id=code,
+                        name=template["name"],
+                        scene=template.get("scenario", template["name"]),
+                        version=template.get("version", "v1.0"),
+                        status=template.get("status", "published"),
+                        solver=template.get("solver", "HiGHS"),
+                        problem_type=template.get("problem_type", template.get("model_problem_type", "MILP")),
+                        objective=((template.get("model_draft") or {}).get("objective_strategy") or {}).get("summary") or (template.get("objectives") or [{"code": "objective"}])[0]["code"],
+                        time_granularity=self._template_time_granularity(template),
+                        tags=template.get("tags", []),
+                        semantic_spec=template,
+                        build_mode=template.get("build_mode", "template_based"),
+                        component_spec=template.get("component_spec", {}),
+                        component_schema=template.get("component_schema", {}),
+                        model_draft=template.get("model_draft", {}),
+                        objective_config=template.get("objective_config", {}),
+                        draft_constraints=template.get("draft_constraints", []),
+                        mathematical_expansion=template.get("mathematical_expansion", {}),
+                        model_problem_type=template.get("model_problem_type", template.get("problem_type", "MILP")),
+                        required_solver_capabilities=template.get("required_solver_capabilities", ["LP"]),
+                        ui_metadata={
+                            **(template.get("ui_metadata", {}) or {}),
+                            "managed_default_template": True,
+                            "managed_template_version": template.get("version", "v1.0"),
+                        },
+                        parameters=dict(template.get("sample_runtime_parameters", {})),
+                        input_contract={"runtime_parameters": [p["code"] for p in template.get("parameters", [])]},
+                        output_contract={"variables": [v["code"] for v in template.get("variables", [])]},
+                        created_at=timestamp,
+                        updated_at=timestamp,
+                        published_at=timestamp,
+                    )
                     changed = True
             if changed:
                 STORE.save_runtime()

@@ -183,7 +183,21 @@ class ModelSkillInvocationTest(unittest.TestCase):
         self.assertEqual(disabled.json()["skill_status"], "disabled")
         skills = client.get("/api/skills")
         self.assertEqual(skills.status_code, 200, skills.text)
-        self.assertFalse(any(item["skill_name"] == skill_name for item in skills.json()))
+        listed = next(item for item in skills.json() if item["skill_name"] == skill_name)
+        self.assertEqual(listed["skill_status"], "disabled")
+        self.assertFalse(listed["callable"])
+        result = client.post(
+            f"/api/skills/{skill_name}/run",
+            json={
+                "parameters": {
+                    "load_forecast": {"T1": 100, "T2": 120, "T3": 90},
+                    "fuel_cost": {"U1": 10, "U2": 20},
+                    "unit_max_output": {"U1": 80, "U2": 100},
+                },
+                "options": {"mode": "sync", "explain": True},
+            },
+        )
+        self.assertEqual(result.status_code, 409, result.text)
         enabled = client.post(f"/api/skills/{skill_name}/enable")
         self.assertEqual(enabled.status_code, 200, enabled.text)
         self.assertEqual(enabled.json()["skill_status"], "enabled")

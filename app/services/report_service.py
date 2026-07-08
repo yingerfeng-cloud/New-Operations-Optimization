@@ -39,6 +39,12 @@ class ReportService:
         output = result.get("business_output", {})
         explanation = result.get("business_explanation", {})
         explanation_text = explanation.get("summary") if isinstance(explanation, dict) else str(explanation)
+        solver = result.get("solver") or result.get("solver_name") or result.get("requested_solver") or "-"
+        problem_type = result.get("problem_type") or result.get("solver_type") or "-"
+        model_code = result.get("model_code") or result.get("resolved_model_code") or result.get("model_id") or "-"
+        termination_condition = result.get("termination_condition") or result.get("raw_termination_condition") or "-"
+        constraint_violation_summary = result.get("constraint_violation_summary") or {}
+        local_optimum_risk = str(problem_type).upper() == "NLP" or str(solver).lower() == "ipopt"
         return f"""<!doctype html>
 <html lang="zh-CN">
 <head>
@@ -59,7 +65,9 @@ class ReportService:
   <h2>输入参数</h2>
   <pre>{html.escape(_json(req.forecast_inputs))}</pre>
   <h2>求解状态</h2>
-  <p>状态：{html.escape(str(result.get("status", "-")))}；求解器：HiGHS；任务ID：{html.escape(str(result.get("job_id", "-")))}</p>
+  <p>状态：{html.escape(str(result.get("status", "-")))}；求解器：{html.escape(str(solver))}；问题类型：{html.escape(str(problem_type))}；模型编码：{html.escape(str(model_code))}；任务ID：{html.escape(str(result.get("job_id") or result.get("task_id") or "-"))}</p>
+  <p>终止状态：{html.escape(str(termination_condition))}；局部最优风险：{html.escape("是" if local_optimum_risk else "否")}</p>
+  <pre>{html.escape(_json({"constraint_violation_summary": constraint_violation_summary}))}</pre>
   <h2>成本/收益测算</h2>
   {''.join(f'<span class="metric">{html.escape(str(k))}: {html.escape(str(v))}</span>' for k, v in metrics.items())}
   <h2>优化结果</h2>

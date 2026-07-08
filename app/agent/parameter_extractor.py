@@ -124,16 +124,26 @@ class ParameterExtractor:
             return {}
         text = str(message or "")
         result: dict[str, Any] = {}
-        price = self._numbers_after_label(text, ["电价", "价格", "electricity_price"], stop_labels=["储能容量", "最大充电功率", "最大放电功率", "充电效率", "放电效率", "初始SOC"])
+        price = self._numbers_after_label(
+            text,
+            ["电价", "价格", "electricity_price"],
+            stop_labels=["储能容量", "容量", "最大充电功率", "最大放电功率", "充放电功率", "功率", "充电效率", "放电效率", "初始SOC", "初始 SOC"],
+        )
         if price and "electricity_price" in keys:
             result["electricity_price"] = price
+        both_power = self._number_after_storage_label(text, ["充放电功率", "充/放电功率", "充放电最大功率"])
+        if both_power is not None:
+            if "charge_power_max" in keys:
+                result["charge_power_max"] = both_power
+            if "discharge_power_max" in keys:
+                result["discharge_power_max"] = both_power
         scalar_patterns = [
             ("storage_capacity", ["储能容量", "容量"]),
             ("charge_power_max", ["最大充电功率", "充电功率", "充电上限"]),
             ("discharge_power_max", ["最大放电功率", "放电功率", "放电上限"]),
             ("charge_efficiency", ["充电效率"]),
             ("discharge_efficiency", ["放电效率"]),
-            ("initial_soc", ["初始SOC", "初始soc", "初始荷电状态"]),
+            ("initial_soc", ["初始SOC", "初始soc", "初始 SOC", "初始soc", "初始荷电状态"]),
         ]
         for key, labels in scalar_patterns:
             if key not in keys:
@@ -160,7 +170,7 @@ class ParameterExtractor:
 
     def _number_after_storage_label(self, text: str, labels: list[str]) -> float | int | None:
         for label in labels:
-            match = re.search(rf"{re.escape(label)}\s*(?:B\d+)?\s*[是为:=：]?\s*([0-9]+(?:\.[0-9]+)?)", text, re.IGNORECASE)
+            match = re.search(rf"{re.escape(label)}\s*(?:B\d+)?\s*(?:改成|设为|设置为|调整为|[是为:=：])?\s*([0-9]+(?:\.[0-9]+)?)", text, re.IGNORECASE)
             if match:
                 return self._num(match.group(1))
         return None

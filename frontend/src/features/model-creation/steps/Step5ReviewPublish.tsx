@@ -1,10 +1,11 @@
-import { Alert, Button, Card, Collapse, Descriptions, Space, Table, Tag, Typography, message } from 'antd';
-import { useState } from 'react';
+import { Alert, Button, Card, Checkbox, Collapse, Descriptions, Space, Table, Tag, Typography, message } from 'antd';
+import { useEffect, useState } from 'react';
 import type { ModelAsset } from '../../../types/model';
 import type { ModelDraft } from '../stores/modelCreationStore';
 import type { DraftValidation } from '../utils/validateModelDraft';
 import { JsonViewer } from '../../../components/JsonViewer';
 import { analyzeDraftNonlinear } from '../utils/nonlinearDiagnostics';
+import { getSolverStatus, type SolverStatusResponse } from '../../../api/solvers';
 
 const sectionLabels: Record<string, string> = {
   basic_info: '基础信息校验',
@@ -62,6 +63,7 @@ export function Step5ReviewPublish({
   onTest,
   pending,
   onFixStep,
+  solverStatus: solverStatusOverride,
 }: {
   draft: ModelDraft;
   validation: DraftValidation;
@@ -69,19 +71,62 @@ export function Step5ReviewPublish({
   onTest: () => Promise<ModelAsset | unknown> | void;
   pending?: boolean;
   onFixStep?: (step: number) => void;
+  solverStatus?: SolverStatusResponse;
 }) {
   const [testResult, setTestResult] = useState<unknown>();
   const [error, setError] = useState('');
+  const [nlpRiskAcknowledged, setNlpRiskAcknowledged] = useState(false);
+  const [solverStatus, setSolverStatus] = useState<SolverStatusResponse | undefined>(solverStatusOverride);
+  const [solverStatusError, setSolverStatusError] = useState('');
+
+  useEffect(() => {
+    if (solverStatusOverride) {
+      setSolverStatus(solverStatusOverride);
+      return;
+    }
+    let active = true;
+    getSolverStatus()
+      .then(status => {
+        if (active) setSolverStatus(status);
+      })
+      .catch(exc => {
+        if (active) setSolverStatusError(exc instanceof Error ? exc.message : '求解器状态接口不可用');
+      });
+    return () => {
+      active = false;
+    };
+  }, [solverStatusOverride]);
+
   const dryRun = (testResult as ModelAsset | undefined)?.dry_run_result;
   const diagnosis = ((dryRun as Record<string, unknown> | undefined)?.problem_type_diagnosis || draft.advanced.component_spec?.problem_type_diagnosis || {}) as Record<string, unknown>;
+  const inferredProblemType = String(diagnosis.inferred_problem_type || draft.advanced.component_spec?.model_problem_type || draft.basic_info.solver || '').toUpperCase();
+  const isNlp = inferredProblemType === 'NLP' || String(diagnosis.recommended_solver || draft.basic_info.solver || '').toLowerCase() === 'ipopt';
+  const isMinlpReserved = inferredProblemType === 'MINLP_RESERVED' || inferredProblemType === 'MINLP';
+  const ipoptAvailable = solverStatus?.ipopt?.available === true;
+  const nlpStatusPending = isNlp && !solverStatus && !solverStatusError;
+  const nlpBlockedByIpopt = isNlp && !ipoptAvailable;
+  const nlpRequiresRiskAck = isNlp && ipoptAvailable;
   const functionAssetsUsed = (diagnosis.function_assets_used as unknown[] | undefined) || draft.components.filter(component => component.function_asset_id).map(component => ({ function_asset_id: component.function_asset_id, component: component.type || component.component_id, solve_strategy: component.solve_strategy }));
   const linearizationStrategy = (diagnosis.linearization_strategy as unknown[] | undefined) || [...new Set(draft.components.map(component => component.solve_strategy).filter(Boolean))];
   const pwl2dRows = pwl2dRiskRows(draft);
   const nonlinearReport = analyzeDraftNonlinear(draft);
+  const hasLinearizedNonlinear = functionAssetsUsed.length > 0 || linearizationStrategy.length > 0 || pwl2dRiskRows(draft).length > 0;
   const pwl2dMilpCount = pwl2dRows.filter(row => row.solve_strategy === 'triangulated_milp_exact').length;
   const hasBlockingPwl2dScale = pwl2dRows.some(row => Number(row.expanded_size) > 4000);
   const hasBlockingNonlinear = nonlinearReport.has_blocking_nonlinearity;
   const blockingReasons = Object.values(validation.sections).flatMap(section => section.errors || []);
+  const publishBlocked = !validation.valid || hasBlockingPwl2dScale || isMinlpReserved || nlpStatusPending || nlpBlockedByIpopt || (nlpRequiresRiskAck && !nlpRiskAcknowledged);
+  const publishBlockReason = isMinlpReserved
+    ? '当前模型被识别为 MINLP，平台当前未开放生产级 MINLP 求解。请改用 McCormick、1D/2D PWL 等线性化策略。'
+    : nlpStatusPending
+      ? '正在检测 Ipopt 状态'
+      : nlpBlockedByIpopt
+        ? '当前模型被识别为 NLP，但运行环境未检测到 Ipopt，无法执行真实 NLP 求解。请安装 Ipopt 或使用线性化策略。'
+        : nlpRequiresRiskAck && !nlpRiskAcknowledged
+          ? '请先确认 NLP 局部最优风险'
+          : hasBlockingPwl2dScale
+            ? '二维 PWL 展开规模超过阈值'
+            : blockingReasons[0] || '存在未通过校验项';
 
   const runTest = async () => {
     setError('');
@@ -140,6 +185,59 @@ export function Step5ReviewPublish({
           { key: 'linearization', label: '线性化策略', children: linearizationStrategy.length ? linearizationStrategy.map(item => <Tag key={String(item)}>{String(item)}</Tag>) : '-' },
         ]} />
       </Card>
+      <Card title="模型求解路径" className="section-gap">
+        <Descriptions size="small" column={2} items={[
+          { key: 'path', label: '当前路径', children: isMinlpReserved ? 'MINLP_RESERVED' : isNlp ? '原生 NLP 模型' : hasLinearizedNonlinear ? 'PWL / McCormick 线性化模型' : '线性 / 混合整数线性模型' },
+          { key: 'solver', label: '求解器', children: isNlp ? 'Ipopt' : 'HiGHS' },
+          { key: 'description', label: '说明', span: 2, children: isMinlpReserved ? '当前模型包含整数变量和非线性表达式，平台当前未开放生产级 MINLP 求解。建议改用 1D/2D PWL 或 McCormick 线性化。' : isNlp ? '当前问题类型：NLP；求解方式：原生非线性求解；风险：可能为局部最优，依赖初值、变量上下界和模型尺度。' : hasLinearizedNonlinear ? '当前模型包含非线性物理关系，但已通过 1D PWL / 2D PWL / McCormick 转换为 LP/MILP。' : '当前问题类型：LP / MILP，默认使用 HiGHS。' },
+        ]} />
+      </Card>
+      {isNlp && ipoptAvailable && (
+        <Alert
+          className="section-gap"
+          type="warning"
+          showIcon
+          title="当前模型被识别为 NLP，将使用 Ipopt 求解。"
+          description={(
+            <Space direction="vertical">
+              <Typography.Text>Ipopt 通常返回局部最优结果，结果依赖初值、变量上下界和模型缩放。请确认你理解该风险。</Typography.Text>
+              <Checkbox checked={nlpRiskAcknowledged} onChange={event => setNlpRiskAcknowledged(event.target.checked)}>我理解 NLP 局部最优风险</Checkbox>
+            </Space>
+          )}
+        />
+      )}
+      {isNlp && (
+        <Card title="NLP 发布检查" className="section-gap">
+          <Descriptions size="small" column={3} items={[
+            { key: 'ipopt', label: 'Ipopt 是否可用', children: ipoptAvailable ? '是' : '否' },
+            { key: 'integer', label: '是否包含整数变量', children: String(Boolean(diagnosis.has_integer_variables || isMinlpReserved)) },
+            { key: 'expr', label: '非线性表达式数量', children: nonlinearReport.count },
+            { key: 'bounds', label: '变量上下界完整性', children: String(diagnosis.variable_bounds_complete ?? '请以 dry-run 为准') },
+            { key: 'initial', label: '变量初值情况', children: String(diagnosis.initial_values_complete ?? '建议提供合理初值') },
+            { key: 'local', label: '局部最优风险', children: '存在' },
+            { key: 'scale', label: '模型尺度风险', children: nonlinearReport.count > 20 ? '需关注' : '低' },
+            { key: 'supported', label: '求解器是否支持', children: isNlp && ipoptAvailable ? '支持连续变量 NLP' : '当前不可用' },
+          ]} />
+        </Card>
+      )}
+      {isNlp && !ipoptAvailable && (
+        <Alert
+          className="section-gap"
+          type="error"
+          showIcon
+          title={nlpStatusPending ? '正在检测 Ipopt 状态' : 'NLP 发布被阻断'}
+          description={nlpStatusPending ? '请等待 /api/solvers/status 返回 Ipopt 状态。' : (solverStatus?.ipopt?.message || '当前模型被识别为 NLP，但运行环境未检测到 Ipopt，无法执行真实 NLP 求解。请安装 Ipopt 或使用线性化策略。')}
+        />
+      )}
+      {isMinlpReserved && (
+        <Alert
+          className="section-gap"
+          type="error"
+          showIcon
+          title="MINLP_RESERVED 发布被阻断"
+          description="当前模型被识别为 MINLP，平台当前未开放生产级 MINLP 求解。请改用 McCormick、1D/2D PWL 等线性化策略。"
+        />
+      )}
       {pwl2dRows.length > 0 && (
         <Card title="二维 PWL 风险诊断" className="section-gap">
           <Alert
@@ -223,11 +321,11 @@ export function Step5ReviewPublish({
         </Card>
       )}
       <Space className="section-gap" wrap>
-        <Button data-testid="model-test-run-button" onClick={runTest} disabled={!validation.valid || hasBlockingPwl2dScale} loading={pending}>测试运行</Button>
-        <Button type="primary" onClick={publish} disabled={!validation.valid || hasBlockingPwl2dScale} loading={pending}>发布模型</Button>
-        {(!validation.valid || hasBlockingPwl2dScale) && (
+        <Button data-testid="model-test-run-button" onClick={runTest} disabled={publishBlocked} loading={pending}>测试运行</Button>
+        <Button type="primary" onClick={publish} disabled={publishBlocked} loading={pending}>发布模型</Button>
+        {publishBlocked && (
           <Typography.Text type="secondary">
-            不可发布原因：{hasBlockingPwl2dScale ? '二维 PWL 展开规模超过阈值' : blockingReasons[0] || '存在未通过校验项'}
+            不可发布原因：{publishBlockReason}
           </Typography.Text>
         )}
       </Space>

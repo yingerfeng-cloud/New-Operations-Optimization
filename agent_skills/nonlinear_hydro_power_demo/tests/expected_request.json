@@ -1,0 +1,18 @@
+{
+  "ok": true,
+  "api_skill_name": "run_nonlinear_hydro_power_demo",
+  "request": {
+    "parameters": {
+      "k": 0.9,
+      "flow_min": 10,
+      "flow_max": 100,
+      "head_min": 20,
+      "head_max": 80,
+      "power_max": 5000
+    },
+    "options": {
+      "mode": "sync",
+      "explain": true
+    }
+  }
+}

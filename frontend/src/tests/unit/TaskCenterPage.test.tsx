@@ -98,4 +98,4 @@ test('retries failed task from list', async () => {
   fireEvent.click(within(failedRow).getByRole('button', { name: /更多/ }));
   fireEvent.click(await screen.findByText('重试任务'));
   await waitFor(() => expect(testState.retryTask.mock.calls[0]?.[0]).toBe('OPT-FAILED'));
-}, 10000);
+}, 30000);

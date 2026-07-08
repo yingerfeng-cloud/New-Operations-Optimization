@@ -91,8 +91,17 @@ class JobRunner:
                 result = {
                     "job_id": task.id,
                     "model_id": task.request.model_id,
+                    "model_code": str(model_code),
                     "status": "SUCCESS",
                     "solver": route["selected_solver"],
+                    "solver_name": solver_result.solver_name or route["selected_solver"],
+                    "solver_type": solver_result.solver_type or problem_type,
+                    "solver_available": solver_result.solver_available,
+                    "problem_type": problem_type,
+                    "termination_condition": solver_result.termination_condition or solver_result.raw_termination_condition,
+                    "raw_termination_condition": solver_result.raw_termination_condition,
+                    "constraint_violation_summary": solver_result.constraint_violation_summary,
+                    "local_optimum_warning": solver_result.local_optimum_warning or str(problem_type).upper() == "NLP",
                     "solver_config": {
                         "backend": route["selected_solver"],
                         "problem_type": problem_type,

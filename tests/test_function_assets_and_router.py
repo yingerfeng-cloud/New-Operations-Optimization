@@ -563,13 +563,17 @@ def test_binary_segment_function_mapping_config_shape_infers_milp() -> None:
 
 def test_solver_router_returns_structured_error_without_highs_fallback_for_nlp() -> None:
     route = solver_router.route("NLP")
-    assert route["ok"] is False
-    assert route["status"] == "solver_unavailable"
     assert route["selected_solver"] == "Ipopt"
-    assert route["error_code"] == "SOLVER_UNAVAILABLE"
-    with pytest.raises(SolverRouteError) as exc_info:
-        solver_router.solve(object(), problem_type="NLP")
-    assert exc_info.value.payload["selected_solver"] == "Ipopt"
+    if route["available"]:
+        assert route["ok"] is True
+        assert route["status"] == "ok"
+    else:
+        assert route["ok"] is False
+        assert route["status"] == "solver_unavailable"
+        assert route["error_code"] == "SOLVER_UNAVAILABLE"
+        with pytest.raises(SolverRouteError) as exc_info:
+            solver_router.solve(object(), problem_type="NLP")
+        assert exc_info.value.payload["selected_solver"] == "Ipopt"
 
 
 def test_solver_router_unknown_problem_type_is_structured_error() -> None:

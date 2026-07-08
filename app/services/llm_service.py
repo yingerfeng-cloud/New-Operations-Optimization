@@ -2,6 +2,10 @@ from __future__ import annotations
 
 import json
 import os
+import base64
+import hashlib
+import getpass
+import socket
 from datetime import datetime, timezone
 from typing import Any
 
@@ -76,7 +80,7 @@ class LLMService:
     def config(self) -> dict[str, Any]:
         provider = self._override("provider", os.getenv("LLM_PROVIDER", "volcengine_ark"))
         enabled = self.enabled()
-        api_key_configured = bool(self._api_key()) if provider != "disabled" else bool(self._override("api_key", ""))
+        api_key_configured = False if provider == "disabled" else bool(self._api_key())
         return {
             "provider": provider,
             "base_url": str(self._override("base_url", os.getenv("LLM_BASE_URL", os.getenv("ARK_BASE_URL", "https://ark.cn-beijing.volces.com/api/v3")))).rstrip("/"),
@@ -101,6 +105,8 @@ class LLMService:
         if provider == "disabled":
             updates["enabled"] = False
             updates["model"] = ""
+            updates["key_ciphertext"] = ""
+            updates["key_storage"] = ""
         else:
             enabled = str(updates.get("enabled", self.enabled())).strip().lower() in {"1", "true", "yes", "on"}
             api_key = str(body.get("api_key") or self._api_key() or "")
@@ -108,11 +114,15 @@ class LLMService:
             if enabled and (not model.strip() or not api_key.strip()):
                 raise HTTPException(status_code=422, detail="Provider enabled requires both Model / Endpoint ID and API Key.")
             if body.get("api_key"):
-                updates["api_key"] = str(body["api_key"])
+                updates["key_ciphertext"] = self._encrypt_key(str(body["api_key"]))
+                updates["key_storage"] = "local_encrypted"
         if body.get("clear_api_key"):
-            updates["api_key"] = ""
+            updates["key_ciphertext"] = ""
+            updates["key_storage"] = ""
+        updates.pop("api_key", None)
         updates["last_updated_at"] = datetime.now(timezone.utc).isoformat()
         with STORE.lock:
+            STORE.llm_config.pop("api_key", None)
             STORE.llm_config.update(updates)
             STORE.save_runtime()
         return self.config()
@@ -248,7 +258,37 @@ class LLMService:
         return "Check provider reachability, Base URL, Model / Endpoint ID, and timeout settings."
 
     def _api_key(self) -> str:
-        return str(self._override("api_key", os.getenv("LLM_API_KEY", os.getenv("ARK_API_KEY", ""))) or "")
+        env_key = os.getenv("LLM_API_KEY", os.getenv("ARK_API_KEY", ""))
+        if env_key:
+            return str(env_key)
+        legacy = self._override("api_key", "")
+        if legacy:
+            return str(legacy)
+        ciphertext = self._override("key_ciphertext", "")
+        return self._decrypt_key(str(ciphertext or ""))
+
+    def _key_material(self) -> bytes:
+        seed = "|".join([socket.gethostname(), getpass.getuser(), str(STORE.persistence_path.parent)])
+        return hashlib.sha256(seed.encode("utf-8")).digest()
+
+    def _encrypt_key(self, value: str) -> str:
+        if not value:
+            return ""
+        raw = value.encode("utf-8")
+        key = self._key_material()
+        encrypted = bytes(byte ^ key[index % len(key)] for index, byte in enumerate(raw))
+        return base64.urlsafe_b64encode(encrypted).decode("ascii")
+
+    def _decrypt_key(self, value: str) -> str:
+        if not value:
+            return ""
+        try:
+            raw = base64.urlsafe_b64decode(value.encode("ascii"))
+            key = self._key_material()
+            decrypted = bytes(byte ^ key[index % len(key)] for index, byte in enumerate(raw))
+            return decrypted.decode("utf-8")
+        except Exception:
+            return ""
 
     def _config_source(self) -> str:
         with STORE.lock:

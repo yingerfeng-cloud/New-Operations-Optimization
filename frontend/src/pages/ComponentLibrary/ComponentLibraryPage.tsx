@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useParams } from 'react-router-dom';
 import { copyComponentVersion, createComponent, getComponent, getComponents, offlineComponent, publishComponent, updateComponent, validateComponent } from '../../api/components';
+import { getSystemConfig } from '../../api/systemConfig';
 import { DataTable } from '../../components/DataTable';
 import { PageHeader } from '../../components/PageHeader';
 import { StatusTag } from '../../components/StatusTag';
@@ -14,6 +15,7 @@ import { ParameterBindingPanel } from '../../features/component-library/Paramete
 import { ComponentValidationPanel } from '../../features/component-library/ComponentValidationPanel';
 import { ComponentEditor } from '../../features/component-library/ComponentEditor';
 import type { ComponentDef } from '../../types/component';
+import type { DictionaryItem } from '../../types/systemConfig';
 
 type ValidationResult = { valid: boolean; errors?: unknown[] };
 
@@ -26,6 +28,13 @@ function asValidationResult(value: unknown): ValidationResult | undefined {
   return value as ValidationResult;
 }
 
+function optionsFromDictionary(items: DictionaryItem[] | undefined, rows: ComponentDef[], key: 'category' | 'domain') {
+  const values = new Map<string, string>();
+  (items || []).filter(item => item.enabled !== false).forEach(item => values.set(item.label, item.label));
+  rows.map(item => String(item[key] || '').trim()).filter(Boolean).forEach(value => values.set(value, value));
+  return [...values.entries()].map(([value, label]) => ({ value, label }));
+}
+
 export function ComponentLibraryPage() {
   const { id } = useParams();
   const qc = useQueryClient();
@@ -34,6 +43,7 @@ export function ComponentLibraryPage() {
   const [validation, setValidation] = useState<ValidationResult | undefined>();
   const [filters, setFilters] = useState<{ category?: string; domain?: string; status?: string; implemented?: string }>({});
   const list = useQuery({ queryKey: ['components'], queryFn: getComponents });
+  const config = useQuery({ queryKey: ['system-config'], queryFn: getSystemConfig, retry: false });
   const detail = useQuery({ queryKey: ['component', viewId], queryFn: () => getComponent(viewId!), enabled: !!viewId });
   const done = (text: string) => {
     message.success(text);
@@ -63,6 +73,7 @@ export function ComponentLibraryPage() {
   const availableIds = rows.map(item => item.component_id);
   const missingDeps = rows.filter(item => (item.depends_on || item.dependencies || []).some(dep => !availableIds.includes(dep))).length;
   const c = detail.data;
+  const dictionaries = config.data?.dictionaries;
   const validationResult = validation || asValidationResult(c?.validation_result);
 
   return (
@@ -80,8 +91,8 @@ export function ComponentLibraryPage() {
       </MetricGrid>
       <Card className="content-card section-gap" title={`组件清单 · 已发布 ${publishedCount}`}>
         <Space wrap className="full-width">
-          <Select allowClear placeholder="分类" style={{ width: 140 }} value={filters.category} onChange={category => setFilters({ ...filters, category })} options={[...new Set(allRows.map(item => String(item.category || '')).filter(Boolean))].map(value => ({ value, label: value }))} />
-          <Select allowClear placeholder="领域" style={{ width: 140 }} value={filters.domain} onChange={domain => setFilters({ ...filters, domain })} options={[...new Set(allRows.map(item => String(item.domain || '')).filter(Boolean))].map(value => ({ value, label: value }))} />
+          <Select allowClear placeholder="分类" style={{ width: 140 }} value={filters.category} onChange={category => setFilters({ ...filters, category })} options={optionsFromDictionary(dictionaries?.component_categories, allRows, 'category')} />
+          <Select allowClear placeholder="领域" style={{ width: 140 }} value={filters.domain} onChange={domain => setFilters({ ...filters, domain })} options={optionsFromDictionary(dictionaries?.component_domains, allRows, 'domain')} />
           <Select allowClear placeholder="状态" style={{ width: 140 }} value={filters.status} onChange={status => setFilters({ ...filters, status })} options={[...new Set(allRows.map(item => String(item.status || '')).filter(Boolean))].map(value => ({ value, label: value }))} />
           <Select allowClear placeholder="实现状态" style={{ width: 140 }} value={filters.implemented} onChange={implemented => setFilters({ ...filters, implemented })} options={[{ value: 'true', label: '已实现' }, { value: 'false', label: '未实现' }]} />
         </Space>
@@ -151,7 +162,7 @@ export function ComponentLibraryPage() {
           </Space>
         )}
       >
-        {editing ? <ComponentEditor component={c} availableIds={availableIds} onSave={value => save.mutate(value)} /> : c && (
+        {editing ? <ComponentEditor component={c} availableIds={availableIds} dictionaries={dictionaries} onSave={value => save.mutate(value)} /> : c && (
           <Tabs
             items={[
               {

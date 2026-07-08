@@ -151,6 +151,7 @@ export function analyzeDraftNonlinear(draft: ModelDraft): NonlinearReport {
   const variableCodes = draft.semantic.variables.map(variable => variable.code).filter(Boolean);
   const rows: NonlinearDiagnostic[] = [];
   for (const [index, formula] of draft.formulas.entries()) {
+    if (formula.solve_participation === 'preview_only') continue;
     rows.push(...analyzeFormulaText(formula.dsl_formula, variableCodes, `formulas[${index}]`).map(row => {
       if (row.nonlinear_type === 'bilinear' && draft.components.some(component => mccormickCovers(component, row.involved_variables))) {
         return { ...row, converted: true, supported_by_current_solver: true, blocking: false, risk_level: 'medium' as const, message: '双线性项已配置 McCormick 松弛；这是松弛，不是精确等价表达。' };

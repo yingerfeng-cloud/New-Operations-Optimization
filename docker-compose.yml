@@ -1,0 +1,19 @@
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "18000:8000"
+    environment:
+      COPT_DATA_DIR: /app/data
+      COPT_RUNTIME_STORE: /app/data/runtime_store.json
+      RUNTIME_STORE_PATH: /app/data/runtime_store.json
+      COPT_SOLVER_MODE: docker
+      SERVICE_MODE: combined
+      OPTIMIZATION_PLATFORM_BASE_URL: http://127.0.0.1:8000
+      AGENT_PLATFORM_ACCESS_MODE: in_process
+      AGENT_ALLOW_IN_PROCESS_PLATFORM_FALLBACK: "false"
+      LLM_ENABLED: "false"
+    volumes:
+      - ./docker-data:/app/data

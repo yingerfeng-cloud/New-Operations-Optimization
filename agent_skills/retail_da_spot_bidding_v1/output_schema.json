@@ -1,0 +1,106 @@
+{
+  "objective_value": "number",
+  "variables": [
+    {
+      "key": "spot_buy",
+      "name": "日前现货购电申报建议",
+      "dimension": [
+        "time"
+      ],
+      "unit": "MWh"
+    },
+    {
+      "key": "charge",
+      "name": "储能充电功率",
+      "dimension": [
+        "time"
+      ],
+      "unit": "MW"
+    },
+    {
+      "key": "discharge",
+      "name": "储能放电功率",
+      "dimension": [
+        "time"
+      ],
+      "unit": "MW"
+    },
+    {
+      "key": "soc",
+      "name": "储能SOC",
+      "dimension": [
+        "time_volume"
+      ],
+      "unit": "MWh"
+    },
+    {
+      "key": "is_charging",
+      "name": "充电状态",
+      "dimension": [
+        "time"
+      ],
+      "unit": "0/1"
+    },
+    {
+      "key": "is_discharging",
+      "name": "放电状态",
+      "dimension": [
+        "time"
+      ],
+      "unit": "0/1"
+    },
+    {
+      "key": "load_shift_out",
+      "name": "负荷移出电量",
+      "dimension": [
+        "time"
+      ],
+      "unit": "MWh"
+    },
+    {
+      "key": "load_shift_in",
+      "name": "负荷移入电量",
+      "dimension": [
+        "time"
+      ],
+      "unit": "MWh"
+    },
+    {
+      "key": "load_cut",
+      "name": "负荷削减电量",
+      "dimension": [
+        "time"
+      ],
+      "unit": "MWh"
+    },
+    {
+      "key": "deviation_short",
+      "name": "短缺偏差",
+      "dimension": [
+        "time"
+      ],
+      "unit": "MWh"
+    },
+    {
+      "key": "deviation_long",
+      "name": "多余偏差",
+      "dimension": [
+        "time"
+      ],
+      "unit": "MWh"
+    },
+    {
+      "key": "terminal_soc_dev_pos",
+      "name": "期末SOC正偏差",
+      "dimension": [],
+      "unit": "MWh"
+    },
+    {
+      "key": "terminal_soc_dev_neg",
+      "name": "期末SOC负偏差",
+      "dimension": [],
+      "unit": "MWh"
+    }
+  ],
+  "explanation": "string"
+}

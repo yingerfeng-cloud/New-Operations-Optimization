@@ -3,10 +3,11 @@ import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { getModels } from '../../api/models';
+import { getSystemConfig } from '../../api/systemConfig';
 import { PageHeader } from '../../components/PageHeader';
 import { StatusTag } from '../../components/StatusTag';
 import { FilterBar, MetricCard } from '../../components/WorkspaceUI';
-import { BLANK_MODEL_ID, scenarioCatalog } from '../../features/model-creation/data/scenarioCatalog';
+import { BLANK_MODEL_ID, scenarioCatalog, scenariosFromDictionary } from '../../features/model-creation/data/scenarioCatalog';
 import type { ScenarioCatalogItem, ScenarioModelItem } from '../../types/scenario';
 
 const statusOptions = ['全部', '已发布', '试运行'];
@@ -44,7 +45,8 @@ export function ScenarioLibraryPage() {
   const [filter, setFilter] = useState('全部');
   const [statusFilter, setStatusFilter] = useState('全部');
   const models = useQuery({ queryKey: ['models'], queryFn: getModels });
-  const scenarios = scenarioCatalog;
+  const config = useQuery({ queryKey: ['system-config'], queryFn: getSystemConfig, retry: false });
+  const scenarios = useMemo(() => scenariosFromDictionary(config.data?.dictionaries.business_scenarios), [config.data]);
   const visible = scenarios.filter(item => {
     const sceneMatched = filter === '全部' || item.name === filter;
     const statusMatched = statusFilter === '全部' || statusLabel(item.status) === statusFilter;

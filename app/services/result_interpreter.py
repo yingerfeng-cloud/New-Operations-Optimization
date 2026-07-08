@@ -41,19 +41,56 @@ class ResultInterpreter:
     def _explain(self, semantic_spec: dict[str, Any], result: dict[str, Any], business_variables: dict[str, Any]) -> str:
         scenario = str(semantic_spec.get("model_code") or semantic_spec.get("code") or semantic_spec.get("scenario") or "").lower()
         objective = result.get("objective_value")
-        if "cascade_hydro_dispatch" in scenario or "梯级水电" in scenario:
-            return self._explain_cascade_hydro(result)
+        status = str(result.get("status") or "").upper()
+        if status in {"FAILED", "TIMEOUT", "CANCELLED"}:
+            solver_route_error = self._solver_route_error(result)
+            if solver_route_error:
+                error_code = str(solver_route_error.get("error_code") or "").upper()
+                recommended_solver = str(solver_route_error.get("recommended_solver") or result.get("recommended_solver") or "").lower()
+                if error_code == "SOLVER_UNAVAILABLE" and recommended_solver == "ipopt":
+                    return "优化模型求解失败：Ipopt 求解器不可用。请安装 Ipopt 并确保 ipopt 可执行文件在 PATH 中，或改用线性化模型。"
+            error_text = str(result.get("error") or result.get("message") or result.get("termination_condition") or "求解失败")
+            if "ipopt" in error_text.lower() and any(key in error_text.lower() for key in ["not found", "unavailable", "missing"]):
+                return "优化模型求解失败：Ipopt 求解器不可用。请安装 Ipopt 并确保 ipopt 可执行文件在 PATH 中，或改用线性化模型。"
+            return f"优化模型求解失败，状态为 {status}。原因：{error_text}。请修正求解器环境、输入参数或模型约束后重新求解。"
         if "unit_commitment" in scenario:
             return self._explain_unit_commitment(objective, business_variables)
+        if "economic_dispatch" in scenario or "经济" in scenario or business_variables.get("unit_output"):
+            return self._explain_economic_dispatch(objective, business_variables)
+        business_explanation = result.get("business_explanation")
+        if isinstance(business_explanation, dict):
+            parts = []
+            summary = business_explanation.get("summary")
+            if summary:
+                parts.append(str(summary))
+            strategy = business_explanation.get("strategy_explanation")
+            if isinstance(strategy, list):
+                parts.extend(str(item) for item in strategy if item)
+            elif strategy:
+                parts.append(str(strategy))
+            advisory = business_explanation.get("advisory")
+            if advisory:
+                parts.append(str(advisory))
+            if parts:
+                return "\n".join(parts)
+        if isinstance(business_explanation, str) and business_explanation.strip():
+            return business_explanation
+        if "cascade_hydro_dispatch" in scenario or "梯级水电" in scenario:
+            return self._explain_cascade_hydro(result)
         if "storage_dispatch" in scenario and "renewable" not in scenario:
             return self._explain_storage_dispatch(objective, business_variables)
         if "renewable_storage" in scenario:
             return self._explain_renewable_storage(objective, business_variables)
         if "chp" in scenario or "电热" in scenario:
             return self._explain_chp(objective, business_variables)
-        if "economic_dispatch" in scenario or "经济" in scenario or business_variables.get("unit_output"):
-            return self._explain_economic_dispatch(objective, business_variables)
         return f"优化模型已完成求解，目标函数值为 {objective}。结果已按业务变量结构返回，建议结合约束校核后人工确认执行方案。"
+
+    def _solver_route_error(self, result: dict[str, Any]) -> dict[str, Any]:
+        raw_result = result.get("raw_result") if isinstance(result.get("raw_result"), dict) else {}
+        route_error = raw_result.get("solver_route_error") if isinstance(raw_result.get("solver_route_error"), dict) else None
+        if route_error is None and isinstance(result.get("solver_route_error"), dict):
+            route_error = result.get("solver_route_error")
+        return dict(route_error or {})
 
     def _explain_economic_dispatch(self, objective: Any, business_variables: dict[str, Any]) -> str:
         unit_output = business_variables.get("unit_output", {}).get("rows", [])

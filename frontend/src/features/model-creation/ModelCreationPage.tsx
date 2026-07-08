@@ -1,16 +1,18 @@
 import { Button, Dropdown, Modal, Space, message } from 'antd';
 import { MoreOutlined } from '@ant-design/icons';
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { useEffect, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { createModel, publishModel, testModel, updateModel } from '../../api/models';
+import { createModel, getModel, publishModel, testModel, updateModel } from '../../api/models';
+import { getSystemConfig } from '../../api/systemConfig';
 import { getTemplateDetail, getTemplates } from '../../api/templates';
 import { PageHeader } from '../../components/PageHeader';
 import { ActionFooter, PageShell, StepBody } from '../../components/LayoutPrimitives';
 import { useModelCreationStore, type ModelDraft } from './stores/modelCreationStore';
-import { getScenarioById } from './data/scenarioCatalog';
+import { getScenarioById, scenarioNameFromDictionary, scenariosFromDictionary } from './data/scenarioCatalog';
 import { applyTemplateToDraft } from './utils/applyTemplateToDraft';
 import { normalizeModelDraft } from './utils/normalizeModelDraft';
+import { modelAssetToDraft } from './utils/modelAssetToDraft';
 import { saveModelDraftAsset } from './utils/saveModelDraftAsset';
 import { validateModelDraft } from './utils/validateModelDraft';
 import { Step1BasicInfo } from './steps/Step1BasicInfo';
@@ -30,6 +32,8 @@ const stepMeta: ModelCreationStepMeta[] = [
   { title: '校验发布', description: '完成 dry-run、兼容性检查、测试运行和模型发布。', sectionKeys: ['solver_compatibility'] },
 ];
 
+const lockedStatuses = new Set(['published', 'trial', 'tested', '已发布', '试运行', '已测试']);
+
 export function ModelCreationPage() {
   const nav = useNavigate();
   const [searchParams] = useSearchParams();
@@ -41,16 +45,37 @@ export function ModelCreationPage() {
     selectedModelId,
     setStep,
     setDraft,
+    setCurrentDraftModelId,
     selectCatalogModel,
     setLoadedTemplate,
     setValidationResult,
     reset,
   } = useModelCreationStore();
   const templates = useQuery({ queryKey: ['templates'], queryFn: getTemplates });
+  const systemConfig = useQuery({ queryKey: ['system-config'], queryFn: getSystemConfig, retry: false });
+  const scenarioDictionary = systemConfig.data?.dictionaries?.business_scenarios;
+  const configuredScenarios = useMemo(() => scenariosFromDictionary(scenarioDictionary), [scenarioDictionary]);
+  const handleCatalogSelection = useCallback((scenarioId: string, modelId?: string) => {
+    selectCatalogModel(scenarioId, modelId);
+    const scenarioName = scenarioNameFromDictionary(scenarioId, scenarioDictionary);
+    if (scenarioName) {
+      const state = useModelCreationStore.getState();
+      setDraft({ ...state.draft, basic_info: { ...state.draft.basic_info, scenario: scenarioName } });
+    }
+  }, [scenarioDictionary, selectCatalogModel, setDraft]);
+  const sourceId = searchParams.get('source') || undefined;
+  const sourceModel = useQuery({ queryKey: ['model-edit-source', sourceId], queryFn: () => getModel(sourceId!), enabled: !!sourceId });
 
   useEffect(() => {
     const queryKey = searchParams.toString();
-    if (!queryKey || appliedQueryRef.current === queryKey) {
+    if (!queryKey) {
+      if (appliedQueryRef.current !== '__new__') {
+        appliedQueryRef.current = '__new__';
+        setStep(0);
+      }
+      return;
+    }
+    if (sourceId || appliedQueryRef.current === queryKey) {
       return;
     }
     const scenarioId = searchParams.get('scenarioId');
@@ -59,10 +84,28 @@ export function ModelCreationPage() {
       appliedQueryRef.current = queryKey;
       const { selectedScenarioId: currentScenarioId, selectedModelId: currentModelId } = useModelCreationStore.getState();
       if (scenarioId !== currentScenarioId || (modelId && modelId !== currentModelId)) {
-        selectCatalogModel(scenarioId, modelId);
+        handleCatalogSelection(scenarioId, modelId);
       }
     }
-  }, [searchParams, selectCatalogModel]);
+  }, [handleCatalogSelection, searchParams, setStep, sourceId]);
+
+  useEffect(() => {
+    const scenarioName = scenarioNameFromDictionary(selectedScenarioId, scenarioDictionary);
+    if (scenarioName && draft.basic_info.scenario !== scenarioName) {
+      setDraft({ ...draft, basic_info: { ...draft.basic_info, scenario: scenarioName } });
+    }
+  }, [draft, scenarioDictionary, selectedScenarioId, setDraft]);
+
+  useEffect(() => {
+    if (!sourceId || !sourceModel.data || appliedQueryRef.current === `source:${sourceId}`) return;
+    const draftFromAsset = modelAssetToDraft(sourceModel.data);
+    setDraft(draftFromAsset);
+    setCurrentDraftModelId(lockedStatuses.has(String(sourceModel.data.status)) ? undefined : sourceModel.data.id);
+    setLoadedTemplate(null);
+    setValidationResult(null);
+    setStep(1);
+    appliedQueryRef.current = `source:${sourceId}`;
+  }, [sourceId, sourceModel.data, setCurrentDraftModelId, setDraft, setLoadedTemplate, setStep, setValidationResult]);
 
   const saveDraftModel = async (requireValid = false) => {
     const state = useModelCreationStore.getState();
@@ -92,7 +135,7 @@ export function ModelCreationPage() {
 
   const loadTemplate = async (code: string) => {
     const template = await getTemplateDetail(code);
-    setDraft(applyTemplateToDraft(draft, template, getScenarioById(selectedScenarioId)?.name || draft.basic_info.scenario));
+    setDraft(applyTemplateToDraft(draft, template, scenarioNameFromDictionary(selectedScenarioId, scenarioDictionary) || getScenarioById(selectedScenarioId)?.name || draft.basic_info.scenario));
     setLoadedTemplate(template);
     message.success('模板已初始化到 ModelDraft');
   };
@@ -114,8 +157,9 @@ export function ModelCreationPage() {
       templates={templates.data || []}
       selectedScenarioId={selectedScenarioId}
       selectedModelId={selectedModelId}
+      scenarios={configuredScenarios}
       onChange={setDraft}
-      onCatalogSelection={selectCatalogModel}
+      onCatalogSelection={handleCatalogSelection}
       onTemplate={loadTemplate}
     />,
     <Step2SemanticModel draft={draft} onChange={setDraft} />,

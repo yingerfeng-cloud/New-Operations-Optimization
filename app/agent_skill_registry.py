@@ -21,6 +21,15 @@ BUSINESS_DISPLAY_NAMES = {
     "renewable_storage_dispatch": "风光储协同",
     "chp_dispatch": "电热协同",
     "cascade_hydro_dispatch": "梯级水电调度",
+    "cascade_hydro_dispatch_v1": "梯级水电调度 v1",
+    "pv_storage_day_ahead_dispatch": "光储日前调度",
+    "pv_storage_intraday_dispatch": "光储日内调度",
+    "pv_storage_dispatch_v2": "光储调度 v2",
+    "pv_storage_day_ahead_dispatch_v2": "光储日前调度 v2",
+    "pv_storage_intraday_dispatch_v2": "光储日内调度 v2",
+    "nonlinear_hydro_power_demo": "非线性水电出力 NLP 试点",
+    "contract_spot_exposure_v1": "合约现货暴露控制",
+    "retail_da_spot_bidding_v1": "售电公司日前现货申报",
 }
 
 
@@ -56,8 +65,10 @@ class AgentSkillRegistry:
             input_schema = api_skill.get("input_schema", [])
         if api_skill and not output_schema:
             output_schema = api_skill.get("output_schema", {})
+        platform_fields = self._platform_fields(api_skill_name, api_skill, input_schema, output_schema)
         return {
             **meta,
+            **platform_fields,
             "path": str(path),
             "enabled": bool(meta.get("enabled", True)),
             "instruction": instruction,
@@ -216,15 +227,42 @@ class AgentSkillRegistry:
         target.mkdir(parents=True, exist_ok=True)
         template = self.root / "economic_dispatch"
         if template.is_dir() and name != "economic_dispatch":
-            for item in ("prompts", "adapter.py"):
+            for item in ("prompts",):
                 src = template / item
                 dst = target / item
                 if src.is_dir() and not dst.exists():
                     shutil.copytree(src, dst)
                 elif src.is_file() and not dst.exists():
                     shutil.copy2(src, dst)
+        if not (target / "skill.yaml").exists():
+            self._write_text(target / "skill.yaml", self._default_skill_yaml(name, api_skill))
+        if not (target / "SKILL.md").exists():
+            display_name = api_skill.get("display_name") or name
+            self._write_text(
+                target / "SKILL.md",
+                f"# {display_name} Agent Skill\n\n"
+                "Use this skill to collect parameters, require explicit user confirmation, invoke the bound platform Skill, "
+                "and explain optimization results as advisory-only analysis requiring human review.\n",
+            )
+        if not (target / "adapter.py").exists():
+            self._write_text(target / "adapter.py", self._default_adapter_py(api_skill))
+        if not (target / "examples.json").exists():
+            sample = self._sample_parameters(api_skill.get("input_schema", []))
+            self._write_json(
+                target / "examples.json",
+                {
+                    "positive_examples": [{"user": f"做{api_skill.get('display_name') or name}", "intent": "optimization_request", "expected_skill": name}],
+                    "help_examples": [{"intent": "parameter_example", "text": "show parameter example"}],
+                    "negative_examples": [{"user": "你好", "intent": "casual_chat"}],
+                    "sample_parameters": sample,
+                },
+            )
         self._write_json(target / "input_schema.json", api_skill.get("input_schema", []))
         self._write_json(target / "output_schema.json", api_skill.get("output_schema", {}))
+        self._write_agent_skill_tests(target, api_skill)
+        validation = self.validate_skill(name, raise_on_missing=False)
+        if validation.get("status") != "valid":
+            self._write_text(target / "skill.yaml", self._default_skill_yaml(name, api_skill, enabled=False))
         return self.load_skill(name)
 
     def _summary(self, skill: dict[str, Any]) -> dict[str, Any]:
@@ -261,17 +299,12 @@ class AgentSkillRegistry:
         ]
         has_instruction = (path / "SKILL.md").is_file()
         has_examples = (path / "examples.json").is_file()
-        validation_status = "valid" if (
-            api_skill_name
-            and input_schema
-            and output_schema
-            and has_instruction
-            and (path / "adapter.py").is_file()
-        ) else "unchecked"
+        validation_status = self.validate_skill(name, raise_on_missing=False).get("status", "invalid")
         return {
             "name": name,
             "display_name": BUSINESS_DISPLAY_NAMES.get(name, str(meta.get("display_name") or name).replace(" Agent Skill", "")),
             "canonical_api_skill_name": api_skill_name,
+            **self._platform_fields(api_skill_name, self._safe_api_skill(api_skill_name), input_schema, output_schema),
             "api_skill_available": bool(api_skill_name),
             "enabled": bool(meta.get("enabled", meta.get("status", "enabled") != "disabled")),
             "trigger_intents": meta.get("trigger_intents") or [],
@@ -281,6 +314,32 @@ class AgentSkillRegistry:
             "has_instruction": has_instruction,
             "has_examples": has_examples,
             "validation_status": validation_status,
+        }
+
+    def _platform_fields(
+        self,
+        api_skill_name: str | None,
+        api_skill: dict[str, Any] | None,
+        input_schema: list[dict[str, Any]],
+        output_schema: Any,
+    ) -> dict[str, Any]:
+        api_skill = api_skill or {}
+        api_input = api_skill.get("input_schema") or []
+        api_output = api_skill.get("output_schema") or {}
+        schema_sync_status = "unknown"
+        if api_skill_name and api_skill:
+            local_keys = {item.get("key") for item in input_schema or [] if isinstance(item, dict)}
+            api_keys = {item.get("key") for item in api_input or [] if isinstance(item, dict)}
+            schema_sync_status = "synced" if local_keys == api_keys and bool(output_schema) == bool(api_output) else "out_of_sync"
+        elif api_skill_name:
+            schema_sync_status = "platform_skill_missing"
+        return {
+            "platform_skill_name": api_skill_name,
+            "model_id": api_skill.get("model_id"),
+            "model_code": api_skill.get("model_code"),
+            "model_version": api_skill.get("model_version") or api_skill.get("version"),
+            "schema_sync_status": schema_sync_status,
+            "platform_skill_status": api_skill.get("skill_status"),
         }
 
     def _skill_dirs(self) -> list[Path]:
@@ -328,7 +387,7 @@ class AgentSkillRegistry:
             if value:
                 container[key] = self._parse_scalar(value)
             else:
-                next_container: Any = []
+                next_container: Any = {} if key in {"execution_policy", "result_explanation", "error_handling"} else []
                 container[key] = next_container
                 stack.append((indent, next_container))
                 last_key_at_indent[indent] = key
@@ -370,6 +429,91 @@ class AgentSkillRegistry:
     def _write_json(self, path: Path, value: Any) -> None:
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(json.dumps(value, ensure_ascii=False, indent=2), encoding="utf-8")
+
+    def _write_text(self, path: Path, value: str) -> None:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(value, encoding="utf-8")
+
+    def _default_skill_yaml(self, name: str, api_skill: dict[str, Any], enabled: bool = True) -> str:
+        required = [
+            item.get("key")
+            for item in api_skill.get("input_schema", [])
+            if isinstance(item, dict) and item.get("key") and item.get("required", True) is not False
+        ]
+        optional = [
+            item.get("key")
+            for item in api_skill.get("input_schema", [])
+            if isinstance(item, dict) and item.get("key") and item.get("required", True) is False
+        ]
+        lines = [
+            f"name: {name}",
+            f"display_name: {api_skill.get('display_name') or name}",
+            f"canonical_api_skill_name: {api_skill.get('skill_name')}",
+            f"enabled: {'true' if enabled else 'false'}",
+            "confirmation_required: true",
+            "execution_policy:",
+            "  mode: advisory_only",
+            "required_parameters:",
+        ]
+        lines.extend(f"  - {item}" for item in required)
+        lines.append("optional_parameters:")
+        lines.extend(f"  - {item}" for item in optional)
+        lines.append("trigger_intents:")
+        lines.extend(f"  - {name}" for _ in [0])
+        return "\n".join(lines) + "\n"
+
+    def _default_adapter_py(self, api_skill: dict[str, Any]) -> str:
+        required = [
+            item.get("key")
+            for item in api_skill.get("input_schema", [])
+            if isinstance(item, dict) and item.get("key") and item.get("required", True) is not False
+        ]
+        optional = [
+            item.get("key")
+            for item in api_skill.get("input_schema", [])
+            if isinstance(item, dict) and item.get("key") and item.get("required", True) is False
+        ]
+        return (
+            "from __future__ import annotations\n\n"
+            "from typing import Any\n\n\n"
+            f"REQUIRED_PARAMETERS = {json.dumps(required, ensure_ascii=False)}\n"
+            f"OPTIONAL_PARAMETERS = {json.dumps(optional, ensure_ascii=False)}\n"
+            f"API_SKILL_NAME = {json.dumps(api_skill.get('skill_name'), ensure_ascii=False)}\n\n\n"
+            "def build_api_request(parameter_draft: dict[str, Any], confirmed_defaults: dict[str, Any] | None = None) -> dict[str, Any]:\n"
+            "    confirmed_defaults = confirmed_defaults or {}\n"
+            "    parameter_draft = parameter_draft or {}\n"
+            "    missing = [key for key in REQUIRED_PARAMETERS if key not in parameter_draft]\n"
+            "    if missing:\n"
+            "        return {\"ok\": False, \"missing_parameters\": missing}\n"
+            "    parameters = {key: parameter_draft[key] for key in REQUIRED_PARAMETERS}\n"
+            "    for key in OPTIONAL_PARAMETERS:\n"
+            "        if key in parameter_draft:\n"
+            "            parameters[key] = parameter_draft[key]\n"
+            "        elif key in confirmed_defaults:\n"
+            "            parameters[key] = confirmed_defaults[key]\n"
+            "    return {\"ok\": True, \"api_skill_name\": API_SKILL_NAME, \"request\": {\"parameters\": parameters, \"options\": {\"mode\": \"sync\", \"explain\": True}}}\n"
+        )
+
+    def _write_agent_skill_tests(self, target: Path, api_skill: dict[str, Any]) -> None:
+        sample = self._sample_parameters(api_skill.get("input_schema", []))
+        required = [
+            item.get("key")
+            for item in api_skill.get("input_schema", [])
+            if isinstance(item, dict) and item.get("key") and item.get("required", True) is not False
+        ]
+        missing = dict(sample)
+        if required:
+            missing.pop(str(required[0]), None)
+        self._write_json(target / "tests" / "sample_input.json", sample)
+        self._write_json(target / "tests" / "missing_parameters.json", missing)
+        self._write_json(
+            target / "tests" / "expected_request.json",
+            {
+                "ok": True,
+                "api_skill_name": api_skill.get("skill_name"),
+                "request": {"parameters": sample, "options": {"mode": "sync", "explain": True}},
+            },
+        )
 
     def _load_adapter(self, name: str) -> Any:
         path = self.root / name / "adapter.py"

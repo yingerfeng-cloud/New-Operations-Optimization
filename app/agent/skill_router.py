@@ -14,7 +14,7 @@ REQUIRED_MARKERS = [
     "缺哪些参数",
     "参数清单",
 ]
-SWITCH_MARKERS = ["切换到", "换成", "改成"]
+SWITCH_MARKERS = ["切换到", "换成"]
 CONFIRM_DEFAULT_MARKERS = ["确认使用默认值", "使用默认值", "默认值确认"]
 CONFIRM_INVOKE_MARKERS = ["确认调用", "开始求解", "执行优化", "开始优化", "运行模型"]
 RESULT_MARKERS = ["解释结果", "结果解释", "总结结果", "分析结果", "上一次结果", "上一次优化结果"]
@@ -22,7 +22,7 @@ CONFIRM_SWITCH_CLEAR_MARKERS = ["确认清空", "清空后切换", "确认切换
 CONFIRM_SWITCH_MIGRATE_MARKERS = ["迁移参数", "保留兼容参数", "迁移后切换"]
 CANCEL_SWITCH_MARKERS = ["取消切换", "不切换", "保持当前"]
 AVAILABILITY_MARKERS = ["有没有", "支持", "能不能做", "平台有", "是否支持", "有模型", "没有"]
-OPTIMIZATION_MARKERS = ["帮我", "运行", "求解", "优化", "调度", "分配", "dispatch", "optimize", "调用"]
+OPTIMIZATION_MARKERS = ["帮我", "做", "运行", "求解", "优化", "调度", "分配", "dispatch", "optimize", "调用"]
 
 
 class AgentSkillRouter:
@@ -61,10 +61,12 @@ class AgentSkillRouter:
             return self._result("skill_availability_query", mentioned, skills, 0.9 if mentioned else 0.62, False, "用户询问平台是否支持某场景")
 
         explicit_switch = any(marker in compact for marker in SWITCH_MARKERS)
-        if mentioned and current_agent_skill and mentioned != current_agent_skill:
+        if mentioned and current_agent_skill and mentioned != current_agent_skill and explicit_switch:
             return self._result("switch_skill", mentioned, skills, 0.88, False, f"检测到场景切换：{current_agent_skill} -> {mentioned}")
-        if current_agent_skill and not explicit_switch and not mentioned and any(ch.isdigit() for ch in compact):
+        if current_agent_skill and not mentioned and any(ch.isdigit() for ch in compact):
             return self._result("parameter_supplement", current_agent_skill, skills, 0.78, False, "沿用当前 Agent Skill 收集参数")
+        if mentioned and current_agent_skill and mentioned != current_agent_skill:
+            return self._result("optimization_request", mentioned, skills, 0.86, False, "识别到新的优化场景请求")
         if mentioned:
             if self._optimization_intent(compact):
                 return self._result("optimization_request", mentioned, skills, 0.86, False, "识别到优化请求和场景")
@@ -93,7 +95,29 @@ class AgentSkillRouter:
             if any(str(item).lower() and str(item).lower() in text for item in names):
                 return skill.get("name")
         aliases = [
-            ("unit_commitment_day_ahead", ["日前机组组合", "机组组合", "机组", "日前", "启停", "备用", "unit commitment"]),
+            ("retail_da_spot_bidding_v1", ["售电公司日前现货申报", "售电日前现货申报", "日前现货申报", "日前现货", "申报优化", "retail da", "spot bidding"]),
+            ("contract_spot_exposure_v1", ["合约现货暴露控制", "合约现货暴露", "现货暴露控制", "中长期合约分解", "contract spot exposure"]),
+            ("pv_storage_day_ahead_dispatch", ["光储日前调度", "光伏储能日前", "pv storage day ahead"]),
+            (
+                "pv_storage_intraday_dispatch",
+                [
+                    "光储日内滚动调度",
+                    "光储日内滚动优化",
+                    "光储实时滚动调度",
+                    "光储协同日内调度",
+                    "光储日内滚动",
+                    "光储实时滚动",
+                    "光储日内调度",
+                    "光伏储能日内",
+                    "pv storage intraday",
+                ],
+            ),
+            ("pv_storage_day_ahead_dispatch_v2", ["光储日前调度v2", "光储日前v2", "pv storage day ahead v2"]),
+            ("pv_storage_intraday_dispatch_v2", ["光储日内滚动调度v2", "光储实时滚动调度v2", "光储日内调度v2", "光储日内v2", "pv storage intraday v2"]),
+            ("pv_storage_dispatch_v2", ["光储调度v2", "光储v2", "pv storage dispatch v2"]),
+            ("nonlinear_hydro_power_demo", ["非线性水电", "nlp水电", "ipopt水电", "nonlinear hydro"]),
+            ("cascade_hydro_dispatch_v1", ["梯级水电调度v1", "梯级水电v1", "cascade hydro v1"]),
+            ("unit_commitment_day_ahead", ["日前机组组合", "机组组合", "机组启停", "启停", "备用", "unit commitment"]),
             ("storage_dispatch", ["储能调度", "储能", "峰谷", "soc", "storage"]),
             ("renewable_storage_dispatch", ["风光储", "新能源", "可再生", "renewable"]),
             ("chp_dispatch", ["电热协同", "热电", "chp"]),
