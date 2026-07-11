@@ -8,11 +8,11 @@ function Step2Harness({ initial }: { initial?: ModelDraft }) {
   return <Step2SemanticModel draft={draft} onChange={setDraft} />;
 }
 
-test('shows productized time and time_volume rules', () => {
+test('shows non-time default and time-dimension configuration entry', () => {
   render(<Step2Harness />);
-  expect(screen.getAllByText('time').length).toBeGreaterThan(0);
-  expect(screen.getAllByText('time_volume').length).toBeGreaterThan(0);
-  expect(screen.getAllByText(/状态时点，长度 horizon \+ 1/).length).toBeGreaterThan(0);
+  expect(screen.getByText('时间维度配置')).toBeInTheDocument();
+  expect(screen.getByText('非时序模型')).toBeInTheDocument();
+  expect(screen.queryByText('time_volume')).not.toBeInTheDocument();
 }, 10000);
 
 test('can add structured sets, parameters, and variables into semantic draft', () => {
@@ -20,8 +20,8 @@ test('can add structured sets, parameters, and variables into semantic draft', (
 
   fireEvent.click(screen.getByText('高级明细'));
   fireEvent.click(screen.getByTestId('add-set'));
-  expect(screen.getByDisplayValue('set_3')).toBeInTheDocument();
-  expect(screen.getByDisplayValue('业务集合 3')).toBeInTheDocument();
+  expect(screen.getByDisplayValue('set_1')).toBeInTheDocument();
+  expect(screen.getByDisplayValue('业务集合 1')).toBeInTheDocument();
 
   fireEvent.click(screen.getByText('参数 0'));
   fireEvent.click(screen.getByTestId('add-parameter'));
@@ -47,12 +47,14 @@ test('validates duplicate semantic codes', () => {
 });
 
 test('opens semantic item editor from overview card', () => {
-  render(<Step2Harness />);
+  const draft = createInitialDraft();
+  draft.semantic.sets = [{ code: 'unit', name: '机组集合', values: ['U1'] }];
+  render(<Step2Harness initial={draft} />);
 
-  fireEvent.click(screen.getByRole('button', { name: '编辑 调度时段' }));
+  fireEvent.click(screen.getByRole('button', { name: '编辑 机组集合' }));
 
   expect(screen.getByText('编辑集合')).toBeInTheDocument();
-  expect(screen.getByDisplayValue('time')).toBeInTheDocument();
+  expect(screen.getByDisplayValue('unit')).toBeInTheDocument();
 });
 
 test('renders component builder writeback without raw JSON block', () => {

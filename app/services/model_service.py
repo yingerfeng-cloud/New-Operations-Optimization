@@ -18,6 +18,8 @@ from app.problem_type_diagnosis import (
 from app.schemas.model import AssetPackage, AssetView, ModelPackage, ModelView
 from app.semantic.semantic_validator import RuntimeParameterValidator
 from app.services.function_asset_service import get_function_asset, validate_function_asset
+from app.services.model_time_dimension_service import normalize_model_time_dimension_contract, validate_model_time_dimension_contract
+from app.services.model_set_reference_validator import validate_set_references
 from app.solvers.solver_router import solver_router
 from app.storage.memory_store import STORE
 from app.templates.power_templates import power_template_library
@@ -32,6 +34,7 @@ class ModelService:
         model = self._normalize_component_model(model)
         model = self._normalize_generic_formula_model(model)
         model = self._apply_generalized_top_level_fields(model)
+        model = self._normalize_time_dimension_contract(model)
         model_id = model.id or f"MODEL-{uuid.uuid4().hex[:8].upper()}"
         with STORE.lock:
             if model.id and model.id in STORE.models:
@@ -61,6 +64,7 @@ class ModelService:
         model = self._normalize_component_model(model)
         model = self._normalize_generic_formula_model(model)
         model = self._apply_generalized_top_level_fields(model)
+        model = self._normalize_time_dimension_contract(model)
         warnings, dry_run_result = self._validate_model_package(model, require_publish_ready=model.status in CALLABLE_STATUSES)
         updated = ModelView(**model.model_dump(exclude={"id", "created_at", "updated_at", "published_at", "validation_warnings", "dry_run_result"}), id=model_id, validation_warnings=warnings, dry_run_result=dry_run_result, created_at=existing.created_at, updated_at=now_text(), published_at=existing.published_at)
         with STORE.lock:
@@ -72,6 +76,7 @@ class ModelService:
         normalized_model = self._normalize_component_model(ModelPackage(**model.model_dump()))
         normalized_model = self._normalize_generic_formula_model(normalized_model)
         normalized_model = self._apply_generalized_top_level_fields(normalized_model)
+        normalized_model = self._normalize_time_dimension_contract(normalized_model)
         diagnosis = self._diagnose_problem_type(normalized_model)
         if not diagnosis.get("publish_valid", True):
             problem_errors, _ = validate_problem_type_override(diagnosis)
@@ -109,6 +114,8 @@ class ModelService:
                 "published_at": now_text(),
                 "updated_at": now_text(),
                 "solver": diagnosis.get("recommended_solver") or normalized_model.solver,
+                "problem_type": (dry_run_result.get("solver_check") or {}).get("problem_type") or normalized_model.problem_type,
+                "model_problem_type": (dry_run_result.get("solver_check") or {}).get("problem_type") or normalized_model.model_problem_type,
                 "validation_warnings": warnings,
                 "dry_run_result": dry_run_result,
                 "ui_metadata": {
@@ -245,6 +252,9 @@ class ModelService:
                 for item in parameter_bindings
             ]
         return model.model_copy(update={"objective": objective, "time_granularity": time_granularity, "ui_metadata": ui_metadata, "parameter_bindings": parameter_bindings, "parameter_schema": parameter_schema, "input_contract": input_contract})
+
+    def _normalize_time_dimension_contract(self, model: ModelPackage) -> ModelPackage:
+        return normalize_model_time_dimension_contract(model)
 
     def _collect_parameter_bindings(self, model: ModelPackage | ModelView) -> list[dict[str, Any]]:
         rows = []
@@ -400,6 +410,8 @@ class ModelService:
         model = self.get_model(model_id)
         params = test_case.get("parameters") if "parameters" in test_case else test_case
         if not isinstance(params, dict) or not params:
+            params = self._default_test_parameters(model)
+        if not isinstance(params, dict) or not params:
             raise HTTPException(status_code=422, detail={"message": "test_case.parameters is required", "errors": [{"field": "test_case.parameters", "error": "missing"}]})
         dry_run_result = self._dry_run_model(model, test_parameters=params, run_solver=True)
         if dry_run_result["structure_check"]["status"] != "passed" or dry_run_result["solver_check"]["status"] != "passed":
@@ -409,6 +421,26 @@ class ModelService:
             STORE.models[model_id] = updated
         return updated
 
+    def _default_test_parameters(self, model: ModelPackage | ModelView) -> dict[str, Any]:
+        semantic = deepcopy(model.semantic_spec or {})
+        draft = deepcopy(model.model_draft or {})
+        component_spec = deepcopy(model.component_spec or semantic.get("component_spec") or {})
+        parameters = {
+            **(semantic.get("sample_runtime_parameters") or {}),
+            **((draft.get("runtime_parameters") or {}) if isinstance(draft, dict) else {}),
+            **(model.parameters or {}),
+        }
+        if component_spec:
+            parameters["semantic_spec"] = {
+                **semantic,
+                "build_mode": "component_based",
+                "component_spec": component_spec,
+            }
+            self._fill_component_dry_parameters(parameters, component_spec)
+            self._normalize_component_dry_parameters(parameters, str(component_spec.get("model_code") or semantic.get("model_code") or ""))
+            parameters.pop("semantic_spec", None)
+        return parameters
+
     def _validate_model_package(self, model: ModelPackage, require_publish_ready: bool = False) -> tuple[list[dict[str, Any]], dict[str, Any]]:
         errors: list[dict[str, Any]] = []
         warnings: list[dict[str, Any]] = []
@@ -416,6 +448,18 @@ class ModelService:
         semantic_spec = model.semantic_spec or {}
         generic_spec = model.generic_spec or {}
         is_component_model = self._is_component_based_model(model)
+        time_errors, time_warnings = validate_model_time_dimension_contract(model, require_publish_ready)
+        errors.extend(time_errors)
+        warnings.extend(time_warnings)
+        errors.extend(validate_set_references(
+            semantic_spec=semantic_spec,
+            component_spec=model.component_spec or semantic_spec.get("component_spec") or {},
+            generic_spec=generic_spec or semantic_spec.get("generic_spec") or {},
+            model_draft=model.model_draft,
+            parameter_schema=model.parameter_schema,
+            input_contract=model.input_contract,
+            output_contract=model.output_contract,
+        ))
         if (semantic_spec or generic_spec) and not is_component_model:
             errors.extend(RuntimeParameterValidator().validate_semantic_and_generic(semantic_spec, generic_spec))
         component_spec_for_objective = model.component_spec or semantic_spec.get("component_spec") or {}
@@ -431,7 +475,7 @@ class ModelService:
             is_component_based = self._is_component_based_model(model)
             is_template_backed = self._is_known_template_model(model)
             has_function_binding_errors = False
-            if not semantic_spec:
+            if not any(semantic_spec.get(section) for section in ("sets", "parameters", "variables", "constraints", "objectives")):
                 errors.append({"field": "semantic_spec", "error": "semantic_spec is required before publish"})
             errors.extend(self._validate_required_parameter_bindings(model))
             if is_component_based and not component_spec:
@@ -690,6 +734,10 @@ class ModelService:
             message = error.get("message") or error.get("error") or error.get("actual") or "校验失败"
             rows.append(
                 {
+                    "code": error.get("code") or "VALIDATION_ERROR",
+                    "field": error.get("field"),
+                    "expected": error.get("expected"),
+                    "actual": error.get("actual"),
                     **error,
                     "message": message,
                     "suggestion": error.get("suggestion") or error.get("expected") or self._suggestion_for_field(str(error.get("field", ""))),
@@ -839,9 +887,9 @@ class ModelService:
                 dry_spec["parameters"] = dry_parameters
                 pyomo_model, _ = GenericLinearBuilder().build(dry_spec)
             if run_solver:
-                problem_type = (self._diagnose_problem_type(model) or {}).get("inferred_problem_type") or model.model_problem_type or model.problem_type
+                problem_type = solver_router.infer_problem_type_from_model(pyomo_model)
                 solver_result = solver_router.solve(pyomo_model, problem_type=problem_type, requested_solver=None)
-                result["solver_check"] = {"status": "passed", "warnings": [], "objective_value": solver_result.objective_value, "solver_status": solver_result.status}
+                result["solver_check"] = {"status": "passed", "warnings": [], "objective_value": solver_result.objective_value, "solver_status": solver_result.status, "problem_type": problem_type}
         except Exception as exc:
             function_component_index = self._first_function_mapping_component_index(component_spec) if is_component_based else None
             field = (
@@ -913,7 +961,7 @@ class ModelService:
                 errors.append({"field": f"component_spec.components[{index}].y", "error": "y is required"})
             if is_2d and not cfg.get("z"):
                 errors.append({"field": f"component_spec.components[{index}].z", "error": "z is required"})
-            supported_strategies = {"display_only", "triangulated_milp_exact", "convex_hull_lp_approx"} if is_2d else {"display_only", "convex_combination_lp", "binary_segment_milp"}
+            supported_strategies = {"display_only", "triangulated_milp_exact", "convex_hull_lp_approx"} if is_2d else {"display_only", "segment_binary", "sos2", "convex_combination_lp", "binary_segment_milp"}
             if strategy not in supported_strategies:
                 errors.append({"field": f"component_spec.components[{index}].solve_strategy", "error": "unsupported solve_strategy", "actual": strategy})
                 continue

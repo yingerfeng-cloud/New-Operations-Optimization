@@ -129,8 +129,8 @@ if (testProcess?.stderr && nativeStderrWrite) {
     return nativeStderrWrite(chunk, ...args);
   });
 }
-afterEach(() => {
+afterEach(async () => {
   message.destroy();
   notification.destroy();
-  cleanupTestEnv();
+  await cleanupTestEnv();
 });

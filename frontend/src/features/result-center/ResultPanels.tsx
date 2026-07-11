@@ -169,18 +169,21 @@ function hydroChartOption(title: string, rows: RowValue[], valueField: string) {
 
 export function ResultCascadeHydroPanel({ result }: { result?: SolveResult }) {
   const output = objectValue(result?.business_output);
-  const hasHydroResult = Boolean(output.storage_curve || output.water_balance_check || output.function_asset_interpolation);
+  const hasHydroResult = Boolean(output.storage_curve || output.dispatch_detail || output.water_balance_check || output.function_asset_interpolation);
   if (!hasHydroResult) return <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无水电结果解释" />;
 
-  const storageRows = hydroRows(result, 'storage_curve');
-  const outflowRows = hydroRows(result, 'outflow_curve');
-  const powerRows = hydroRows(result, 'power_curve');
-  const spillRows = hydroRows(result, 'spill_curve');
+  const dispatchRows = rowsFrom(output.dispatch_detail, 'dispatch_detail');
+  const storageRows = hydroRows(result, 'storage_curve').length ? hydroRows(result, 'storage_curve') : dispatchRows;
+  const outflowRows = hydroRows(result, 'outflow_curve').length ? hydroRows(result, 'outflow_curve') : dispatchRows;
+  const powerRows = hydroRows(result, 'power_curve').length ? hydroRows(result, 'power_curve') : dispatchRows;
+  const spillRows = hydroRows(result, 'spill_curve').length ? hydroRows(result, 'spill_curve') : dispatchRows;
   const balanceRows = hydroRows(result, 'water_balance_check');
   const interpolationRows = hydroRows(result, 'function_asset_interpolation');
   const metrics = objectValue(result?.metrics || result?.summary);
   const functionAssetSummary = objectValue(output.function_asset_summary || output.function_assets);
-  const hasLoadCompare = Boolean(output.load_power_curve || output.load_forecast_vs_total_power);
+  const loadRows = rowsFrom(output.load_tracking || output.system_curve, 'load_tracking');
+  const hasLoadCompare = loadRows.length > 0;
+  const objectiveBreakdown = objectValue(output.objective_breakdown);
 
   return (
     <Space orientation="vertical" size={16} style={{ width: '100%' }}>
@@ -197,12 +200,23 @@ export function ResultCascadeHydroPanel({ result }: { result?: SolveResult }) {
           { key: 'runtime', label: '运行耗时', children: text(result?.runtime || result?.solve_time) },
         ]} />
       </Card>
+      <Card title="目标函数拆解">
+        <Descriptions size="small" column={3} items={[
+          { key: 'generation', label: '发电量价值', children: text(objectiveBreakdown.generation_value) },
+          { key: 'revenue', label: '收益价值', children: text(objectiveBreakdown.revenue_value) },
+          { key: 'spillPenalty', label: '弃水惩罚', children: text(objectiveBreakdown.spill_penalty_value) },
+          { key: 'terminalPenalty', label: '期末库容偏差惩罚', children: text(objectiveBreakdown.terminal_storage_penalty_value) },
+          { key: 'loadPenalty', label: '负荷偏差惩罚', children: text(objectiveBreakdown.load_deviation_penalty_value) },
+          { key: 'total', label: '总目标值', children: text(objectiveBreakdown.total_objective_value) },
+        ]} />
+      </Card>
       <Row gutter={[14, 14]}>
-        <Col xs={24} lg={12}><Card title="库容过程曲线"><ReactECharts style={{ height: 300 }} option={hydroChartOption('库容过程曲线', storageRows, 'storage')} /></Card></Col>
-        <Col xs={24} lg={12}><Card title="出库流量曲线"><ReactECharts style={{ height: 300 }} option={hydroChartOption('出库流量曲线', outflowRows, 'outflow')} /></Card></Col>
-        <Col xs={24} lg={12}><Card title="出力曲线"><ReactECharts style={{ height: 300 }} option={hydroChartOption('出力曲线', powerRows, 'power')} /></Card></Col>
-        <Col xs={24} lg={12}><Card title="弃水曲线"><ReactECharts style={{ height: 300 }} option={hydroChartOption('弃水曲线', spillRows, 'spill')} /></Card></Col>
+        <Col xs={24} lg={12}><Card title="库容过程曲线"><ReactECharts style={{ height: 300 }} option={hydroChartOption('库容过程曲线', storageRows, storageRows[0]?.storage !== undefined ? 'storage' : 'volume_start_million_m3')} /></Card></Col>
+        <Col xs={24} lg={12}><Card title="出库流量曲线"><ReactECharts style={{ height: 300 }} option={hydroChartOption('出库流量曲线', outflowRows, outflowRows[0]?.outflow !== undefined ? 'outflow' : 'q_out_m3s')} /></Card></Col>
+        <Col xs={24} lg={12}><Card title="出力曲线"><ReactECharts style={{ height: 300 }} option={hydroChartOption('出力曲线', powerRows, powerRows[0]?.power !== undefined ? 'power' : 'station_power_MW')} /></Card></Col>
+        <Col xs={24} lg={12}><Card title="弃水曲线"><ReactECharts style={{ height: 300 }} option={hydroChartOption('弃水曲线', spillRows, spillRows[0]?.spill !== undefined ? 'spill' : 'q_spill_m3s')} /></Card></Col>
       </Row>
+      {hasLoadCompare && <Card title="负荷跟踪解释"><Table size="small" pagination={{ pageSize: 6 }} rowKey="__row_key" dataSource={loadRows} columns={['time_index', 'load_forecast_MW', 'total_hydro_power_MW', 'load_dev_pos_MW', 'load_dev_neg_MW', 'deviation_rate', 'hard_constraint_satisfied'].map(field => ({ title: field, dataIndex: field, render: text }))} /></Card>}
       {!hasLoadCompare && <Alert showIcon type="info" title="负荷预测 vs 总出力曲线" description="当前结果未返回 load_forecast 或总出力对比数据，因此不编造曲线。" />}
       <Card title="水量平衡校验表">
         <Table
@@ -210,7 +224,7 @@ export function ResultCascadeHydroPanel({ result }: { result?: SolveResult }) {
           pagination={{ pageSize: 6 }}
           rowKey="__row_key"
           dataSource={balanceRows}
-          columns={['time', 'reservoir', 'previous_storage', 'natural_inflow', 'upstream_release', 'outflow', 'spill', 'expected_storage', 'actual_storage', 'balance_error'].map(field => ({
+          columns={['time_index', 'station', 'local_and_upstream_inflow_m3s', 'q_out_m3s', 'volume_start_million_m3', 'volume_end_million_m3', 'balance_error_million_m3', 'delay_mapping'].map(field => ({
             title: field,
             dataIndex: field,
             render: text,
@@ -232,11 +246,12 @@ export function ResultCascadeHydroPanel({ result }: { result?: SolveResult }) {
           rowKey="__row_key"
           dataSource={interpolationRows}
           columns={[
-            { title: 'time', dataIndex: 'time', render: text },
-            { title: 'reservoir', dataIndex: 'reservoir', render: text },
-            { title: '1D 水位库容', dataIndex: 'level_storage', render: text },
-            { title: '1D 尾水位流量', dataIndex: 'tailwater_outflow', render: text },
-            { title: '2D 出力曲面', dataIndex: 'power_surface', render: text },
+            { title: '时段', render: (_, row) => text(row.time_index ?? row.time) },
+            { title: '电站', render: (_, row) => text(row.station ?? row.reservoir) },
+            { title: '类型', dataIndex: 'type', render: text },
+            { title: '函数资产', render: (_, row) => text(row.function_asset_id || objectValue(row.power_surface).function_asset_id || objectValue(row.level_storage).function_asset_id || objectValue(row.tailwater_outflow).function_asset_id) },
+            { title: '一维区间', render: (_, row) => text(row.segment_index !== undefined ? { segment: row.segment_index, left: row.left_breakpoint, right: row.right_breakpoint, weights: row.weights } : row.level_storage || row.tailwater_outflow || '-') },
+            { title: '二维三角片', render: (_, row) => text(row.selected_triangle !== undefined ? { triangle: row.selected_triangle, vertices: row.vertices, weights: row.lambda_weights } : row.power_surface || '-') },
           ]}
         />
       </Card>

@@ -29,8 +29,11 @@ COMPONENT_OUTPUTS: dict[str, list[str]] = {
     "hydro_volume_bounds": ["hydro_volume_bounds"],
     "hydro_station_available_capacity": ["station_pmax", "hydro_station_available_capacity"],
     "hydro_power_flow_conversion": ["station_power"],
+    "hydro_generation_flow_bounds": ["q_gen"],
     "hydro_outflow_balance": ["q_out"],
     "hydro_outflow_bounds": ["hydro_outflow_bounds"],
+    "hydro_ecological_flow": ["hydro_ecological_flow"],
+    "hydro_head_calculation": ["head"],
     "hydro_spill_bounds": ["hydro_spill_bounds"],
     "hydro_cascade_inflow_delay": ["inflow"],
     "hydro_reservoir_balance": ["volume"],
@@ -44,8 +47,11 @@ COMPONENT_CONSTRAINT_TYPES: dict[str, str] = {
     "hydro_volume_bounds": "boundary",
     "hydro_station_available_capacity": "capacity",
     "hydro_power_flow_conversion": "conversion",
+    "hydro_generation_flow_bounds": "boundary",
     "hydro_outflow_balance": "balance",
     "hydro_outflow_bounds": "boundary",
+    "hydro_ecological_flow": "boundary",
+    "hydro_head_calculation": "conversion",
     "hydro_spill_bounds": "boundary",
     "hydro_cascade_inflow_delay": "derived_expression",
     "hydro_reservoir_balance": "state_transition",
@@ -59,8 +65,11 @@ COMPONENT_INDICES: dict[str, list[str]] = {
     "hydro_volume_bounds": ["station", "time_volume"],
     "hydro_station_available_capacity": ["station", "time"],
     "hydro_power_flow_conversion": ["station", "time"],
+    "hydro_generation_flow_bounds": ["station", "time"],
     "hydro_outflow_balance": ["station", "time"],
     "hydro_outflow_bounds": ["station", "time"],
+    "hydro_ecological_flow": ["station", "time"],
+    "hydro_head_calculation": ["station", "time"],
     "hydro_spill_bounds": ["station", "time"],
     "hydro_cascade_inflow_delay": ["station", "time"],
     "hydro_reservoir_balance": ["station", "time"],
@@ -142,6 +151,9 @@ HYDRO_VARIABLES: list[dict[str, Any]] = [
     {"code": "terminal_dev_pos", "name": "末库容正偏差", "dimension": ["station"], "type": "continuous", "lower_bound": 0},
     {"code": "terminal_dev_neg", "name": "末库容负偏差", "dimension": ["station"], "type": "continuous", "lower_bound": 0},
     {"code": "ramp_abs", "name": "出力变化绝对值", "dimension": ["station", "time"], "type": "continuous", "lower_bound": 0},
+    {"code": "forebay_level", "name": "上游水位", "dimension": ["station", "time"], "type": "continuous", "lower_bound": 0},
+    {"code": "tailwater_level", "name": "尾水位", "dimension": ["station", "time"], "type": "continuous", "lower_bound": 0},
+    {"code": "head", "name": "净水头", "dimension": ["station", "time"], "type": "continuous", "lower_bound": 0},
 ]
 
 HYDRO_PARAMETERS: list[dict[str, Any]] = [
@@ -163,6 +175,10 @@ HYDRO_PARAMETERS: list[dict[str, Any]] = [
     {"code": "units", "name": "电站机组映射", "dimension": ["station"], "default": 1},
     {"code": "edges", "name": "梯级拓扑", "dimension": [], "default": 1},
     {"code": "initial_upstream_outflow", "name": "初始上游下泄", "dimension": [], "default": 1},
+    {"code": "gen_flow_min", "name": "发电流量下限", "dimension": ["station"], "default": 0},
+    {"code": "gen_flow_max", "name": "发电流量上限", "dimension": ["station"], "default": 160},
+    {"code": "ecological_flow_min", "name": "生态下泄下限", "dimension": ["station"], "default": 0},
+    {"code": "head_loss", "name": "水头损失", "dimension": ["station"], "default": 0},
 ]
 
 HYDRO_CONSTRAINT_OVERRIDES: dict[str, list[dict[str, Any]]] = {
@@ -173,6 +189,10 @@ HYDRO_CONSTRAINT_OVERRIDES: dict[str, list[dict[str, Any]]] = {
     ],
     "hydro_station_available_capacity": [{"expression": "station_power[s,t] <= station_pmax[s,t]"}],
     "hydro_power_flow_conversion": [{"expression": "station_power[s,t] == power_conversion[s] * q_gen[s,t]"}],
+    "hydro_generation_flow_bounds": [
+        {"constraint_id": "hydro_gen_flow_min", "expression": "q_gen[s,t] >= gen_flow_min[s]"},
+        {"constraint_id": "hydro_gen_flow_max", "expression": "q_gen[s,t] <= gen_flow_max[s]"},
+    ],
     "hydro_outflow_balance": [{"expression": "q_out[s,t] == q_gen[s,t] + q_spill[s,t]"}],
     "hydro_outflow_bounds": [
         {"constraint_id": "hydro_outflow_min", "expression": "q_out[s,t] >= outflow_min[s]"},
@@ -182,6 +202,8 @@ HYDRO_CONSTRAINT_OVERRIDES: dict[str, list[dict[str, Any]]] = {
         {"constraint_id": "hydro_spill_min", "expression": "q_spill[s,t] >= 0"},
         {"constraint_id": "hydro_spill_max", "expression": "q_spill[s,t] <= spill_max[s]"},
     ],
+    "hydro_ecological_flow": [{"expression": "q_out[s,t] >= ecological_flow_min[s]"}],
+    "hydro_head_calculation": [{"expression": "head[s,t] == forebay_level[s,t] - tailwater_level[s,t] - head_loss[s]"}],
     "hydro_cascade_inflow_delay": [{"expression": "inflow[s,t] == local_inflow[s,t]"}],
     "hydro_reservoir_balance": [{"expression": "volume[s,t+1] == volume[s,t] + (inflow[s,t] - q_out[s,t]) * delta_v", "boundary_strategy": "skip_out_of_range"}],
     "hydro_load_tracking": [{"expression": "sum(station_power[s,t] for s in station) + load_dev_pos[t] - load_dev_neg[t] == load_forecast[t]"}],
@@ -306,16 +328,6 @@ def component_definition(component_type: str, builder: Any | None = None) -> dic
         "math_template": {"formula": formula, "business_meaning": description},
         "description": description,
     }
-    if component_type in {"hydro_head_calculation"}:
-        item.update(
-            {
-                "implemented": False,
-                "enabled": False,
-                "status": "reserved",
-                "metadata_only": True,
-                "required": False,
-            }
-        )
     if hasattr(builder, "explain"):
         item.update(builder.explain())
     if component_type.startswith("hydro_"):

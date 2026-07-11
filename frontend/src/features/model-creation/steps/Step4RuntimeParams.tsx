@@ -1,8 +1,9 @@
-import { Alert, Button, Card, Collapse, Descriptions, Input, Space, Table, Tabs, Tag, message } from 'antd';
+import { Alert, Button, Card, Collapse, Descriptions, Input, Segmented, Select, Space, Table, Tabs, Tag, message } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { useMemo, useState } from 'react';
 import type { ModelDraft } from '../stores/modelCreationStore';
 import { JsonViewer } from '../../../components/JsonViewer';
+import { systemTimeFieldCodes } from '../utils/timeDimensionDraft';
 
 type ParameterGroupKey = 'runtime' | 'static' | 'ledger' | 'system' | 'objective_weights';
 type ParameterDef = ModelDraft['semantic']['parameters'][number];
@@ -20,6 +21,7 @@ interface RuntimeParameterRow {
   description?: string;
   currentValue: unknown;
   status: 'missing' | 'provided' | 'defaulted' | 'optional';
+  disabled?: boolean;
 }
 
 const functionMappingRowKeys = new WeakMap<object, string>();
@@ -75,12 +77,14 @@ function hasValue(value: unknown) {
 }
 
 export function buildRuntimeParameterRows(draft: ModelDraft): RuntimeParameterRow[] {
-  return draft.semantic.parameters.map(parameter => {
+  const systemFields = systemTimeFieldCodes(draft.time_dimension);
+  return draft.semantic.parameters.filter(parameter => !systemFields.has(parameter.code)).map(parameter => {
     const source = sourceOf(parameter);
     const code = parameter.code;
     const currentValue = draft.runtime_parameters[code] ?? draft.parameter_groups[source]?.[code];
     const defaultValue = parameter.defaultValue ?? parameter.default;
-    const required = Boolean(parameter.required ?? source === 'runtime');
+    const loadDisabled = code === 'load_forecast' && draft.runtime_parameters.load_tracking_mode === 'disabled';
+    const required = loadDisabled ? false : Boolean(parameter.required ?? source === 'runtime');
     const status: RuntimeParameterRow['status'] = hasValue(currentValue)
       ? 'provided'
       : hasValue(defaultValue)
@@ -101,6 +105,7 @@ export function buildRuntimeParameterRows(draft: ModelDraft): RuntimeParameterRo
       description: parameter.description,
       currentValue,
       status,
+      disabled: loadDisabled,
     };
   });
 }
@@ -122,9 +127,19 @@ function groupValues(rows: RuntimeParameterRow[], runtimeParameters: Record<stri
 
 export function Step4RuntimeParams({ draft, onChange }: { draft: ModelDraft; onChange: (d: ModelDraft) => void }) {
   const rows = useMemo(() => buildRuntimeParameterRows(draft), [draft]);
-  const [json, setJson] = useState(JSON.stringify(draft.runtime_parameters, null, 2));
+  const systemFields = useMemo(() => systemTimeFieldCodes(draft.time_dimension), [draft.time_dimension]);
+  const businessRuntime = useMemo(() => Object.fromEntries(Object.entries(draft.runtime_parameters).filter(([key]) => !systemFields.has(key))), [draft.runtime_parameters, systemFields]);
+  const [json, setJson] = useState(JSON.stringify(businessRuntime, null, 2));
   const missing = validateRuntimeParameters(draft);
   const functionMappings = draft.components.filter(component => String(component.type || component.component_id) === 'function_mapping_component' || component.function_asset_id);
+  const isHydro = String(draft.basic_info.model_code || '').startsWith('cascade_hydro_dispatch');
+  const isDeprecatedV1 = draft.basic_info.model_code === 'cascade_hydro_dispatch_v1';
+
+  const updateHydroMode = (code: string, value: unknown) => {
+    const runtimeParameters = { ...draft.runtime_parameters, [code]: value };
+    onChange({ ...draft, runtime_parameters: runtimeParameters, parameter_groups: groupValues(rows, runtimeParameters) });
+    setJson(JSON.stringify(runtimeParameters, null, 2));
+  };
 
   const updateRuntimeValue = (row: RuntimeParameterRow, value: unknown) => {
     const runtimeParameters = { ...draft.runtime_parameters, [row.code]: value };
@@ -135,7 +150,11 @@ export function Step4RuntimeParams({ draft, onChange }: { draft: ModelDraft; onC
 
   const applyJson = () => {
     try {
-      const runtime = JSON.parse(json) as Record<string, unknown>;
+      const imported = JSON.parse(json) as Record<string, unknown>;
+      const runtime = {
+        ...Object.fromEntries(Object.entries(draft.runtime_parameters).filter(([key]) => systemFields.has(key))),
+        ...Object.fromEntries(Object.entries(imported).filter(([key]) => !systemFields.has(key))),
+      };
       onChange({ ...draft, runtime_parameters: runtime, parameter_groups: groupValues(rows, runtime) });
       const nextMissing = validateRuntimeParameters({ ...draft, runtime_parameters: runtime, parameter_groups: groupValues(rows, runtime) });
       if (import.meta.env.MODE !== 'test') {
@@ -165,6 +184,7 @@ export function Step4RuntimeParams({ draft, onChange }: { draft: ModelDraft; onC
           aria-label={`${labelPrefix}${row.code} 当前值`}
           defaultValue={valueToText(row.currentValue)}
           placeholder={valueToText(row.defaultValue || row.exampleValue)}
+          disabled={row.disabled}
           onBlur={event => updateRuntimeValue(row, parseValue(event.target.value))}
         />
       ),
@@ -186,6 +206,48 @@ export function Step4RuntimeParams({ draft, onChange }: { draft: ModelDraft; onC
 
   return (
     <>
+      {isDeprecatedV1 && <Alert className="compact-step-note" type="warning" showIcon title="该模板为兼容入口" description="新建模型请使用 cascade_hydro_dispatch，并选择二维三角片 PWL；旧调用将自动迁移到统一组件模型。" />}
+      {isHydro && (
+        <Card size="small" title="梯级水电求解配置" className="section-gap">
+          <Space wrap size={20}>
+            <Space orientation="vertical" size={4}>
+              <span>水电出力关系</span>
+              <Segmented
+                aria-label="水电出力关系"
+                value={String(draft.runtime_parameters.hydro_power_mode || 'linear')}
+                options={[{ label: '线性', value: 'linear' }, { label: '一维严格 PWL', value: 'pwl_1d' }, { label: '二维三角片 PWL', value: 'pwl_2d' }]}
+                onChange={value => updateHydroMode('hydro_power_mode', value)}
+              />
+            </Space>
+            <Space orientation="vertical" size={4}>
+              <span>负荷跟踪模式</span>
+              <Select
+                aria-label="负荷跟踪模式"
+                style={{ width: 180 }}
+                value={String(draft.runtime_parameters.load_tracking_mode || 'soft')}
+                options={[{ label: '关闭', value: 'disabled' }, { label: '软约束', value: 'soft' }, { label: '硬约束', value: 'hard' }]}
+                onChange={value => updateHydroMode('load_tracking_mode', value)}
+              />
+            </Space>
+            <Tag color={String(draft.runtime_parameters.hydro_power_mode || 'linear') === 'linear' ? 'blue' : 'gold'}>
+              {String(draft.runtime_parameters.hydro_power_mode || 'linear') === 'linear' ? 'LP / HiGHS' : 'MILP / HiGHS'}
+            </Tag>
+          </Space>
+          <Alert className="section-gap-tight" type="info" showIcon title="当前模型通过分段线性方式近似水电非线性特性，并由 HiGHS 按 LP/MILP 求解。" />
+        </Card>
+      )}
+      <Card size="small" title="时间维度摘要">
+        <Descriptions size="small" column={3}>
+          <Descriptions.Item label="时间策略">{draft.time_dimension.policy === 'fixed' ? '固定时段' : draft.time_dimension.policy === 'runtime_variable' ? (draft.time_dimension.allowed_horizons?.length ? '候选时段切换' : '运行时自由调整') : draft.time_dimension.policy === 'data_derived' ? '由输入数据推导（试验能力）' : '非时序模型'}</Descriptions.Item>
+          {draft.time_dimension.enabled && <Descriptions.Item label="默认 horizon">{draft.time_dimension.default_horizon ?? '-'}</Descriptions.Item>}
+          {draft.time_dimension.allowed_horizons?.length ? <Descriptions.Item label="候选值">{draft.time_dimension.allowed_horizons.join('、')}</Descriptions.Item> : null}
+          {draft.time_dimension.allowed_horizons?.length ? <Descriptions.Item label="候选粒度">{draft.time_dimension.allowed_horizons.map(horizon => `${horizon}点=${draft.time_dimension.interval_minutes_by_horizon?.[String(horizon)] ?? '-'}分钟`).join('；')}</Descriptions.Item> : null}
+          {draft.time_dimension.enabled && <Descriptions.Item label="时间集合">{draft.time_dimension.time_set || 'time'}</Descriptions.Item>}
+          {draft.time_dimension.enabled && <Descriptions.Item label="状态集合">{draft.time_dimension.state_time_set || '未启用'}</Descriptions.Item>}
+          {draft.time_dimension.enabled && <Descriptions.Item label="默认粒度">{draft.time_dimension.interval_minutes || draft.time_dimension.interval_minutes_by_horizon?.[String(draft.time_dimension.default_horizon)] || '-'} 分钟</Descriptions.Item>}
+          {draft.time_dimension.enabled && !draft.time_dimension.allowed_horizons?.length && <Descriptions.Item label="delta_t">{draft.time_dimension.delta_t ?? (draft.time_dimension.interval_minutes ? draft.time_dimension.interval_minutes / 60 : '-')}</Descriptions.Item>}
+        </Descriptions>
+      </Card>
       {functionMappings.length > 0 && (
         <Card className="section-gap" title="函数/曲线资产绑定">
           <Table
@@ -233,10 +295,10 @@ export function Step4RuntimeParams({ draft, onChange }: { draft: ModelDraft; onC
               <Input.TextArea aria-label="运行参数 JSON" rows={8} value={json} onChange={event => setJson(event.target.value)} />
               <Space style={{ marginTop: 12 }}>
                 <Button type="primary" onClick={applyJson}>导入并校验</Button>
-                <Button onClick={() => setJson(JSON.stringify(draft.runtime_parameters, null, 2))}>恢复当前参数</Button>
+                <Button onClick={() => setJson(JSON.stringify(businessRuntime, null, 2))}>恢复当前参数</Button>
               </Space>
               <Card title="运行参数结构预览" className="section-gap">
-                <JsonViewer value={{ runtime_parameters: draft.runtime_parameters, parameter_groups: draft.parameter_groups }} />
+                <JsonViewer value={{ runtime_parameters: businessRuntime, parameter_groups: draft.parameter_groups }} />
               </Card>
             </>
           ),

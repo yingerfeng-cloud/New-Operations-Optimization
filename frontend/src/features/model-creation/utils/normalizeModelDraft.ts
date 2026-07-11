@@ -1,1 +1,9 @@
-import type { ModelDraft } from '../stores/modelCreationStore'; export function normalizeModelDraft(draft:ModelDraft):ModelDraft{const horizon=Number(draft.runtime_parameters.horizon||24);const sets=draft.semantic.sets.map(s=>s.code==='time'?{...s,horizon,values:Array.from({length:horizon},(_,i)=>i)}:s.code==='time_volume'?{...s,horizon:horizon+1,values:Array.from({length:horizon+1},(_,i)=>i)}:s);return{...draft,semantic:{...draft.semantic,sets},runtime_parameters:{...draft.runtime_parameters,horizon}}}
+import type { ModelDraft } from '../stores/modelCreationStore';
+import { applyTimeDimensionToDraft, inferTimeDimensionConfig, normalizeTimeDimensionConfig } from './timeDimensionDraft';
+
+export function normalizeModelDraft(draft: ModelDraft): ModelDraft {
+  const config = draft.time_dimension
+    ? normalizeTimeDimensionConfig(draft.time_dimension, draft.semantic.sets.map(item => item.code))
+    : inferTimeDimensionConfig(draft);
+  return applyTimeDimensionToDraft({ ...draft, time_dimension: config }, config);
+}

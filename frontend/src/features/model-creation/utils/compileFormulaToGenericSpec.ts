@@ -1,14 +1,15 @@
 import type { FormulaDef } from '../../../types/formula';
 import { splitRelation } from '../../formula-editor/formulaParser';
 import { validateFormula } from '../../formula-editor/formulaValidator';
+import { extractDimensions } from './modelDimensions';
 
 type Term = { var: string; key: string[]; foreach?: string[]; coef?: number; coef_param?: string; param_key?: string[]; sign?: string };
 type ParamTerm = { param: string; key: string[]; coef?: number; sign?: string };
 type LinearExpr = { terms: Term[]; paramTerms: ParamTerm[]; constant: number };
 type SemanticSpec = {
   sets?: { code: string; values?: unknown[] }[];
-  parameters?: { code: string; default?: unknown; defaultValue?: unknown; dimension?: string[]; indices?: string[] }[];
-  variables?: { code: string; dimension?: string[]; indices?: string[]; domain?: string; variableType?: string; lowerBound?: string | number; upperBound?: string | number }[];
+  parameters?: { code: string; default?: unknown; defaultValue?: unknown; dimension?: string[]; dimensions?: string[]; indices?: string[]; index_sets?: string[] }[];
+  variables?: { code: string; dimension?: string[]; dimensions?: string[]; indices?: string[]; index_sets?: string[]; domain?: string; variableType?: string; lowerBound?: string | number; upperBound?: string | number }[];
 };
 
 const ref = (text: string) => /^(\w+)(?:\[([^\]]+)\])?$/.exec(text.trim());
@@ -142,8 +143,6 @@ function rhsFields(expr: LinearExpr): Record<string, unknown> {
 
 function defaultSetValues(code: string, values?: unknown[]): unknown[] {
   if (values?.length) return values;
-  if (code === 'time') return Array.from({ length: 24 }, (_, index) => index);
-  if (code === 'time_volume') return Array.from({ length: 25 }, (_, index) => index);
   return [];
 }
 
@@ -187,7 +186,7 @@ export function compileFormulaToGenericSpec(formulas: FormulaDef[], semantic: Se
     parameters: Object.fromEntries((semantic.parameters || []).map(p => [p.code, p.defaultValue ?? p.default ?? 0])),
     variables: (semantic.variables || []).map(v => ({
       name: v.code,
-      indices: v.indices || v.dimension || [],
+      indices: extractDimensions(v as unknown as Record<string, unknown>),
       domain: variableDomain(v),
       ...(v.lowerBound !== undefined ? { lb: Number(v.lowerBound) } : {}),
       ...(v.upperBound !== undefined && v.upperBound !== '' ? { ub: Number(v.upperBound) } : {}),

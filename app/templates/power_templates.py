@@ -65,6 +65,7 @@ def power_template_library() -> dict[str, dict[str, Any]]:
         if code == "pv_storage_capacity_planning":
             _normalize_pv_storage_capacity_template(template)
         _normalize_template_time_sets(template)
+        apply_time_dimension_metadata(template)
         template.setdefault("version", "v1.0")
         template.setdefault("status", "published")
         template.setdefault("tags", ["power", "HiGHS", "Pyomo"])
@@ -80,6 +81,7 @@ def power_template_library() -> dict[str, dict[str, Any]]:
                 **(template.get("component_schema") or {}),
                 "components": list_component_catalog(),
             }
+            apply_time_dimension_metadata(template)
     return templates
 
 
@@ -111,6 +113,58 @@ def _normalize_template_time_sets(template: dict[str, Any]) -> None:
     normalize(template.get("sets") or [])
     component_spec = template.get("component_spec") or {}
     normalize(component_spec.get("sets") or [])
+
+
+def apply_time_dimension_metadata(template: dict[str, Any]) -> dict[str, Any]:
+    explicit_metadata = deepcopy((template.get("ui_metadata") or {}).get("time_dimension") or {})
+    code = str(template.get("model_code") or template.get("code") or "")
+    sample = template.get("sample_runtime_parameters") or {}
+    horizon = int(sample.get("horizon") or len(sample.get("time") or []) or 0)
+    has_time = bool(sample.get("time") or any((item.get("code") or item.get("key")) == "time" for item in template.get("sets") or []))
+    has_state_time = bool(sample.get("time_volume") or any((item.get("code") or item.get("key")) == "time_volume" for item in template.get("sets") or []))
+    runtime_variable_codes = {
+        "unit_commitment_day_ahead",
+        "economic_dispatch",
+        "storage_dispatch",
+        "renewable_storage_dispatch",
+        "chp_dispatch",
+        "cascade_hydro_dispatch",
+        "cascade_hydro_dispatch_v1",
+        "pv_storage_day_ahead_dispatch",
+        "pv_storage_intraday_dispatch",
+        "pv_storage_dispatch_v2",
+        "pv_storage_day_ahead_dispatch_v2",
+        "pv_storage_intraday_dispatch_v2",
+    }
+    if not has_time:
+        metadata = {"enabled": False, "policy": "not_applicable", "editable": False}
+    elif code in runtime_variable_codes:
+        metadata = {
+            "enabled": True,
+            "policy": "runtime_variable",
+            "default_horizon": horizon or None,
+            "time_set": "time",
+            "state_time_set": "time_volume" if has_state_time else None,
+            "interval_minutes": 60,
+            "editable": True,
+            "derive_from": None,
+        }
+    else:
+        metadata = {
+            "enabled": True,
+            "policy": "fixed",
+            "default_horizon": horizon or None,
+            "time_set": "time",
+            "state_time_set": "time_volume" if has_state_time else None,
+            "editable": False,
+        }
+    metadata = {"schema_version": 1, **metadata, **explicit_metadata}
+    template.setdefault("ui_metadata", {})["time_dimension"] = metadata
+    if template.get("component_spec"):
+        template["component_spec"].setdefault("ui_metadata", {})["time_dimension"] = deepcopy(metadata)
+    if template.get("generic_spec"):
+        template["generic_spec"].setdefault("ui_metadata", {})["time_dimension"] = deepcopy(metadata)
+    return template
 
 
 def get_power_templates() -> dict[str, dict[str, Any]]:
@@ -211,9 +265,17 @@ def _with_uc_sample(template: dict[str, Any]) -> dict[str, Any]:
     template["name"] = "日前机组组合优化 Unit Commitment"
     template["scenario"] = "日前机组组合优化"
     template["sample_runtime_parameters"] = {
+        "unit": ["U1", "U2", "U3"],
         "horizon": 4,
         "load_forecast": [120, 180, 210, 160],
         "renewable_forecast": [20, 30, 40, 20],
+        "unit_min_output": {"U1": 50, "U2": 30, "U3": 20},
+        "unit_max_output": {"U1": 180, "U2": 120, "U3": 80},
+        "ramp_up_limit": {"U1": 80, "U2": 60, "U3": 40},
+        "ramp_down_limit": {"U1": 80, "U2": 60, "U3": 40},
+        "fuel_cost": {"U1": 280, "U2": 330, "U3": 420},
+        "startup_cost": {"U1": 6000, "U2": 3500, "U3": 1500},
+        "reserve_ratio": 0.1,
         "initial_unit_status": {"U1": 1, "U2": 0, "U3": 0},
         "initial_unit_output": {"U1": 80, "U2": 0, "U3": 0},
     }
@@ -537,7 +599,25 @@ def _cascade_hydro_dispatch() -> dict[str, Any]:
         ],
         "initial_upstream_outflow": {"S1->S2": 300, "S2->S3": 260},
         "time_step_seconds": 900,
-        "weights": {"load_deviation": 1000, "spill": 1, "ramp": 0.1, "terminal_volume": 500},
+        "hydro_power_mode": "linear",
+        "load_tracking_mode": "soft",
+        "objective_mode": "comprehensive",
+        "terminal_storage_mode": "soft",
+        "ramp_smoothing_enabled": True,
+        "gen_flow_min": {"S1": 0, "S2": 0, "S3": 0},
+        "gen_flow_max": {"S1": 900, "S2": 850, "S3": 800},
+        "ecological_flow_min": {"S1": 80, "S2": 70, "S3": 60},
+        "head_min": {"S1": 35, "S2": 35, "S3": 35},
+        "head_max": {"S1": 65, "S2": 65, "S3": 65},
+        "head_loss": {"S1": 0, "S2": 0, "S3": 0},
+        "electricity_price": 300,
+        "function_asset_bindings": {
+            "level_storage": "cascade_hydro_level_storage_v1",
+            "tailwater_outflow": "cascade_hydro_tailwater_outflow_v1",
+            "power_flow_1d": "cascade_hydro_power_flow_v1",
+            "power_surface": "cascade_hydro_power_surface_v1",
+        },
+        "weights": {"load_deviation": 1000, "spill": 1, "ramp": 0.1, "terminal_volume": 500, "generation": 1, "revenue": 1},
     }
     variables = [
         {"name": "station_power", "indices": ["station", "time"], "domain": "NonNegativeReals"},
@@ -550,14 +630,18 @@ def _cascade_hydro_dispatch() -> dict[str, Any]:
         {"name": "terminal_dev_pos", "indices": ["station"], "domain": "NonNegativeReals"},
         {"name": "terminal_dev_neg", "indices": ["station"], "domain": "NonNegativeReals"},
         {"name": "ramp_abs", "indices": ["station", "time"], "domain": "NonNegativeReals"},
+        {"name": "forebay_level", "indices": ["station", "time"], "domain": "NonNegativeReals"},
+        {"name": "tailwater_level", "indices": ["station", "time"], "domain": "NonNegativeReals"},
+        {"name": "head", "indices": ["station", "time"], "domain": "NonNegativeReals"},
     ]
     hydro_order = [
         "hydro_initial_volume",
         "hydro_volume_bounds",
         "hydro_station_available_capacity",
-        "hydro_power_flow_conversion",
+        "hydro_generation_flow_bounds",
         "hydro_outflow_balance",
         "hydro_outflow_bounds",
+        "hydro_ecological_flow",
         "hydro_spill_bounds",
         "hydro_cascade_inflow_delay",
         "hydro_reservoir_balance",
@@ -567,14 +651,63 @@ def _cascade_hydro_dispatch() -> dict[str, Any]:
     ]
     catalog_by_id = {item["component_id"]: item for item in list_component_catalog()}
     components = [{"type": component_id} for component_id in hydro_order if component_id in catalog_by_id]
+    components.insert(3, {"type": "hydro_power_flow_conversion", "enabled_when": {"parameter": "hydro_power_mode", "equals": "linear"}})
+    components.insert(4, {
+        "type": "function_mapping_component",
+        "name": "一维严格流量出力映射",
+        "function_asset_binding_key": "power_flow_1d",
+        "function_asset_id": sample["function_asset_bindings"]["power_flow_1d"],
+        "x": "q_gen[s,t]", "y": "station_power[s,t]",
+        "indices": [{"set": "station", "alias": "s"}, {"set": "time", "alias": "t"}],
+        "solve_strategy": "segment_binary",
+        "domain_bounds": {"x_min_param": "gen_flow_min", "x_max_param": "gen_flow_max"},
+        "out_of_domain_policy": "reject",
+        "enabled_when": {"parameter": "hydro_power_mode", "equals": "pwl_1d"},
+    })
+    components[5:5] = [
+        {
+            "type": "function_mapping_component", "name": "水位库容严格 PWL 映射",
+            "function_asset_binding_key": "level_storage", "function_asset_id": sample["function_asset_bindings"]["level_storage"],
+            "x": "volume[s,t]", "y": "forebay_level[s,t]",
+            "indices": [{"set": "station", "alias": "s"}, {"set": "time", "alias": "t"}],
+            "solve_strategy": "segment_binary",
+            "domain_bounds": {"x_min_param": "volume_min", "x_max_param": "volume_max"},
+            "out_of_domain_policy": "reject", "enabled_when": {"parameter": "hydro_power_mode", "equals": "pwl_2d"},
+        },
+        {
+            "type": "function_mapping_component", "name": "尾水位流量严格 PWL 映射",
+            "function_asset_binding_key": "tailwater_outflow", "function_asset_id": sample["function_asset_bindings"]["tailwater_outflow"],
+            "x": "q_out[s,t]", "y": "tailwater_level[s,t]",
+            "indices": [{"set": "station", "alias": "s"}, {"set": "time", "alias": "t"}],
+            "solve_strategy": "segment_binary",
+            "domain_bounds": {"x_min_param": "outflow_min", "x_max_param": "outflow_max"},
+            "out_of_domain_policy": "reject", "enabled_when": {"parameter": "hydro_power_mode", "equals": "pwl_2d"},
+        },
+        {"type": "hydro_head_calculation", "enabled_when": {"parameter": "hydro_power_mode", "equals": "pwl_2d"}},
+        {
+            "type": "function_mapping_2d_component", "name": "二维多三角片出力曲面",
+            "function_asset_binding_key": "power_surface", "function_asset_id": sample["function_asset_bindings"]["power_surface"],
+            "x": "q_gen[s,t]", "y": "head[s,t]", "z": "station_power[s,t]",
+            "indices": [{"set": "station", "alias": "s"}, {"set": "time", "alias": "t"}],
+            "solve_strategy": "triangulated_milp_exact",
+            "domain_bounds": {"x_min_param": "gen_flow_min", "x_max_param": "gen_flow_max", "y_min_param": "head_min", "y_max_param": "head_max"},
+            "out_of_domain_policy": "reject", "enabled_when": {"parameter": "hydro_power_mode", "equals": "pwl_2d"},
+        },
+    ]
+    for component in components:
+        if component.get("type") == "hydro_ramp_smoothing":
+            component["enabled_when"] = {"parameter": "ramp_smoothing_enabled", "equals": True}
     component_spec = {
         "model_code": "cascade_hydro_dispatch",
         "build_mode": "component_based",
+        "runtime_normalizer": "cascade_hydro",
         "name": "梯级水电日前调度优化模型",
         "model_problem_type": "LP",
         "required_solver_capabilities": ["LP"],
         "sets": [
             {"code": "station", "name": "电站清单", "values": sample["station"]},
+            {"code": "unit", "name": "机组清单", "values": [unit for units in sample["units"].values() for unit in units]},
+            {"code": "edge", "name": "梯级连接", "values": [f"{item['upstream']}->{item['downstream']}" for item in sample["edges"]]},
             {"code": "time", "name": "调度时段", "values": sample["time"]},
             {"code": "time_volume", "name": "库容时点", "values": sample["time_volume"]},
         ],
@@ -589,6 +722,8 @@ def _cascade_hydro_dispatch() -> dict[str, Any]:
                 {"term_id": "hydro_spill_penalty", "name": "弃水惩罚", "expression": "sum(q_spill[station,t] for station in station for t in time)", "weight_key": "spill", "solve_participation": "solve_active", "supported_by_backend": True, "enabled": True},
                 {"term_id": "hydro_terminal_volume_penalty", "name": "期末库容偏差惩罚", "expression": "sum(terminal_dev_pos[station] + terminal_dev_neg[station] for station in station)", "weight_key": "terminal_volume", "solve_participation": "solve_active", "supported_by_backend": True, "enabled": True},
                 {"term_id": "hydro_ramp_penalty", "name": "出力爬坡平滑惩罚", "expression": "sum(ramp_abs[station,t] for station in station for t in time)", "weight_key": "ramp", "solve_participation": "solve_active", "supported_by_backend": True, "enabled": True},
+                {"term_id": "hydro_generation_value", "name": "发电量价值", "expression": "sum(station_power[station,t] for station in station for t in time)", "weight_key": "generation", "solve_participation": "solve_active", "supported_by_backend": True, "enabled": True},
+                {"term_id": "hydro_revenue_value", "name": "发电收益", "expression": "sum(station_power[station,t] for station in station for t in time)", "weight_key": "revenue", "solve_participation": "solve_active", "supported_by_backend": True, "enabled": True},
             ],
         },
         "future_extensions": {
@@ -620,7 +755,7 @@ def _cascade_hydro_dispatch() -> dict[str, Any]:
             _param("horizon", "调度时段数", "period", [], "dispatch_plan", sample["horizon"], {"type": "integer", "min": 1}),
             _param("time", "调度时段", "", ["time"], "dispatch_plan", sample["time"], {"type": "array"}),
             _param("time_volume", "库容时点", "", ["time_volume"], "dispatch_plan", sample["time_volume"], {"type": "list"}),
-            _param("units", "电站机组清单", "", ["station", "unit"], "EAM", sample["units"], {"type": "dict"}),
+            _param("units", "电站机组清单", "", ["station"], "EAM", sample["units"], {"type": "dict"}),
             _param("unit_pmax", "机组最大出力", "MW", ["unit"], "EAM", sample["unit_pmax"], {"type": "dict", "min": 0}),
             _param("availability", "机组可用状态", "0/1", ["unit", "time"], "EAM", sample["availability"], {"type": "dict"}),
             _param("power_conversion", "出力转换系数", "MW/(m3/s)", ["station"], "hydrology", sample["power_conversion"], {"type": "dict", "min": 0}),
@@ -636,6 +771,19 @@ def _cascade_hydro_dispatch() -> dict[str, Any]:
             _param("edges", "梯级拓扑及传播时滞", "", ["edge"], "hydrology", sample["edges"], {"type": "list"}),
             _param("initial_upstream_outflow", "初始上游下泄", "m3/s", ["edge"], "hydrology", sample["initial_upstream_outflow"], {"type": "dict"}),
             _param("time_step_seconds", "时段长度", "s", [], "dispatch_plan", sample["time_step_seconds"], {"type": "integer", "min": 1}),
+            _param("hydro_power_mode", "水电出力关系", "", [], "dispatch_rule", sample["hydro_power_mode"], {"type": "string", "enum": ["linear", "pwl_1d", "pwl_2d"]}),
+            _param("load_tracking_mode", "负荷跟踪模式", "", [], "dispatch_rule", sample["load_tracking_mode"], {"type": "string", "enum": ["disabled", "soft", "hard"]}),
+            _param("objective_mode", "目标函数模式", "", [], "dispatch_rule", sample["objective_mode"], {"type": "string", "enum": ["generation_max", "revenue_max", "load_tracking", "comprehensive"]}),
+            _param("terminal_storage_mode", "期末库容模式", "", [], "dispatch_rule", sample["terminal_storage_mode"], {"type": "string", "enum": ["soft", "hard"]}),
+            _param("ramp_smoothing_enabled", "启用出力平滑", "", [], "dispatch_rule", sample["ramp_smoothing_enabled"], {"type": "boolean"}),
+            _param("gen_flow_min", "最小发电流量", "m3/s", ["station"], "hydrology", sample["gen_flow_min"], {"type": "dict", "min": 0}),
+            _param("gen_flow_max", "最大发电流量", "m3/s", ["station"], "hydrology", sample["gen_flow_max"], {"type": "dict", "min": 0}),
+            _param("ecological_flow_min", "最小生态下泄", "m3/s", ["station"], "dispatch_rule", sample["ecological_flow_min"], {"type": "dict", "min": 0}),
+            _param("head_min", "最小净水头", "m", ["station"], "hydrology", sample["head_min"], {"type": "dict"}),
+            _param("head_max", "最大净水头", "m", ["station"], "hydrology", sample["head_max"], {"type": "dict"}),
+            _param("head_loss", "水头损失", "m", ["station"], "hydrology", sample["head_loss"], {"type": "dict", "min": 0}),
+            _param("electricity_price", "电价", "CNY/MWh", [], "market", sample["electricity_price"], {"type": "number"}),
+            _param("function_asset_bindings", "函数资产绑定", "", [], "function_asset", sample["function_asset_bindings"], {"type": "dict"}),
             _param("weights", "目标函数权重", "", [], "dispatch_rule", sample["weights"], {"type": "dict"}),
         ],
         "variables": [_var(item["name"], _hydro_var_name(item["name"]), _hydro_var_unit(item["name"]), item["indices"], item["domain"]) for item in variables],
@@ -657,6 +805,10 @@ def _cascade_hydro_dispatch() -> dict[str, Any]:
             "display_build_mode": "组件化自定义 Builder",
             "display_problem_type": "线性规划 LP",
             "solver": "HiGHS",
+            "runtime_validation": {
+                "error_prefix": "梯级水电模型参数错误",
+                "dimension_labels": {"unit": "机组"},
+            },
             "component_catalog": component_catalog,
             "complex_components": {
                 "hydro_cascade_inflow_delay": {
@@ -710,223 +862,104 @@ def _hydro_var_unit(code: str) -> str:
 
 
 def _cascade_hydro_dispatch_v1() -> dict[str, Any]:
-    stations = ["R1", "R2"]
-    horizon = 24
-    time = list(range(horizon))
-    inflow_r1 = [92, 95, 98, 102, 108, 112, 116, 120, 118, 114, 110, 106, 104, 102, 100, 98, 96, 94, 92, 90, 88, 90, 92, 94]
-    inflow_r2 = [24, 24, 25, 26, 28, 30, 32, 34, 33, 31, 30, 29, 28, 27, 26, 26, 25, 25, 24, 24, 23, 23, 24, 24]
-    sample = {
-        "reservoir": stations,
-        "station": stations,
-        "horizon": horizon,
-        "time": time,
-        "inflow": {"R1": inflow_r1, "R2": inflow_r2},
-        "initial_storage": {"R1": 122, "R2": 108},
-        "target_final_storage": {"R1": 120, "R2": 108},
-        "storage_min": {"R1": 90, "R2": 85},
-        "storage_max": {"R1": 160, "R2": 150},
-        "outflow_min": {"R1": 45, "R2": 50},
-        "outflow_max": {"R1": 155, "R2": 155},
-        "power_min": {"R1": 0, "R2": 0},
-        "power_max": {"R1": 95, "R2": 95},
-        "load_forecast": [82, 80, 78, 76, 78, 82, 90, 98, 110, 116, 120, 118, 112, 108, 104, 106, 114, 122, 128, 124, 116, 104, 94, 88],
-        "delta_t": 1.0,
-        "cascade_delay": {"R1": 0, "R2": 0},
-        "upstream_station": {"R2": "R1"},
-        "initial_upstream_outflow": {"R2": 95},
-        "penalty_spill": 10.0,
-        "penalty_storage_deviation": 500.0,
-        "function_asset_bindings": {
-            "level_storage": "cascade_hydro_level_storage_v1",
-            "tailwater_outflow": "cascade_hydro_tailwater_outflow_v1",
-            "power_surface": "cascade_hydro_power_surface_v1",
-        },
-        "future_extensions": {
-            "cascade_delay_mode": "reserved",
-            "unit_commitment": False,
-            "ecological_flow": "reserved",
-            "multi_objective_weights": "reserved",
-        },
-    }
-
-    function_components = [
+    """Backward-compatible alias for the unified cascade hydro component model."""
+    template = deepcopy(_cascade_hydro_dispatch())
+    template.update(
         {
-            "component_id": "cascade_hydro_v1_water_balance",
-            "type": "cascade_hydro_v1_water_balance",
-            "name": "水量平衡组件",
-            "display_name": "水量平衡组件",
-            "generated_constraints": [{"constraint_id": "water_balance", "name": "水量平衡约束", "expression": "storage[r,t] = previous_storage[r,t] + (inflow[r,t] + upstream_release[r,t] - outflow[r,t] - spill[r,t]) * delta_t"}],
-        },
-        {
-            "component_id": "function_mapping_component",
-            "type": "function_mapping_component",
-            "name": "水位库容函数映射",
-            "display_name": "水位库容函数映射",
-            "function_asset_id": sample["function_asset_bindings"]["level_storage"],
-            "x": "storage[r,t]",
-            "y": "level[r,t]",
-            "indices": [{"set": "reservoir", "alias": "r"}, {"set": "time", "alias": "t"}],
-            "solve_strategy": "convex_combination_lp",
-            "generated_constraints": [{"constraint_id": "level_storage_mapping", "type": "piecewise", "expression": "level[r,t] == piecewise(storage[r,t], cascade_hydro_level_storage_v1)"}],
-            "metadata": {"function_asset_name": "梯级水电样例水位库容曲线 v1", "point_count": 5},
-        },
-        {
-            "component_id": "function_mapping_component",
-            "type": "function_mapping_component",
-            "name": "尾水位流量函数映射",
-            "display_name": "尾水位流量函数映射",
-            "function_asset_id": sample["function_asset_bindings"]["tailwater_outflow"],
-            "x": "outflow[r,t]",
-            "y": "tailwater[r,t]",
-            "indices": [{"set": "reservoir", "alias": "r"}, {"set": "time", "alias": "t"}],
-            "solve_strategy": "convex_combination_lp",
-            "generated_constraints": [{"constraint_id": "tailwater_outflow_mapping", "type": "piecewise", "expression": "tailwater[r,t] == piecewise(outflow[r,t], cascade_hydro_tailwater_outflow_v1)"}],
-            "metadata": {"function_asset_name": "梯级水电样例尾水位流量曲线 v1", "point_count": 4},
-        },
-        {
-            "component_id": "cascade_hydro_v1_head_calculation",
-            "type": "cascade_hydro_v1_head_calculation",
-            "name": "水头计算组件",
-            "display_name": "水头计算：head = level - tailwater",
-            "generated_constraints": [{"constraint_id": "head_calculation", "name": "水头计算", "expression": "head[r,t] = level[r,t] - tailwater[r,t]"}],
-        },
-        {
-            "component_id": "function_mapping_2d_component",
-            "type": "function_mapping_2d_component",
-            "name": "二维出力曲面函数映射",
-            "display_name": "二维出力曲面函数映射",
-            "function_asset_id": sample["function_asset_bindings"]["power_surface"],
-            "x": "outflow[r,t]",
-            "y": "head[r,t]",
-            "z": "power[r,t]",
-            "indices": [{"set": "reservoir", "alias": "r"}, {"set": "time", "alias": "t"}],
-            "solve_strategy": "triangulated_milp_exact",
-            "generated_constraints": [{"constraint_id": "power_surface_mapping", "type": "piecewise_2d", "expression": "power[r,t] == piecewise_2d(outflow[r,t], head[r,t], cascade_hydro_power_surface_v1)", "piecewise_method": "triangulated_milp_exact", "expression_class": "linear"}],
-            "metadata": {"function_asset_name": "梯级水电样例出力曲面 v1", "point_count": 3, "triangle_count": 1},
-        },
-        {
-            "component_id": "cascade_hydro_v1_terminal_storage",
-            "type": "cascade_hydro_v1_terminal_storage",
-            "name": "期末库容约束",
-            "display_name": "期末库容约束",
-            "generated_constraints": [
-                {"constraint_id": "final_storage_deviation_pos", "name": "期末库容正偏差", "expression": "final_storage_deviation[r] >= storage[r,T] - target_final_storage[r]"},
-                {"constraint_id": "final_storage_deviation_neg", "name": "期末库容负偏差", "expression": "final_storage_deviation[r] >= target_final_storage[r] - storage[r,T]"},
-            ],
-        },
-    ]
-    component_spec = {
-        "model_code": "cascade_hydro_dispatch_v1",
-        "build_mode": "template_based",
-        "model_problem_type": "MILP",
-        "required_solver_capabilities": ["MILP"],
-        "sets": [
-            {"code": "reservoir", "name": "水库/电站集合", "values": stations},
-            {"code": "station", "name": "水库/电站集合", "values": stations},
-            {"code": "time", "name": "调度时段", "values": time},
-        ],
-        "variables": [
-            {"name": "storage", "indices": ["reservoir", "time"], "domain": "NonNegativeReals"},
-            {"name": "outflow", "indices": ["reservoir", "time"], "domain": "NonNegativeReals"},
-            {"name": "spill", "indices": ["reservoir", "time"], "domain": "NonNegativeReals"},
-            {"name": "level", "indices": ["reservoir", "time"], "domain": "NonNegativeReals"},
-            {"name": "tailwater", "indices": ["reservoir", "time"], "domain": "NonNegativeReals"},
-            {"name": "head", "indices": ["reservoir", "time"], "domain": "NonNegativeReals"},
-            {"name": "power", "indices": ["reservoir", "time"], "domain": "NonNegativeReals"},
-            {"name": "generation", "indices": ["reservoir", "time"], "domain": "NonNegativeReals"},
-            {"name": "final_storage_deviation", "indices": ["reservoir"], "domain": "NonNegativeReals"},
-        ],
-        "components": function_components,
-        "function_asset_bindings": sample["function_asset_bindings"],
-        "problem_type_diagnosis": {
-            "inferred_problem_type": "MILP",
-            "recommended_solver": "HiGHS",
-            "function_assets_used": [
-                {"function_asset_id": sample["function_asset_bindings"]["level_storage"], "component": "水位库容函数映射", "solve_strategy": "convex_combination_lp"},
-                {"function_asset_id": sample["function_asset_bindings"]["tailwater_outflow"], "component": "尾水位流量函数映射", "solve_strategy": "convex_combination_lp"},
-                {"function_asset_id": sample["function_asset_bindings"]["power_surface"], "component": "二维出力曲面函数映射", "solve_strategy": "triangulated_milp_exact"},
-            ],
-            "linearization_strategy": ["convex_combination_lp", "triangulated_milp_exact"],
-            "estimated_binary_variables": horizon * len(stations),
-            "milp_risk": "2D PWL surface introduces triangle-selection binary variables.",
-        },
-        "objective": {
-            "type": "weighted_sum",
-            "sense": "maximize",
-            "terms": [
-                {"term_id": "total_generation", "name": "总发电量", "expression": "sum(generation[r,t] for r in reservoir for t in time)", "weight": 1, "solve_participation": "solve_active", "supported_by_backend": True},
-                {"term_id": "spill_penalty", "name": "弃水惩罚", "expression": "penalty_spill * sum(spill[r,t] for r in reservoir for t in time)", "weight": -1, "solve_participation": "solve_active", "supported_by_backend": True},
-                {"term_id": "final_storage_penalty", "name": "期末库容偏差惩罚", "expression": "penalty_storage_deviation * sum(final_storage_deviation[r] for r in reservoir)", "weight": -1, "solve_participation": "solve_active", "supported_by_backend": True},
-            ],
-        },
-    }
-    t = _base("cascade_hydro_dispatch_v1", "Cascade hydro dispatch v1", "Cascade hydro dispatch with PWL function assets.", ["power", "hydro", "cascade", "MILP", "piecewise_1d", "piecewise_2d"])
-    t.update(
-        solver="HiGHS",
-        build_mode="template_based",
-        model_problem_type="MILP",
-        problem_type="MILP",
-        required_solver_capabilities=["MILP"],
-        sets=component_spec["sets"],
-        parameters=[
-            _param("horizon", "调度时段数", "period", [], "dispatch_plan", sample["horizon"], {"type": "integer", "min": 1}),
-            _param("time", "调度时段", "", ["time"], "dispatch_plan", sample["time"], {"type": "array"}),
-            _param("inflow", "天然来水", "m3/s", ["reservoir", "time"], "hydrology", sample["inflow"], {"type": "dict", "min": 0}),
-            _param("initial_storage", "初始库容", "million m3", ["reservoir"], "hydrology", sample["initial_storage"], {"type": "dict"}),
-            _param("target_final_storage", "目标期末库容", "million m3", ["reservoir"], "hydrology", sample["target_final_storage"], {"type": "dict"}),
-            _param("storage_min", "库容下限", "million m3", ["reservoir"], "hydrology", sample["storage_min"], {"type": "dict"}),
-            _param("storage_max", "库容上限", "million m3", ["reservoir"], "hydrology", sample["storage_max"], {"type": "dict"}),
-            _param("outflow_min", "出库流量下限", "m3/s", ["reservoir"], "dispatch_rule", sample["outflow_min"], {"type": "dict"}),
-            _param("outflow_max", "出库流量上限", "m3/s", ["reservoir"], "dispatch_rule", sample["outflow_max"], {"type": "dict"}),
-            _param("power_min", "出力下限", "MW", ["reservoir"], "dispatch_rule", sample["power_min"], {"type": "dict"}),
-            _param("power_max", "出力上限", "MW", ["reservoir"], "dispatch_rule", sample["power_max"], {"type": "dict"}),
-            _param("load_forecast", "负荷/发电目标", "MW", ["time"], "forecast", sample["load_forecast"], {"type": "array"}),
-            _param("delta_t", "时段长度", "h", [], "dispatch_plan", sample["delta_t"], {"type": "number", "min": 0}),
-            _param("cascade_delay", "上下游时滞", "period", ["reservoir"], "hydrology", sample["cascade_delay"], {"type": "dict"}),
-            _param("penalty_spill", "弃水惩罚", "", [], "dispatch_rule", sample["penalty_spill"], {"type": "number", "min": 0}),
-            _param("penalty_storage_deviation", "期末库容偏差惩罚", "", [], "dispatch_rule", sample["penalty_storage_deviation"], {"type": "number", "min": 0}),
-        ],
-        variables=[
-            _var("storage", "库容", "million m3", ["reservoir", "time"]),
-            _var("outflow", "出库流量", "m3/s", ["reservoir", "time"]),
-            _var("spill", "弃水", "m3/s", ["reservoir", "time"]),
-            _var("level", "上游水位", "m", ["reservoir", "time"]),
-            _var("tailwater", "尾水位", "m", ["reservoir", "time"]),
-            _var("head", "水头", "m", ["reservoir", "time"]),
-            _var("power", "出力", "MW", ["reservoir", "time"]),
-            _var("generation", "发电量", "MWh", ["reservoir", "time"]),
-            _var("final_storage_deviation", "期末库容偏差", "million m3", ["reservoir"]),
-        ],
-        constraints=[
-            _constraint("water_balance", "水量平衡约束", "storage transition with initial_storage and previous period storage", ["reservoir", "time"]),
-            _constraint("storage_bounds", "库容上下限约束", "storage_min <= storage <= storage_max", ["reservoir", "time"]),
-            _constraint("outflow_bounds", "出库流量上下限约束", "outflow_min <= outflow <= outflow_max", ["reservoir", "time"]),
-            _constraint("level_storage_mapping", "水位库容函数映射", "level = f(storage)", ["reservoir", "time"]),
-            _constraint("tailwater_outflow_mapping", "尾水位流量函数映射", "tailwater = f(outflow)", ["reservoir", "time"]),
-            _constraint("head_calculation", "水头计算", "head = level - tailwater", ["reservoir", "time"]),
-            _constraint("power_surface_mapping", "二维出力曲面函数映射", "power = f(outflow, head)", ["reservoir", "time"]),
-            _constraint("generation_calculation", "发电量计算", "generation = power * delta_t", ["reservoir", "time"]),
-            _constraint("terminal_storage", "期末库容约束", "final_storage_deviation >= +/- (storage[T] - target)", ["reservoir"]),
-            _constraint("spill_nonnegative", "弃水非负约束", "spill >= 0", ["reservoir", "time"]),
-        ],
-        objectives=[_objective("hydro_generation_max", "最大化总发电量 - 弃水惩罚 - 期末库容偏差惩罚", "maximize", "sum(generation)-penalty_spill*sum(spill)-penalty_storage_deviation*sum(final_storage_deviation)")],
-        components=function_components,
-        component_spec=component_spec,
-        mathematical_components=function_components,
-        sample_runtime_parameters=sample,
-        ui_metadata={
-            "display_problem_type": "MILP",
-            "function_assets": "1D PWL + 2D PWL",
-            "use_case": "日前/日内水电优化调度",
-            "step5_diagnostics": {
-                "function_asset_binding_complete": True,
-                "piecewise_2d_triangle_count": 1,
-                "estimated_binary_variables": horizon * len(stations),
-                "milp_risk": "二维出力曲面使用三角剖分精确 MILP，会引入二进制变量。",
-            },
-        },
+            "model_code": "cascade_hydro_dispatch_v1",
+            "code": "cascade_hydro_dispatch_v1",
+            "name": "梯级水电调度 v1（兼容入口）",
+            "description": "Deprecated compatibility alias; use cascade_hydro_dispatch with hydro_power_mode=pwl_2d for new models.",
+            "deprecated": True,
+            "replacement_model_code": "cascade_hydro_dispatch",
+            "version": "v1-compatible",
+            "model_problem_type": "MILP",
+            "problem_type": "MILP",
+            "required_solver_capabilities": ["MILP"],
+            "tags": ["power", "hydro", "cascade", "deprecated", "pwl_2d", "MILP"],
+        }
     )
-    return t
+    sample = deepcopy(template["sample_runtime_parameters"])
+    sample.update(
+        {
+            "hydro_power_mode": "pwl_2d",
+            "load_tracking_mode": "soft",
+            "objective_mode": "comprehensive",
+            "station": ["R1", "R2"],
+            "reservoir": ["R1", "R2"],
+            "horizon": 24,
+            "time": list(range(24)),
+            "time_volume": list(range(25)),
+            "local_inflow": {
+                "R1": [92, 95, 98, 102, 108, 112, 116, 120, 118, 114, 110, 106, 104, 102, 100, 98, 96, 94, 92, 90, 88, 90, 92, 94],
+                "R2": [24, 24, 25, 26, 28, 30, 32, 34, 33, 31, 30, 29, 28, 27, 26, 26, 25, 25, 24, 24, 23, 23, 24, 24],
+            },
+            "initial_volume": {"R1": 122, "R2": 108},
+            "target_terminal_volume": {"R1": 120, "R2": 108},
+            "volume_min": {"R1": 90, "R2": 85},
+            "volume_max": {"R1": 160, "R2": 150},
+            "outflow_min": {"R1": 40, "R2": 40},
+            "outflow_max": {"R1": 160, "R2": 160},
+            "gen_flow_min": {"R1": 40, "R2": 40},
+            "gen_flow_max": {"R1": 160, "R2": 160},
+            "spill_max": {"R1": 120, "R2": 120},
+            "ecological_flow_min": {"R1": 40, "R2": 40},
+            "head_min": {"R1": 35, "R2": 35},
+            "head_max": {"R1": 65, "R2": 65},
+            "head_loss": {"R1": 0, "R2": 0},
+            "units": {"R1": ["R1_U1"], "R2": ["R2_U1"]},
+            "unit_pmax": {"R1_U1": 95, "R2_U1": 95},
+            "availability": {"R1_U1": [1] * 24, "R2_U1": [1] * 24},
+            "power_conversion": {"R1": 0.4, "R2": 0.4},
+            "load_forecast": [82, 80, 78, 76, 78, 82, 90, 98, 110, 116, 120, 118, 112, 108, 104, 106, 114, 122, 128, 124, 116, 104, 94, 88],
+            "edges": [{"upstream": "R1", "downstream": "R2", "delay_periods": 0}],
+            "initial_upstream_outflow": {"R1->R2": 95},
+            "time_step_seconds": 3600,
+            "delta_t": 1.0,
+            "electricity_price": 300,
+            "weights": {"load_deviation": 1000, "spill": 10, "ramp": 0.1, "terminal_volume": 500, "generation": 1, "revenue": 1},
+        }
+    )
+    sample.update(
+        {
+            "inflow": deepcopy(sample["local_inflow"]),
+            "initial_storage": deepcopy(sample["initial_volume"]),
+            "target_final_storage": deepcopy(sample["target_terminal_volume"]),
+            "storage_min": deepcopy(sample["volume_min"]),
+            "storage_max": deepcopy(sample["volume_max"]),
+            "power_min": {"R1": 0, "R2": 0},
+            "power_max": {"R1": 95, "R2": 95},
+            "cascade_delay": {"R1": 0, "R2": 0},
+            "upstream_station": {"R2": "R1"},
+            "penalty_spill": 10.0,
+            "penalty_storage_deviation": 500.0,
+        }
+    )
+    template["sample_runtime_parameters"] = sample
+    template["component_spec"] = deepcopy(template["component_spec"])
+    template["component_spec"]["runtime_defaults"] = {"hydro_power_mode": "pwl_2d", "load_tracking_mode": "soft"}
+    template["component_spec"]["name"] = template["name"]
+    alias_sets = {
+        "station": sample["station"],
+        "unit": ["R1_U1", "R2_U1"],
+        "edge": ["R1->R2"],
+        "time": sample["time"],
+        "time_volume": sample["time_volume"],
+    }
+    for set_spec in template["component_spec"].get("sets") or []:
+        code = set_spec.get("code") or set_spec.get("name")
+        if code in alias_sets:
+            set_spec["values"] = deepcopy(alias_sets[code])
+    template["ui_metadata"] = {
+        **(template.get("ui_metadata") or {}),
+        "display_build_mode": "组件化 Builder（统一模型兼容入口）",
+        "deprecated": True,
+        "replacement_model_code": "cascade_hydro_dispatch",
+        "migration_defaults": {"hydro_power_mode": "pwl_2d"},
+    }
+    return template
+
+
 
 
 def _nonlinear_hydro_power_demo() -> dict[str, Any]:

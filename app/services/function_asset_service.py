@@ -24,9 +24,12 @@ CASCADE_HYDRO_SAMPLE_FUNCTION_ASSETS: list[dict[str, Any]] = [
         "input_schema": [{"code": "storage", "name": "库容", "unit": "million m3", "type": "number"}],
         "output_schema": {"code": "level", "name": "上游水位", "unit": "m", "type": "number"},
         "points": [[80, 300], [100, 306], [120, 312], [140, 319], [170, 330]],
-        "solve_strategy": "convex_combination_lp",
+        "solve_strategy": "segment_binary",
+        "interpolation_mode": "segment_binary",
+        "out_of_domain_policy": "reject",
+        "allow_extrapolation": False,
         "status": "published",
-        "metadata": {"sample_asset": True, "model_code": "cascade_hydro_dispatch_v1"},
+        "metadata": {"sample_asset": True, "model_code": "cascade_hydro_dispatch", "asset_version": "2026-07-11-strict-pwl"},
     },
     {
         "function_id": "cascade_hydro_tailwater_outflow_v1",
@@ -36,9 +39,27 @@ CASCADE_HYDRO_SAMPLE_FUNCTION_ASSETS: list[dict[str, Any]] = [
         "input_schema": [{"code": "outflow", "name": "出库流量", "unit": "m3/s", "type": "number"}],
         "output_schema": {"code": "tailwater", "name": "尾水位", "unit": "m", "type": "number"},
         "points": [[40, 262], [80, 264], [120, 266], [160, 268]],
-        "solve_strategy": "convex_combination_lp",
+        "solve_strategy": "segment_binary",
+        "interpolation_mode": "segment_binary",
+        "out_of_domain_policy": "reject",
+        "allow_extrapolation": False,
         "status": "published",
-        "metadata": {"sample_asset": True, "model_code": "cascade_hydro_dispatch_v1"},
+        "metadata": {"sample_asset": True, "model_code": "cascade_hydro_dispatch", "asset_version": "2026-07-11-strict-pwl"},
+    },
+    {
+        "function_id": "cascade_hydro_power_flow_v1",
+        "name": "梯级水电示例流量出力曲线 v1",
+        "description": "示例 1D 严格 PWL 资产，仅用于工程演示：power = f(generation flow)。",
+        "function_type": "piecewise_1d",
+        "input_schema": [{"code": "q_gen", "name": "发电流量", "unit": "m3/s", "type": "number"}],
+        "output_schema": {"code": "power", "name": "出力", "unit": "MW", "type": "number"},
+        "points": [[40, 14], [80, 30], [120, 49], [160, 70]],
+        "solve_strategy": "segment_binary",
+        "interpolation_mode": "segment_binary",
+        "out_of_domain_policy": "reject",
+        "allow_extrapolation": False,
+        "status": "published",
+        "metadata": {"sample_asset": True, "model_code": "cascade_hydro_dispatch", "asset_version": "2026-07-11-strict-pwl", "data_class": "illustrative_not_station_curve"},
     },
     {
         "function_id": "cascade_hydro_power_surface_v1",
@@ -50,11 +71,22 @@ CASCADE_HYDRO_SAMPLE_FUNCTION_ASSETS: list[dict[str, Any]] = [
             {"code": "head", "name": "水头", "unit": "m", "type": "number"},
         ],
         "output_schema": {"code": "power", "name": "出力", "unit": "MW", "type": "number"},
-        "points_2d": [[40, 35, 11.9], [160, 35, 47.6], [160, 65, 88.4]],
-        "triangles": [[0, 1, 2]],
+        "points_2d": [
+            [40, 35, 12.012], [40, 45, 15.444], [40, 55, 18.876], [40, 65, 22.308],
+            [80, 35, 24.024], [80, 45, 30.888], [80, 55, 37.752], [80, 65, 44.616],
+            [120, 35, 36.036], [120, 45, 46.332], [120, 55, 56.628], [120, 65, 66.924],
+            [160, 35, 48.048], [160, 45, 61.776], [160, 55, 75.504], [160, 65, 89.232]
+        ],
+        "triangles": [
+            [0, 4, 1], [4, 5, 1], [1, 5, 2], [5, 6, 2], [2, 6, 3], [6, 7, 3],
+            [4, 8, 5], [8, 9, 5], [5, 9, 6], [9, 10, 6], [6, 10, 7], [10, 11, 7],
+            [8, 12, 9], [12, 13, 9], [9, 13, 10], [13, 14, 10], [10, 14, 11], [14, 15, 11]
+        ],
         "solve_strategy": "triangulated_milp_exact",
+        "out_of_domain_policy": "reject",
+        "allow_extrapolation": False,
         "status": "published",
-        "metadata": {"sample_asset": True, "model_code": "cascade_hydro_dispatch_v1", "asset_version": "2026-07-07-scattered-triangle"},
+        "metadata": {"sample_asset": True, "model_code": "cascade_hydro_dispatch", "asset_version": "2026-07-11-grid-4x4", "data_class": "illustrative_not_station_curve"},
     },
 ]
 
@@ -138,7 +170,16 @@ class FunctionAssetService:
                 raw_inputs = [xs[0] + step * i for i in range(5)]
             else:
                 raw_inputs = xs
-        values = [{"x": float(x), "y": _interpolate_piecewise_1d(float(x), points)} for x in raw_inputs]
+        policy = str(asset.get("out_of_domain_policy") or "reject")
+        values = []
+        for raw_x in raw_inputs:
+            requested_x = float(raw_x)
+            evaluated_x = requested_x
+            clamped = False
+            if policy == "clamp":
+                evaluated_x = min(max(requested_x, points[0][0]), points[-1][0])
+                clamped = evaluated_x != requested_x
+            values.append({"x": evaluated_x, "requested_x": requested_x, "y": _interpolate_piecewise_1d(evaluated_x, points), "boundary_clamped": clamped})
         return {
             "function_id": asset["function_id"],
             "function_type": asset.get("function_type", "piecewise_1d"),
@@ -214,7 +255,10 @@ class FunctionAssetService:
             ),
             "group_keys": [group_field] if group_field else [],
             "interpolation": payload.get("interpolation") or "linear",
-            "solve_strategy": payload.get("solve_strategy") or ("triangulated_milp_exact" if function_type == "piecewise_2d" else "convex_combination_lp"),
+            "interpolation_mode": payload.get("interpolation_mode") or ("triangulated" if function_type == "piecewise_2d" else "segment_binary"),
+            "out_of_domain_policy": payload.get("out_of_domain_policy") or "reject",
+            "allow_extrapolation": bool(payload.get("allow_extrapolation", False)),
+            "solve_strategy": payload.get("solve_strategy") or ("triangulated_milp_exact" if function_type == "piecewise_2d" else "segment_binary"),
             "status": "draft",
             "points": points,
             "points_2d": points_2d,
@@ -368,6 +412,8 @@ def validate_function_asset(asset: dict[str, Any]) -> dict[str, Any]:
     warnings: list[dict[str, Any]] = []
     function_type = str(asset.get("function_type") or "piecewise_1d")
     interpolation = str(asset.get("interpolation") or "linear").lower()
+    interpolation_mode = str(asset.get("interpolation_mode") or asset.get("solve_strategy") or "segment_binary").lower()
+    out_of_domain_policy = str(asset.get("out_of_domain_policy") or "reject").lower()
     if function_type == "piecewise_2d":
         return _validate_piecewise_2d(asset)
     if function_type == "piecewise_nd":
@@ -389,6 +435,12 @@ def validate_function_asset(asset: dict[str, Any]) -> dict[str, Any]:
         errors.append({"field": "function_type", "message": "only piecewise_1d is supported in this phase", "actual": function_type})
     if interpolation != "linear":
         errors.append({"field": "interpolation", "message": "piecewise_1d only supports linear interpolation", "actual": interpolation})
+    if interpolation_mode not in {"segment_binary", "sos2", "binary_segment_milp", "convex_combination_lp"}:
+        errors.append({"field": "interpolation_mode", "message": "unsupported 1D interpolation mode", "actual": interpolation_mode})
+    if out_of_domain_policy not in {"reject", "clamp"}:
+        errors.append({"field": "out_of_domain_policy", "message": "policy must be reject or clamp", "actual": out_of_domain_policy})
+    if bool(asset.get("allow_extrapolation", False)):
+        errors.append({"field": "allow_extrapolation", "message": "production PWL assets do not permit extrapolation", "actual": True, "expected": False})
     if not isinstance(points, list) or len(points) < 2:
         errors.append({"field": "points", "message": "at least two breakpoints are required"})
     previous_x: float | None = None
@@ -426,6 +478,8 @@ def validate_function_asset(asset: dict[str, Any]) -> dict[str, Any]:
                 if declared != domain[key]:
                     errors.append({"field": f"domain.{key}", "message": "domain must match points", "actual": declared, "expected": domain[key]})
         diagnostics.update(_curve_shape_diagnostics(normalized_points))
+        diagnostics["interpolation_mode"] = "segment_binary" if interpolation_mode in {"binary_segment_milp", "convex_combination_lp"} else interpolation_mode
+        diagnostics["out_of_domain_policy"] = out_of_domain_policy
         if diagnostics.get("monotonicity") == "non_monotone":
             warnings.append({"field": "points", "message": "curve is non-monotone", "actual": diagnostics.get("monotonicity")})
         if diagnostics.get("convexity") == "unknown":
@@ -740,14 +794,25 @@ def _preview_piecewise_2d(asset: dict[str, Any], payload: dict[str, Any], valida
         domain = validation.get("domain") or {}
         x = (float(domain.get("x_min", 0)) + float(domain.get("x_max", 0))) / 2
         y = (float(domain.get("y_min", 0)) + float(domain.get("y_max", 0))) / 2
-    x_float = float(x)
-    y_float = float(y)
+    requested_x = float(x)
+    requested_y = float(y)
+    x_float = requested_x
+    y_float = requested_y
+    boundary_clamped = False
+    if str(asset.get("out_of_domain_policy") or "reject") == "clamp":
+        domain = validation.get("domain") or {}
+        x_float = min(max(x_float, float(domain.get("x_min", x_float))), float(domain.get("x_max", x_float)))
+        y_float = min(max(y_float, float(domain.get("y_min", y_float))), float(domain.get("y_max", y_float)))
+        boundary_clamped = x_float != requested_x or y_float != requested_y
     found = _interpolate_piecewise_2d(x_float, y_float, points, triangles)
     base = {
         "function_id": asset["function_id"],
         "function_type": "piecewise_2d",
         "x": x_float,
         "y": y_float,
+        "requested_x": requested_x,
+        "requested_y": requested_y,
+        "boundary_clamped": boundary_clamped,
         "domain": validation["domain"],
         "diagnostics": validation["diagnostics"],
         "validation_status": validation["validation_status"],

@@ -17,8 +17,9 @@ const symbols = {
 
 function nonlinearDraft(): ModelDraft {
   const draft = createInitialDraft();
+  draft.time_dimension = { schema_version: 1, enabled: true, policy: 'fixed', default_horizon: 1, time_set: 'time', state_time_set: null, editable: false };
   draft.basic_info.builder_mode = 'component_based';
-  draft.semantic.sets = [{ code: 'time', name: '时段', values: [0] }];
+  draft.semantic.sets = [{ code: 'time', name: '时段', values: [0], type: 'time_period', dimensionType: 'time_period', managed_by: 'time_dimension' }];
   draft.semantic.variables = [
     { code: 'flow', name: '流量', dimension: ['time'], domain: 'NonNegativeReals', lowerBound: 0, upperBound: 10 },
     { code: 'head', name: '水头', dimension: ['time'], domain: 'NonNegativeReals', lowerBound: 0, upperBound: 20 },

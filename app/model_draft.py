@@ -12,6 +12,7 @@ from app.storage.memory_store import STORE
 COMPONENT_CONFIG_COMPONENTS = {"function_mapping_component", "piecewise_linear_curve", "function_mapping_2d_component"}
 COMPONENT_CONFIG_FIELDS = {
     "function_asset_id",
+    "function_asset_binding_key",
     "curve_asset_id",
     "x",
     "y",
@@ -22,6 +23,9 @@ COMPONENT_CONFIG_FIELDS = {
     "generated_constraints",
     "config",
     "metadata",
+    "domain_bounds",
+    "out_of_domain_policy",
+    "enabled_when",
 }
 
 
@@ -35,18 +39,27 @@ def create_model_draft_from_template(template: dict[str, Any]) -> dict[str, Any]
         definition = deepcopy(item.get("definition") or {}) or _component_definition_or_metadata(component_type)
         if definition:
             definition = normalize_component_payload({**definition, "component_id": definition.get("component_id") or component_type})
-        components.append(
-            {
-                "component_id": component_type,
-                "type": component_type,
-                "enabled": item.get("enabled", True),
-                "required": item.get("required", definition.get("required", False)),
-                "config": deepcopy(item.get("config") or {}),
-                "definition": definition,
-                "generated_constraints": deepcopy(definition.get("generated_constraints") or []),
-                "generated_objective_terms": deepcopy(definition.get("generated_objective_terms") or []),
-            }
-        )
+        config = deepcopy(item.get("config") or {})
+        draft_item = {
+            "component_id": component_type,
+            "type": component_type,
+            "enabled": item.get("enabled", True),
+            "enabled_when": deepcopy(item.get("enabled_when")),
+            "required": item.get("required", definition.get("required", False)),
+            "config": config,
+            "definition": definition,
+            "generated_constraints": deepcopy(definition.get("generated_constraints") or []),
+            "generated_objective_terms": deepcopy(definition.get("generated_objective_terms") or []),
+        }
+        if component_type in COMPONENT_CONFIG_COMPONENTS:
+            for field in COMPONENT_CONFIG_FIELDS:
+                if field == "config":
+                    continue
+                if field in item:
+                    draft_item[field] = deepcopy(item[field])
+                elif field in config:
+                    draft_item[field] = deepcopy(config[field])
+        components.append(draft_item)
     draft = {
         "basic_info": {
             "name": template.get("name", ""),
@@ -444,6 +457,8 @@ def build_component_spec_from_draft(draft: dict[str, Any]) -> dict[str, Any]:
 def _component_spec_item_from_draft(item: dict[str, Any]) -> dict[str, Any]:
     component_type = item.get("type") or item.get("component_id")
     row: dict[str, Any] = {"type": component_type}
+    if item.get("enabled_when") is not None:
+        row["enabled_when"] = deepcopy(item["enabled_when"])
     config = deepcopy(item.get("config") or {})
     if item.get("definition"):
         row["definition"] = deepcopy(item["definition"])
@@ -752,6 +767,7 @@ def _draft_components_from_component_spec(component_spec: dict[str, Any]) -> lis
             "component_id": component_type,
             "type": component_type,
             "enabled": item.get("enabled", True),
+            "enabled_when": deepcopy(item.get("enabled_when")),
             "required": item.get("required", definition.get("required", False)),
             "config": config,
             "definition": definition,

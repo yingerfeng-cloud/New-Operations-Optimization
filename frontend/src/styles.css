@@ -2526,7 +2526,7 @@ button.metric-card-v2:hover {
 }
 
 .agent-workbench-layout {
-  grid-template-columns: minmax(240px, 280px) minmax(0, 1fr) minmax(300px, 360px);
+  grid-template-columns: minmax(220px, 280px) minmax(520px, 1fr) minmax(320px, 380px);
   align-items: stretch;
 }
 
@@ -2538,6 +2538,106 @@ button.metric-card-v2:hover {
 
 .agent-workbench-layout .ant-card-body {
   overflow-x: hidden;
+}
+
+.agent-workbench-layout > div {
+  display: flex;
+  flex-direction: column;
+}
+
+.agent-workbench-layout .content-card {
+  height: 100%;
+}
+
+.agent-chat-card .ant-card-body {
+  height: min(760px, calc(100vh - 220px));
+  min-height: 560px;
+  padding: 0 !important;
+}
+
+.agent-message-list {
+  min-height: 0;
+  overflow: auto;
+  padding: 16px;
+  border-bottom: 1px solid var(--proto-line);
+}
+
+.agent-message-list .ant-spin-nested-loading,
+.agent-message-list .ant-spin-container {
+  min-height: 100%;
+}
+
+.agent-message-list .ant-spin-container {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.agent-message {
+  max-width: min(78%, 720px);
+  overflow-wrap: anywhere;
+  line-height: 1.55;
+}
+
+.agent-message b {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 12px;
+  color: var(--proto-muted);
+}
+
+.agent-confirm-card {
+  max-height: 220px;
+  margin: 0;
+  overflow: auto;
+  border-width: 0 0 1px;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.agent-input-bar {
+  margin-top: 0;
+  padding: 14px 16px 16px;
+  background: #fff;
+}
+
+.agent-input-bar .ant-space {
+  margin-top: 10px;
+}
+
+.agent-session-card .ant-card-body {
+  height: min(760px, calc(100vh - 220px));
+  min-height: 560px;
+}
+
+.agent-session-list {
+  min-height: 0;
+  padding-right: 2px;
+}
+
+.agent-session-item {
+  min-height: 64px;
+}
+
+.agent-session-item .ant-typography {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
+.agent-workbench-layout > div:last-child .content-card .ant-card-body {
+  max-height: min(760px, calc(100vh - 220px));
+  overflow: auto;
+}
+
+.agent-workbench-layout .panel {
+  padding: 14px;
+  box-shadow: none !important;
+}
+
+.agent-workbench-layout .ant-descriptions-view,
+.agent-workbench-layout .ant-table {
+  max-width: 100%;
+  overflow: hidden;
 }
 
 .agent-context-summary {

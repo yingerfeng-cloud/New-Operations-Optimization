@@ -11,7 +11,9 @@ from app.schemas.solve import SolveRequest, TaskRecord, TaskView
 from app.semantic.semantic_mapper import map_business_parameters
 from app.semantic.semantic_validator import RuntimeParameterValidator
 from app.services.model_service import CALLABLE_STATUSES, model_service
+from app.services.model_set_reference_validator import validate_set_references
 from app.services.template_service import template_library
+from app.services.time_dimension_service import normalize_runtime_time_dimension, resolve_time_dimension_config
 from app.storage.memory_store import STORE
 from app.utils import now_text
 
@@ -70,6 +72,13 @@ class JobService:
 
     def _prepare_request(self, req: SolveRequest) -> None:
         req.solver = "HiGHS"
+        user_parameter_keys = set(req.parameters or {})
+        user_runtime_keys = set(req.runtime_parameters or {})
+        user_payload_keys = set(req.payload or {})
+        explicit_keys = user_parameter_keys | user_runtime_keys | user_payload_keys
+        if req.interval_minutes is not None:
+            explicit_keys.add("interval_minutes")
+        explicit_horizon = self._explicit_horizon(req, explicit_keys)
         if req.solver_config:
             if req.solver_config.get("time_limit") is not None:
                 req.time_limit_seconds = int(req.solver_config["time_limit"])
@@ -92,11 +101,35 @@ class JobService:
                 if warning:
                     req.payload["resolution_warning"] = warning
             except HTTPException:
-                template = template_library.get_template(req.model_code)
+                template = deepcopy(template_library.get_template(req.model_code))
+                component_spec = deepcopy(template.get("component_spec") or {})
+                generic_spec = deepcopy(template.get("generic_spec") or {})
                 runtime_parameters = {**template.get("sample_runtime_parameters", {}), **req.parameters, **req.payload}
-                if req.horizon is not None:
-                    runtime_parameters["horizon"] = req.horizon
-                self._normalize_time_sets(runtime_parameters)
+                self._validate_set_references(template, component_spec, generic_spec)
+                if explicit_horizon is not None:
+                    runtime_parameters["horizon"] = explicit_horizon
+                time_dimension = resolve_time_dimension_config(
+                    model=None,
+                    semantic_spec=template,
+                    component_spec=component_spec,
+                    generic_spec=generic_spec,
+                    runtime_parameters=runtime_parameters,
+                )
+                runtime_parameters, component_spec, generic_spec, normalized_time_dimension = normalize_runtime_time_dimension(
+                    semantic_spec=template,
+                    component_spec=component_spec,
+                    generic_spec=generic_spec,
+                    runtime_parameters=runtime_parameters,
+                    explicit_horizon=explicit_horizon,
+                    explicitly_provided_keys=explicit_keys,
+                    time_dimension=time_dimension,
+                )
+                template.setdefault("ui_metadata", {})["time_dimension"] = normalized_time_dimension
+                if component_spec:
+                    template["component_spec"] = component_spec
+                    runtime_parameters["component_spec"] = component_spec
+                if generic_spec:
+                    runtime_parameters["generic_spec"] = self._instantiate_generic_spec(generic_spec, runtime_parameters)
                 runtime_parameters["semantic_spec"] = template
                 errors = RuntimeParameterValidator().validate(template, runtime_parameters)
                 if errors:
@@ -125,74 +158,78 @@ class JobService:
             "resolved_model_id": model.id,
             "resolved_model_code": model_code,
         }
-        runtime_parameters = map_business_parameters(model.semantic_spec, req.parameters)
-        merged = {**deepcopy(model.parameters), **deepcopy(runtime_parameters), **deepcopy(req.payload)}
-        if req.horizon is not None:
-            merged["horizon"] = req.horizon
+        semantic_spec = deepcopy(model.semantic_spec or {})
+        component_spec = deepcopy(model.component_spec or semantic_spec.get("component_spec") or {})
+        generic_spec = deepcopy(model.generic_spec or semantic_spec.get("generic_spec") or {})
+        self._validate_set_references(semantic_spec, component_spec, generic_spec)
+        runtime_parameters = map_business_parameters(semantic_spec, req.parameters)
+        merged = {**self._default_parameters_from_model(model), **deepcopy(runtime_parameters), **deepcopy(req.payload)}
+        if explicit_horizon is not None:
+            merged["horizon"] = explicit_horizon
         if req.interval_minutes is not None:
             merged["interval_minutes"] = req.interval_minutes
         if req.objective_config:
             merged["objective_config"] = req.objective_config
         if req.constraint_config:
             merged["constraint_config"] = req.constraint_config
-        if model.generic_spec:
-            consistency_errors = RuntimeParameterValidator().validate_semantic_and_generic(model.semantic_spec, model.generic_spec)
+        time_dimension = resolve_time_dimension_config(
+            model=model,
+            semantic_spec=semantic_spec,
+            component_spec=component_spec,
+            generic_spec=generic_spec,
+            runtime_parameters=merged,
+        )
+        merged, component_spec, generic_spec, normalized_time_dimension = normalize_runtime_time_dimension(
+            semantic_spec=semantic_spec,
+            component_spec=component_spec,
+            generic_spec=generic_spec,
+            runtime_parameters=merged,
+            explicit_horizon=explicit_horizon,
+            explicitly_provided_keys=explicit_keys,
+            time_dimension=time_dimension,
+        )
+        semantic_spec.setdefault("ui_metadata", {})["time_dimension"] = normalized_time_dimension
+        if component_spec:
+            component_spec.setdefault("ui_metadata", {})["time_dimension"] = normalized_time_dimension
+            semantic_spec["component_spec"] = component_spec
+            merged["component_spec"] = component_spec
+        if generic_spec:
+            generic_spec.setdefault("ui_metadata", {})["time_dimension"] = normalized_time_dimension
+            semantic_spec["generic_spec"] = generic_spec
+        if generic_spec:
+            consistency_errors = RuntimeParameterValidator().validate_semantic_and_generic(semantic_spec, generic_spec)
             if consistency_errors:
                 raise HTTPException(status_code=422, detail=consistency_errors)
-            merged["generic_spec"] = self._instantiate_generic_spec(model.generic_spec, merged)
-        if model.semantic_spec:
-            merged["semantic_spec"] = model.semantic_spec
-        self._normalize_time_sets(merged)
-        self._normalize_default_hydro_series(merged, model_code, set(runtime_parameters.keys()))
-        errors = RuntimeParameterValidator().validate(model.semantic_spec, merged)
+            merged["generic_spec"] = self._instantiate_generic_spec(generic_spec, merged)
+        if semantic_spec:
+            merged["semantic_spec"] = semantic_spec
+        errors = RuntimeParameterValidator().validate(semantic_spec, merged)
         if errors:
             raise HTTPException(status_code=422, detail=errors)
         req.payload = merged
 
-    def _normalize_time_sets(self, params: dict) -> None:
-        try:
-            horizon = int(params.get("horizon"))
-        except (TypeError, ValueError):
-            return
-        if horizon <= 0:
-            return
-        time = params.get("time")
-        time_volume = params.get("time_volume")
-        if not isinstance(time, list) or len(time) != horizon:
-            params["time"] = list(range(horizon))
-        if not isinstance(time_volume, list) or len(time_volume) != horizon + 1:
-            params["time_volume"] = list(range(horizon + 1))
+    @staticmethod
+    def _validate_set_references(semantic_spec: dict, component_spec: dict, generic_spec: dict) -> None:
+        errors = validate_set_references(
+            semantic_spec=semantic_spec,
+            component_spec=component_spec,
+            generic_spec=generic_spec,
+        )
+        if errors:
+            raise HTTPException(
+                status_code=422,
+                detail={"message": "模型存在无效集合引用，无法运行。", "errors": errors},
+            )
 
-    def _normalize_default_hydro_series(self, params: dict, model_code: str | None, provided_keys: set[str]) -> None:
-        if model_code != "cascade_hydro_dispatch":
-            return
-        try:
-            horizon = int(params.get("horizon"))
-        except (TypeError, ValueError):
-            return
-        if horizon <= 0:
-            return
-
-        def resize(values: object) -> object:
-            if not isinstance(values, list):
-                return values
-            if len(values) == horizon:
-                return list(values)
-            if not values:
-                return [0 for _ in range(horizon)]
-            result = list(values)
-            while len(result) < horizon:
-                result.extend(values)
-            return result[:horizon]
-
-        for key in ("availability", "local_inflow"):
-            if key in provided_keys:
-                continue
-            value = params.get(key)
-            if not isinstance(value, dict):
-                continue
-            for item_key, item_value in list(value.items()):
-                value[item_key] = resize(item_value)
+    def _default_parameters_from_model(self, model: object) -> dict:
+        semantic = deepcopy(getattr(model, "semantic_spec", None) or {})
+        draft = deepcopy(getattr(model, "model_draft", None) or {})
+        draft_parameters = draft.get("runtime_parameters") if isinstance(draft, dict) else {}
+        return {
+            **(semantic.get("sample_runtime_parameters") or {}),
+            **(draft_parameters or {}),
+            **(deepcopy(getattr(model, "parameters", None) or {})),
+        }
 
     def _instantiate_generic_spec(self, template: dict, runtime_payload: dict) -> dict:
         spec = {**template}
@@ -200,6 +237,42 @@ class JobService:
         params.update({key: value for key, value in runtime_payload.items() if key not in {"generic_spec", "semantic_spec"}})
         spec["parameters"] = params
         return spec
+
+    def _explicit_horizon(self, req: SolveRequest, explicit_keys: set[str]) -> int | None:
+        values: list[tuple[str, int]] = []
+        if req.horizon is not None:
+            values.append(("horizon", int(req.horizon)))
+        for source_name, source in (
+            ("runtime_parameters.horizon", req.runtime_parameters or {}),
+            ("parameters.horizon", req.parameters or {}),
+            ("payload.horizon", req.payload or {}),
+        ):
+            if "horizon" not in source:
+                continue
+            try:
+                values.append((source_name, int(source["horizon"])))
+            except (TypeError, ValueError):
+                raise HTTPException(
+                    status_code=422,
+                    detail={
+                        "message": "提交的调度时段 horizon 必须是整数。",
+                        "errors": [{"field": source_name, "error": "invalid_horizon", "expected": "整数", "actual": source["horizon"]}],
+                    },
+                )
+        if len({item[1] for item in values}) > 1:
+            top = next((value for field, value in values if field == "horizon"), values[0][1])
+            actual_field, actual = next((field, value) for field, value in values if value != top)
+            raise HTTPException(
+                status_code=422,
+                detail={
+                    "message": f"提交的调度时段不一致：顶层 horizon={top}，但 {actual_field}={actual}。",
+                    "errors": [{"field": "horizon", "error": "inconsistent_horizon", "expected": top, "actual": actual}],
+                },
+            )
+        if values:
+            explicit_keys.add("horizon")
+            return values[0][1]
+        return None
 
 
 job_service = JobService()

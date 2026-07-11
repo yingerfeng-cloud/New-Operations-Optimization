@@ -76,6 +76,11 @@ class JobRunner:
                     }
                 )
                 self._log(task, "INFO", f"求解完成，{solver_result.solver_log}，耗时={task.trace['solve_seconds']}s")
+                if solver_result.status == "infeasible":
+                    reason = solver_result.message or "模型不可行，请检查硬负荷目标、库容边界、生态流量和函数资产定义域。"
+                    self._log(task, "ERROR", reason)
+                    self._finish(task, status="INFEASIBLE", error=reason)
+                    return
                 elapsed = time.monotonic() - started
                 raw_termination = str(getattr(solver_result, "raw_termination_condition", "") or "").lower()
                 if elapsed > float(task.request.time_limit_seconds) or "max" in raw_termination and "time" in raw_termination:

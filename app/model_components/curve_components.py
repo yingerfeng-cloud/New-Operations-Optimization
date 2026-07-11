@@ -5,15 +5,23 @@ from typing import Any
 
 import pyomo.environ as pyo
 
-from app.model_components.formula_components import DynamicFormulaComponent
 from app.model_components.formula_components import _eval_formula_node, _normalize_index_specs, _safe_name
 from app.model_components.registry import register_component
 from app.services.function_asset_service import get_function_asset, get_function_asset_points, get_function_asset_surface
+from app.services.pwl_modeling_service import pwl_modeling_service
 
 
 def _component_config(spec: dict[str, Any]) -> dict[str, Any]:
     config = spec.get("config") if isinstance(spec.get("config"), dict) else {}
     return {**config, **{key: value for key, value in spec.items() if key != "config"}}
+
+
+def _function_id(cfg: dict[str, Any], context: dict[str, Any], *fallback_keys: str) -> str:
+    binding_key = str(cfg.get("function_asset_binding_key") or "")
+    bindings = (context.get("runtime_parameters") or {}).get("function_asset_bindings") or {}
+    if binding_key and isinstance(bindings, dict) and bindings.get(binding_key):
+        return str(bindings[binding_key])
+    return str(next((cfg.get(key) for key in fallback_keys if cfg.get(key)), ""))
 
 
 class _ReservedComponent:
@@ -46,23 +54,24 @@ class FunctionMappingComponent:
 
     def validate(self, spec: dict[str, Any], context: dict[str, Any]) -> None:
         cfg = _component_config(spec)
-        strategy = str(cfg.get("solve_strategy") or "convex_combination_lp")
-        if strategy not in {"display_only", "convex_combination_lp", "binary_segment_milp"}:
+        strategy = str(cfg.get("solve_strategy") or cfg.get("interpolation_mode") or "segment_binary")
+        if strategy not in {"display_only", "segment_binary", "sos2", "binary_segment_milp", "convex_combination_lp"}:
             raise RuntimeError(f"unsupported function mapping solve_strategy: {strategy}")
-        function_id = str(cfg.get("function_asset_id") or cfg.get("curve_asset_id") or cfg.get("curve") or "")
+        function_id = _function_id(cfg, context, "function_asset_id", "curve_asset_id", "curve")
         if not function_id:
             raise RuntimeError("function_mapping_component requires function_asset_id")
         asset = get_function_asset(function_id)
         if asset.get("function_type", "piecewise_1d") != "piecewise_1d":
             raise RuntimeError("function_mapping_component currently supports only piecewise_1d assets")
         get_function_asset_points(function_id)
+        _validate_domain_coverage(cfg, asset, context, axes=("x",))
         if not cfg.get("x") or not cfg.get("y"):
             raise RuntimeError("function_mapping_component requires x and y expressions")
 
     def build(self, model: Any, spec: dict[str, Any], context: dict[str, Any]) -> None:
         cfg = _component_config(spec)
-        strategy = str(cfg.get("solve_strategy") or "convex_combination_lp")
-        function_id = str(cfg.get("function_asset_id") or cfg.get("curve_asset_id") or cfg.get("curve") or "")
+        strategy = str(cfg.get("solve_strategy") or cfg.get("interpolation_mode") or "segment_binary")
+        function_id = _function_id(cfg, context, "function_asset_id", "curve_asset_id", "curve")
         asset = get_function_asset(function_id)
         points = get_function_asset_points(function_id)
         record = {
@@ -78,31 +87,35 @@ class FunctionMappingComponent:
         if strategy == "display_only":
             context["metadata"].setdefault("display_only_function_mappings", []).append(record)
             return
-        if strategy == "binary_segment_milp":
-            context["metadata"].setdefault("reserved_function_mappings", []).append(record)
-            raise RuntimeError("binary_segment_milp structure is recorded for diagnosis, but full MILP constraints are not implemented in this phase")
-        curve_name = f"__function_asset_{function_id.replace('-', '_')}"
         indices = cfg.get("indices") or cfg.get("index") or [{"set": "time", "alias": "t"}]
-        definition = {
-            "component_id": self.component_type,
-            "variables": (context.get("model_spec") or {}).get("variables") or [],
-            "parameters": [{"code": curve_name, "type": "piecewise_curve", "points": points, "interpolation": asset.get("interpolation", "linear")}],
-            "constraints": [
-                {
-                    "constraint_id": cfg.get("constraint_id") or f"function_mapping_{function_id}",
-                    "type": "piecewise",
-                    "indices": indices,
-                    "x": cfg["x"],
-                    "y": cfg["y"],
-                    "curve": curve_name,
-                    "expression": f"{cfg['y']} == piecewise({cfg['x']}, {curve_name})",
-                    "solve_participation": "solve_active",
-                    "piecewise_method": "convex_combination_lp",
-                    "function_asset_id": function_id,
-                }
-            ],
-        }
-        DynamicFormulaComponent(definition).build(model, spec, context)
+        index_specs = _normalize_index_specs(indices)
+        index_sets = [getattr(model, item["set"]) for item in index_specs]
+        x_node = ast.parse(str(cfg["x"]), mode="eval").body
+        y_node = ast.parse(str(cfg["y"]), mode="eval").body
+
+        def expression(node: ast.AST):
+            def factory(values: tuple[Any, ...]) -> Any:
+                scoped: dict[str, Any] = {}
+                for item, value in zip(index_specs, values, strict=False):
+                    scoped[item["set"]] = value
+                    scoped[item["alias"]] = value
+                return _eval_formula_node(node, model, context, scoped)
+
+            return factory
+
+        interpolation_mode = "sos2" if strategy == "sos2" else "segment_binary"
+        compiled = pwl_modeling_service.add_piecewise_1d(
+            model,
+            base_name=str(cfg.get("constraint_id") or f"function_mapping_{function_id}"),
+            index_sets=index_sets,
+            index_count=len(index_specs),
+            points=points,
+            x_expr=expression(x_node),
+            y_expr=expression(y_node),
+            interpolation_mode=interpolation_mode,
+        )
+        record.update(compiled)
+        context["metadata"].setdefault("piecewise_1d_constraints", []).append(record)
 
     def explain(self) -> dict[str, Any]:
         return {
@@ -114,7 +127,7 @@ class FunctionMappingComponent:
                 "x": {"type": "formula_expression", "required": True},
                 "y": {"type": "formula_expression", "required": True},
                 "indices": {"type": "index_list", "default": [{"set": "time", "alias": "t"}]},
-                "solve_strategy": {"enum": ["display_only", "convex_combination_lp", "binary_segment_milp"]},
+                "solve_strategy": {"enum": ["display_only", "segment_binary", "sos2"]},
             },
             "sample_generated_constraints": [
                 {
@@ -128,7 +141,7 @@ class FunctionMappingComponent:
             ],
             "problem_types": ["LP", "MILP"],
             "solver_capabilities": ["LP", "MILP"],
-            "linearization_strategy": "convex_combination_lp",
+            "linearization_strategy": "segment_binary",
             "function_asset_binding": True,
         }
 
@@ -145,7 +158,7 @@ class FunctionMapping2DComponent:
         strategy = str(cfg.get("solve_strategy") or "triangulated_milp_exact")
         if strategy not in {"display_only", "triangulated_milp_exact", "convex_hull_lp_approx"}:
             raise RuntimeError(f"unsupported 2D function mapping solve_strategy: {strategy}")
-        function_id = str(cfg.get("function_asset_id") or "")
+        function_id = _function_id(cfg, context, "function_asset_id")
         if not function_id:
             raise RuntimeError("function_mapping_2d_component requires function_asset_id")
         asset = get_function_asset(function_id)
@@ -160,11 +173,12 @@ class FunctionMapping2DComponent:
         surface = get_function_asset_surface(function_id)
         if not surface["triangles"]:
             raise RuntimeError("function_mapping_2d_component requires triangles for triangulated_milp_exact")
+        _validate_domain_coverage(cfg, {**asset, "domain": surface["domain"]}, context, axes=("x", "y"))
 
     def build(self, model: Any, spec: dict[str, Any], context: dict[str, Any]) -> None:
         cfg = _component_config(spec)
         strategy = str(cfg.get("solve_strategy") or "triangulated_milp_exact")
-        function_id = str(cfg.get("function_asset_id") or "")
+        function_id = _function_id(cfg, context, "function_asset_id")
         surface = get_function_asset_surface(function_id)
         points: list[list[float]] = surface["points_2d"]
         triangles: list[list[int]] = surface["triangles"]
@@ -196,84 +210,33 @@ class FunctionMapping2DComponent:
         index_specs = _normalize_index_specs(indices)
         index_sets = [getattr(model, item["set"]) for item in index_specs]
         base_name = _safe_name(str(cfg.get("constraint_id") or f"function_mapping_2d_{function_id}"))
-        tri_name = _safe_name(f"{base_name}_triangles")
-        vertex_name = _safe_name(f"{base_name}_vertices")
-        setattr(model, tri_name, pyo.RangeSet(0, len(triangles) - 1))
-        setattr(model, vertex_name, pyo.RangeSet(0, 2))
-        triangle_set = getattr(model, tri_name)
-        vertex_set = getattr(model, vertex_name)
-        binary_name = _safe_name(f"{base_name}_select")
-        lambda_name = _safe_name(f"{base_name}_lambda")
-        if index_sets:
-            setattr(model, binary_name, pyo.Var(*index_sets, triangle_set, within=pyo.Binary))
-            setattr(model, lambda_name, pyo.Var(*index_sets, triangle_set, vertex_set, bounds=(0, 1)))
-        else:
-            setattr(model, binary_name, pyo.Var(triangle_set, within=pyo.Binary))
-            setattr(model, lambda_name, pyo.Var(triangle_set, vertex_set, bounds=(0, 1)))
-        binary = getattr(model, binary_name)
-        lambdas = getattr(model, lambda_name)
         x_node = ast.parse(str(cfg["x"]), mode="eval").body
         y_node = ast.parse(str(cfg["y"]), mode="eval").body
         z_node = ast.parse(str(cfg["z"]), mode="eval").body
 
-        def scoped_indices(values: tuple[Any, ...]) -> dict[str, Any]:
-            scoped: dict[str, Any] = {}
-            for item, value in zip(index_specs, values, strict=False):
-                scoped[item["set"]] = value
-                scoped[item["alias"]] = value
-            return scoped
+        def expression(node: ast.AST):
+            def factory(values: tuple[Any, ...]) -> Any:
+                scoped: dict[str, Any] = {}
+                for item, value in zip(index_specs, values, strict=False):
+                    scoped[item["set"]] = value
+                    scoped[item["alias"]] = value
+                return _eval_formula_node(node, model, context, scoped)
 
-        def b(values: tuple[Any, ...], k: int) -> Any:
-            return binary[(*values, k)] if values else binary[k]
+            return factory
 
-        def lam(values: tuple[Any, ...], k: int, j: int) -> Any:
-            return lambdas[(*values, k, j)] if values else lambdas[k, j]
-
-        def selected_point(k: int, j: int) -> list[float]:
-            return points[triangles[k][j]]
-
-        def binary_sum_rule(_m: Any, *values: Any) -> Any:
-            return sum(b(values, k) for k in range(len(triangles))) == 1
-
-        def lambda_sum_rule(_m: Any, *values: Any) -> Any:
-            return sum(lam(values, k, j) for k in range(len(triangles)) for j in range(3)) == 1
-
-        def lambda_bound_rule(_m: Any, *args: Any) -> Any:
-            values = args[: len(index_specs)]
-            k = int(args[len(index_specs)])
-            j = int(args[len(index_specs) + 1])
-            return lam(values, k, j) <= b(values, k)
-
-        def link_rule(node: ast.AST, coord: int):
-            def rule(_m: Any, *values: Any) -> Any:
-                scoped = scoped_indices(values)
-                lhs = _eval_formula_node(node, model, context, scoped)
-                rhs = sum(float(selected_point(k, j)[coord]) * lam(values, k, j) for k in range(len(triangles)) for j in range(3))
-                return lhs == rhs
-
-            return rule
-
-        constraints = {
-            _safe_name(f"{base_name}_binary_sum"): (index_sets, binary_sum_rule),
-            _safe_name(f"{base_name}_lambda_sum"): (index_sets, lambda_sum_rule),
-            _safe_name(f"{base_name}_x_link"): (index_sets, link_rule(x_node, 0)),
-            _safe_name(f"{base_name}_y_link"): (index_sets, link_rule(y_node, 1)),
-            _safe_name(f"{base_name}_z_link"): (index_sets, link_rule(z_node, 2)),
-        }
-        for name, (sets, rule) in constraints.items():
-            setattr(model, name, pyo.Constraint(*sets, rule=rule) if sets else pyo.Constraint(rule=lambda m, _rule=rule: _rule(m)))
-            context["constraints"][name] = getattr(model, name)
-        bound_name = _safe_name(f"{base_name}_lambda_bound")
-        setattr(model, bound_name, pyo.Constraint(*(index_sets + [triangle_set, vertex_set]), rule=lambda_bound_rule) if index_sets else pyo.Constraint(triangle_set, vertex_set, rule=lambda_bound_rule))
-        context["constraints"][bound_name] = getattr(model, bound_name)
-        context["metadata"].setdefault("piecewise_2d_constraints", []).append(
-            {
-                **record,
-                "compiler": "triangulated_milp_exact",
-                "binary_variable": binary_name,
-                "lambda_variable": lambda_name,
-            }
+        compiled = pwl_modeling_service.add_piecewise_2d(
+            model,
+            base_name=base_name,
+            index_sets=index_sets,
+            index_count=len(index_specs),
+            points=points,
+            triangles=triangles,
+            x_expr=expression(x_node),
+            y_expr=expression(y_node),
+            z_expr=expression(z_node),
         )
+        record.update(compiled)
+        context["metadata"].setdefault("piecewise_2d_constraints", []).append(record)
 
     def explain(self) -> dict[str, Any]:
         return {
@@ -328,3 +291,59 @@ class HydroHeadCalculationComponent(_ReservedComponent):
     display_name = "水头计算组件"
     description = "预留：head = forebay_level - tailwater_level - head_loss。"
     formula = "head = forebay_level - tailwater_level - head_loss"
+
+    def build(self, model: Any, spec: dict[str, Any], context: dict[str, Any]) -> None:
+        params = context.get("runtime_parameters") or {}
+        head_loss = params.get("head_loss") or {}
+
+        def rule(m: Any, station: Any, t: Any) -> Any:
+            loss = head_loss.get(station, head_loss.get(str(station), 0.0)) if isinstance(head_loss, dict) else head_loss
+            return m.head[station, t] == m.forebay_level[station, t] - m.tailwater_level[station, t] - float(loss or 0.0)
+
+        model.hydro_head_calculation = pyo.Constraint(model.station, model.time, rule=rule)
+        context["constraints"]["hydro_head_calculation"] = model.hydro_head_calculation
+
+
+def _validate_domain_coverage(
+    cfg: dict[str, Any],
+    asset: dict[str, Any],
+    context: dict[str, Any],
+    *,
+    axes: tuple[str, ...],
+) -> None:
+    domain = asset.get("domain") or {}
+    bounds = cfg.get("domain_bounds") or {}
+    policy = str(cfg.get("out_of_domain_policy") or asset.get("out_of_domain_policy") or "reject")
+    params = context.get("runtime_parameters") or {}
+    stations = list((context.get("sets") or {}).get("station") or [None])
+    violations: list[str] = []
+    for axis in axes:
+        for side in ("min", "max"):
+            param_name = bounds.get(f"{axis}_{side}_param")
+            if not param_name:
+                continue
+            raw = params.get(str(param_name))
+            domain_value = domain.get(f"{axis}_{side}")
+            if raw is None or domain_value is None:
+                continue
+            for station in stations:
+                value = raw.get(station, raw.get(str(station))) if isinstance(raw, dict) and station is not None else raw
+                if value is None:
+                    continue
+                numeric = float(value)
+                outside = numeric < float(domain_value) if side == "min" else numeric > float(domain_value)
+                if outside:
+                    label = f"电站 {station} " if station is not None else ""
+                    violations.append(
+                        f"{label}{param_name} 模型边界={numeric}，函数资产边界={domain_value}"
+                    )
+    if violations and policy == "reject":
+        raise RuntimeError(
+            "函数资产定义域不覆盖模型运行边界："
+            + "；".join(violations)
+            + "。请调整模型边界或更换覆盖完整的函数资产。"
+        )
+    if violations:
+        context.setdefault("metadata", {}).setdefault("function_domain_clamps", []).append(
+            {"function_asset_id": asset.get("function_id"), "policy": policy, "violations": violations}
+        )

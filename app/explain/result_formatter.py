@@ -20,7 +20,7 @@ class SolveResultFormatter:
         if model_code == "unit_commitment_day_ahead":
             return self._format_unit_commitment(solver_result, context)
         if model_code == "cascade_hydro_dispatch_v1":
-            return self._format_cascade_hydro_dispatch_v1(solver_result, context)
+            return self._format_cascade_hydro_dispatch(solver_result, context)
         if model_code == "cascade_hydro_dispatch":
             return self._format_cascade_hydro_dispatch(solver_result, context)
         if model_code == "storage_dispatch":
@@ -546,6 +546,8 @@ class SolveResultFormatter:
         total_spill_flow_sum_m3s = 0.0
         total_spill_volume_m3 = 0.0
         total_abs_deviation = 0.0
+        water_balance_check = []
+        ecological_flow_check = []
 
         for time_idx, time_label in enumerate(times):
             total_power = sum(self._value(values, "station_power", station, time_label) for station in stations)
@@ -553,13 +555,17 @@ class SolveResultFormatter:
             dev_pos = self._value(values, "load_dev_pos", time_label)
             dev_neg = self._value(values, "load_dev_neg", time_label)
             signed_deviation = dev_pos - dev_neg
-            total_abs_deviation += abs(signed_deviation)
+            total_abs_deviation += dev_pos + dev_neg
             system_curve.append(
                 {
                     "time_index": time_label,
                     "load_forecast_MW": round(load, 6),
                     "total_hydro_power_MW": round(total_power, 6),
                     "load_deviation_MW": round(signed_deviation, 6),
+                    "load_dev_pos_MW": round(dev_pos, 6),
+                    "load_dev_neg_MW": round(dev_neg, 6),
+                    "deviation_rate": round((dev_pos + dev_neg) / load, 8) if load else 0.0,
+                    "hard_constraint_satisfied": abs(total_power - load) <= 1e-5 if params.get("load_tracking_mode") == "hard" else None,
                 }
             )
             for station in stations:
@@ -576,6 +582,22 @@ class SolveResultFormatter:
                 total_spill_flow_sum_m3s += q_spill
                 total_spill_volume_m3 += spill_volume_m3
                 total_spill_million_m3 += spill_volume_m3 / 1_000_000
+                inflow = self._hydro_inflow_value(values, params, station, time_idx, times)
+                delta_v = float(params.get("delta_v", float(params.get("time_step_seconds", 900)) / 1_000_000))
+                balance_error = volume_end - volume_start - (inflow - q_out) * delta_v
+                ecological_min = float((params.get("ecological_flow_min") or {}).get(station, 0.0))
+                water_balance_check.append(
+                    {
+                        "station": station, "time_index": time_label,
+                        "local_and_upstream_inflow_m3s": round(inflow, 6), "q_out_m3s": round(q_out, 6),
+                        "volume_start_million_m3": round(volume_start, 6), "volume_end_million_m3": round(volume_end, 6),
+                        "balance_error_million_m3": round(balance_error, 10),
+                        "delay_mapping": self._hydro_delay_mapping(params, station, time_idx, times),
+                    }
+                )
+                ecological_flow_check.append(
+                    {"station": station, "time_index": time_label, "q_out_m3s": round(q_out, 6), "minimum_m3s": ecological_min, "satisfied": q_out + 1e-6 >= ecological_min}
+                )
                 dispatch_detail.append(
                     {
                         "time_index": time_label,
@@ -620,6 +642,24 @@ class SolveResultFormatter:
             )
 
         objective = float(solver_result.objective_value or 0.0)
+        weights = params.get("weights") or {}
+        raw_prices = params.get("electricity_price", params.get("price"))
+        prices = list(raw_prices) if isinstance(raw_prices, (list, tuple)) else [float(raw_prices or 0.0)] * len(times)
+        revenue_value = sum(
+            self._value(values, "station_power", station, time_label)
+            * (float(prices[idx]) if idx < len(prices) else 0.0) * step_hours
+            for idx, time_label in enumerate(times) for station in stations
+        )
+        objective_breakdown = {
+            "generation_value": round(total_generation_mwh, 6),
+            "revenue_value": round(revenue_value, 6),
+            "spill_penalty_value": round(float(weights.get("spill", 0.0)) * total_spill_flow_sum_m3s, 6),
+            "terminal_storage_penalty_value": round(float(weights.get("terminal_volume", 0.0)) * terminal_deviation_sum, 6),
+            "load_deviation_penalty_value": round(float(weights.get("load_deviation", 0.0)) * total_abs_deviation, 6),
+            "total_objective_value": round(objective, 6),
+        }
+        pwl_interpolation = self._hydro_pwl_interpolation(values, component_context, stations, times)
+        max_balance_error = max((abs(row["balance_error_million_m3"]) for row in water_balance_check), default=0.0)
         metrics = {
             "objective_value": round(objective, 6),
             "total_cost": round(objective, 6),
@@ -632,6 +672,8 @@ class SolveResultFormatter:
             "terminal_volume_deviation_sum_million_m3": round(terminal_deviation_sum, 6),
             "gap": "0.00%",
             "risk": "low",
+            "max_water_balance_error_million_m3": round(max_balance_error, 10),
+            **objective_breakdown,
         }
         explanation = {
             "summary": f"梯级水电调度优化已完成，总弃水量 {metrics['total_spill_million_m3']} 百万立方米，结果包含各电站分时出力、发电流量、弃水、下泄流量和库容过程。",
@@ -659,8 +701,14 @@ class SolveResultFormatter:
                 "system_curve": system_curve,
                 "station_summary": station_summary,
                 "metrics": metrics,
+                "objective_breakdown": objective_breakdown,
+                "load_tracking": system_curve,
+                "water_balance_check": water_balance_check,
+                "ecological_flow_check": ecological_flow_check,
+                "function_asset_interpolation": pwl_interpolation,
+                "milp_size": component_context.get("model_size") or {},
                 "constraint_check": {
-                    "load_tracking_mode": "positive_and_negative_deviation",
+                    "load_tracking_mode": params.get("load_tracking_mode", "soft"),
                     "component_based": True,
                 },
             },
@@ -963,6 +1011,79 @@ class SolveResultFormatter:
             "business_output": {"variable_values": solver_result.variable_values, "constraint_check": {}, "mccormick_relaxations": mccormick},
             "business_explanation": {"summary": summary, "model_code": model_code, "relaxation_advisory": advisory},
         }
+
+    def _hydro_inflow_value(self, values: dict[str, Any], params: dict[str, Any], station: Any, time_index: int, times: list[Any]) -> float:
+        local = self._series_value(params.get("local_inflow"), station, time_index, times[time_index])
+        for edge in params.get("edges") or []:
+            if str(edge.get("downstream")) != str(station):
+                continue
+            delay = int(edge.get("delay_periods", 0) or 0)
+            shifted = time_index - delay
+            if shifted < 0:
+                local += float((params.get("initial_upstream_outflow") or {}).get(f"{edge.get('upstream')}->{station}", 0.0))
+            else:
+                local += self._value(values, "q_out", edge.get("upstream"), times[shifted])
+        return local
+
+    def _hydro_delay_mapping(self, params: dict[str, Any], station: Any, time_index: int, times: list[Any]) -> list[dict[str, Any]]:
+        rows = []
+        for edge in params.get("edges") or []:
+            if str(edge.get("downstream")) != str(station):
+                continue
+            delay = int(edge.get("delay_periods", 0) or 0)
+            shifted = time_index - delay
+            rows.append({
+                "upstream": edge.get("upstream"), "downstream": station, "delay_periods": delay,
+                "source_time": times[shifted] if shifted >= 0 else "initial_upstream_outflow",
+            })
+        return rows
+
+    def _hydro_pwl_interpolation(self, values: dict[str, Any], context: dict[str, Any], stations: list[Any], times: list[Any]) -> list[dict[str, Any]]:
+        metadata = context.get("metadata") or {}
+        rows: list[dict[str, Any]] = []
+        for mapping in metadata.get("piecewise_1d_constraints") or []:
+            points = mapping.get("points") or []
+            segment_var = str(mapping.get("segment_binary_variable") or "")
+            lambda_var = str(mapping.get("lambda_variable") or "")
+            for station in stations:
+                for time_label in times:
+                    selected = next((k for k in range(max(len(points) - 1, 0)) if self._value(values, segment_var, station, time_label, k) > 0.5), None)
+                    if selected is None:
+                        continue
+                    weights = [self._value(values, lambda_var, station, time_label, selected), self._value(values, lambda_var, station, time_label, selected + 1)]
+                    rows.append({
+                        "type": "piecewise_1d", "station": station, "time_index": time_label,
+                        "function_asset_id": mapping.get("function_asset_id"), "mapping": mapping.get("y"),
+                        "segment_index": selected, "left_breakpoint": points[selected], "right_breakpoint": points[selected + 1],
+                        "weights": weights, "boundary_clamped": False,
+                    })
+        for mapping in metadata.get("piecewise_2d_constraints") or []:
+            points = mapping.get("points") or []
+            triangles = mapping.get("triangles") or []
+            binary_var = str(mapping.get("binary_variable") or "")
+            lambda_var = str(mapping.get("lambda_variable") or "")
+            domain = mapping.get("domain") or {}
+            for station in stations:
+                for time_label in times:
+                    selected = next((k for k in range(len(triangles)) if self._value(values, binary_var, station, time_label, k) > 0.5), None)
+                    if selected is None:
+                        continue
+                    triangle = triangles[selected]
+                    vertices = [points[index] for index in triangle]
+                    lambdas = [self._value(values, lambda_var, station, time_label, selected, j) for j in range(3)]
+                    flow = self._value(values, "q_gen", station, time_label)
+                    head = self._value(values, "head", station, time_label)
+                    power = self._value(values, "station_power", station, time_label)
+                    span_x = max(float(domain.get("x_max", 0)) - float(domain.get("x_min", 0)), 1e-9)
+                    span_y = max(float(domain.get("y_max", 0)) - float(domain.get("y_min", 0)), 1e-9)
+                    near_boundary = min(flow - float(domain.get("x_min", flow)), float(domain.get("x_max", flow)) - flow) <= 0.01 * span_x or min(head - float(domain.get("y_min", head)), float(domain.get("y_max", head)) - head) <= 0.01 * span_y
+                    rows.append({
+                        "type": "piecewise_2d", "station": station, "time_index": time_label,
+                        "function_asset_id": mapping.get("function_asset_id"), "selected_triangle": selected,
+                        "triangle_vertex_indices": triangle, "vertices": vertices, "lambda_weights": lambdas,
+                        "flow_m3s": flow, "head_m": head, "power_MW": power, "near_domain_boundary": near_boundary,
+                    })
+        return rows
 
     def _value(self, variable_values: dict[str, Any], name: str, *indices: Any) -> float:
         values = variable_values.get(name, {})

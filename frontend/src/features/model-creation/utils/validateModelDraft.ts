@@ -2,6 +2,8 @@ import type { ModelDraft } from '../stores/modelCreationStore';
 import { validateFormulaDef } from '../../formula-editor/formulaValidator';
 import { bindingCode, hasBindingValue, isBindingComplete } from './bindingValidation';
 import { analyzeDraftNonlinear } from './nonlinearDiagnostics';
+import { systemTimeFieldCodes, validateDraftTimeDimension } from './timeDimensionDraft';
+import { dimensionFieldConflict, extractDimensions } from './modelDimensions';
 
 export interface DraftValidation { valid: boolean; sections: Record<string, { valid: boolean; errors: string[]; warnings?: string[] }> }
 
@@ -32,7 +34,9 @@ function parameterBindingErrors(draft: ModelDraft) {
 }
 
 function runtimeParameterErrors(draft: ModelDraft) {
+  const systemFields = systemTimeFieldCodes(draft.time_dimension);
   return draft.semantic.parameters
+    .filter(parameter => !systemFields.has(parameter.code))
     .filter(parameter => (parameter.sourceType || parameter.source_type || 'runtime') === 'runtime')
     .filter(parameter => parameter.required !== false)
     .filter(parameter => !hasBindingValue(draft.runtime_parameters[parameter.code]) && !hasBindingValue(parameter.defaultValue ?? parameter.default))
@@ -83,7 +87,10 @@ export function validateModelDraft(d: ModelDraft): DraftValidation {
   if (!d.basic_info.scenario) basicInfoErrors.push('业务场景必填');
 
   const semanticStructureErrors: string[] = [];
-  if (!d.semantic.sets.length) semanticStructureErrors.push('至少需要一个集合');
+  if (!d.semantic.sets.length && (d.semantic.parameters.some(item => extractDimensions(item as unknown as Record<string, unknown>).length) || d.semantic.variables.some(item => extractDimensions(item as unknown as Record<string, unknown>).length))) semanticStructureErrors.push('存在有维度参数或变量时至少需要一个集合');
+  [...d.semantic.parameters, ...d.semantic.variables].forEach(item => {
+    if (dimensionFieldConflict(item as unknown as Record<string, unknown>)) semanticStructureErrors.push(`${item.code} 的维度字段定义不一致`);
+  });
   if (!d.semantic.variables.length && d.basic_info.builder_mode === 'generic_linear') semanticStructureErrors.push('通用线性 Builder 至少需要一个变量');
 
   const formulaErrors = d.formulas.flatMap(f => validateFormulaDef(f).errors.map(e => `${f.name}: ${e}`));
@@ -96,10 +103,12 @@ export function validateModelDraft(d: ModelDraft): DraftValidation {
   const runtimeErrors = runtimeParameterErrors(d);
   const problemErrors = problemTypeErrors(d);
   const solverErrors = ['HiGHS', 'Ipopt'].includes(d.basic_info.solver) ? [] : [`求解器 ${d.basic_info.solver} 暂未声明兼容`];
+  const timeDimensionErrors = validateDraftTimeDimension(d);
 
   const sections = {
     basic_info: { valid: basicInfoErrors.length === 0, errors: basicInfoErrors },
     semantic_structure: { valid: semanticStructureErrors.length === 0, errors: semanticStructureErrors },
+    time_dimension: { valid: timeDimensionErrors.length === 0, errors: timeDimensionErrors },
     component_dependencies: { valid: componentErrors.length === 0, errors: componentErrors },
     parameter_bindings: { valid: parameterErrors.length === 0, errors: parameterErrors },
     formula: { valid: formulaErrors.length === 0, errors: formulaErrors },

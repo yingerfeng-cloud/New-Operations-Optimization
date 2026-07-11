@@ -51,7 +51,7 @@ export function getComponentBindingRows(component: Record<string, unknown>): Bin
         parameter: code,
         required: parameter.required ?? true,
         unit: parameter.unit,
-        indices: parameter.indices || parameter.dimension,
+        indices: extractDimensions(parameter),
         source_type: parameter.source_type || parameter.sourceType || parameter.source_system || 'runtime',
         type: parameter.type || parameter.data_type || parameter.value_type,
       },
@@ -63,3 +63,4 @@ export function getComponentBindingRows(component: Record<string, unknown>): Bin
 export function getMissingBindingRows(component: Record<string, unknown>) {
   return getComponentBindingRows(component).filter(row => row.binding.required !== false && !isBindingComplete(row.binding));
 }
+import { extractDimensions } from './modelDimensions';

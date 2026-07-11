@@ -359,7 +359,7 @@ def test_model_create_prefers_model_draft_components_over_stale_component_spec(c
     created = client.post("/api/models", json=payload)
     assert created.status_code == 200, created.text
     components = created.json()["component_spec"]["components"]
-    mapping = next(item for item in components if item.get("type") == "function_mapping_component")
+    mapping = next(item for item in components if item.get("function_asset_id") == "storage_level_curve_frontend_added")
     assert mapping["function_asset_id"] == "storage_level_curve_frontend_added"
     assert mapping["x"] == "volume[S1,t]"
     assert mapping["y"] == "level[S1,t]"

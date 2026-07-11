@@ -2,6 +2,8 @@ import { fireEvent, screen, within } from '@testing-library/react';
 import { vi } from 'vitest';
 import { Step3MathExpansion } from '../../features/model-creation/steps/Step3MathExpansion';
 import { Step5ReviewPublish } from '../../features/model-creation/steps/Step5ReviewPublish';
+import { Step4RuntimeParams, buildRuntimeParameterRows } from '../../features/model-creation/steps/Step4RuntimeParams';
+import { inferModelProblemType } from '../../features/model-creation/utils/inferModelProblemType';
 import { ResultCascadeHydroPanel } from '../../features/result-center/ResultPanels';
 import { createInitialDraft, type ModelDraft } from '../../features/model-creation/stores/modelCreationStore';
 import { applyTemplateToDraft } from '../../features/model-creation/utils/applyTemplateToDraft';
@@ -18,7 +20,7 @@ const cascadeTemplate: ModelTemplate = {
   tags: ['power', 'hydro', 'MILP', 'piecewise_1d', 'piecewise_2d'],
   scenario: '日前/日内水电优化调度',
   description: '使用 1D PWL + 2D PWL 函数资产构建 MILP。',
-  build_mode: 'template_based',
+  build_mode: 'component_based',
   problem_type: 'MILP',
   solver: 'HiGHS',
   model_draft: {
@@ -26,26 +28,26 @@ const cascadeTemplate: ModelTemplate = {
       name: '梯级水电调度 v1',
       model_code: 'cascade_hydro_dispatch_v1',
       scenario: '日前/日内水电优化调度',
-      builder_mode: 'template_based',
+      builder_mode: 'component_based',
       solver: 'HiGHS',
       problem_type: 'MILP',
     },
     semantic: {
       sets: [{ code: 'reservoir', name: '水库/电站集合', values: ['R1', 'R2'] }, { code: 'time', name: '调度时段', values: [0, 1] }],
-      parameters: [{ code: 'inflow', name: '天然来水', dimension: ['reservoir', 'time'] }],
+      parameters: [{ code: 'inflow', name: '天然来水', dimension: ['reservoir', 'time'] }, { code: 'load_forecast', name: '负荷预测', dimension: ['time'], required: true }],
       variables: [{ code: 'storage', name: '库容', dimension: ['reservoir', 'time'] }],
     },
     components: [
       { component_id: 'water_balance_component', name: '水量平衡组件', generated_constraints: [{ constraint_id: 'water_balance', name: '水量平衡约束' }] },
-      { component_id: 'function_mapping_component', type: 'function_mapping_component', name: '水位库容函数映射', function_asset_id: 'cascade_hydro_level_storage_v1', x: 'storage[r,t]', y: 'level[r,t]', solve_strategy: 'convex_combination_lp' },
-      { component_id: 'function_mapping_component', type: 'function_mapping_component', name: '尾水位流量函数映射', function_asset_id: 'cascade_hydro_tailwater_outflow_v1', x: 'outflow[r,t]', y: 'tailwater[r,t]', solve_strategy: 'convex_combination_lp' },
-      { component_id: 'function_mapping_2d_component', type: 'function_mapping_2d_component', name: '二维出力曲面函数映射', function_asset_id: 'cascade_hydro_power_surface_v1', x: 'outflow[r,t]', y: 'head[r,t]', z: 'power[r,t]', solve_strategy: 'triangulated_milp_exact', metadata: { triangle_count: 1 } },
+      { component_id: 'function_mapping_component', type: 'function_mapping_component', name: '水位库容函数映射', function_asset_id: 'cascade_hydro_level_storage_v1', x: 'storage[r,t]', y: 'level[r,t]', solve_strategy: 'segment_binary' },
+      { component_id: 'function_mapping_component', type: 'function_mapping_component', name: '尾水位流量函数映射', function_asset_id: 'cascade_hydro_tailwater_outflow_v1', x: 'outflow[r,t]', y: 'tailwater[r,t]', solve_strategy: 'segment_binary' },
+      { component_id: 'function_mapping_2d_component', type: 'function_mapping_2d_component', name: '二维出力曲面函数映射', function_asset_id: 'cascade_hydro_power_surface_v1', x: 'outflow[r,t]', y: 'head[r,t]', z: 'power[r,t]', solve_strategy: 'triangulated_milp_exact', metadata: { triangle_count: 18 } },
       { component_id: 'terminal_storage_constraint', name: '期末库容约束', generated_constraints: [{ constraint_id: 'terminal_storage', name: '期末库容约束' }] },
     ],
     formulas: [],
     constraints: [],
     objective: { sense: 'maximize', terms: [] },
-    runtime_parameters: { horizon: 2, time: [0, 1] },
+    runtime_parameters: { horizon: 2, time: [0, 1], hydro_power_mode: 'pwl_2d', load_tracking_mode: 'soft', load_forecast: [100, 100], station: ['R1', 'R2'] },
     advanced: {
       component_spec: {
         model_problem_type: 'MILP',
@@ -118,9 +120,29 @@ test('Step3 展示梯级水电核心组件', () => {
   expect(screen.getAllByText('期末库容约束').length).toBeGreaterThan(0);
 });
 
+test('负荷跟踪关闭时负荷预测非必填，出力模式决定 LP/MILP', () => {
+  const draft = cascadeDraft();
+  draft.runtime_parameters.load_tracking_mode = 'disabled';
+  draft.runtime_parameters.hydro_power_mode = 'linear';
+  const loadRow = buildRuntimeParameterRows(draft).find(row => row.code === 'load_forecast');
+  expect(loadRow?.required).toBe(false);
+  expect(loadRow?.disabled).toBe(true);
+  expect(inferModelProblemType(draft)).toBe('LP');
+  draft.runtime_parameters.hydro_power_mode = 'pwl_2d';
+  expect(inferModelProblemType(draft)).toBe('MILP');
+});
+
+test('Step4 展示水电模式控件和兼容提示', () => {
+  renderWithQueryClient(<Step4RuntimeParams draft={cascadeDraft()} onChange={vi.fn()} />);
+  expect(screen.getByText('梯级水电求解配置')).toBeInTheDocument();
+  expect(screen.getByText('一维严格 PWL')).toBeInTheDocument();
+  expect(screen.getByText('二维三角片 PWL')).toBeInTheDocument();
+  expect(screen.getByText('该模板为兼容入口')).toBeInTheDocument();
+});
+
 test('Step5 展示函数资产和 MILP 风险诊断', () => {
   const draft = cascadeDraft();
-  draft.runtime_parameters = { horizon: 24, time: Array.from({ length: 24 }, (_, index) => index) };
+  draft.runtime_parameters = { ...draft.runtime_parameters, horizon: 24, time: Array.from({ length: 24 }, (_, index) => index), station: ['R1', 'R2'] };
   renderWithQueryClient(
     <Step5ReviewPublish
       draft={draft}
@@ -166,5 +188,5 @@ test('结果中心展示水电结果解释视图', () => {
   expect(screen.getByText('弃水曲线')).toBeInTheDocument();
   expect(screen.getByText('水量平衡校验表')).toBeInTheDocument();
   expect(screen.getByText('函数资产插值解释')).toBeInTheDocument();
-  expect(screen.getByText(/cascade_hydro_power_surface_v1/)).toBeInTheDocument();
+  expect(screen.getAllByText(/cascade_hydro_power_surface_v1/).length).toBeGreaterThan(0);
 });

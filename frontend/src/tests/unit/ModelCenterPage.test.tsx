@@ -197,7 +197,7 @@ test('runs model asset operations from list', async () => {
 
   fireEvent.click(screen.getByRole('button', { name: /更多/ }));
   fireEvent.click(await screen.findByText('测试运行'));
-  await waitFor(() => expect(testState.testModel).toHaveBeenCalledWith('model_001', {}));
+  await waitFor(() => expect(testState.testModel).toHaveBeenCalledWith('model_001', { parameters: { load: [10, 12] } }));
 
   fireEvent.click(screen.getByRole('button', { name: /更多/ }));
   fireEvent.click(await screen.findByText('下线模型'));

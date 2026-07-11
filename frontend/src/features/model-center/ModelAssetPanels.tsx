@@ -82,9 +82,29 @@ function statusTag(status: unknown) {
   return <Tag color={color}>{value}</Tag>;
 }
 
+function timeDimensionFrom(model: ModelAsset, detail: Detail) {
+  const sources = [detail, model, objectValue(detail.semantic_spec || model.semantic_spec), objectValue(detail.component_spec || model.component_spec), objectValue(detail.generic_spec || model.generic_spec)];
+  for (const source of sources) {
+    const config = objectValue(objectValue(source.ui_metadata).time_dimension);
+    if (Object.keys(config).length) return config;
+  }
+  return {};
+}
+
+function timePolicyText(config: Record<string, unknown>) {
+  if (config.policy === 'fixed') return '固定时段';
+  if (config.policy === 'runtime_variable') return Array.isArray(config.allowed_horizons) && config.allowed_horizons.length ? '候选时段切换' : '运行时自由调整';
+  if (config.policy === 'data_derived') return '由输入数据推导';
+  return '非时序模型';
+}
+
 export function ModelBasicPanel({ model, detail = {} }: { model: ModelAsset; detail?: Detail }) {
   const basic = { ...model, ...objectValue(detail.basic_info) };
   const skill = objectValue(detail.skill_info);
+  const timeDimension = timeDimensionFrom(model, detail);
+  const defaultHorizon = String(timeDimension.default_horizon || '');
+  const defaultInterval = objectValue(timeDimension.interval_minutes_by_horizon)[defaultHorizon] || timeDimension.interval_minutes;
+  const defaultDelta = objectValue(timeDimension.delta_t_by_horizon)[defaultHorizon] || timeDimension.delta_t || (defaultInterval ? Number(defaultInterval) / 60 : undefined);
   return (
     <Space orientation="vertical" size={14} style={{ width: '100%' }}>
       <Descriptions bordered size="small" column={2}>
@@ -99,6 +119,23 @@ export function ModelBasicPanel({ model, detail = {} }: { model: ModelAsset; det
         <Descriptions.Item label="更新时间">{text(basic.updated_at || model.updated_at)}</Descriptions.Item>
         <Descriptions.Item label="发布时间">{text(basic.published_at || model.published_at)}</Descriptions.Item>
       </Descriptions>
+      <Card size="small" title="时间维度契约">
+        <Descriptions size="small" column={2}>
+          <Descriptions.Item label="是否启用">{timeDimension.enabled ? '是' : '否'}</Descriptions.Item>
+          <Descriptions.Item label="策略">{timePolicyText(timeDimension)}</Descriptions.Item>
+          {timeDimension.enabled ? <>
+            <Descriptions.Item label="默认 horizon">{text(timeDimension.default_horizon)}</Descriptions.Item>
+            <Descriptions.Item label="候选 horizon">{text(Array.isArray(timeDimension.allowed_horizons) && timeDimension.allowed_horizons.length ? timeDimension.allowed_horizons.join('、') : '-')}</Descriptions.Item>
+            <Descriptions.Item label="时间集合">{text(timeDimension.time_set)}</Descriptions.Item>
+            <Descriptions.Item label="状态集合">{text(timeDimension.state_time_set)}</Descriptions.Item>
+            <Descriptions.Item label="时间粒度">{defaultInterval ? `${text(defaultInterval)} 分钟` : '-'}</Descriptions.Item>
+            <Descriptions.Item label="delta_t">{text(defaultDelta)}</Descriptions.Item>
+            <Descriptions.Item label="标签生成">{timeDimension.label_generation === 'auto' ? `自动（${text(timeDimension.label_set)}）` : '不生成'}</Descriptions.Item>
+            <Descriptions.Item label="任务中心可编辑">{timeDimension.editable ? '是' : '否'}</Descriptions.Item>
+            {timeDimension.policy === 'data_derived' && <Descriptions.Item label="推导规则">由参数 {text(timeDimension.derive_from)} 的长度推导</Descriptions.Item>}
+          </> : null}
+        </Descriptions>
+      </Card>
       <Card size="small" title="模型服务接口">
         <Descriptions size="small" column={2}>
           <Descriptions.Item label="接口编码">{text(skill.skill_name || `run_${String(model.template_id || model.id).toLowerCase().replaceAll('-', '_')}`)}</Descriptions.Item>

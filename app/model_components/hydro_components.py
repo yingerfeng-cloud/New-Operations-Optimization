@@ -127,6 +127,28 @@ class HydroPowerFlowConversionComponent(HydroComponentBase):
         context["constraints"]["hydro_power_flow_conversion"] = model.hydro_power_flow_conversion
 
 
+@register_component("hydro_generation_flow_bounds")
+class HydroGenerationFlowBoundsComponent(HydroComponentBase):
+    display_name = "发电流量上下限组件"
+    formula = "gen_flow_min[s] <= q_gen[s,t] <= gen_flow_max[s]"
+    required_parameters = ["gen_flow_min", "gen_flow_max"]
+
+    def build(self, model: Any, spec: dict[str, Any], context: dict[str, Any]) -> None:
+        import pyomo.environ as pyo
+
+        params = context["runtime_parameters"]
+
+        def rule(m: Any, station: str, t: Any) -> Any:
+            return pyo.inequality(
+                float(_lookup(params["gen_flow_min"], station)),
+                m.q_gen[station, t],
+                float(_lookup(params["gen_flow_max"], station)),
+            )
+
+        model.hydro_generation_flow_bounds = pyo.Constraint(model.station, model.time, rule=rule)
+        context["constraints"]["hydro_generation_flow_bounds"] = model.hydro_generation_flow_bounds
+
+
 @register_component("hydro_outflow_balance")
 class HydroOutflowBalanceComponent(HydroComponentBase):
     display_name = "下泄流量平衡组件"
@@ -166,6 +188,24 @@ class HydroOutflowBoundsComponent(HydroComponentBase):
 
         model.hydro_outflow_bounds = pyo.Constraint(model.station, model.time, rule=rule)
         context["constraints"]["hydro_outflow_bounds"] = model.hydro_outflow_bounds
+
+
+@register_component("hydro_ecological_flow")
+class HydroEcologicalFlowComponent(HydroComponentBase):
+    display_name = "生态下泄约束组件"
+    formula = "q_out[s,t] >= ecological_flow_min[s]"
+    required_parameters = ["ecological_flow_min"]
+
+    def build(self, model: Any, spec: dict[str, Any], context: dict[str, Any]) -> None:
+        import pyomo.environ as pyo
+
+        minimum = context["runtime_parameters"]["ecological_flow_min"]
+
+        def rule(m: Any, station: str, t: Any) -> Any:
+            return m.q_out[station, t] >= float(_lookup(minimum, station))
+
+        model.hydro_ecological_flow = pyo.Constraint(model.station, model.time, rule=rule)
+        context["constraints"]["hydro_ecological_flow"] = model.hydro_ecological_flow
 
 
 @register_component("hydro_spill_bounds")
@@ -272,21 +312,34 @@ class HydroLoadTrackingComponent(HydroComponentBase):
     def build(self, model: Any, spec: dict[str, Any], context: dict[str, Any]) -> None:
         import pyomo.environ as pyo
 
+        mode = str(context["runtime_parameters"].get("load_tracking_mode") or "soft")
+        if mode == "disabled":
+            for item in model.load_dev_pos.values():
+                item.fix(0)
+            for item in model.load_dev_neg.values():
+                item.fix(0)
+            context["metadata"]["load_tracking_mode"] = mode
+            return
         load_forecast = list(context["runtime_parameters"]["load_forecast"])
         times = _set_values(context, "time")
         time_index = {time_label: idx for idx, time_label in enumerate(times)}
 
         def rule(m: Any, t: Any) -> Any:
             idx = time_index[t]
-            return (
-                sum(m.station_power[station, t] for station in m.station)
-                + m.load_dev_pos[t]
-                - m.load_dev_neg[t]
-                == float(load_forecast[idx])
-            )
+            total_power = sum(m.station_power[station, t] for station in m.station)
+            if mode == "hard":
+                return total_power == float(load_forecast[idx])
+            return total_power - float(load_forecast[idx]) == m.load_dev_pos[t] - m.load_dev_neg[t]
+
+        if mode == "hard":
+            for item in model.load_dev_pos.values():
+                item.fix(0)
+            for item in model.load_dev_neg.values():
+                item.fix(0)
 
         model.hydro_load_tracking = pyo.Constraint(model.time, rule=rule)
         context["constraints"]["hydro_load_tracking"] = model.hydro_load_tracking
+        context["metadata"]["load_tracking_mode"] = mode
 
 
 @register_component("hydro_terminal_volume")
@@ -302,18 +355,23 @@ class HydroTerminalVolumeComponent(HydroComponentBase):
         import pyomo.environ as pyo
 
         target = context["runtime_parameters"]["target_terminal_volume"]
+        mode = str(context["runtime_parameters"].get("terminal_storage_mode") or "soft")
         terminal_t = _set_values(context, "time_volume")[-1]
 
         def rule(m: Any, station: str) -> Any:
-            return (
-                m.volume[station, terminal_t]
-                - float(_lookup(target, station))
-                == m.terminal_dev_pos[station]
-                - m.terminal_dev_neg[station]
-            )
+            if mode == "hard":
+                return m.volume[station, terminal_t] == float(_lookup(target, station))
+            return m.volume[station, terminal_t] - float(_lookup(target, station)) == m.terminal_dev_pos[station] - m.terminal_dev_neg[station]
+
+        if mode == "hard":
+            for item in model.terminal_dev_pos.values():
+                item.fix(0)
+            for item in model.terminal_dev_neg.values():
+                item.fix(0)
 
         model.hydro_terminal_volume = pyo.Constraint(model.station, rule=rule)
         context["constraints"]["hydro_terminal_volume"] = model.hydro_terminal_volume
+        context["metadata"]["terminal_storage_mode"] = mode
 
 
 @register_component("hydro_ramp_smoothing")

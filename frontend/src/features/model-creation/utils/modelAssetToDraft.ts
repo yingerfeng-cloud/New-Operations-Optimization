@@ -2,6 +2,8 @@ import type { ModelAsset } from '../../../types/model';
 import type { FormulaDef } from '../../../types/formula';
 import { createInitialDraft, type ModelDraft } from '../stores/modelCreationStore';
 import { normalizeModelDraft } from './normalizeModelDraft';
+import { inferTimeDimensionConfig, normalizeTimeDimensionConfig } from './timeDimensionDraft';
+import { extractDimensions } from './modelDimensions';
 
 function objectValue(value: unknown): Record<string, unknown> {
   return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {};
@@ -53,7 +55,7 @@ function normalizeSets(rows: unknown): ModelDraft['semantic']['sets'] {
 function normalizeParameters(rows: unknown): ModelDraft['semantic']['parameters'] {
   return arrayValue(rows).map(row => {
     const code = String(row.code || row.key || row.name || '');
-    const dimension = Array.isArray(row.indices) ? row.indices as string[] : Array.isArray(row.dimension) ? row.dimension as string[] : [];
+    const dimension = extractDimensions(row);
     return {
       ...row,
       code,
@@ -75,7 +77,7 @@ function normalizeParameters(rows: unknown): ModelDraft['semantic']['parameters'
 function normalizeVariables(rows: unknown): ModelDraft['semantic']['variables'] {
   return arrayValue(rows).map(row => {
     const code = String(row.code || row.key || row.name || '');
-    const dimension = Array.isArray(row.indices) ? row.indices as string[] : Array.isArray(row.dimension) ? row.dimension as string[] : [];
+    const dimension = extractDimensions(row);
     const type = variableType(row.variableType || row.type || row.domain);
     return {
       ...row,
@@ -236,7 +238,7 @@ export function modelAssetToDraft(asset: ModelAsset): ModelDraft {
   const fallbackGenericFormulas = formulasFromGenericSpec(hasKeys(genericSpec) ? genericSpec : savedGenericSpec);
   const fallbackTemplateFormulas = formulasFromTemplateDraft(savedDraft, mathematicalExpansion);
 
-  return normalizeModelDraft({
+  const candidate = {
     ...base,
     ...savedDraft,
     basic_info: {
@@ -250,6 +252,7 @@ export function modelAssetToDraft(asset: ModelAsset): ModelDraft {
       template_code: String(asset.template_id || savedBasic.template_code || semanticSpec.model_code || semanticSpec.code || asset.id),
     },
     semantic: {
+      ui_metadata: objectValue(semanticSource.ui_metadata),
       sets: normalizeSets(semanticSource.sets || componentSemanticFallback.sets || base.semantic.sets),
       parameters: normalizeParameters(semanticSource.parameters || componentSemanticFallback.parameters || []),
       variables: normalizeVariables(semanticSource.variables || componentSemanticFallback.variables || []),
@@ -257,13 +260,24 @@ export function modelAssetToDraft(asset: ModelAsset): ModelDraft {
     components: savedComponents.length ? savedComponents : specComponents,
     objective: objectValue(savedDraft.objective || componentSpec.objective),
     formulas: savedFormulas.length ? savedFormulas : fallbackGenericFormulas.length ? fallbackGenericFormulas : fallbackTemplateFormulas,
-    runtime_parameters: hasKeys(runtimeFromDraft) ? runtimeFromDraft : { ...runtimeFromAsset, horizon: runtimeFromAsset.horizon || 24 },
+    runtime_parameters: hasKeys(runtimeFromDraft) ? runtimeFromDraft : { ...runtimeFromAsset },
     parameter_groups: hasKeys(objectValue(savedDraft.parameter_groups)) ? objectValue(savedDraft.parameter_groups) as ModelDraft['parameter_groups'] : base.parameter_groups,
     advanced: {
       ...base.advanced,
       ...savedAdvanced,
+      ui_metadata: { ...objectValue(asset.ui_metadata), ...objectValue(savedAdvanced.ui_metadata) },
       generic_spec: hasKeys(genericSpec) ? genericSpec : hasKeys(savedGenericSpec) ? savedGenericSpec : undefined,
       component_spec: hasKeys(componentSpec) ? componentSpec : hasKeys(savedComponentSpec) ? savedComponentSpec : undefined,
     },
-  });
+  } as ModelDraft;
+  const explicitTimeDimension = objectValue(asset.ui_metadata).time_dimension
+    || savedDraft.time_dimension
+    || objectValue(savedAdvanced.ui_metadata).time_dimension
+    || objectValue(semanticSpec.ui_metadata).time_dimension
+    || objectValue(componentSpec.ui_metadata).time_dimension
+    || objectValue(genericSpec.ui_metadata).time_dimension;
+  candidate.time_dimension = explicitTimeDimension
+    ? normalizeTimeDimensionConfig(explicitTimeDimension, candidate.semantic.sets.map(item => item.code))
+    : inferTimeDimensionConfig(candidate);
+  return normalizeModelDraft(candidate);
 }

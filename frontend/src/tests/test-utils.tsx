@@ -3,6 +3,7 @@ import { cleanup, render, type RenderOptions } from '@testing-library/react';
 import type { ReactElement, PropsWithChildren } from 'react';
 import { vi } from 'vitest';
 import axios from 'axios';
+import { ConfigProvider } from 'antd';
 
 const testQueryClients = new Set<QueryClient>();
 const originalFetch = globalThis.fetch;
@@ -32,9 +33,13 @@ export function createTestQueryClient() {
   return client;
 }
 
-export function clearTestQueryClients() {
+export async function clearTestQueryClients() {
+  const cancellations: Promise<unknown>[] = [];
   for (const client of testQueryClients) {
-    client.cancelQueries();
+    cancellations.push(client.cancelQueries());
+  }
+  await Promise.allSettled(cancellations);
+  for (const client of testQueryClients) {
     client.clear();
   }
   testQueryClients.clear();
@@ -77,9 +82,9 @@ function removeAntdPortals() {
     .forEach(node => node.remove());
 }
 
-export function cleanupTestEnv() {
+export async function cleanupTestEnv() {
   cleanup();
-  clearTestQueryClients();
+  await clearTestQueryClients();
   removeAntdPortals();
   try {
     vi.clearAllTimers();
@@ -100,7 +105,11 @@ export function cleanupTestEnv() {
 export function renderWithProviders(ui: ReactElement, options?: RenderOptions) {
   const queryClient = createTestQueryClient();
   function Wrapper({ children }: PropsWithChildren) {
-    return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>;
+    return (
+      <ConfigProvider theme={{ token: { motion: false } }}>
+        <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+      </ConfigProvider>
+    );
   }
   const result = render(ui, { wrapper: Wrapper, ...options });
   return { ...result, queryClient };

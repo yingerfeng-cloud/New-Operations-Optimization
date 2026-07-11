@@ -165,12 +165,11 @@ def test_reserved_components_not_marked_implemented(client) -> None:
     assert piecewise["implemented"] is True
     assert piecewise.get("enabled", True) is not False
     assert piecewise["status"] in {"published", "trial", "tested"}
-    for component_id in ["hydro_head_calculation"]:
-        item = catalog[component_id]
-        assert item["implemented"] is False
-        assert item["enabled"] is False
-        assert item["status"] in {"reserved", "planned"}
-        assert item["metadata_only"] is True
+    head = catalog["hydro_head_calculation"]
+    assert head["implemented"] is True
+    assert head.get("enabled", True) is not False
+    assert head["status"] in {"published", "trial", "tested"}
+    assert head.get("metadata_only", False) is False
 
 
 def test_component_parameter_bindings_enter_runtime_schema(client) -> None:

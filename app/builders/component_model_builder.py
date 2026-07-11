@@ -25,6 +25,13 @@ DOMAIN_MAP = {
 
 class ComponentModelBuilder:
     def build(self, model_spec: dict[str, Any], runtime_parameters: dict[str, Any]) -> tuple[Any, dict[str, Any]]:
+        caller_runtime = runtime_parameters
+        runtime_parameters = {**(model_spec.get("runtime_defaults") or {}), **runtime_parameters}
+        if model_spec.get("runtime_normalizer") == "cascade_hydro":
+            from app.model_components.validators import normalize_hydro_runtime_parameters
+
+            runtime_parameters = normalize_hydro_runtime_parameters(runtime_parameters)
+            caller_runtime.update(runtime_parameters)
         solver_name = runtime_parameters.get("solver", "highs")
         required = model_spec.get("required_solver_capabilities", ["LP"])
         required_list = [str(item).upper() for item in list(required)]
@@ -44,7 +51,11 @@ class ComponentModelBuilder:
         self._run_precheck_config(model_spec, context)
         self._build_variables(model, model_spec, context)
 
-        components = list(model_spec.get("components", []))
+        components = [
+            component
+            for component in list(model_spec.get("components", []))
+            if self._component_enabled(component, runtime_parameters)
+        ]
         for component in components:
             builder = self._component_builder(component)
             builder.validate(component, context)
@@ -55,6 +66,7 @@ class ComponentModelBuilder:
         self._build_pv_storage_capacity_guards(model, context)
         self._build_additional_custom_constraints(model, model_spec)
         build_weighted_objective(model, model_spec.get("objective", {}), context)
+        context["model_size"] = self._model_size(model)
         model._component_context = context
         return model, {
             "model_code": model_spec.get("model_code"),
@@ -62,6 +74,30 @@ class ComponentModelBuilder:
             "component_types": [component.get("type") for component in components],
             "context": context,
             **context,
+        }
+
+    def _component_enabled(self, component: dict[str, Any] | str, runtime_parameters: dict[str, Any]) -> bool:
+        if not isinstance(component, dict):
+            return True
+        condition = component.get("enabled_when")
+        if not isinstance(condition, dict):
+            return component.get("enabled", True) is not False
+        parameter = str(condition.get("parameter") or "")
+        actual = runtime_parameters.get(parameter)
+        if "in" in condition:
+            return actual in list(condition.get("in") or [])
+        if "equals" in condition:
+            return actual == condition.get("equals")
+        if "not_equals" in condition:
+            return actual != condition.get("not_equals")
+        return bool(actual)
+
+    def _model_size(self, model: Any) -> dict[str, int]:
+        variables = [item for component in model.component_objects(pyo.Var, active=True) for item in component.values()]
+        return {
+            "variables": len(variables),
+            "binary_variables": sum(1 for item in variables if item.is_binary()),
+            "constraints": sum(len(component) for component in model.component_objects(pyo.Constraint, active=True)),
         }
 
     def _component_builder(self, component: dict[str, Any] | str) -> Any:

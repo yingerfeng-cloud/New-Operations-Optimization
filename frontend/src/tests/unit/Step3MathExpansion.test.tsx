@@ -139,6 +139,17 @@ test('Step3 component builder renders generated constraints and dependencies', (
   expect(screen.getAllByText('load_forecast').length).toBeGreaterThan(0);
 });
 
+test('Step3 template builder opens formula editor for generated formulas', async () => {
+  const draft = genericDraft();
+  draft.basic_info.builder_mode = 'template_based';
+
+  renderWithQueryClient(<Harness initial={draft} />);
+  fireEvent.click(screen.getAllByRole('button', { name: /编\s*辑/ })[0]);
+
+  expect((await screen.findAllByRole('dialog')).at(-1)).toBeInTheDocument();
+  expect(screen.getByText('公式编辑器')).toBeInTheDocument();
+});
+
 test('Step3 opens Add Function Mapping modal and saves complete component config', async () => {
   renderWithQueryClient(<Harness initial={componentDraft()} />);
   fireEvent.click(screen.getByRole('button', { name: '添加函数映射' }));

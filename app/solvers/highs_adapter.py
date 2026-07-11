@@ -27,12 +27,20 @@ class HiGHSAdapter:
             solver.options["threads"] = int(threads)
 
         started = time.monotonic()
-        result = solver.solve(model)
+        result = solver.solve(model, load_solutions=False)
         solve_time = time.monotonic() - started
         termination = str(result.solver.termination_condition)
-        status = "optimal" if "optimal" in termination.lower() else "feasible" if "feasible" in termination.lower() else "failed"
+        termination_lower = termination.lower()
+        status = "optimal" if "optimal" in termination_lower else "infeasible" if "infeasible" in termination_lower else "failed"
+        if status != "infeasible":
+            try:
+                model.solutions.load_from(result)
+                if status == "failed" and "time" in termination_lower:
+                    status = "feasible"
+            except Exception:
+                pass
         objective_value = None
-        if hasattr(model, "objective"):
+        if status in {"optimal", "feasible"} and hasattr(model, "objective"):
             objective_value = float(pyo.value(model.objective))
         return SolverRunResult(
             status=status,
@@ -41,6 +49,11 @@ class HiGHSAdapter:
             variable_values=self._extract_variables(model),
             solver_log=f"HiGHS termination_condition={termination}",
             raw_termination_condition=termination,
+            termination_condition=termination,
+            solver_name=self.name,
+            solver_type="MILP" if any(var.is_binary() or var.is_integer() for component in model.component_objects(pyo.Var, active=True) for var in component.values()) else "LP",
+            solver_available=True,
+            message="模型不可行，请检查硬负荷目标、库容边界、生态流量和函数资产定义域。" if status == "infeasible" else "",
         )
 
     def _extract_variables(self, model: Any) -> dict[str, Any]:

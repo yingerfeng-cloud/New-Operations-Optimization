@@ -5,6 +5,7 @@ import type { ModelDraft } from '../stores/modelCreationStore';
 import { SemanticOverviewCard } from '../components/SemanticOverviewCard';
 import { ComponentDependencyCard, type BindingTarget } from '../components/ComponentDependencyCard';
 import { ParameterBindingDrawer } from '../components/ParameterBindingDrawer';
+import { TimeDimensionConfigCard } from '../components/TimeDimensionConfigCard';
 
 type SemanticKind = 'sets' | 'parameters' | 'variables';
 type SetRow = ModelDraft['semantic']['sets'][number];
@@ -178,6 +179,7 @@ export function Step2SemanticModel({ draft, onChange }: { draft: ModelDraft; onC
     fixed: 'right',
     width: 140,
     render: (_value, row, index) => (
+      'managed_by' in row && row.managed_by === 'time_dimension' ? <Tag color="blue">系统托管</Tag> :
       <Space>
         <Button type="link" onClick={() => openEdit(kind, row, index)}>编辑</Button>
         <Popconfirm title="确认删除？" onConfirm={() => removeRow(kind, index)}>
@@ -257,11 +259,6 @@ export function Step2SemanticModel({ draft, onChange }: { draft: ModelDraft; onC
 
   return (
     <>
-      <div className="semantic-time-strip">
-        <Typography.Text strong>时间集合约定</Typography.Text>
-        <span><Tag color="blue">time</Tag> 调度时段，长度 horizon，用于出力、负荷、价格等逐时变量和参数。</span>
-        <span><Tag color="geekblue">time_volume</Tag> 状态时点，长度 horizon + 1，用于 SOC、库容等跨时段状态变量。</span>
-      </div>
       {duplicateMessages.length > 0 && <Alert className="section-gap" type="error" showIcon title="编码唯一性校验失败" description={duplicateMessages.join('；')} />}
       <div className="semantic-workbench section-gap">
         <SemanticOverviewCard
@@ -275,6 +272,7 @@ export function Step2SemanticModel({ draft, onChange }: { draft: ModelDraft; onC
         />
         <ComponentDependencyCard draft={draft} onEditBinding={setBindingTarget} />
       </div>
+      <TimeDimensionConfigCard draft={draft} onChange={onChange} />
       <Collapse
         className="section-gap"
         items={[{

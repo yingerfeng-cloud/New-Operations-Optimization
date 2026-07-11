@@ -59,6 +59,23 @@ function isCallable(model: ModelAsset) {
   return callableStatuses.has(String(model.status));
 }
 
+function objectValue(value: unknown): Record<string, unknown> {
+  return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {};
+}
+
+function defaultTestParameters(model: ModelAsset, detail: Record<string, unknown> = {}) {
+  const semantic = objectValue(model.semantic_spec);
+  const detailSemantic = objectValue(detail.semantic_spec);
+  const draft = objectValue(model.model_draft || detail.model_draft);
+  return {
+    ...objectValue(semantic.sample_runtime_parameters),
+    ...objectValue(detailSemantic.sample_runtime_parameters),
+    ...objectValue(draft.runtime_parameters),
+    ...objectValue(model.parameters),
+    ...objectValue(detail.parameters),
+  };
+}
+
 function templateCapability(template: { code?: string; problem_type?: string; tags?: string[]; scenario?: string; description?: string }) {
   const capability = capabilityOrFallback(template as Record<string, unknown>, template.problem_type || '-');
   return {
@@ -90,7 +107,10 @@ export function ModelCenterPage() {
     }
   };
   const publish = useMutation({ mutationFn: publishModel, onSuccess: model => { message.success('模型发布成功'); refresh(model.id); } });
-  const test = useMutation({ mutationFn: (modelId: string) => testModel(modelId, {}), onSuccess: model => { message.success('模型测试完成'); refresh(model.id); } });
+  const test = useMutation({
+    mutationFn: ({ model, detail: testDetail = {} }: { model: ModelAsset; detail?: Record<string, unknown> }) => testModel(model.id, { parameters: defaultTestParameters(model, testDetail) }),
+    onSuccess: model => { message.success('模型测试完成'); refresh(model.id); },
+  });
   const copy = useMutation({ mutationFn: copyModel, onSuccess: model => { message.success('模型复制成功'); refresh(model.id); setViewId(model.id); } });
   const offline = useMutation({ mutationFn: offlineModel, onSuccess: model => { message.success('模型已下线'); refresh(model.id); } });
   const clone = useMutation({
@@ -227,7 +247,7 @@ export function ModelCenterPage() {
                       ],
                       onClick: ({ key }) => {
                         if (key === 'edit') nav(`/models/create?source=${encodeURIComponent(model.id)}`);
-                        if (key === 'test') test.mutate(model.id);
+                        if (key === 'test') test.mutate({ model });
                         if (key === 'publish') (isCallable(model) ? offline : publish).mutate(model.id);
                         if (key === 'copy') copy.mutate(model.id);
                       },
@@ -249,7 +269,7 @@ export function ModelCenterPage() {
         footer={(
           <Space style={{ width: '100%', justifyContent: 'flex-end' }}>
             <Button onClick={() => setViewId(undefined)}>关闭</Button>
-            {current && <Button onClick={() => test.mutate(current.id)}>测试运行</Button>}
+            {current && <Button onClick={() => test.mutate({ model: current, detail: currentAssetDetail })}>测试运行</Button>}
             {current && <Button onClick={() => copy.mutate(current.id)}>复制版本</Button>}
             {current && <Button type="primary" onClick={() => isCallable(current) ? offline.mutate(current.id) : publish.mutate(current.id)}>{isCallable(current) ? '下线模型' : '发布模型'}</Button>}
           </Space>
@@ -276,6 +296,7 @@ export function ModelCenterPage() {
           <div className="template-card-grid section-gap">
             {(templates.data || []).map(item => {
               const capability = templateCapability(item);
+              const deprecated = Boolean((item as Record<string, unknown>).deprecated);
               return (
                 <Card
                   key={item.code}
@@ -283,12 +304,13 @@ export function ModelCenterPage() {
                   className={template === item.code ? 'selected-template-card' : undefined}
                   onClick={() => setTemplate(item.code)}
                   title={item.name}
-                  extra={<Tag color={capability.problemType === 'MILP' ? 'purple' : 'blue'}>模型类型：{capability.problemType}</Tag>}
+                  extra={<Space>{deprecated && <Tag color="warning">已弃用</Tag>}<Tag color={String(capability.problemType).includes('MILP') ? 'purple' : 'blue'}>模型类型：{capability.problemType}</Tag></Space>}
                 >
                   <Space orientation="vertical" size={4}>
                     <span>求解器：{capability.solver}</span>
                     <span>函数资产：{capability.functionAssets}</span>
                     <span>适用场景：{capability.useCase}</span>
+                    {deprecated && <span className="muted">替代模型：cascade_hydro_dispatch</span>}
                     <span className="muted">{item.code}</span>
                   </Space>
                 </Card>

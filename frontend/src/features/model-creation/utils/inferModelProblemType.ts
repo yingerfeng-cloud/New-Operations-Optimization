@@ -20,6 +20,10 @@ function metadataProblemType(value: Record<string, unknown>) {
 }
 
 export function inferModelProblemType(draft: ModelDraft): 'LP' | 'MILP' | 'NLP' | 'MINLP_RESERVED' {
+  const modelCode = String(draft.basic_info.model_code || '');
+  if (modelCode.startsWith('cascade_hydro_dispatch')) {
+    return String(draft.runtime_parameters.hydro_power_mode || 'linear') === 'linear' ? 'LP' : 'MILP';
+  }
   const componentTypes = draft.components.map(component => metadataProblemType(component)).filter(Boolean);
   if (componentTypes.includes('MILP')) return 'MILP';
 

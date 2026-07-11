@@ -37,6 +37,11 @@ function statusOf(result: unknown) {
 function pwl2dRiskRows(draft: ModelDraft) {
   return draft.components
     .filter(component => String(component.type || component.component_id) === 'function_mapping_2d_component')
+    .filter(component => {
+      const condition = component.enabled_when as Record<string, unknown> | undefined;
+      if (!condition) return true;
+      return draft.runtime_parameters[String(condition.parameter || '')] === condition.equals;
+    })
     .map((component, index) => {
       const metadata = (component.metadata || {}) as Record<string, unknown>;
       const triangleCount = Number(metadata.triangle_count || 0);
@@ -44,7 +49,8 @@ function pwl2dRiskRows(draft: ModelDraft) {
       const firstSet = String(indices[0]?.set || 'time');
       const setValues = draft.runtime_parameters[firstSet];
       const horizon = Array.isArray(setValues) ? setValues.length : Number(draft.runtime_parameters.horizon || 1);
-      const expandedSize = Math.max(1, horizon || 1) * Math.max(0, triangleCount || 0);
+      const stationCount = Array.isArray(draft.runtime_parameters.station) ? draft.runtime_parameters.station.length : 1;
+      const expandedSize = Math.max(1, horizon || 1) * Math.max(1, stationCount) * Math.max(0, triangleCount || 0);
       return {
         key: `${String(component.function_asset_id || index)}_${index}`,
         function_asset_id: String(component.function_asset_id || '-'),

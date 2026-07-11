@@ -15,7 +15,7 @@ test('persists draft changes in store', () => {
 });
 
 test('normalizes time dimensions', () => {
-  const d = normalizeModelDraft({ ...initialDraft, runtime_parameters: { horizon: 2 } });
+  const d = normalizeModelDraft({ ...initialDraft, time_dimension: { schema_version: 1, enabled: true, policy: 'fixed', default_horizon: 2, time_set: 'time', state_time_set: 'time_volume', editable: false }, runtime_parameters: {} });
   expect(d.semantic.sets.find(x => x.code === 'time')?.values).toHaveLength(2);
   expect(d.semantic.sets.find(x => x.code === 'time_volume')?.values).toHaveLength(3);
 });
@@ -150,6 +150,7 @@ test('model asset edit restores saved model draft fields', () => {
       parameters: [{ code: 'load', name: '负荷', indices: ['time'], required: true }],
       variables: [{ code: 'p', name: '出力', variableType: 'continuous', indices: ['time'] }],
     },
+    time_dimension: { schema_version: 1, enabled: true, policy: 'fixed', default_horizon: 2, time_set: 'time', state_time_set: null, editable: false },
     components: [{ component_id: 'function_mapping_component', enabled: true, function_asset_id: 'curve_1' }],
     runtime_parameters: { horizon: 2, load: [1, 2] },
     advanced: { component_spec: { components: [{ type: 'function_mapping_component' }] } },

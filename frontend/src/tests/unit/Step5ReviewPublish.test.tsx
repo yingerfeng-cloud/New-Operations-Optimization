@@ -6,7 +6,8 @@ import { createInitialDraft, type ModelDraft } from '../../features/model-creati
 
 function validDraft(): ModelDraft {
   const draft = createInitialDraft();
-  draft.semantic.sets = [{ code: 'time', name: '时段', values: [0] }];
+  draft.time_dimension = { schema_version: 1, enabled: true, policy: 'fixed', default_horizon: 1, time_set: 'time', state_time_set: null, editable: false };
+  draft.semantic.sets = [{ code: 'time', name: '时段', values: [0], type: 'time_period', dimensionType: 'time_period', managed_by: 'time_dimension' }];
   draft.semantic.variables = [{ code: 'p', name: '出力', dimension: ['time'], domain: 'NonNegativeReals' }];
   draft.semantic.parameters = [{ code: 'load', name: '负荷', dimension: ['time'], sourceType: 'runtime', source_type: 'runtime', required: true }];
   draft.runtime_parameters = { horizon: 1, time: [0], load: [100] };

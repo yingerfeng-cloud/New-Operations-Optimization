@@ -29,6 +29,8 @@ def test_market_trading_templates_registered() -> None:
         assert template["component_spec"]["metrics_config"]
         assert template["component_spec"]["explanation_config"]
         assert template["sample_runtime_parameters"]
+        assert template["ui_metadata"]["time_dimension"]["policy"] == "fixed"
+        assert template["ui_metadata"]["time_dimension"]["default_horizon"] == 96
         assert template["ui_metadata"]["execution_policy"] == "advisory_only"
         assert template["ui_metadata"]["requires_human_review"] is True
         assert "不自动下单" in template["ui_metadata"]["capability_boundary"]

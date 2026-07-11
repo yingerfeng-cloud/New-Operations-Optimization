@@ -354,6 +354,17 @@ export function Step3MathExpansion({ draft, onChange }: { draft: ModelDraft; onC
 
   const componentKey = (component: Record<string, unknown>, index: number) => String(component.constraint_id || component.function_asset_id || component.component_id || component.name || `component_${index}`);
 
+  const formulaEditor = (
+    <FormulaBuilderModal
+      open={!!editing}
+      value={editing}
+      symbols={symbols}
+      onApply={applyFormula}
+      onCancel={() => setEditing(undefined)}
+      onDelete={deleteFormula}
+    />
+  );
+
   const renderComponentDetail = (component?: Record<string, unknown>) => {
     if (!component) return <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="请选择左侧构件查看配置" />;
     const status = componentStatus(component);
@@ -614,6 +625,7 @@ export function Step3MathExpansion({ draft, onChange }: { draft: ModelDraft; onC
           </Space>
         </Form>
       </Modal>
+      {formulaEditor}
     </>
   );
 
@@ -681,14 +693,7 @@ export function Step3MathExpansion({ draft, onChange }: { draft: ModelDraft; onC
           ),
         }]}
       />
-      <FormulaBuilderModal
-        open={!!editing}
-        value={editing}
-        symbols={symbols}
-        onApply={applyFormula}
-        onCancel={() => setEditing(undefined)}
-        onDelete={deleteFormula}
-      />
+      {formulaEditor}
     </>
   );
 }

@@ -76,7 +76,7 @@ def test_cascade_hydro_optimize_run_by_model_code_success() -> None:
     assert task["status"] == "SUCCESS", task
 
 
-def test_cascade_hydro_model_run_expands_default_series_when_horizon_changes() -> None:
+def test_cascade_hydro_model_run_rejects_partial_series_when_horizon_changes() -> None:
     params = _sample_params()
     load = params["load_forecast"] * 6
     response = client.post(
@@ -89,9 +89,8 @@ def test_cascade_hydro_model_run_expands_default_series_when_horizon_changes() -
             "time_limit_seconds": 30,
         },
     )
-    assert response.status_code == 200, response.text
-    task = _wait_task(response.json()["id"])
-    assert task["status"] == "SUCCESS", task
+    assert response.status_code == 422, response.text
+    assert "horizon=24" in response.text
 
 
 def test_cascade_hydro_skill_resolves_default_model() -> None:

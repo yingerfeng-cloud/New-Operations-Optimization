@@ -10,6 +10,8 @@ SolveStrategy = Literal[
     "display_only",
     "convex_combination_lp",
     "binary_segment_milp",
+    "segment_binary",
+    "sos2",
     "triangulated_milp_exact",
     "convex_hull_lp_approx",
 ]
@@ -23,6 +25,9 @@ class FunctionAsset(BaseModel):
     output_schema: dict[str, Any] = Field(default_factory=dict)
     group_keys: list[str] = Field(default_factory=list)
     interpolation: str = "linear"
+    interpolation_mode: str = "segment_binary"
+    out_of_domain_policy: Literal["reject", "clamp"] = "reject"
+    allow_extrapolation: bool = False
     points: list[list[float]] = Field(default_factory=list)
     points_2d: list[list[float]] = Field(default_factory=list)
     triangles: list[list[int]] = Field(default_factory=list)

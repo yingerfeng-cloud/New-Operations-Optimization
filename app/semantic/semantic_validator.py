@@ -3,7 +3,8 @@
 import re
 from typing import Any
 
-from app.model_components.validators import validate_hydro_runtime_parameters
+from app.services.time_dimension_service import resolve_state_time_set
+from app.model_dimensions import extract_dimensions
 
 FORMULA_NOT_GENERATED = "公式未生成，请检查左端变量、右端参数和索引配置"
 TRIVIAL_ZERO_CONSTRAINT_RE = re.compile(r"^\s*(?:∀\s*[^：:]+[：:]\s*)?0\s*(?:>=|<=|==)\s*0\s*$")
@@ -105,8 +106,8 @@ class RuntimeParameterValidator:
         set_keys = {str(item.get("key") or item.get("code")) for item in sets if item.get("key") or item.get("code")}
         param_keys = {str(item.get("math_param") or item.get("key") or item.get("code")) for item in params if item.get("math_param") or item.get("key") or item.get("code")}
         var_keys = {str(item.get("math_var") or item.get("key") or item.get("code") or item.get("name")) for item in variables if item.get("math_var") or item.get("key") or item.get("code") or item.get("name")}
-        var_dims = {str(item.get("math_var") or item.get("key") or item.get("code") or item.get("name")): list(item.get("dimension") or []) for item in variables if item.get("math_var") or item.get("key") or item.get("code") or item.get("name")}
-        param_dims = {str(item.get("math_param") or item.get("key") or item.get("code")): list(item.get("dimension") or []) for item in params if item.get("math_param") or item.get("key") or item.get("code")}
+        var_dims = {str(item.get("math_var") or item.get("key") or item.get("code") or item.get("name")): extract_dimensions(item) for item in variables if item.get("math_var") or item.get("key") or item.get("code") or item.get("name")}
+        param_dims = {str(item.get("math_param") or item.get("key") or item.get("code")): extract_dimensions(item) for item in params if item.get("math_param") or item.get("key") or item.get("code")}
         generic_sets = generic_spec.get("sets") or {}
 
         def check_generic_set(field: str, index: Any, require_non_empty: bool = False) -> None:
@@ -128,7 +129,8 @@ class RuntimeParameterValidator:
                 errors.append({"field": f"generic_spec.variables.{name}", "error": "anonymous variable name is forbidden", "expected": "business semantic variable name", "actual": name})
             if name and name not in var_keys:
                 errors.append({"field": f"generic_spec.variables.{name}", "error": "variable not defined in semantic_spec", "expected": sorted(var_keys), "actual": name})
-            for index in variable.get("indices", []) or []:
+            variable_indices = extract_dimensions(variable)
+            for index in variable_indices:
                 if str(index) not in set_keys:
                     errors.append({"field": f"{name}.indices", "error": "unknown set", "expected": sorted(set_keys), "actual": index})
                 check_generic_set(f"{name}.indices", index, True)
@@ -136,9 +138,9 @@ class RuntimeParameterValidator:
                 if variable.get(key) and str(variable[key]) not in param_keys:
                     errors.append({"field": f"{name}.{key}", "error": "unknown parameter", "expected": sorted(param_keys), "actual": variable[key]})
                 if variable.get(key):
-                    invalid = [dim for dim in param_dims.get(str(variable[key]), []) if dim not in list(variable.get("indices", []) or [])]
+                    invalid = [dim for dim in param_dims.get(str(variable[key]), []) if dim not in variable_indices]
                     if invalid:
-                        errors.append({"field": f"{name}.{key}", "error": "parameter dimension mismatch", "expected": list(variable.get("indices", []) or []), "actual": param_dims.get(str(variable[key]), [])})
+                        errors.append({"field": f"{name}.{key}", "error": "parameter dimension mismatch", "expected": variable_indices, "actual": param_dims.get(str(variable[key]), [])})
             if variable.get("lb") is not None and variable.get("ub") is not None and float(variable["lb"]) > float(variable["ub"]):
                 errors.append({"field": f"{name}.bounds", "error": "lower bound greater than upper bound", "expected": "<= ub", "actual": variable["lb"]})
 
@@ -219,14 +221,10 @@ class RuntimeParameterValidator:
 
     def validate(self, semantic_spec: dict[str, Any], runtime_parameters: dict[str, Any]) -> list[dict[str, Any]]:
         errors: list[dict[str, Any]] = []
-        model_code = semantic_spec.get("model_code") or semantic_spec.get("code")
         build_mode = semantic_spec.get("build_mode") or (semantic_spec.get("component_spec") or {}).get("build_mode")
         if build_mode == "component_based":
             return self._validate_component_based(semantic_spec, runtime_parameters)
-        if model_code == "unit_commitment_day_ahead":
-            errors.extend(self._validate_unit_commitment(runtime_parameters))
-        else:
-            errors.extend(self._validate_by_template(semantic_spec, runtime_parameters))
+        errors.extend(self._validate_by_template(semantic_spec, runtime_parameters))
         for param in semantic_spec.get("parameters", []):
             code = str(param.get("math_param") or param.get("code") or param.get("key") or "")
             if not code or code not in runtime_parameters:
@@ -241,19 +239,18 @@ class RuntimeParameterValidator:
         return errors
 
     def _validate_component_based(self, semantic_spec: dict[str, Any], params: dict[str, Any]) -> list[dict[str, Any]]:
-        model_code = semantic_spec.get("model_code") or semantic_spec.get("code")
         try:
-            if model_code == "cascade_hydro_dispatch":
-                validate_hydro_runtime_parameters(params)
-            else:
-                self._validate_component_runtime_shape(semantic_spec, params)
+            self._validate_component_runtime_shape(semantic_spec, params)
         except RuntimeError as exc:
             return [{"field": "runtime_parameters", "error": str(exc), "expected": "组件化模型参数校验通过", "actual": "校验失败"}]
         return []
 
     def _validate_component_runtime_shape(self, semantic_spec: dict[str, Any], params: dict[str, Any]) -> None:
         component_spec = semantic_spec.get("component_spec") or {}
-        set_lengths = self._semantic_set_lengths(semantic_spec)
+        set_lengths = self._semantic_set_lengths(semantic_spec, params)
+        runtime_validation = (semantic_spec.get("ui_metadata") or {}).get("runtime_validation") or (component_spec.get("ui_metadata") or {}).get("runtime_validation") or {}
+        error_prefix = str(runtime_validation.get("error_prefix") or "组件化模型参数错误")
+        dimension_labels = runtime_validation.get("dimension_labels") if isinstance(runtime_validation.get("dimension_labels"), dict) else {}
         param_defs = list(semantic_spec.get("parameters", []) or [])
         param_defs.extend(component_spec.get("parameters") or [])
         for param in param_defs:
@@ -261,7 +258,7 @@ class RuntimeParameterValidator:
             if not code:
                 continue
             validation = param.get("validation") or {}
-            required = bool(validation.get("required", param.get("required", True)))
+            required = bool(validation.get("required", param.get("required", False)))
             if required and code not in params:
                 raise RuntimeError(f"component runtime parameter error: missing required parameter {code}.")
             if code not in params:
@@ -277,8 +274,9 @@ class RuntimeParameterValidator:
                     raise RuntimeError(f"组件化模型参数错误：{code} 不得小于 {validation['min']}。")
             if expected_type == "dict" and not isinstance(value, dict):
                 raise RuntimeError(f"component runtime parameter error: {code} must be a dict, got {type(value).__name__}.")
-            dimensions = list(param.get("dimension") or param.get("indices") or [])
-            self._validate_value_matches_dimensions(code, value, dimensions, set_lengths)
+            dimensions = extract_dimensions(param)
+            if dimensions or expected_type not in {"array", "list", "dict"}:
+                self._validate_value_matches_dimensions(code, value, dimensions, set_lengths, error_prefix, dimension_labels)
             if expected_type in {"number", "integer"}:
                 numeric = float(value)
                 if validation.get("min") is not None and numeric < float(validation["min"]):
@@ -288,7 +286,7 @@ class RuntimeParameterValidator:
                 if validation.get("greater_than") and numeric <= float(params.get(str(validation["greater_than"]), 0)):
                     raise RuntimeError(f"组件化模型参数错误：{code} 必须大于 {validation['greater_than']}。")
 
-    def _semantic_set_lengths(self, semantic_spec: dict[str, Any]) -> dict[str, int]:
+    def _semantic_set_lengths(self, semantic_spec: dict[str, Any], params: dict[str, Any]) -> dict[str, int]:
         lengths: dict[str, int] = {}
         for item in list(semantic_spec.get("sets") or []) + list((semantic_spec.get("component_spec") or {}).get("sets") or []):
             code = str(item.get("code") or item.get("key") or "")
@@ -297,9 +295,32 @@ class RuntimeParameterValidator:
                 lengths[code] = len(members)
             elif code and item.get("horizon") is not None:
                 lengths[code] = int(item["horizon"]) + (1 if item.get("type") == "state_time" else 0)
+        for key, value in params.items():
+            if isinstance(value, list):
+                lengths[str(key)] = len(value)
+        time_dimension = (semantic_spec.get("ui_metadata") or {}).get("time_dimension") or ((semantic_spec.get("component_spec") or {}).get("ui_metadata") or {}).get("time_dimension") or {}
+        time_set = str(time_dimension.get("time_set") or "time")
+        state_time_set = resolve_state_time_set(time_dimension, available_sets=set(lengths))
+        horizon = self._coerce_int(params.get("horizon"))
+        if isinstance(params.get(time_set), list):
+            lengths[time_set] = len(params[time_set])
+        if state_time_set and isinstance(params.get(state_time_set), list):
+            lengths[state_time_set] = len(params[state_time_set])
+        if horizon is not None:
+            lengths[time_set] = horizon
+            if state_time_set:
+                lengths[state_time_set] = horizon + 1
         return lengths
 
-    def _validate_value_matches_dimensions(self, code: str, value: Any, dimensions: list[str], set_lengths: dict[str, int]) -> None:
+    def _validate_value_matches_dimensions(
+        self,
+        code: str,
+        value: Any,
+        dimensions: list[str],
+        set_lengths: dict[str, int],
+        error_prefix: str,
+        dimension_labels: dict[str, Any],
+    ) -> None:
         if not dimensions:
             if isinstance(value, (list, dict)):
                 raise RuntimeError(f"参数 {code} 维度错误：该参数为标量，但实际提供了数组。")
@@ -312,16 +333,19 @@ class RuntimeParameterValidator:
             if isinstance(value, dict) and len(value) != expected:
                 raise RuntimeError(f"参数 {code} 维度不匹配：当前 {dimensions[0]} 集合长度为 {expected}，但实际提供 {len(value)} 个值。")
             return
-        if len(dimensions) == 2 and all(item is not None for item in expected_lengths):
-            first, second = int(expected_lengths[0]), int(expected_lengths[1])
-            if isinstance(value, list) and len(value) != first:
-                raise RuntimeError(f"参数 {code} 维度不匹配：第一维应为 {first}。")
-            if isinstance(value, dict) and len(value) != first:
-                raise RuntimeError(f"参数 {code} 维度不匹配：第一维应为 {first}。")
-            rows = value if isinstance(value, list) else list(value.values()) if isinstance(value, dict) else []
-            for row in rows:
+        if len(dimensions) == 2:
+            first_expected, second_expected = expected_lengths
+            if first_expected is not None and isinstance(value, (list, dict)) and len(value) != int(first_expected):
+                raise RuntimeError(f"参数 {code} 维度不匹配：第一维应为 {int(first_expected)}。")
+            rows = list(enumerate(value)) if isinstance(value, list) else list(value.items()) if isinstance(value, dict) else []
+            if second_expected is None:
+                return
+            second = int(second_expected)
+            first_dimension = str(dimensions[0])
+            first_label = str(dimension_labels.get(first_dimension) or first_dimension)
+            for row_key, row in rows:
                 if isinstance(row, (list, dict)) and len(row) != second:
-                    raise RuntimeError(f"参数 {code} 维度不匹配：第二维 {dimensions[1]} 应为 {second}。")
+                    raise RuntimeError(f"{error_prefix}：{first_label} {row_key} 的 {code} 长度为 {len(row)}，但 horizon 为 {second}。")
 
     def _validate_by_template(self, semantic_spec: dict[str, Any], params: dict[str, Any]) -> list[dict[str, Any]]:
         errors: list[dict[str, Any]] = []
@@ -331,6 +355,12 @@ class RuntimeParameterValidator:
             key = item.get("key") or item.get("code")
             if key:
                 set_values[str(key)] = list(params.get(str(key), item.get("values", [])))
+        for key, value in params.items():
+            if isinstance(value, list):
+                set_values[str(key)] = list(value)
+        set_lengths = self._semantic_set_lengths(semantic_spec, params)
+        set_lengths.setdefault("time", horizon)
+        set_lengths.setdefault("time_volume", horizon + 1)
         for param in semantic_spec.get("parameters", []):
             code = str(param.get("code") or param.get("math_param") or param.get("key") or "")
             if not code:
@@ -343,13 +373,22 @@ class RuntimeParameterValidator:
             if code not in params:
                 continue
             value = params[code]
-            dimensions = list(param.get("dimension", []))
+            dimensions = extract_dimensions(param)
             expected_type = validation.get("type")
             if expected_type == "array":
                 if not isinstance(value, list):
                     errors.append({"field": code, "error": "type mismatch", "expected": "array", "actual": type(value).__name__})
-                elif len(value) != horizon:
-                    errors.append({"field": code, "error": "length mismatch", "expected": horizon, "actual": len(value)})
+                elif dimensions and set_lengths.get(str(dimensions[-1])) is not None and len(value) != int(set_lengths[str(dimensions[-1])]):
+                    expected = int(set_lengths[str(dimensions[-1])])
+                    errors.append(
+                        {
+                            "field": code,
+                            "error": "length mismatch",
+                            "expected": expected,
+                            "actual": len(value),
+                            "message": f"当前调度时段 horizon={horizon}，但参数 {code} 实际提供 {len(value)} 个点，需要 {expected} 个点。",
+                        }
+                    )
                 continue
             if expected_type == "dict":
                 if not isinstance(value, dict):
@@ -357,10 +396,19 @@ class RuntimeParameterValidator:
                     continue
                 self._check_dimension_keys(errors, code, value, dimensions, set_values, horizon)
                 continue
-            if dimensions == ["time"]:
+            if dimensions and dimensions[-1] in set_lengths:
+                expected = int(set_lengths[str(dimensions[-1])])
                 if isinstance(value, list):
-                    if len(value) != horizon:
-                        errors.append({"field": code, "error": "length mismatch", "expected": horizon, "actual": len(value)})
+                    if len(value) != expected:
+                        errors.append(
+                            {
+                                "field": code,
+                                "error": "length mismatch",
+                                "expected": expected,
+                                "actual": len(value),
+                                "message": f"当前调度时段 horizon={horizon}，但参数 {code} 实际提供 {len(value)} 个点，需要 {expected} 个点。",
+                            }
+                        )
                 elif isinstance(value, dict):
                     self._check_dimension_keys(errors, code, value, dimensions, set_values, horizon)
                 else:
@@ -394,9 +442,18 @@ class RuntimeParameterValidator:
             second_values = set_values.get(second, [])
             for first_item in first_values:
                 nested = value.get(first_item, value.get(str(first_item)))
-                if second == "time" and isinstance(nested, list):
-                    if len(nested) != horizon:
-                        errors.append({"field": f"{code}[{first_item}]", "error": "length mismatch", "expected": horizon, "actual": len(nested)})
+                if second in {"time", "time_volume"} and isinstance(nested, list):
+                    expected = horizon + 1 if second == "time_volume" else horizon
+                    if len(nested) != expected:
+                        errors.append(
+                            {
+                                "field": f"{code}[{first_item}]",
+                                "error": "length mismatch",
+                                "expected": expected,
+                                "actual": len(nested),
+                                "message": f"当前调度时段 horizon={horizon}，但参数 {code}[{first_item}] 实际提供 {len(nested)} 个点，需要 {expected} 个点。",
+                            }
+                        )
                 elif isinstance(nested, dict):
                     missing = [item for item in second_values if item not in nested and str(item) not in nested]
                     if missing:
@@ -472,3 +529,11 @@ class RuntimeParameterValidator:
 
     def _lookup_number(self, value: dict[str, Any], key: str, default: float) -> float:
         return float(value.get(key, value.get(str(key), default)))
+
+    def _coerce_int(self, value: Any) -> int | None:
+        try:
+            if value is None or value == "":
+                return None
+            return int(value)
+        except (TypeError, ValueError):
+            return None

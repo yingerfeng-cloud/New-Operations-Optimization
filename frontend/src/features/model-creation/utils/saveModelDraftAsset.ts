@@ -64,21 +64,39 @@ export function buildComponentSpecFromDraft(normalizedDraft: ModelDraft) {
     variables: mergeByCode(normalizedDraft.semantic.variables || current.variables, componentItems(normalizedDraft, 'variables'), 'name'),
     components: enabledComponents,
     objective: { ...(current.objective as Record<string, unknown> | undefined), ...objective },
+    ui_metadata: {
+      ...((current.ui_metadata && typeof current.ui_metadata === 'object' ? current.ui_metadata : {}) as Record<string, unknown>),
+      time_dimension: normalizedDraft.time_dimension,
+    },
   };
 }
 
 export function buildModelDraftPayload(draft: ModelDraft) {
   const normalized = normalizeModelDraft(draft);
   const componentSpec = buildComponentSpecFromDraft(normalized);
+  const existingUiMetadata = normalized.advanced.ui_metadata || {};
+  const semanticSpec = {
+    ...normalized.semantic,
+    ui_metadata: { ...(normalized.semantic.ui_metadata || {}), time_dimension: normalized.time_dimension },
+  };
+  const currentGenericSpec = normalized.advanced.generic_spec || {};
+  const genericSpec = Object.keys(currentGenericSpec).length ? {
+    ...currentGenericSpec,
+    ui_metadata: {
+      ...((currentGenericSpec.ui_metadata && typeof currentGenericSpec.ui_metadata === 'object' ? currentGenericSpec.ui_metadata : {}) as Record<string, unknown>),
+      time_dimension: normalized.time_dimension,
+    },
+  } : {};
   return {
     name: normalized.basic_info.name,
     scene: normalized.basic_info.scenario,
     template_id: normalized.basic_info.model_code,
     build_mode: normalized.basic_info.builder_mode,
     solver: normalized.basic_info.solver,
+    ui_metadata: { ...existingUiMetadata, time_dimension: normalized.time_dimension },
     model_draft: normalized as unknown as Record<string, unknown>,
-    semantic_spec: normalized.semantic,
-    generic_spec: normalized.advanced.generic_spec || {},
+    semantic_spec: semanticSpec,
+    generic_spec: genericSpec,
     component_spec: componentSpec,
     parameters: normalized.runtime_parameters,
     model_problem_type: inferModelProblemType(normalized),

@@ -11,10 +11,36 @@ import {
   getScenarioById,
   getScenarioModelById,
 } from '../data/scenarioCatalog';
+import { migrateModelDraft } from '../utils/timeDimensionDraft';
+
+export type TimeDimensionPolicy = 'not_applicable' | 'fixed' | 'runtime_variable' | 'data_derived';
+
+export interface TimeDimensionConfig {
+  schema_version: 1;
+  enabled: boolean;
+  policy: TimeDimensionPolicy;
+  default_horizon?: number;
+  time_set?: string;
+  state_time_set?: string | null;
+  editable?: boolean;
+  min_horizon?: number;
+  max_horizon?: number;
+  horizon_step?: number;
+  allowed_horizons?: number[];
+  interval_minutes?: number;
+  delta_t?: number;
+  interval_minutes_by_horizon?: Record<string, number>;
+  delta_t_by_horizon?: Record<string, number>;
+  derive_from?: string | null;
+  label_set?: string | null;
+  label_generation?: 'none' | 'auto';
+  label_format?: 'HH:mm' | 'sequence';
+}
 
 export interface ModelDraft {
   basic_info: { name: string; model_code: string; scenario: string; builder_mode: BuildMode; solver: string; template_code?: string; modeling_skeleton?: string };
   semantic: {
+    ui_metadata?: Record<string, unknown>;
     sets: Array<{
       code: string;
       name?: string;
@@ -25,6 +51,10 @@ export interface ModelDraft {
       defaultSize?: number;
       values?: unknown[];
       horizon?: number;
+      type?: string;
+      base_set?: string;
+      generation_rule?: string;
+      managed_by?: string;
     }>;
     parameters: Array<{
       code: string;
@@ -32,6 +62,8 @@ export interface ModelDraft {
       unit?: string;
       indices?: string[];
       dimension?: string[];
+      dimensions?: string[];
+      index_sets?: string[];
       sourceType?: 'runtime' | 'static' | 'ledger' | 'system';
       source_type?: 'runtime' | 'static' | 'ledger' | 'system';
       defaultValue?: unknown;
@@ -46,6 +78,8 @@ export interface ModelDraft {
       variableType?: 'continuous' | 'binary' | 'integer';
       indices?: string[];
       dimension?: string[];
+      dimensions?: string[];
+      index_sets?: string[];
       lowerBound?: string | number;
       upperBound?: string | number;
       unit?: string;
@@ -56,9 +90,10 @@ export interface ModelDraft {
   components: Array<Record<string, unknown>>;
   objective?: Record<string, unknown>;
   formulas: FormulaDef[];
+  time_dimension: TimeDimensionConfig;
   runtime_parameters: Record<string, unknown>;
   parameter_groups: Record<string, Record<string, unknown>>;
-  advanced: { generic_spec?: Record<string, unknown>; component_spec?: Record<string, unknown> };
+  advanced: { generic_spec?: Record<string, unknown>; component_spec?: Record<string, unknown>; ui_metadata?: Record<string, unknown> };
 }
 
 export interface ModelDraftValidationResult {
@@ -67,10 +102,7 @@ export interface ModelDraftValidationResult {
 }
 
 const createBaseSemantic = (): ModelDraft['semantic'] => ({
-  sets: [
-    { code: 'time', name: '调度时段', values: [] },
-    { code: 'time_volume', name: '状态时点', values: [] },
-  ],
+  sets: [],
   parameters: [],
   variables: [],
 });
@@ -99,7 +131,8 @@ export function createInitialDraft(): ModelDraft {
     semantic: createBaseSemantic(),
     components: [],
     formulas: [],
-    runtime_parameters: { horizon: 24 },
+    time_dimension: { schema_version: 1, enabled: false, policy: 'not_applicable', editable: false },
+    runtime_parameters: {},
     parameter_groups: createParameterGroups(),
     advanced: {},
   };
@@ -134,7 +167,8 @@ function createDraftForSelection(current: ModelDraft, scenarioId: string, modelI
     semantic: createBaseSemantic(),
     components: [],
     formulas: [],
-    runtime_parameters: { horizon: 24 },
+    time_dimension: { schema_version: 1, enabled: false, policy: 'not_applicable', editable: false },
+    runtime_parameters: {},
     parameter_groups: createParameterGroups(),
     advanced: {},
   };
@@ -210,4 +244,13 @@ export const useModelCreationStore = create<State>()(persist((set) => ({
       currentDraftModelId: undefined,
     });
   },
-}), { name: 'copt-model-creation-draft' }));
+}), {
+  name: 'copt-model-creation-draft',
+  version: 1,
+  migrate: persisted => {
+    const state = (persisted || {}) as Partial<State>;
+    const fallback = createInitialDraft();
+    const draft = migrateModelDraft(state.draft || state.modelDraft, fallback);
+    return { ...state, draft, modelDraft: draft, builderMode: draft.basic_info.builder_mode } as State;
+  },
+}));

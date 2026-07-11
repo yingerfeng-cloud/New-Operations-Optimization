@@ -19,6 +19,8 @@ DEFAULT_OBJECTIVE_WEIGHTS = {
     "energy_revenue": 1.0,
     "terminal_soc": 100.0,
     "piecewise_cost": 1.0,
+    "generation": 1.0,
+    "revenue": 1.0,
 }
 
 SUPPORTED_OBJECTIVE_WEIGHT_KEYS = set(DEFAULT_OBJECTIVE_WEIGHTS)
@@ -58,6 +60,18 @@ def build_weighted_objective(model: Any, objective_spec: dict[str, Any], context
     else:
         enabled_weight_keys = set(DEFAULT_OBJECTIVE_WEIGHTS.keys())
         weights.update(params.get("weights") or {})
+    if context.get("sets", {}).get("station") and hasattr(model, "station_power"):
+        objective_mode = str(params.get("objective_mode") or "comprehensive")
+        if objective_mode == "generation_max":
+            enabled_weight_keys = {"generation"}
+        elif objective_mode == "revenue_max":
+            enabled_weight_keys = {"revenue"}
+        elif objective_mode == "load_tracking":
+            enabled_weight_keys &= {"load_deviation", "spill", "terminal_volume", "ramp"}
+        if str(params.get("load_tracking_mode") or "soft") == "disabled":
+            enabled_weight_keys.discard("load_deviation")
+        if not bool(params.get("ramp_smoothing_enabled", True)):
+            enabled_weight_keys.discard("ramp")
     stations = context["sets"].get("station", [])
     times = context["sets"].get("time", [])
     delta_t = float(params.get("delta_t", 1.0))
@@ -72,6 +86,13 @@ def build_weighted_objective(model: Any, objective_spec: dict[str, Any], context
     if "terminal_volume" in enabled_weight_keys and hasattr(model, "terminal_dev_pos") and hasattr(model, "terminal_dev_neg"):
         expr += float(weights["terminal_volume"]) * sum(
             model.terminal_dev_pos[station] + model.terminal_dev_neg[station] for station in stations
+        )
+    if "generation" in enabled_weight_keys and hasattr(model, "station_power"):
+        expr -= float(weights["generation"]) * delta_t * sum(model.station_power[station, t] for station in stations for t in times)
+    if "revenue" in enabled_weight_keys and hasattr(model, "station_power"):
+        price = _series(params.get("electricity_price", params.get("price")), times, 0.0)
+        expr -= float(weights["revenue"]) * delta_t * sum(
+            float(price[t]) * model.station_power[station, t] for station in stations for t in times
         )
     if "investment" in enabled_weight_keys:
         capex_power = float(params.get("capex_power", 0.0))
