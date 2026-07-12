@@ -3,6 +3,8 @@
 import ast
 from typing import Any
 
+from app.model_components.validators import lookup_initial_upstream_outflow
+
 
 def _metric_series(raw: Any, times: list[Any], default: float = 0.0) -> dict[Any, float]:
     if isinstance(raw, dict):
@@ -564,6 +566,8 @@ class SolveResultFormatter:
                     "load_deviation_MW": round(signed_deviation, 6),
                     "load_dev_pos_MW": round(dev_pos, 6),
                     "load_dev_neg_MW": round(dev_neg, 6),
+                    "load_dev_pos_description": "超出负荷目标的正偏差（超发）",
+                    "load_dev_neg_description": "低于负荷目标的负偏差（缺额）",
                     "deviation_rate": round((dev_pos + dev_neg) / load, 8) if load else 0.0,
                     "hard_constraint_satisfied": abs(total_power - load) <= 1e-5 if params.get("load_tracking_mode") == "hard" else None,
                 }
@@ -1020,7 +1024,10 @@ class SolveResultFormatter:
             delay = int(edge.get("delay_periods", 0) or 0)
             shifted = time_index - delay
             if shifted < 0:
-                local += float((params.get("initial_upstream_outflow") or {}).get(f"{edge.get('upstream')}->{station}", 0.0))
+                found, history = lookup_initial_upstream_outflow(
+                    params.get("initial_upstream_outflow") or {}, f"{edge.get('upstream')}->{station}", shifted
+                )
+                local += float(history) if found else 0.0
             else:
                 local += self._value(values, "q_out", edge.get("upstream"), times[shifted])
         return local
@@ -1034,7 +1041,7 @@ class SolveResultFormatter:
             shifted = time_index - delay
             rows.append({
                 "upstream": edge.get("upstream"), "downstream": station, "delay_periods": delay,
-                "source_time": times[shifted] if shifted >= 0 else "initial_upstream_outflow",
+                "source_time": times[shifted] if shifted >= 0 else f"initial_upstream_outflow[{shifted}]",
             })
         return rows
 
@@ -1081,7 +1088,8 @@ class SolveResultFormatter:
                         "type": "piecewise_2d", "station": station, "time_index": time_label,
                         "function_asset_id": mapping.get("function_asset_id"), "selected_triangle": selected,
                         "triangle_vertex_indices": triangle, "vertices": vertices, "lambda_weights": lambdas,
-                        "flow_m3s": flow, "head_m": head, "power_MW": power, "near_domain_boundary": near_boundary,
+                        "q_gen_m3s": flow, "flow_m3s": flow, "flow_description": "发电流量 q_gen",
+                        "head_m": head, "power_MW": power, "near_domain_boundary": near_boundary,
                     })
         return rows
 

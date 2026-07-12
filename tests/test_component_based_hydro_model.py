@@ -66,8 +66,43 @@ def test_hydro_missing_initial_upstream_outflow_validation_error() -> None:
     template = get_template("cascade_hydro_dispatch")
     params = deepcopy(template["sample_runtime_parameters"])
     del params["initial_upstream_outflow"]["S1->S2"]
-    with pytest.raises(RuntimeError, match="initial_upstream_outflow 缺少 S1->S2"):
+    with pytest.raises(RuntimeError, match="S1->S2.*delay_periods=1.*历史时段 -1"):
         PyomoModelBuilder().build(template, {**params, "semantic_spec": template})
+
+
+def test_zero_lag_does_not_require_initial_upstream_outflow() -> None:
+    template = get_template("cascade_hydro_dispatch")
+    params = deepcopy(template["sample_runtime_parameters"])
+    params["edges"] = [{**edge, "delay_periods": 0} for edge in params["edges"]]
+    params["initial_upstream_outflow"] = {}
+    model, _ = PyomoModelBuilder().build(template, {**params, "semantic_spec": template})
+    result = HiGHSAdapter().solve(model, time_limit_seconds=30)
+    assert result.status == "optimal"
+    upstream = params["edges"][0]["upstream"]
+    downstream = params["edges"][0]["downstream"]
+    assert pyo.value(model.hydro_inflow[downstream, 0]) == pytest.approx(
+        params["local_inflow"][downstream][0]
+        + result.variable_values["q_out"][f"q_out[{upstream},0]"]
+    )
+
+
+def test_positive_lag_requires_missing_history() -> None:
+    template = get_template("cascade_hydro_dispatch")
+    params = deepcopy(template["sample_runtime_parameters"])
+    params["edges"] = [{"upstream": "S1", "downstream": "S2", "delay_periods": 2}]
+    params["initial_upstream_outflow"] = {"S1->S2": {"-1": 301.0}}
+    with pytest.raises(RuntimeError, match="S1->S2.*delay_periods=2.*历史时段 -2"):
+        PyomoModelBuilder().build(template, {**params, "semantic_spec": template})
+
+
+def test_positive_lag_uses_initial_upstream_outflow() -> None:
+    template = get_template("cascade_hydro_dispatch")
+    params = deepcopy(template["sample_runtime_parameters"])
+    params["edges"] = [{"upstream": "S1", "downstream": "S2", "delay_periods": 2}]
+    params["initial_upstream_outflow"] = {"S1->S2": {"-2": 302.0, "-1": 301.0}}
+    model, _ = PyomoModelBuilder().build(template, {**params, "semantic_spec": template})
+    assert pyo.value(model.hydro_inflow["S2", 0]) == pytest.approx(params["local_inflow"]["S2"][0] + 302.0)
+    assert pyo.value(model.hydro_inflow["S2", 1]) == pytest.approx(params["local_inflow"]["S2"][1] + 301.0)
 
 
 def test_hydro_components_registered() -> None:

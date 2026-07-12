@@ -1,0 +1,30 @@
+:root {
+  --proto-bg: #f4f6f9;
+  --proto-panel: #ffffff;
+  --proto-text: #172033;
+  --proto-muted: #667085;
+  --proto-line: #dce4ef;
+  --proto-nav: #10243a;
+  --proto-nav-2: #173756;
+  --proto-blue: #2166c2;
+  --proto-green: #12805c;
+  --proto-amber: #c98314;
+  --proto-red: #c24132;
+  --proto-purple: #6d4db3;
+  --proto-soft-blue: #eaf2ff;
+  --proto-soft-green: #e8f7f1;
+  --proto-soft-amber: #fff5dd;
+  --proto-soft-red: #fff0ee;
+  --proto-shadow: 0 12px 28px rgba(20, 34, 52, .08);
+  --font-size-body: 14px;
+  --line-height-body: 1.6;
+  --page-gap: 24px;
+  --card-gap: 16px;
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --header-height: 64px;
+  --sidebar-width: 232px;
+  --sidebar-collapsed-width: 68px;
+  --drawer-max-width: 960px;
+  --breakpoint-mobile: 1024px;
+}

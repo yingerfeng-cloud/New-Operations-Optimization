@@ -215,6 +215,45 @@ def test_hydro_result_explanation_contains_load_pwl_and_balances() -> None:
     assert max(abs(row["balance_error_million_m3"]) for row in output["water_balance_check"]) <= 1e-6
 
 
+def test_hydro_load_deviation_direction_and_explanation() -> None:
+    excess = _base_params()
+    excess.update(load_tracking_mode="soft", objective_mode="load_tracking", load_forecast=[10] * 4)
+    excess["gen_flow_min"] = {station: 100 for station in excess["station"]}
+    _, excess_context, excess_result = _solve(excess)
+    excess_output = SolveResultFormatter().format("cascade_hydro_dispatch", excess_result, excess_context)["business_output"]
+    assert all(row["load_dev_pos_MW"] > 0 and row["load_dev_neg_MW"] == pytest.approx(0) for row in excess_output["load_tracking"])
+    assert all("超发" in row["load_dev_pos_description"] for row in excess_output["load_tracking"])
+
+    shortage = _base_params()
+    shortage.update(load_tracking_mode="soft", objective_mode="load_tracking", load_forecast=[10_000] * 4)
+    _, shortage_context, shortage_result = _solve(shortage)
+    shortage_output = SolveResultFormatter().format("cascade_hydro_dispatch", shortage_result, shortage_context)["business_output"]
+    assert all(row["load_dev_neg_MW"] > 0 and row["load_dev_pos_MW"] == pytest.approx(0) for row in shortage_output["load_tracking"])
+    assert all("缺额" in row["load_dev_neg_description"] for row in shortage_output["load_tracking"])
+
+
+def test_hydro_2d_asset_uses_q_gen_and_rejects_q_out_binding() -> None:
+    asset = next(item for item in function_asset_service.list_assets() if item.function_id == "cascade_hydro_power_surface_v1")
+    assert asset.input_schema[0]["code"] == "q_gen"
+    assert asset.input_schema[0]["name"] == "发电流量"
+
+    template = deepcopy(get_template("cascade_hydro_dispatch"))
+    mapping = next(
+        item for item in template["component_spec"]["components"]
+        if item.get("type") == "function_mapping_2d_component"
+    )
+    mapping["x"] = "q_out[s,t]"
+    params = deepcopy(template["sample_runtime_parameters"])
+    params["hydro_power_mode"] = "pwl_2d"
+    params["volume_min"] = {station: 85 for station in params["station"]}
+    params["initial_volume"] = {station: max(90, params["initial_volume"][station]) for station in params["station"]}
+    params["target_terminal_volume"] = {station: max(90, params["target_terminal_volume"][station]) for station in params["station"]}
+    params["outflow_min"] = {station: 40 for station in params["station"]}
+    params["outflow_max"] = {station: 160 for station in params["station"]}
+    with pytest.raises(RuntimeError, match="应绑定 q_gen.*当前绑定为 q_out"):
+        PyomoModelBuilder().build(template, params)
+
+
 def test_hydro_function_asset_metadata_is_production_safe() -> None:
     assets = {item.function_id: item for item in function_asset_service.list_assets()}
     for function_id in ("cascade_hydro_level_storage_v1", "cascade_hydro_tailwater_outflow_v1", "cascade_hydro_power_flow_v1"):

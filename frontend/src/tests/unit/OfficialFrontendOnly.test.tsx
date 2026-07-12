@@ -41,5 +41,5 @@ test('navigation descriptions do not advertise legacy entrypoints', () => {
   const text = navEntries.map(entry => `${entry.label} ${entry.description}`).join('\n');
 
   expect(text).not.toMatch(/legacy|prototype/i);
-  expect(text).toContain('React 前端托管状态');
+  expect(text).toContain('从业务问题出发选择模型');
 });

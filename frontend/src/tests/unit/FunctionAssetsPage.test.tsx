@@ -29,7 +29,7 @@ const surface: FunctionAsset = {
   function_id: 'hydro_power_surface_001',
   name: '水电出力曲面',
   function_type: 'piecewise_2d',
-  input_schema: [{ code: 'flow', name: '流量', unit: 'm3/s' }, { code: 'head', name: '水头', unit: 'm' }],
+  input_schema: [{ code: 'q_gen', name: '发电流量', unit: 'm3/s' }, { code: 'head', name: '水头', unit: 'm' }],
   output_schema: { code: 'power', name: '出力', unit: 'MW' },
   points: [],
   points_2d: [[0, 0, 1], [10, 0, 21], [0, 10, 31], [10, 10, 51]],

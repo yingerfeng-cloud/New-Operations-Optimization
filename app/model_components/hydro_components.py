@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 from app.model_components.registry import register_component
-from app.model_components.validators import validate_hydro_runtime_parameters
+from app.model_components.validators import lookup_initial_upstream_outflow, validate_hydro_runtime_parameters
 
 
 class HydroComponentBase:
@@ -235,8 +235,8 @@ class HydroCascadeInflowDelayComponent(HydroComponentBase):
     description = "根据上游下泄、传播时滞和区间来水生成下游入库表达式。"
     formula = "inflow[down,t] = local_inflow[down,t] + sum(q_out[up,t-delay])"
     example = "S1 到 S2 时滞为 1 时段，则 S2 在 t=1 的入库包含 S1 在 t=0 的下泄。"
-    required_parameters = ["local_inflow", "edges", "initial_upstream_outflow"]
-    common_errors = ["initial_upstream_outflow 缺少 up->down", "edge 中电站编码不在 station 中"]
+    required_parameters = ["local_inflow", "edges"]
+    common_errors = ["正时滞越过调度期起点时 initial_upstream_outflow 缺少边和历史时段", "edge 中电站编码不在 station 中"]
 
     def build(self, model: Any, spec: dict[str, Any], context: dict[str, Any]) -> None:
         import pyomo.environ as pyo
@@ -257,7 +257,10 @@ class HydroCascadeInflowDelayComponent(HydroComponentBase):
                 shifted_idx = idx - delay
                 key = f"{upstream}->{edge['downstream']}"
                 if shifted_idx < 0:
-                    expr += float(_lookup(params["initial_upstream_outflow"], key))
+                    found, history = lookup_initial_upstream_outflow(params["initial_upstream_outflow"], key, shifted_idx)
+                    if not found:
+                        raise RuntimeError(f"边 {key} 的 delay_periods={delay} 缺少历史时段 {shifted_idx} 的 initial_upstream_outflow。")
+                    expr += float(history)
                 else:
                     expr += m.q_out[upstream, times[shifted_idx]]
             return expr
@@ -304,8 +307,8 @@ class HydroReservoirBalanceComponent(HydroComponentBase):
 class HydroLoadTrackingComponent(HydroComponentBase):
     display_name = "负荷跟踪组件"
     description = "用正负偏差变量表达无法完全跟踪负荷的情况。"
-    formula = "sum(station_power[s,t]) + load_dev_pos[t] - load_dev_neg[t] = load_forecast[t]"
-    example = "当可用水电出力不足时，load_dev_pos 表示未跟踪到的负荷缺口。"
+    formula = "sum(station_power[s,t]) - load_forecast[t] = load_dev_pos[t] - load_dev_neg[t]"
+    example = "实际出力高于目标时 load_dev_pos 表示超发；低于目标时 load_dev_neg 表示负荷缺额。"
     required_parameters = ["load_forecast"]
     common_errors = ["load_forecast 长度与 horizon 不一致", "未声明 load_dev_pos 或 load_dev_neg"]
 

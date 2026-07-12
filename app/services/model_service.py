@@ -968,6 +968,22 @@ class ModelService:
             if is_2d and asset.get("function_type") != "piecewise_2d":
                 errors.append({"field": field, "error": "function_mapping_2d_component requires a piecewise_2d asset", "actual": asset.get("function_type")})
                 continue
+            asset_metadata = asset.get("metadata") if isinstance(asset.get("metadata"), dict) else {}
+            recommended = asset_metadata.get("recommended_bindings") or {}
+            if is_2d and asset_metadata.get("binding_policy") == "exact_variable_code":
+                for axis in ("x", "y", "z"):
+                    expected = str(recommended.get(axis) or "")
+                    actual = self._base_variable_name(str(cfg.get(axis) or ""))
+                    if expected and actual and actual != expected:
+                        errors.append(
+                            {
+                                "field": f"component_spec.components[{index}].{axis}",
+                                "error": f"函数资产绑定变量不匹配：{axis} 应绑定 {expected}，当前为 {actual}",
+                                "expected": expected,
+                                "actual": actual,
+                                "suggestion": "二维水电出力曲面的第一输入请绑定发电流量 q_gen，不要绑定包含弃水的 q_out。",
+                            }
+                        )
             y_var = self._base_variable_name(str(cfg.get("y") or ""))
             if y_var and y_var not in variables:
                 row = {

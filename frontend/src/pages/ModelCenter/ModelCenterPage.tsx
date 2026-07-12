@@ -93,6 +93,7 @@ export function ModelCenterPage() {
   const [templateOpen, setTemplateOpen] = useState(false);
   const [template, setTemplate] = useState<string>();
   const [viewId, setViewId] = useState(id);
+  const [expertView, setExpertView] = useState(false);
   const [filters, setFilters] = useState<{ build?: string; problem?: string; status?: string; scene?: string; keyword?: string }>({});
   const models = useQuery({ queryKey: ['models'], queryFn: getModels });
   const templates = useQuery({ queryKey: ['templates'], queryFn: getTemplates });
@@ -265,7 +266,7 @@ export function ModelCenterPage() {
         size="large"
         open={!!viewId}
         onClose={() => setViewId(undefined)}
-        title={current?.name || '模型详情'}
+        title={<Space>{current?.name || '模型详情'}<Button type="link" onClick={() => setExpertView(value => !value)}>{expertView ? '业务视图' : '专家视图'}</Button></Space>}
         footer={(
           <Space style={{ width: '100%', justifyContent: 'flex-end' }}>
             <Button onClick={() => setViewId(undefined)}>关闭</Button>
@@ -279,9 +280,11 @@ export function ModelCenterPage() {
           <Tabs
             items={[
               { key: 'basic', label: '基本信息', children: <ModelBasicPanel model={current} detail={currentAssetDetail} /> },
-              { key: 'semantic', label: '模型语义', children: <ModelSemanticPanel model={current} detail={currentAssetDetail} /> },
-              { key: 'generic', label: 'generic_spec', children: <ModelGenericPanel model={current} detail={currentAssetDetail} /> },
-              { key: 'component', label: '组件装配', children: <ModelComponentPanel model={current} detail={currentAssetDetail} /> },
+              ...(expertView ? [
+                { key: 'semantic', label: '模型语义', children: <ModelSemanticPanel model={current} detail={currentAssetDetail} /> },
+                { key: 'generic', label: 'generic_spec', children: <ModelGenericPanel model={current} detail={currentAssetDetail} /> },
+                { key: 'component', label: '组件装配', children: <ModelComponentPanel model={current} detail={currentAssetDetail} /> },
+              ] : []),
               { key: 'runtime', label: '运行参数', children: <ModelRuntimePanel model={current} detail={currentAssetDetail} /> },
               { key: 'demo', label: '演示说明', children: <ModelDemoPanel model={current} /> },
               { key: 'governance', label: '发布治理', children: <ModelGovernancePanel model={current} detail={currentAssetDetail} /> },

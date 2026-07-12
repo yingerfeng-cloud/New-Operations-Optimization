@@ -216,7 +216,15 @@ export function ResultCascadeHydroPanel({ result }: { result?: SolveResult }) {
         <Col xs={24} lg={12}><Card title="出力曲线"><ReactECharts style={{ height: 300 }} option={hydroChartOption('出力曲线', powerRows, powerRows[0]?.power !== undefined ? 'power' : 'station_power_MW')} /></Card></Col>
         <Col xs={24} lg={12}><Card title="弃水曲线"><ReactECharts style={{ height: 300 }} option={hydroChartOption('弃水曲线', spillRows, spillRows[0]?.spill !== undefined ? 'spill' : 'q_spill_m3s')} /></Card></Col>
       </Row>
-      {hasLoadCompare && <Card title="负荷跟踪解释"><Table size="small" pagination={{ pageSize: 6 }} rowKey="__row_key" dataSource={loadRows} columns={['time_index', 'load_forecast_MW', 'total_hydro_power_MW', 'load_dev_pos_MW', 'load_dev_neg_MW', 'deviation_rate', 'hard_constraint_satisfied'].map(field => ({ title: field, dataIndex: field, render: text }))} /></Card>}
+      {hasLoadCompare && <Card title="负荷跟踪解释"><Table size="small" pagination={{ pageSize: 6 }} rowKey="__row_key" dataSource={loadRows} columns={[
+        { title: '时段', dataIndex: 'time_index' },
+        { title: '负荷目标 (MW)', dataIndex: 'load_forecast_MW' },
+        { title: '实际总出力 (MW)', dataIndex: 'total_hydro_power_MW' },
+        { title: '正偏差：超发 (MW)', dataIndex: 'load_dev_pos_MW' },
+        { title: '负偏差：缺额 (MW)', dataIndex: 'load_dev_neg_MW' },
+        { title: '偏差率', dataIndex: 'deviation_rate' },
+        { title: '满足硬约束', dataIndex: 'hard_constraint_satisfied' },
+      ].map(column => ({ ...column, render: text }))} /></Card>}
       {!hasLoadCompare && <Alert showIcon type="info" title="负荷预测 vs 总出力曲线" description="当前结果未返回 load_forecast 或总出力对比数据，因此不编造曲线。" />}
       <Card title="水量平衡校验表">
         <Table
@@ -251,6 +259,7 @@ export function ResultCascadeHydroPanel({ result }: { result?: SolveResult }) {
             { title: '类型', dataIndex: 'type', render: text },
             { title: '函数资产', render: (_, row) => text(row.function_asset_id || objectValue(row.power_surface).function_asset_id || objectValue(row.level_storage).function_asset_id || objectValue(row.tailwater_outflow).function_asset_id) },
             { title: '一维区间', render: (_, row) => text(row.segment_index !== undefined ? { segment: row.segment_index, left: row.left_breakpoint, right: row.right_breakpoint, weights: row.weights } : row.level_storage || row.tailwater_outflow || '-') },
+            { title: '发电流量 q_gen', render: (_, row) => text(row.q_gen_m3s ?? row.flow_m3s ?? objectValue(row.power_surface).q_gen_m3s ?? '-') },
             { title: '二维三角片', render: (_, row) => text(row.selected_triangle !== undefined ? { triangle: row.selected_triangle, vertices: row.vertices, weights: row.lambda_weights } : row.power_surface || '-') },
           ]}
         />

@@ -41,7 +41,7 @@ const cascadeTemplate: ModelTemplate = {
       { component_id: 'water_balance_component', name: '水量平衡组件', generated_constraints: [{ constraint_id: 'water_balance', name: '水量平衡约束' }] },
       { component_id: 'function_mapping_component', type: 'function_mapping_component', name: '水位库容函数映射', function_asset_id: 'cascade_hydro_level_storage_v1', x: 'storage[r,t]', y: 'level[r,t]', solve_strategy: 'segment_binary' },
       { component_id: 'function_mapping_component', type: 'function_mapping_component', name: '尾水位流量函数映射', function_asset_id: 'cascade_hydro_tailwater_outflow_v1', x: 'outflow[r,t]', y: 'tailwater[r,t]', solve_strategy: 'segment_binary' },
-      { component_id: 'function_mapping_2d_component', type: 'function_mapping_2d_component', name: '二维出力曲面函数映射', function_asset_id: 'cascade_hydro_power_surface_v1', x: 'outflow[r,t]', y: 'head[r,t]', z: 'power[r,t]', solve_strategy: 'triangulated_milp_exact', metadata: { triangle_count: 18 } },
+      { component_id: 'function_mapping_2d_component', type: 'function_mapping_2d_component', name: '二维出力曲面函数映射', function_asset_id: 'cascade_hydro_power_surface_v1', x: 'q_gen[r,t]', y: 'head[r,t]', z: 'power[r,t]', solve_strategy: 'triangulated_milp_exact', metadata: { triangle_count: 18 } },
       { component_id: 'terminal_storage_constraint', name: '期末库容约束', generated_constraints: [{ constraint_id: 'terminal_storage', name: '期末库容约束' }] },
     ],
     formulas: [],
@@ -108,6 +108,7 @@ test('模型创建可加载梯级水电模板', () => {
   expect(draft.basic_info.name).toBe('梯级水电调度 v1');
   expect(draft.components.some(component => component.name === '水量平衡组件')).toBe(true);
   expect(draft.components.some(component => component.name === '二维出力曲面函数映射')).toBe(true);
+  expect(draft.components.find(component => component.name === '二维出力曲面函数映射')?.x).toBe('q_gen[r,t]');
 });
 
 test('Step3 展示梯级水电核心组件', () => {
@@ -188,5 +189,6 @@ test('结果中心展示水电结果解释视图', () => {
   expect(screen.getByText('弃水曲线')).toBeInTheDocument();
   expect(screen.getByText('水量平衡校验表')).toBeInTheDocument();
   expect(screen.getByText('函数资产插值解释')).toBeInTheDocument();
+  expect(screen.getByText('发电流量 q_gen')).toBeInTheDocument();
   expect(screen.getAllByText(/cascade_hydro_power_surface_v1/).length).toBeGreaterThan(0);
 });

@@ -31,6 +31,11 @@ class HiGHSAdapter:
         solve_time = time.monotonic() - started
         termination = str(result.solver.termination_condition)
         termination_lower = termination.lower()
+        lower_bound = getattr(result.problem, "lower_bound", None)
+        upper_bound = getattr(result.problem, "upper_bound", None)
+        actual_mip_gap = None
+        if isinstance(lower_bound, (int, float)) and isinstance(upper_bound, (int, float)):
+            actual_mip_gap = abs(float(upper_bound) - float(lower_bound)) / max(1.0, abs(float(upper_bound)))
         status = "optimal" if "optimal" in termination_lower else "infeasible" if "infeasible" in termination_lower else "failed"
         if status != "infeasible":
             try:
@@ -46,6 +51,7 @@ class HiGHSAdapter:
             status=status,
             objective_value=objective_value,
             solve_time=round(solve_time, 4),
+            mip_gap=None if actual_mip_gap is None else round(actual_mip_gap, 8),
             variable_values=self._extract_variables(model),
             solver_log=f"HiGHS termination_condition={termination}",
             raw_termination_condition=termination,

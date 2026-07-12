@@ -759,7 +759,7 @@ export function FunctionAssetsPage() {
             {selected.function_type === 'piecewise_2d' ? (
               <Card size="small" title="二维曲面诊断" className="function-surface-diagnostics">
                 <Descriptions size="small" column={3} items={[
-                  { key: 'x_dim', label: 'x 维度', children: `${schemaName(selected, 'input', 0)} / outflow` },
+                  { key: 'x_dim', label: 'x 维度', children: `${schemaName(selected, 'input', 0)} / q_gen` },
                   { key: 'y_dim', label: 'y 维度', children: `${schemaName(selected, 'input', 1)} / head` },
                   { key: 'z_dim', label: 'z 输出', children: `${schemaName(selected, 'output')} / power` },
                   { key: 'points', label: '点数量', children: String(selected.domain?.point_count ?? selected.points_2d?.length ?? '-') },

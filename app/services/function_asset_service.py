@@ -64,10 +64,10 @@ CASCADE_HYDRO_SAMPLE_FUNCTION_ASSETS: list[dict[str, Any]] = [
     {
         "function_id": "cascade_hydro_power_surface_v1",
         "name": "梯级水电样例出力曲面 v1",
-        "description": "Sample 2D PWL asset for cascade_hydro_dispatch_v1: power = f(outflow, head).",
+        "description": "梯级水电工程示例二维 PWL 资产：power = f(q_gen, head)，其中 q_gen 为经过机组的发电流量。",
         "function_type": "piecewise_2d",
         "input_schema": [
-            {"code": "outflow", "name": "出库流量", "unit": "m3/s", "type": "number"},
+            {"code": "q_gen", "name": "发电流量", "unit": "m3/s", "type": "number"},
             {"code": "head", "name": "水头", "unit": "m", "type": "number"},
         ],
         "output_schema": {"code": "power", "name": "出力", "unit": "MW", "type": "number"},
@@ -86,7 +86,14 @@ CASCADE_HYDRO_SAMPLE_FUNCTION_ASSETS: list[dict[str, Any]] = [
         "out_of_domain_policy": "reject",
         "allow_extrapolation": False,
         "status": "published",
-        "metadata": {"sample_asset": True, "model_code": "cascade_hydro_dispatch", "asset_version": "2026-07-11-grid-4x4", "data_class": "illustrative_not_station_curve"},
+        "metadata": {
+            "sample_asset": True,
+            "model_code": "cascade_hydro_dispatch",
+            "asset_version": "2026-07-11-grid-4x4-qgen",
+            "data_class": "illustrative_not_station_curve",
+            "binding_policy": "exact_variable_code",
+            "recommended_bindings": {"x": "q_gen", "y": "head", "z": "station_power"},
+        },
     },
 ]
 

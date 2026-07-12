@@ -46,7 +46,7 @@ export function ScenarioLibraryPage() {
   const [statusFilter, setStatusFilter] = useState('全部');
   const models = useQuery({ queryKey: ['models'], queryFn: getModels });
   const config = useQuery({ queryKey: ['system-config'], queryFn: getSystemConfig, retry: false });
-  const scenarios = useMemo(() => scenariosFromDictionary(config.data?.dictionaries.business_scenarios), [config.data]);
+  const scenarios = useMemo(() => scenariosFromDictionary(config.data?.dictionaries?.business_scenarios), [config.data]);
   const visible = scenarios.filter(item => {
     const sceneMatched = filter === '全部' || item.name === filter;
     const statusMatched = statusFilter === '全部' || statusLabel(item.status) === statusFilter;

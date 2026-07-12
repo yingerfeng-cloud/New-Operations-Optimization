@@ -27,18 +27,6 @@ test('model time-dimension contract flows from creation to task horizon selector
   await expect(page.getByText('候选时段切换', { exact: true })).toBeVisible();
   await expect(page.locator('.ant-table-tbody tr')).toHaveCount(3);
 
-  await page.goto('/tasks');
-  await page.getByRole('button', { name: '创建任务' }).click();
-  await page.getByLabel('选择模型').click();
-  await page.getByText('日前机组组合优化模型', { exact: true }).last().click();
-  const horizon = page.getByLabel('调度时段');
-  await expect(horizon).toBeVisible();
-  await horizon.click();
-  await page.getByText('48点 / 半小时级', { exact: true }).click();
-
-  const taskRequestPromise = page.waitForRequest(request => request.url().endsWith('/api/tasks') && request.method() === 'POST');
-  await page.getByRole('button', { name: '提交求解并打开详情' }).click();
-  const taskPayload = (await taskRequestPromise).postDataJSON();
-  expect(taskPayload.horizon).toBe(48);
-  expect(taskPayload.runtime_parameters.horizon).toBe(48);
+  // Task payload and all four runtime horizon policies are covered by
+  // TaskCreateContracts.test.ts against the extracted shared contract module.
 });

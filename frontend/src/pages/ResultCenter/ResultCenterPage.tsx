@@ -1,5 +1,5 @@
 import { Button, Card, Drawer, Space, Tabs } from 'antd';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { getResult, getResults } from '../../api/results';
 import { DataTable } from '../../components/DataTable';
@@ -21,6 +21,7 @@ import type { SolveResult } from '../../types/result';
 
 export function ResultCenterPage() {
   const [id, setId] = useState<string>();
+  useEffect(() => { const task = new URLSearchParams(window.location.search).get('task'); if (task) setId(task); }, []);
   const list = useQuery({ queryKey: ['results'], queryFn: getResults });
   const detail = useQuery({ queryKey: ['result', id], queryFn: () => getResult(id!), enabled: !!id });
   const rows = list.data || [];

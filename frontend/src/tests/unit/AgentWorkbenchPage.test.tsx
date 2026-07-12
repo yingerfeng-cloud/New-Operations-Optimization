@@ -83,32 +83,59 @@ function renderPage() {
 test('loads agent status, skills and sends analyze request', async () => {
   renderPage();
   expect(screen.getByText('Agent 工作台')).toBeInTheDocument();
-  expect(await screen.findByText('大模型服务已配置')).toBeInTheDocument();
-  expect(screen.getAllByText('调度 Agent').length).toBeGreaterThan(0);
+  expect(await screen.findByText('服务可用')).toBeInTheDocument();
+  expect(screen.getByText('默认自动识别 Skill')).toBeInTheDocument();
 
-  fireEvent.change(screen.getByPlaceholderText('描述优化任务，例如：基于光储模板创建日前调度模型，并补齐运行参数'), { target: { value: '请创建日前调度模型' } });
-  fireEvent.click(screen.getByRole('button', { name: '发送分析' }));
+  fireEvent.change(screen.getByPlaceholderText('描述优化目标、时间范围和可用数据'), { target: { value: '请创建日前调度模型' } });
+  fireEvent.click(screen.getByRole('button', { name: '发送需求' }));
 
   await waitFor(() => expect(testState.analyzeAgentMessage).toHaveBeenCalledTimes(1));
   const analyzeCalls = testState.analyzeAgentMessage.mock.calls as unknown as Array<[Record<string, unknown>]>;
   expect(analyzeCalls[0][0]).toMatchObject({ message: '请创建日前调度模型' });
-  expect(await screen.findByText('参数已抽取，等待确认调用')).toBeInTheDocument();
-  expect(screen.getByText('build_and_run_model')).toBeInTheDocument();
+  expect((await screen.findAllByText('参数已抽取，等待确认调用')).length).toBeGreaterThan(0);
+  expect(screen.getAllByText('build_and_run_model').length).toBeGreaterThan(0);
   expect(screen.getAllByText('缺失必填参数').length).toBeGreaterThan(0);
   expect(screen.getAllByText('price').length).toBeGreaterThan(0);
 });
 
 test('confirms defaults and invokes agent conversation', async () => {
   renderPage();
-  fireEvent.change(screen.getByPlaceholderText('描述优化任务，例如：基于光储模板创建日前调度模型，并补齐运行参数'), { target: { value: '补齐参数并调用' } });
-  fireEvent.click(screen.getByRole('button', { name: '发送分析' }));
+  fireEvent.change(screen.getByPlaceholderText('描述优化目标、时间范围和可用数据'), { target: { value: '补齐参数并调用' } });
+  fireEvent.click(screen.getByRole('button', { name: '发送需求' }));
   expect((await screen.findAllByText('参数已抽取，等待确认调用')).length).toBeGreaterThan(0);
 
   fireEvent.click(screen.getByRole('button', { name: '确认默认值' }));
   await waitFor(() => expect(testState.confirmAgentDefaults).toHaveBeenCalledWith({ conversation_id: 'CONV-2', agent_skill_name: undefined }));
 
-  fireEvent.click(screen.getByRole('button', { name: '确认调用' }));
+  fireEvent.click(screen.getByRole('button', { name: '提交优化任务' }));
   await waitFor(() => expect(testState.confirmAgentInvoke).toHaveBeenCalledWith({ conversation_id: 'CONV-2' }));
   expect(await screen.findByText('模型调用完成')).toBeInTheDocument();
   expect(screen.getByText('INV-1')).toBeInTheDocument();
+});
+
+test('clears expert Skill before returning to business mode', async () => {
+  renderPage();
+  fireEvent.click(screen.getByRole('button', { name: '专家视图' }));
+  fireEvent.mouseDown(screen.getByLabelText('指定 Skill'));
+  fireEvent.click((await screen.findAllByText('调度 Agent')).at(-1)!);
+  expect(screen.getByText(/已指定 Skill/)).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: '返回业务视图' }));
+  expect(screen.getByText('默认自动识别 Skill')).toBeInTheDocument();
+  fireEvent.change(screen.getByPlaceholderText('描述优化目标、时间范围和可用数据'), { target: { value: '自动识别需求' } });
+  fireEvent.click(screen.getByRole('button', { name: '发送需求' }));
+  await waitFor(() => expect(testState.analyzeAgentMessage).toHaveBeenCalled());
+  const calls = testState.analyzeAgentMessage.mock.calls as unknown as Array<[Record<string, unknown>]>;
+  const payload = calls.at(-1)![0];
+  expect(payload).not.toHaveProperty('agent_skill_name');
+  expect(payload).not.toHaveProperty('skill_name');
+});
+
+test('switching history clears previous execution progress', async () => {
+  renderPage();
+  fireEvent.change(screen.getByPlaceholderText('描述优化目标、时间范围和可用数据'), { target: { value: '生成计划' } });
+  fireEvent.click(screen.getByRole('button', { name: '发送需求' }));
+  expect((await screen.findAllByText('参数已抽取，等待确认调用')).length).toBeGreaterThan(0);
+  fireEvent.click(screen.getByRole('button', { name: /日前调度/ }));
+  expect(screen.queryByText('参数已抽取，等待确认调用')).not.toBeInTheDocument();
+  expect(screen.getByText('尚未检查')).toBeInTheDocument();
 });

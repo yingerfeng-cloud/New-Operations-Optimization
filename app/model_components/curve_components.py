@@ -24,6 +24,31 @@ def _function_id(cfg: dict[str, Any], context: dict[str, Any], *fallback_keys: s
     return str(next((cfg.get(key) for key in fallback_keys if cfg.get(key)), ""))
 
 
+def _base_expression_name(expression: Any) -> str:
+    try:
+        node = ast.parse(str(expression), mode="eval").body
+    except (SyntaxError, ValueError):
+        return ""
+    while isinstance(node, ast.Subscript):
+        node = node.value
+    return node.id if isinstance(node, ast.Name) else ""
+
+
+def _validate_recommended_bindings(asset: dict[str, Any], cfg: dict[str, Any]) -> None:
+    metadata = asset.get("metadata") if isinstance(asset.get("metadata"), dict) else {}
+    if metadata.get("binding_policy") != "exact_variable_code":
+        return
+    recommended = metadata.get("recommended_bindings") or {}
+    for axis in ("x", "y", "z"):
+        expected = str(recommended.get(axis) or "")
+        actual = _base_expression_name(cfg.get(axis))
+        if expected and actual and actual != expected:
+            raise RuntimeError(
+                f"函数资产 {asset.get('function_id')} 的 {axis} 输入应绑定 {expected}，"
+                f"当前绑定为 {actual}。二维水电出力曲面的第一输入必须是发电流量 q_gen，不能使用总下泄 q_out。"
+            )
+
+
 class _ReservedComponent:
     category = "预留扩展"
     formula = ""
@@ -166,6 +191,7 @@ class FunctionMapping2DComponent:
             raise RuntimeError("function_mapping_2d_component requires a piecewise_2d asset")
         if not cfg.get("x") or not cfg.get("y") or not cfg.get("z"):
             raise RuntimeError("function_mapping_2d_component requires x, y and z expressions")
+        _validate_recommended_bindings(asset, cfg)
         if strategy == "display_only":
             return
         if strategy == "convex_hull_lp_approx":

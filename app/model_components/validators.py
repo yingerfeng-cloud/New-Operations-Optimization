@@ -203,8 +203,36 @@ def validate_hydro_runtime_parameters(params: dict[str, Any]) -> None:
         if not isinstance(delay, int) or delay < 0:
             raise RuntimeError(prefix + f"edge {upstream}->{downstream} 的 delay_periods 必须为非负整数。")
         key = f"{upstream}->{downstream}"
-        if key not in initial_upstream_outflow:
-            raise RuntimeError(prefix + f"initial_upstream_outflow 缺少 {key}。")
+        required_offsets = [idx - delay for idx in range(horizon) if idx - delay < 0]
+        for offset in required_offsets:
+            found, _ = lookup_initial_upstream_outflow(initial_upstream_outflow, key, offset)
+            if not found:
+                raise RuntimeError(
+                    prefix
+                    + f"边 {key} 的 delay_periods={delay}，initial_upstream_outflow 缺少历史时段 {offset}。"
+                    + f"请使用 {{\"{key}\": {{\"{offset}\": 流量值}}}} 补充历史上游下泄。"
+                )
+
+
+def lookup_initial_upstream_outflow(data: dict[str, Any], edge_key: str, offset: int) -> tuple[bool, float | None]:
+    """Resolve indexed history while preserving the legacy edge-level scalar payload."""
+    if edge_key not in data:
+        return False, None
+    raw = data[edge_key]
+    if isinstance(raw, dict):
+        for candidate in (offset, str(offset), f"t{offset}"):
+            if candidate in raw:
+                return True, float(raw[candidate])
+        return False, None
+    if isinstance(raw, (list, tuple)):
+        index = -offset - 1
+        if 0 <= index < len(raw):
+            return True, float(raw[index])
+        return False, None
+    try:
+        return True, float(raw)
+    except (TypeError, ValueError):
+        return False, None
 
 
 def _dict(value: Any, field: str, prefix: str) -> dict[str, Any]:

@@ -129,12 +129,13 @@ export function normalizeTimeDimensionForMode(config: TimeDimensionConfig, mode:
     if (mappedDelta) next.delta_t = mappedDelta;
     remove('allowed_horizons', 'interval_minutes_by_horizon', 'delta_t_by_horizon', 'derive_from');
   } else if (mode === 'choice') {
+    const wasChoice = config.policy === 'runtime_variable' && Boolean(config.allowed_horizons?.length);
     next.policy = 'runtime_variable';
     next.editable = true;
     next.allowed_horizons = next.allowed_horizons?.length ? next.allowed_horizons : [24, 48, 96];
     next.interval_minutes_by_horizon = Object.keys(next.interval_minutes_by_horizon || {}).length ? next.interval_minutes_by_horizon : { '24': 60, '48': 30, '96': 15 };
     next.delta_t_by_horizon = Object.keys(next.delta_t_by_horizon || {}).length ? next.delta_t_by_horizon : { '24': 1, '48': 0.5, '96': 0.25 };
-    if (!next.default_horizon || !next.allowed_horizons.includes(next.default_horizon)) next.default_horizon = next.allowed_horizons.at(-1);
+    if (!wasChoice || !next.default_horizon || !next.allowed_horizons.includes(next.default_horizon)) next.default_horizon = next.allowed_horizons.at(-1);
     remove('min_horizon', 'max_horizon', 'horizon_step', 'derive_from', 'interval_minutes', 'delta_t');
   } else {
     const mappedInterval = next.default_horizon ? next.interval_minutes_by_horizon?.[String(next.default_horizon)] : undefined;

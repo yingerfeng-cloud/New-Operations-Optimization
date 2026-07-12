@@ -10,6 +10,7 @@ class SolverRunResult(BaseModel):
     objective_value: float | None = None
     objective: float | None = None
     solve_time: float = 0.0
+    mip_gap: float | None = None
     variable_values: dict[str, Any] = Field(default_factory=dict)
     variables: dict[str, Any] = Field(default_factory=dict)
     solver_log: str = ""

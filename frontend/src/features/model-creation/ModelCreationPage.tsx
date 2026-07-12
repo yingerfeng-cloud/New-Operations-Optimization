@@ -193,9 +193,6 @@ export function ModelCreationPage() {
         description="基于业务场景选择、模型语义、统一公式、运行参数和发布校验的五步建模流程。"
         extra={(
           <Space wrap>
-            <Button loading={saveDraft.isPending} onClick={() => saveDraft.mutate()}>保存草稿</Button>
-            <Button onClick={validateCurrentDraft}>校验模型</Button>
-            <Button type="primary" disabled={!validation.valid} loading={publish.isPending} onClick={() => publish.mutate()}>发布模型</Button>
             <Dropdown
               menu={{
                 items: [{ key: 'reset', label: '清空草稿', danger: true }],
