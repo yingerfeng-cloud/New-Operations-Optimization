@@ -196,22 +196,12 @@ try {
 
   Add-Type -AssemblyName System.IO.Compression
   Add-Type -AssemblyName System.IO.Compression.FileSystem
-  $zip = [System.IO.Compression.ZipFile]::Open($OutputFullPath, [System.IO.Compression.ZipArchiveMode]::Create)
-  try {
-    Get-ChildItem -LiteralPath $staging -Recurse -Force -File |
-      ForEach-Object {
-        $entryName = $_.FullName.Substring($staging.Length).TrimStart("\", "/") -replace "\\", "/"
-        [System.IO.Compression.ZipFileExtensions]::CreateEntryFromFile(
-          $zip,
-          $_.FullName,
-          $entryName,
-          [System.IO.Compression.CompressionLevel]::Optimal
-        ) | Out-Null
-      }
-  }
-  finally {
-    $zip.Dispose()
-  }
+  [System.IO.Compression.ZipFile]::CreateFromDirectory(
+    $staging,
+    $OutputFullPath,
+    [System.IO.Compression.CompressionLevel]::Optimal,
+    $false
+  )
 }
 finally {
   if (Test-Path -LiteralPath $staging) {
