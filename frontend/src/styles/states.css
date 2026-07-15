@@ -1,0 +1,9 @@
+.page-state { display: flex; align-items: center; justify-content: center; gap: 12px; color: var(--color-text-secondary, #64748b); }
+.page-state-full { min-height: 55vh; flex-direction: column; padding: 40px; }
+.page-state-full .ant-skeleton { width: min(640px, 90vw); }
+.page-state-section { min-height: 160px; }
+.page-state-empty { min-height: 180px; flex-direction: column; text-align: center; padding: 24px; }
+.page-state-empty p { margin: -8px 0 8px; }
+.page-state-error { padding-block: 32px; }
+.task-processing-state { margin-block: 12px; }
+@media (max-width: 600px) { .page-state-full { min-height: 45vh; padding: 24px 16px; } }

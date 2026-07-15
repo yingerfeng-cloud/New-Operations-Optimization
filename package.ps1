@@ -7,6 +7,7 @@ $Root = Split-Path -Parent $MyInvocation.MyCommand.Path
 $OutputFullPath = if ([System.IO.Path]::IsPathRooted($OutputPath)) { $OutputPath } else { Join-Path $Root $OutputPath }
 
 $IncludeItems = @(
+  ".github",
   "agent_skills",
   "app",
   "data",
@@ -34,6 +35,24 @@ $IncludeItems = @(
   "启动-React前后端.ps1",
   "启动-运筹优化底座.ps1"
 )
+
+$RequiredPackageItems = @(
+  ".github/workflows/ci.yml",
+  ".github/workflows/e2e-real.yml",
+  "frontend/package.json",
+  "requirements.txt",
+  "server.py",
+  "frontend/src/main.tsx",
+  "OPERATION_MANUAL.md"
+)
+
+$LauncherScripts = @(Get-ChildItem -LiteralPath $Root -File -Filter "*.ps1" |
+  Where-Object { $_.Name -ne "package.ps1" })
+if ($LauncherScripts.Count -lt 2) {
+  throw "Package requires at least one start script and one stop script in the repository root."
+}
+$IncludeItems += @($LauncherScripts | ForEach-Object { $_.Name })
+$RequiredPackageItems += @($LauncherScripts | ForEach-Object { $_.Name })
 
 $RemovePatterns = @(
   "\\__pycache__(\\|$)",
@@ -140,7 +159,8 @@ function Copy-PackageItem {
   }
 }
 
-Clean-Package
+# Source runtime data and logs are never deleted by packaging. Exclusion is
+# performed only while copying into the isolated staging directory.
 
 if (Test-Path -LiteralPath $OutputFullPath) {
   Remove-Item -LiteralPath $OutputFullPath -Force
@@ -151,6 +171,13 @@ New-Item -ItemType Directory -Path $staging | Out-Null
 try {
   foreach ($item in $IncludeItems) {
     Copy-PackageItem $item
+  }
+
+  $missingFromStaging = @($RequiredPackageItems | Where-Object {
+    -not (Test-Path -LiteralPath (Join-Path $staging ($_ -replace "/", "\")))
+  })
+  if ($missingFromStaging.Count -gt 0) {
+    throw "Package self-check failed before compression. Missing: $($missingFromStaging -join ', ')"
   }
 
   Get-ChildItem -LiteralPath $staging -Recurse -Force |
@@ -192,4 +219,18 @@ finally {
   }
 }
 
+$archive = [System.IO.Compression.ZipFile]::OpenRead($OutputFullPath)
+try {
+  $entryNames = @($archive.Entries | ForEach-Object { $_.FullName })
+  $missingFromArchive = @($RequiredPackageItems | Where-Object { $_ -notin $entryNames })
+  if ($missingFromArchive.Count -gt 0) {
+    Remove-Item -LiteralPath $OutputFullPath -Force -ErrorAction SilentlyContinue
+    throw "Package self-check failed after compression. Missing: $($missingFromArchive -join ', ')"
+  }
+}
+finally {
+  $archive.Dispose()
+}
+
+Write-Output "PACKAGE_SELF_CHECK_OK"
 Write-Output "Package created: $OutputFullPath"

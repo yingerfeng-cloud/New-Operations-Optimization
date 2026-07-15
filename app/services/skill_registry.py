@@ -240,24 +240,25 @@ class SkillRegistry:
         return invocation_service.analyze_parameters(skill.get("input_schema", []), partial)
 
     def _model_for_skill(self, skill_name: str, parameters: dict[str, Any] | None = None, require_enabled: bool = True):
-        if skill_name == "run_cascade_hydro_dispatch":
-            default_model = self._builtin_default_model(skill_name)
-            if default_model is not None:
-                with STORE.lock:
-                    stored = dict(STORE.skills.get(skill_name, {}))
-                if require_enabled and stored.get("status", "enabled") != "enabled":
-                    raise HTTPException(status_code=409, detail=f"Skill is not enabled: {skill_name}")
-                return default_model
         with STORE.lock:
             stored = dict(STORE.skills.get(skill_name, {}))
+        if require_enabled and stored and stored.get("status", "enabled") != "enabled":
+            raise HTTPException(status_code=409, detail=f"Skill is not enabled: {skill_name}")
+        if self._is_builtin_default_skill(skill_name):
+            return model_service.resolve_model(model_code=skill_name.removeprefix("run_"))
         if stored.get("model_id"):
-            model = model_service.get_model(stored["model_id"])
-            if model.status not in CALLABLE_STATUSES:
-                raise HTTPException(status_code=409, detail=f"Model is not callable in status: {model.status}")
+            bound_model = model_service.get_model(stored["model_id"])
+            model = model_service.resolve_model(model_code=self._model_code(bound_model))
             if not parameters or self._parameters_match_model(model, parameters):
-                if require_enabled and stored.get("status", "enabled") != "enabled":
-                    raise HTTPException(status_code=409, detail=f"Skill is not enabled: {skill_name}")
                 return model
+        code = skill_name.removeprefix("run_")
+        try:
+            model = model_service.resolve_model(model_code=code)
+            if skill_name in self._skill_aliases(model) and (not parameters or self._parameters_match_model(model, parameters)):
+                return model
+        except HTTPException as exc:
+            if exc.status_code != 404:
+                raise
         matches = self._matching_models(skill_name)
         if parameters:
             compatible = [model for model in matches if self._parameters_match_model(model, parameters)]
@@ -285,20 +286,13 @@ class SkillRegistry:
         ]
 
     def _choose_model(self, models: list[Any]) -> Any:
-        def score(model: Any) -> tuple[int, int, str]:
-            status_score = {"tested": 3, "published": 2, "trial": 1}.get(str(model.status), 0)
-            template_score = 1 if getattr(model, "template_id", None) else 0
-            return (status_score, template_score, str(model.updated_at or model.created_at or ""))
+        def score(model: Any) -> tuple[int, int, int, str]:
+            active_score = 1 if getattr(model, "is_active_version", False) else 0
+            user_score = 0 if bool((getattr(model, "ui_metadata", None) or {}).get("managed_default_template")) else 1
+            status_score = {"published": 4, "tested": 3, "trial": 2}.get(str(model.status), 0)
+            return (active_score, user_score, status_score, str(model.updated_at or model.created_at or ""))
 
         return sorted(models, key=score, reverse=True)[0]
-
-    def _builtin_default_model(self, skill_name: str):
-        code = skill_name.removeprefix("run_")
-        model_id = f"MODEL-POWER-{code.upper().replace('_', '-')}"
-        try:
-            return model_service.get_model(model_id)
-        except HTTPException:
-            return None
 
     def _model_code(self, model: Any) -> str:
         semantic = model.semantic_spec or {}

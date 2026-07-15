@@ -113,7 +113,7 @@ export function SkillCenterPage() {
       title: 'Skill',
       width: 250,
       render: (_, row) => (
-        <Space direction="vertical" size={2}>
+        <Space orientation="vertical" size={2}>
           <Typography.Text strong>{row.display_name || row.name || row.skill_name}</Typography.Text>
           <Typography.Text type="secondary">{row.skill_name}</Typography.Text>
         </Space>
@@ -121,7 +121,7 @@ export function SkillCenterPage() {
     },
     { title: '绑定模型', width: 240, render: (_, row) => <span>{text(row.model_id)}<br /><Typography.Text type="secondary">{text(row.model_code)} / {text(row.model_version || row.version)}</Typography.Text></span> },
     { title: '状态', width: 110, render: (_, row) => <Tag color={statusColor(row.skill_status)}>{text(row.skill_status)}</Tag> },
-    { title: 'Agent', width: 180, render: (_, row) => <Space direction="vertical" size={2}><Tag color={row.agent_enabled ? 'green' : 'default'}>{row.agent_enabled ? '已绑定' : '未绑定'}</Tag><Typography.Text type="secondary">{text(row.agent_skill_name || row.agent_package_status)}</Typography.Text></Space> },
+    { title: 'Agent', width: 180, render: (_, row) => <Space orientation="vertical" size={2}><Tag color={row.agent_enabled ? 'green' : 'default'}>{row.agent_enabled ? '已绑定' : '未绑定'}</Tag><Typography.Text type="secondary">{text(row.agent_skill_name || row.agent_package_status)}</Typography.Text></Space> },
     { title: 'Schema', width: 120, render: (_, row) => `${row.input_parameter_count ?? row.input_schema?.length ?? 0} / ${row.output_field_count ?? outputRows(row.output_schema).length}` },
     { title: '最近调用', width: 170, render: (_, row) => text(row.last_invocation_at) },
     { title: '成功率', width: 100, render: (_, row) => row.success_rate === null || row.success_rate === undefined ? '-' : `${Math.round(Number(row.success_rate) * 100)}%` },
@@ -179,7 +179,7 @@ export function SkillCenterPage() {
                 key: 'basic',
                 label: '基础信息',
                 children: (
-                  <Space direction="vertical" size={14} style={{ width: '100%' }}>
+                  <Space orientation="vertical" size={14} style={{ width: '100%' }}>
                     <Descriptions bordered size="small" column={2} items={[
                       { key: 'skill_name', label: 'skill_name', children: detail.skill_name },
                       { key: 'display_name', label: 'display_name', children: detail.display_name || detail.name },
@@ -192,7 +192,7 @@ export function SkillCenterPage() {
                       { key: 'policy', label: 'execution_policy', children: detail.execution_policy },
                       { key: 'review', label: 'requires_human_review', children: detail.requires_human_review ? 'true' : 'false' },
                     ]} />
-                    <Alert showIcon type="warning" message="本结果仅用于辅助分析，不构成自动控制指令，需经人工复核后方可用于生产调度。" />
+                    <Alert showIcon type="warning" title="本结果仅用于辅助分析，不构成自动控制指令，需经人工复核后方可用于生产调度。" />
                   </Space>
                 ),
               },
@@ -242,8 +242,8 @@ export function SkillCenterPage() {
           <Button key="run" type="primary" loading={runMutation.isPending} onClick={() => runMutation.mutate()}>运行测试</Button>,
         ]}
       >
-        <Space direction="vertical" size={12} style={{ width: '100%' }}>
-          <Alert showIcon type="info" icon={<ApiOutlined />} message="测试调用会执行真实 Skill；高风险生产参数请先人工复核。" />
+        <Space orientation="vertical" size={12} style={{ width: '100%' }}>
+          <Alert showIcon type="info" icon={<ApiOutlined />} title="测试调用会执行真实 Skill；高风险生产参数请先人工复核。" />
           <Input.TextArea rows={10} value={debugPayload} onChange={event => setDebugPayload(event.target.value)} />
           {debugResult && <Card size="small" title="原始返回"><JsonViewer value={debugResult} /></Card>}
         </Space>

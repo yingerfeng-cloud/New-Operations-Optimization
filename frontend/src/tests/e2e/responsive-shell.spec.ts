@@ -19,6 +19,16 @@ for (const viewport of [{ width: 390, height: 844 }, { width: 768, height: 1024 
       if (viewport.width < 1440) await expect(page.getByRole('button', { name: /侧栏/ })).toBeVisible();
       else await expect(page.getByText('安全生产运筹优化平台')).toBeVisible();
     }
+    const brandCopy = page.locator('.brand-copy:visible');
+    if (await brandCopy.count()) {
+      await expect(brandCopy).toHaveCSS('white-space', 'nowrap');
+      const brandFits = await brandCopy.evaluate(element => {
+        const copy = element.getBoundingClientRect();
+        const brand = element.closest('.brand')?.getBoundingClientRect();
+        return Boolean(brand && copy.left >= brand.left && copy.right <= brand.right + 1 && element.scrollWidth <= element.clientWidth + 1);
+      });
+      expect(brandFits).toBe(true);
+    }
     await page.screenshot({ path: `test-results/responsive-${viewport.width}x${viewport.height}.png`, fullPage: true });
   });
 }

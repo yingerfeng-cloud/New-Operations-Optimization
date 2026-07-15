@@ -130,6 +130,14 @@ class JobRunner:
                     "finished_at": now_text(),
                     **formatted,
                 }
+                result["result_capabilities"] = self._result_capabilities(result)
+                result["result_metadata"] = {
+                    "capabilities": result["result_capabilities"],
+                    "problem_type": problem_type,
+                    "explanation_type": (result.get("business_explanation") or {}).get("explanation_type")
+                    if isinstance(result.get("business_explanation"), dict)
+                    else None,
+                }
                 task.result = result
                 task.cost = float(result.get("metrics", {}).get("total_cost") or 0.0)
                 task.gap = str(result.get("metrics", {}).get("gap") or "0.00%")
@@ -151,6 +159,7 @@ class JobRunner:
                         "result": result,
                         "parameters": runtime,
                     }
+                    STORE.save_runtime()
                 self._log(task, "INFO", "结果保存完成")
         except Exception as exc:
             diagnosis = diagnose_infeasible(self._model_code(task), task.request.payload or {})
@@ -198,6 +207,7 @@ class JobRunner:
                 started = datetime.strptime(task.started_at, "%Y-%m-%d %H:%M:%S")
                 finished = datetime.strptime(task.finished_at, "%Y-%m-%d %H:%M:%S")
                 task.duration_seconds = round((finished - started).total_seconds(), 3)
+            STORE.save_runtime()
 
     def _log(self, task: TaskRecord, level: str, message: str | None = None) -> None:
         if message is None:
@@ -222,6 +232,26 @@ class JobRunner:
             or semantic_spec.get("model_problem_type")
             or solver_router.infer_problem_type_from_model(model, "LP")
         )
+
+    @staticmethod
+    def _result_capabilities(result: dict[str, Any]) -> list[str]:
+        """Describe result presentation without coupling the frontend to a model code."""
+        business_output = result.get("business_output") if isinstance(result.get("business_output"), dict) else {}
+        capabilities = ["summary"]
+        if result.get("variable_values") or business_output.get("variable_values"):
+            capabilities.append("variable_series")
+        if any(business_output.get(key) for key in ("storage_curve", "reservoir_process", "water_balance_check", "forebay_level_curve", "tailwater_level_curve")):
+            capabilities.append("hydro_process")
+        if any(business_output.get(key) for key in ("dispatch_series", "power_curve", "load_curve", "load_comparison", "station_power_curve")):
+            capabilities.append("dispatch_series")
+        if any(business_output.get(key) for key in ("function_asset_interpolation", "pwl_diagnostics", "triangle_diagnostics")):
+            capabilities.append("pwl_diagnostics")
+        if str(result.get("problem_type") or "").upper() == "NLP" and any(result.get(key) for key in ("termination_condition", "local_optimum_warning", "constraint_violation_summary")):
+            capabilities.append("nlp_convergence")
+        if result.get("business_explanation") or result.get("explanation") or result.get("suggestion"):
+            capabilities.append("business_explanation")
+        capabilities.append("raw_result")
+        return capabilities
 
 
 job_runner = JobRunner()

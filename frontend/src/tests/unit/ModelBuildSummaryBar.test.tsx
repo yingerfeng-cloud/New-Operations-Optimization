@@ -20,8 +20,16 @@ test('renders compact model build summary from draft and validation', () => {
   expect(screen.getByLabelText('当前建模状态摘要')).toBeInTheDocument();
   expect(screen.getByText('电力调度')).toBeInTheDocument();
   expect(screen.getByText('组件化 Builder')).toBeInTheDocument();
+  expect(screen.getByText('LP')).toBeInTheDocument();
   expect(screen.getByText('1 个组件')).toBeInTheDocument();
   expect(screen.getByText('参数绑定 1/2')).toBeInTheDocument();
+});
+
+test('does not expose validation errors from unvisited steps', () => {
+  const draft = createInitialDraft();
+  const validation = validateModelDraft(draft);
+  render(<ModelBuildSummaryBar draft={draft} validation={validation} visibleSectionKeys={['basic_info']} />);
+  expect(screen.queryByText(/组件化 Builder 至少选择一个组件/)).not.toBeInTheDocument();
 });
 
 test('renders first blocker inside summary bar', () => {

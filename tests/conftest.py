@@ -155,6 +155,7 @@ def reset_runtime_store(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
         "custom_components",
         "function_assets",
         "model_versions",
+        "active_model_versions",
     )
     registry_keys = (
         "COMPONENT_REGISTRY",

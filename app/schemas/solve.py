@@ -10,6 +10,8 @@ from app.utils import now_text
 
 TaskStatus = Literal[
     "PENDING",
+    "QUEUED",
+    "RUNNING",
     "VALIDATING",
     "BUILDING_MODEL",
     "SOLVING",
@@ -19,6 +21,7 @@ TaskStatus = Literal[
     "INFEASIBLE",
     "TIMEOUT",
     "CANCELLED",
+    "INTERRUPTED",
 ]
 
 
@@ -48,6 +51,8 @@ class SolveRequest(BaseModel):
 
 
 class TaskView(BaseModel):
+    model_config = ConfigDict(protected_namespaces=())
+
     id: str
     model_id: str | None = None
     resolved_model_id: str | None = None
@@ -116,3 +121,33 @@ class TaskRecord:
             recent_logs=self.logs[-5:],
             trace=dict(self.trace),
         )
+
+
+class TaskRecordState(BaseModel):
+    id: str
+    request: SolveRequest
+    status: TaskStatus = "PENDING"
+    progress: int = 5
+    gap: str = "-"
+    cost: float = 0.0
+    risk: str = "low"
+    created_at: str
+    started_at: str | None = None
+    finished_at: str | None = None
+    duration_seconds: float | None = None
+    retry_count: int = 0
+    max_retries: int = 0
+    result: dict[str, Any] | None = None
+    error: str | None = None
+    trace: dict[str, Any] = Field(default_factory=dict)
+    logs: list[str] = Field(default_factory=list)
+    run_metrics: dict[str, Any] = Field(default_factory=dict)
+
+    @classmethod
+    def from_record(cls, record: TaskRecord) -> "TaskRecordState":
+        return cls(**{name: getattr(record, name) for name in cls.model_fields})
+
+    def to_record(self) -> TaskRecord:
+        data = self.model_dump()
+        data["request"] = self.request
+        return TaskRecord(**data)

@@ -3,7 +3,12 @@ import { mockApi } from './fixtures';
 
 test('model time-dimension contract flows from creation to task horizon selector', async ({ page }) => {
   await mockApi(page);
-  await page.goto('/models/create');
+  await page.goto('/models/create?mode=new');
+
+  await page.getByTestId('scenario-select').click();
+  await page.getByTestId('scenario-select').press('ArrowDown');
+  await page.getByTestId('scenario-select').press('Enter');
+  await page.locator('.ant-form-item').filter({ hasText: '模型名称' }).locator('input').fill('时间维度契约测试模型');
 
   await page.getByRole('button', { name: /模型语义/ }).click();
   await expect(page.getByText('时间维度配置')).toBeVisible();
@@ -22,8 +27,8 @@ test('model time-dimension contract flows from creation to task horizon selector
   expect(savePayload.model_draft.time_dimension).toEqual(savePayload.ui_metadata.time_dimension);
   expect(savePayload.component_spec.ui_metadata.time_dimension).toEqual(savePayload.ui_metadata.time_dimension);
 
-  await page.reload();
-  await page.getByRole('button', { name: /模型语义/ }).click();
+  await page.goto('/models/MODEL-DRAFT-1/edit');
+  await expect(page.getByText('编辑模型草稿').first()).toBeVisible();
   await expect(page.getByText('候选时段切换', { exact: true })).toBeVisible();
   await expect(page.locator('.ant-table-tbody tr')).toHaveCount(3);
 

@@ -14,13 +14,14 @@ client = TestClient(app)
 
 def minimal_dispatch_payload() -> dict:
     model_id = f"MODEL-SKILL-{uuid.uuid4().hex[:8].upper()}"
+    model_code = f"custom_optimization_model_{uuid.uuid4().hex[:8]}"
     return {
         "id": model_id,
         "name": "最小经济调度模型",
         "scene": "经济调度",
         "objective": "total_cost_min",
         "semantic_spec": {
-            "model_code": "custom_optimization_model",
+            "model_code": model_code,
             "scenario": "最小经济调度模型",
             "sets": [
                 {"key": "unit", "name": "机组集合", "values": ["U1", "U2"]},
@@ -51,14 +52,21 @@ def minimal_dispatch_payload() -> dict:
     }
 
 
+def create_published_skill() -> tuple[str, str]:
+    created = client.post("/api/models", json=minimal_dispatch_payload())
+    assert created.status_code == 200, created.text
+    model_id = created.json()["id"]
+    published = client.post(f"/api/models/{model_id}/publish")
+    assert published.status_code == 200, published.text
+    generated = client.post(f"/api/models/{model_id}/skills/generate")
+    assert generated.status_code == 200, generated.text
+    return model_id, generated.json()["skill_name"]
+
+
 @unittest.skipUnless(has_pyomo() and has_highspy(), "pyomo/highspy are required for skill invocation")
 class ModelSkillInvocationTest(unittest.TestCase):
     def test_published_custom_dispatch_generates_skill_and_runs(self) -> None:
-        created = client.post("/api/models", json=minimal_dispatch_payload())
-        self.assertEqual(created.status_code, 200, created.text)
-        model_id = created.json()["id"]
-        published = client.post(f"/api/models/{model_id}/publish")
-        self.assertEqual(published.status_code, 200, published.text)
+        model_id, skill_name = create_published_skill()
 
         schema = client.get(f"/api/models/{model_id}/schema")
         self.assertEqual(schema.status_code, 200, schema.text)
@@ -68,13 +76,13 @@ class ModelSkillInvocationTest(unittest.TestCase):
         self.assertEqual(skills.status_code, 200, skills.text)
         self.assertTrue(
             any(
-                "run_economic_dispatch" in item.get("skill_aliases", [item["skill_name"]]) and item["model_id"] == model_id
+                item["skill_name"] == skill_name and item["model_id"] == model_id
                 for item in skills.json()
             )
         )
 
         result = client.post(
-            "/api/skills/run_economic_dispatch/run",
+            f"/api/skills/{skill_name}/run",
             json={
                 "load_forecast": {"T1": 100, "T2": 120, "T3": 90},
                 "fuel_cost": {"U1": 10, "U2": 20},
@@ -94,21 +102,17 @@ class ModelSkillInvocationTest(unittest.TestCase):
 
         invocation = client.get(f"/api/invocations/{body['invocation_id']}")
         self.assertEqual(invocation.status_code, 200, invocation.text)
-        self.assertEqual(invocation.json()["skill_name"], "run_economic_dispatch")
+        self.assertEqual(invocation.json()["skill_name"], skill_name)
         self.assertIn("load_forecast", invocation.json()["parameter_summary"])
         invocations = client.get("/api/invocations")
         self.assertEqual(invocations.status_code, 200, invocations.text)
         self.assertTrue(any(item["invocation_id"] == body["invocation_id"] for item in invocations.json()))
 
     def test_async_invocation_refreshes_to_terminal_status(self) -> None:
-        created = client.post("/api/models", json=minimal_dispatch_payload())
-        self.assertEqual(created.status_code, 200, created.text)
-        model_id = created.json()["id"]
-        published = client.post(f"/api/models/{model_id}/publish")
-        self.assertEqual(published.status_code, 200, published.text)
+        _, skill_name = create_published_skill()
 
         result = client.post(
-            "/api/skills/run_economic_dispatch/run",
+            f"/api/skills/{skill_name}/run",
             json={
                 "parameters": {
                     "load_forecast": {"T1": 100, "T2": 120, "T3": 90},
@@ -134,32 +138,18 @@ class ModelSkillInvocationTest(unittest.TestCase):
         self.assertIn("response", latest)
         self.assertEqual(latest["response"]["status"], "SUCCESS")
 
-    def test_failed_skill_call_returns_invocation_id_and_error_record(self) -> None:
-        created = client.post("/api/models", json=minimal_dispatch_payload())
-        self.assertEqual(created.status_code, 200, created.text)
-        model_id = created.json()["id"]
-        published = client.post(f"/api/models/{model_id}/publish")
-        self.assertEqual(published.status_code, 200, published.text)
-
-        result = client.post("/api/skills/run_economic_dispatch/run", json={"load_forecast": {"T1": 100}})
-        self.assertEqual(result.status_code, 200, result.text)
+    def test_invalid_skill_call_is_rejected_before_invocation(self) -> None:
+        _, skill_name = create_published_skill()
+        result = client.post(f"/api/skills/{skill_name}/run", json={"load_forecast": {"T1": 100}})
+        self.assertEqual(result.status_code, 422, result.text)
         body = result.json()
-        self.assertEqual(body["status"], "FAILED")
-        self.assertIn("invocation_id", body)
-        self.assertEqual(body["error"]["type"], "parameter_validation_error")
-        detail = client.get(f"/api/invocations/{body['invocation_id']}")
-        self.assertEqual(detail.status_code, 200, detail.text)
-        self.assertEqual(detail.json()["status"], "FAILED")
-        self.assertIn("error", detail.json())
+        self.assertEqual(body["detail"]["status"], "PARAMETER_INVALID")
+        self.assertTrue(body["detail"]["missing_required"])
 
     def test_analyze_input_reports_missing_and_defaults(self) -> None:
-        created = client.post("/api/models", json=minimal_dispatch_payload())
-        self.assertEqual(created.status_code, 200, created.text)
-        model_id = created.json()["id"]
-        published = client.post(f"/api/models/{model_id}/publish")
-        self.assertEqual(published.status_code, 200, published.text)
+        _, skill_name = create_published_skill()
 
-        analyzed = client.post("/api/skills/run_economic_dispatch/analyze-input", json={"partial_parameters": {"load_forecast": {"T1": 100}}})
+        analyzed = client.post(f"/api/skills/{skill_name}/analyze-input", json={"partial_parameters": {"load_forecast": {"T1": 100}}})
         self.assertEqual(analyzed.status_code, 200, analyzed.text)
         body = analyzed.json()
         self.assertIn("ready", body)

@@ -15,7 +15,7 @@ body {
   width: 100%;
   max-width: 100vw;
   display: grid;
-  grid-template-columns: 232px minmax(0, 1fr);
+  grid-template-columns: var(--sidebar-width) minmax(0, 1fr);
   height: 100vh;
   overflow: hidden;
 }
@@ -23,18 +23,21 @@ body {
 .sidebar {
   background: linear-gradient(180deg, var(--proto-nav), #0c1b2d);
   color: #dce6f2;
-  padding: 18px 12px;
+  display: flex;
+  flex-direction: column;
+  padding: 0 12px;
   height: 100vh;
-  overflow-y: auto;
+  overflow: hidden;
   overscroll-behavior: contain;
 }
 
 .sidebar .brand {
-  height: auto;
-  min-height: 54px;
-  padding: 0 8px 16px;
+  flex: 0 0 72px;
+  height: 72px;
+  min-height: 72px;
+  padding: 0 8px;
   border-bottom: 1px solid rgba(255,255,255,.1);
-  margin-bottom: 14px;
+  margin-bottom: 0;
   font-weight: 800;
 }
 
@@ -50,6 +53,33 @@ body {
   color: #9eb4cb;
   font-size: 12px;
   font-weight: 500;
+}
+
+.sidebar .nav {
+  flex: 1 1 auto;
+  min-height: 0;
+  padding: 12px 0 18px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(158, 180, 203, .24) transparent;
+}
+
+.sidebar .nav::-webkit-scrollbar {
+  width: 5px;
+}
+
+.sidebar .nav::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.sidebar .nav::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: rgba(158, 180, 203, .2);
+}
+
+.sidebar .nav:hover::-webkit-scrollbar-thumb {
+  background: rgba(158, 180, 203, .55);
 }
 
 .nav button {

@@ -16,10 +16,11 @@ vi.mock('../../api/solvers', () => ({
   }),
 }));
 
-test('P4 dashboard shows capability matrix and demo entries', async () => {
+test('dashboard keeps solver capabilities concise and routes details to runtime', async () => {
   renderWithQueryClient(<MemoryRouter><DashboardPage /></MemoryRouter>);
-  expect(await screen.findByText('平台能力矩阵')).toBeInTheDocument();
-  expect(screen.getByText('MINLP_RESERVED')).toBeInTheDocument();
-  expect(screen.getByText('梯级水电优化调度')).toBeInTheDocument();
-  expect(screen.getByText('非线性水电出力 NLP 演示')).toBeInTheDocument();
+  expect(await screen.findByText('求解能力摘要')).toBeInTheDocument();
+  expect(await screen.findByText('HiGHS：可用')).toBeInTheDocument();
+  expect(await screen.findByText('Ipopt：可用')).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: '查看完整求解环境' })).toBeInTheDocument();
+  expect(screen.queryByText('MINLP_RESERVED')).not.toBeInTheDocument();
 });

@@ -1,6 +1,5 @@
 import { vi } from 'vitest';
-import { initialDraft, useModelCreationStore } from '../../features/model-creation/stores/modelCreationStore';
-import { BLANK_MODEL_ID } from '../../features/model-creation/data/scenarioCatalog';
+import { createBlankDraft, initialDraft, useModelCreationStore } from '../../features/model-creation/stores/modelCreationStore';
 import { applyTemplateToDraft } from '../../features/model-creation/utils/applyTemplateToDraft';
 import { inferModelProblemType } from '../../features/model-creation/utils/inferModelProblemType';
 import { modelAssetToDraft } from '../../features/model-creation/utils/modelAssetToDraft';
@@ -20,62 +19,32 @@ test('normalizes time dimensions', () => {
   expect(d.semantic.sets.find(x => x.code === 'time_volume')?.values).toHaveLength(3);
 });
 
-test('defaults to day-ahead unit commitment catalog model', () => {
+test('new workspace starts blank and writes one generated code into the draft', () => {
   const state = useModelCreationStore.getState();
-  expect(state.selectedScenarioId).toBe('day_ahead_unit_commitment');
-  expect(state.draft.basic_info.name).toBe('日前机组组合优化模型');
-  expect(state.draft.basic_info.scenario).toBe('日前机组组合优化');
-  expect(state.draft.basic_info.builder_mode).toBe('generic_linear');
-});
-
-test('switching catalog model clears derived model state', () => {
-  useModelCreationStore.getState().setDraft({
-    ...useModelCreationStore.getState().draft,
-    formulas: [{
-      formula_id: 'f1',
-      name: '旧公式',
-      kind: 'constraint',
-      display_formula: 'old',
-      dsl_formula: 'old',
-      tokens: [],
-      foreach: [],
-      referenced_sets: [],
-      referenced_parameters: [],
-      referenced_variables: [],
-      free_indices: [],
-      compile_status: 'ready',
-    }],
-    components: [{ code: 'old_component' }],
-    advanced: { generic_spec: { old: true }, component_spec: { old: true } },
-  });
-
-  useModelCreationStore.getState().selectCatalogModel('cascade_hydro_day_ahead');
-  const state = useModelCreationStore.getState();
-
-  expect(state.selectedModelId).toBe('cascade_hydro_dispatch_lp');
-  expect(state.draft.basic_info.name).toBe('梯级水电日前调度模型');
-  expect(state.draft.basic_info.builder_mode).toBe('component_based');
-  expect(state.draft.formulas).toHaveLength(0);
-  expect(state.draft.components).toHaveLength(0);
-  expect(state.draft.advanced.generic_spec).toBeUndefined();
-  expect(state.validationResult).toBeNull();
-});
-
-test('blank model selection keeps current scenario and clears model metadata', () => {
-  useModelCreationStore.getState().selectCatalogModel('chp_coordination', BLANK_MODEL_ID);
-  const state = useModelCreationStore.getState();
-
-  expect(state.selectedScenarioId).toBe('chp_coordination');
-  expect(state.selectedModelId).toBe(BLANK_MODEL_ID);
-  expect(state.draft.basic_info.scenario).toBe('热电协同优化');
+  expect(state.workspace.mode).toBe('new');
   expect(state.draft.basic_info.name).toBe('');
-  expect(state.draft.basic_info.model_code).toBe('');
-  expect(state.draft.basic_info.template_code).toBeUndefined();
+  expect(state.draft.basic_info.scenario).toBe('');
+  expect(state.draft.basic_info.scenario_id).toBeUndefined();
+  expect(state.draft.basic_info.model_code).toMatch(/^model_/);
+  expect(state.draft.basic_info.builder_mode).toBe('generic_linear');
+  expect(state.draft.semantic.sets).toEqual([]);
+  expect(state.draft.components).toEqual([]);
+  expect(state.draft.formulas).toEqual([]);
+});
+
+test('workspace initialization replaces all previous draft state without persistence bleed', () => {
+  useModelCreationStore.getState().updateDraft({ runtime_parameters: { stale: true }, components: [{ code: 'stale' }] });
+  const clean = createBlankDraft();
+  useModelCreationStore.getState().initializeWorkspace({ mode: 'edit', sourceModelId: 'MODEL-B', currentAssetId: 'MODEL-B', sessionId: 'edit:MODEL-B' }, clean, 1);
+  const state = useModelCreationStore.getState();
+  expect(state.workspace).toEqual(expect.objectContaining({ mode: 'edit', sourceModelId: 'MODEL-B', currentAssetId: 'MODEL-B', initialized: true, dirty: false }));
+  expect(state.draft.runtime_parameters).toEqual({});
+  expect(state.draft.components).toEqual([]);
 });
 
 test('loading template after selecting cascade hydro keeps selected scenario', () => {
-  useModelCreationStore.getState().selectCatalogModel('cascade_hydro_day_ahead');
   const state = useModelCreationStore.getState();
+  const selected = { ...state.draft, basic_info: { ...state.draft.basic_info, scenario: '梯级水电日前调度', scenario_id: 'cascade_hydro_day_ahead' } };
   const next = applyTemplateToDraft(state.draft, {
     code: 'unit_commitment_day_ahead',
     name: '模板返回的机组组合',
@@ -88,7 +57,7 @@ test('loading template after selecting cascade hydro keeps selected scenario', (
         variables: [{ code: 'p', name: '出力', variableType: 'continuous' }],
       },
     },
-  }, state.draft.basic_info.scenario);
+  }, selected.basic_info.scenario);
 
   expect(next.basic_info.scenario).toBe('梯级水电日前调度');
   expect(next.basic_info.name).toBe('模板返回的机组组合');
@@ -106,6 +75,9 @@ test('infers MILP when integer variables exist and respects LP otherwise', () =>
     semantic: { ...lpDraft.semantic, variables: [{ code: 'on', variableType: 'binary' }] },
   })).toBe('MILP');
   expect(inferModelProblemType({ ...lpDraft, components: [{ component_id: 'commitment', metadata: { problemType: 'MILP' } }] })).toBe('MILP');
+  const componentLp = { ...lpDraft, basic_info: { ...lpDraft.basic_info, builder_mode: 'component_based' as const, model_code: 'cascade_hydro_dispatch' }, components: [{ component_id: 'balance' }] };
+  expect(inferModelProblemType(componentLp)).toBe('LP');
+  expect(inferModelProblemType({ ...componentLp, basic_info: { ...componentLp.basic_info, model_code: 'unit_commitment_day_ahead' } })).toBe('LP');
 });
 
 test('saving an existing draft asset updates instead of creating a duplicate', async () => {

@@ -1,40 +1,34 @@
 import { Alert, Card, Col, Collapse, Descriptions, Form, Input, Radio, Row, Select, Space, Tag, Typography } from 'antd';
 import type { ModelTemplate } from '../../../types/template';
-import { BLANK_MODEL_ID, getScenarioById, getScenarioModelById, scenarioCatalog } from '../data/scenarioCatalog';
-import type { ModelDraft } from '../stores/modelCreationStore';
+import type { ModelAsset } from '../../../types/model';
+import { scenarioCatalog } from '../data/scenarioCatalog';
+import type { ModelDraft, ModelWorkspaceContext } from '../stores/modelCreationStore';
 import type { ScenarioCatalogItem } from '../../../types/scenario';
 
 export function Step1BasicInfo({
   draft,
+  workspace,
+  sourceAsset,
   templates,
-  selectedScenarioId,
-  selectedModelId,
   scenarios,
   onChange,
-  onCatalogSelection,
+  onScenario,
   onTemplate,
 }: {
   draft: ModelDraft;
+  workspace: ModelWorkspaceContext;
+  sourceAsset?: ModelAsset;
   templates: ModelTemplate[];
-  selectedScenarioId: string;
-  selectedModelId: string;
   scenarios?: ScenarioCatalogItem[];
   onChange: (d: ModelDraft) => void;
-  onCatalogSelection: (scenarioId: string, modelId?: string) => void;
+  onScenario: (scenarioId: string) => void;
   onTemplate: (code: string) => void;
 }) {
   const b = draft.basic_info;
   const scenarioOptions = scenarios?.length ? scenarios : scenarioCatalog;
-  const scenario = scenarioOptions.find(item => item.id === selectedScenarioId) || getScenarioById(selectedScenarioId) || scenarioOptions[0] || scenarioCatalog[0];
-  const selectedModel = selectedModelId === BLANK_MODEL_ID ? undefined : scenario.models.find(model => model.id === selectedModelId) || getScenarioModelById(scenario.id, selectedModelId);
-  const modelOptions = [
-    ...scenario.models.map(model => ({ value: model.id, label: model.name })),
-    { value: BLANK_MODEL_ID, label: '+ 在当前场景下创建空白模型' },
-  ];
   const set = (p: Partial<typeof b>) => onChange({ ...draft, basic_info: { ...b, ...p } });
-  const createMode = selectedModelId === BLANK_MODEL_ID ? 'blank' : 'template';
-  const autoCode = b.model_code || `${scenario.id}_${Date.now().toString().slice(-4)}`;
   const objectiveCount = draft.formulas.filter(formula => formula.kind === 'objective').length;
+  const isAssetMode = workspace.mode === 'edit' || workspace.mode === 'clone' || workspace.mode === 'version';
 
   return (
     <>
@@ -44,25 +38,25 @@ export function Step1BasicInfo({
             <Card title="创建方式" className="model-step-block">
               <Radio.Group
                 className="creation-mode-group"
-                value={createMode}
+                value={workspace.mode === 'template' ? 'template' : 'blank'}
                 onChange={event => {
-                  if (event.target.value === 'blank') onCatalogSelection(scenario.id, BLANK_MODEL_ID);
-                  else onCatalogSelection(scenario.id, scenario.models[0]?.id);
+                  if (event.target.value === 'blank') onTemplate('');
                 }}
+                disabled={isAssetMode}
                 options={[
-                  { value: 'template', label: '从模板克隆' },
+                  { value: 'template', label: '从模板创建' },
                   { value: 'blank', label: '空白创建' },
                 ]}
               />
-              <Form.Item label="模板加载" className="section-gap">
-                <Select allowClear showSearch placeholder="选择后端模板初始化" options={templates.map(t => ({ value: t.code, label: t.name }))} onChange={onTemplate} />
+              <Form.Item label="模型模板" className="section-gap">
+                <Select allowClear showSearch disabled={isAssetMode} value={workspace.templateCode ?? null} placeholder="未选择" options={templates.map(t => ({ value: t.code, label: t.name }))} onChange={value => onTemplate(value || '')} />
               </Form.Item>
             </Card>
           </Col>
           <Col xs={24} lg={8}>
             <Card title="模型定位" className="model-step-block">
               <Form.Item label="业务场景" required>
-                <Select data-testid="scenario-select" aria-label="当前场景" value={scenario.id} options={scenarioOptions.map(item => ({ value: item.id, label: item.name }))} onChange={value => onCatalogSelection(value)} />
+                <Select data-testid="scenario-select" aria-label="当前场景" disabled={isAssetMode} value={b.scenario_id ?? null} placeholder="未选择" options={scenarioOptions.map(item => ({ value: item.id, label: item.name }))} onChange={onScenario} />
               </Form.Item>
               <Form.Item label="建模骨架">
                 <Select
@@ -91,9 +85,13 @@ export function Step1BasicInfo({
           </Col>
           <Col xs={24} lg={8}>
             <Card title="模型信息" className="model-step-block">
-              <Form.Item label="当前模型" required>
-                <Select data-testid="model-select" aria-label="当前模型" value={selectedModelId} options={modelOptions} onChange={value => onCatalogSelection(scenario.id, value)} />
-              </Form.Item>
+              {isAssetMode && sourceAsset && (
+                <Descriptions size="small" column={1} className="workspace-source-summary">
+                  <Descriptions.Item label={workspace.mode === 'edit' ? '正在编辑' : '来源模型'}>{sourceAsset.name}</Descriptions.Item>
+                  <Descriptions.Item label="当前版本">{sourceAsset.version}</Descriptions.Item>
+                  <Descriptions.Item label="状态">{sourceAsset.status}</Descriptions.Item>
+                </Descriptions>
+              )}
               <Form.Item label="模型名称" required>
                 <Input value={b.name} onChange={e => set({ name: e.target.value })} />
               </Form.Item>
@@ -108,7 +106,7 @@ export function Step1BasicInfo({
                 items={[{
                   key: 'advanced-code',
                   label: '高级编辑：模型编码',
-                  children: <Form.Item label="模型编码" required><Input value={autoCode} onChange={e => set({ model_code: e.target.value })} /></Form.Item>,
+                  children: <Form.Item label="模型编码" required><Input value={b.model_code} onChange={e => set({ model_code: e.target.value })} /></Form.Item>,
                 }]}
               />
             </Card>
@@ -117,23 +115,23 @@ export function Step1BasicInfo({
       </Form>
 
       <Card title="模型摘要" className="section-gap">
-        {selectedModel ? (
+        {isAssetMode && sourceAsset ? (
           <Descriptions size="small" column={2}>
-            <Descriptions.Item label="模型范式">{selectedModel.paradigmSummary}</Descriptions.Item>
-            <Descriptions.Item label="问题类型">{selectedModel.problemType}</Descriptions.Item>
-            <Descriptions.Item label="目标策略">{selectedModel.objectiveSummary}</Descriptions.Item>
-            <Descriptions.Item label="集合配置">{selectedModel.setSummary}</Descriptions.Item>
-            <Descriptions.Item label="模型说明" span={2}>{selectedModel.description}</Descriptions.Item>
+            <Descriptions.Item label="问题类型">{sourceAsset.model_problem_type || sourceAsset.problem_type}</Descriptions.Item>
+            <Descriptions.Item label="Builder">{sourceAsset.build_mode}</Descriptions.Item>
+            <Descriptions.Item label="集合">{draft.semantic.sets.length}</Descriptions.Item>
+            <Descriptions.Item label="组件">{draft.components.length}</Descriptions.Item>
+            <Descriptions.Item label="公式" span={2}>{draft.formulas.length}</Descriptions.Item>
           </Descriptions>
         ) : (
-          <Alert showIcon type="info" title="空白模型" description="将保留当前业务场景，并清空公式、组件、诊断和编译结果。请在后续步骤补齐语义和数学定义。" />
+          <Alert showIcon type="info" title={workspace.mode === 'template' ? '后端模板已加载' : '空白模型'} description={workspace.mode === 'template' ? '集合、参数、变量、组件、公式、时间维度和运行参数均来自后端模板详情。' : '当前工作台未选择历史模型或目录模型，请按需选择业务场景和后端模板。'} />
         )}
       </Card>
 
       <Card title="当前选择摘要" className="section-gap">
         <Space wrap>
-          <Tag color="blue">{scenario.name}</Tag>
-          <Tag color={createMode === 'blank' ? 'gold' : 'green'}>{createMode === 'blank' ? '空白创建' : '模板克隆'}</Tag>
+          <Tag color="blue">{b.scenario || '业务场景未选择'}</Tag>
+          <Tag color={workspace.mode === 'new' ? 'gold' : 'green'}>{workspace.mode === 'new' ? '空白创建' : workspace.mode}</Tag>
           <Tag>{b.builder_mode === 'component_based' ? '组件化 Builder' : '通用线性 Builder'}</Tag>
           <Typography.Text type="secondary">编码由系统自动生成，必要时可在高级编辑中调整。</Typography.Text>
         </Space>

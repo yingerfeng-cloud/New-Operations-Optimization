@@ -11,6 +11,13 @@
 .parameter-field > p { margin: 6px 0 10px; color: var(--proto-muted); }
 .parameter-editor-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin: 7px 0; color: var(--proto-muted); font-size: 12px; }
 .parameter-sequence-editor, .parameter-matrix-editor { min-width: 0; }
+.time-series-preview { margin-top: 14px; padding: 14px; border: 1px solid var(--proto-line); border-radius: 12px; background: #f8fbff; }
+.time-series-preview-header { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 8px; }
+.time-series-preview-header > div { display: flex; gap: 22px; }
+.time-series-preview .ant-statistic-title { font-size: 12px; }
+.time-series-preview .ant-statistic-content { font-size: 16px; }
+.time-series-preview small { color: var(--proto-muted); }
+.chart-fallback { min-height: 120px; display: grid; place-items: center; color: var(--proto-muted); }
 .parameter-matrix-editor .ant-table-wrapper { max-width: 100%; overflow: hidden; }
 .field-error { margin-top: 4px; color: #c73535; font-size: 12px; }
 .payload-preview { max-height: 340px; overflow: auto; margin: 0; padding: 12px; background: #f6f8fa; border-radius: 6px; font-size: 12px; }
@@ -26,4 +33,5 @@
   .wizard-footer .ant-btn { flex: 1 1 calc(50% - 8px); min-height: 42px; }
   .runtime-control { grid-template-columns: 1fr; gap: 6px; }
   .parameter-field-label code { width: 100%; overflow-wrap: anywhere; }
+  .time-series-preview-header { align-items: flex-start; flex-direction: column; }
 }

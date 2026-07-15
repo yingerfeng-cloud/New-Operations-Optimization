@@ -1,4 +1,4 @@
-.app { grid-template-columns: 232px minmax(0, 1fr); }
+.app { grid-template-columns: var(--sidebar-width) minmax(0, 1fr); }
 .app-sidebar-collapsed { grid-template-columns: 68px minmax(0, 1fr); }
 .app-mobile { display: block; }
 
@@ -7,7 +7,7 @@
 .sidebar-collapsed .nav button { justify-content: center; padding-inline: 8px; }
 .sidebar-collapsed .nav-group + .nav-group { margin-top: 8px; }
 .sidebar .brand { display: flex; align-items: center; gap: 10px; }
-.brand-copy { min-width: 0; font-size: 14px; line-height: 1.45; }
+.brand-copy { min-width: 0; font-size: 16px; font-weight: 600; line-height: 1.4; white-space: nowrap; }
 .brand-copy small { display: block; }
 
 .top-search-area { min-width: 0; display: flex; align-items: center; gap: 8px; }

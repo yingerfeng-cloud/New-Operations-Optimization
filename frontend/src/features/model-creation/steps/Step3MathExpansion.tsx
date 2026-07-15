@@ -1,4 +1,4 @@
-﻿import { Alert, Button, Card, Descriptions, Empty, Form, Input, Modal, Select, Space, Table, Tag, Tooltip, Typography, message } from 'antd';
+import { Alert, Button, Card, Descriptions, Empty, Form, Input, Modal, Select, Space, Table, Tag, Tooltip, Typography, message } from 'antd';
 import { useEffect, useState } from 'react';
 import { Collapse } from 'antd';
 import { useQuery } from '@tanstack/react-query';
@@ -123,6 +123,7 @@ function formulaBusinessCards(formulas: FormulaDef[], onEdit: (formula: FormulaD
 }
 
 export function Step3MathExpansion({ draft, onChange }: { draft: ModelDraft; onChange: (d: ModelDraft) => void }) {
+  const [modal, modalContextHolder] = Modal.useModal();
   const [editing, setEditing] = useState<FormulaDef>();
   const [selectedComponentKey, setSelectedComponentKey] = useState<string>();
   const [compileError, setCompileError] = useState('');
@@ -164,11 +165,11 @@ export function Step3MathExpansion({ draft, onChange }: { draft: ModelDraft; onC
       const spec = compileFormulaToGenericSpec(draft.formulas, draft.semantic);
       setCompileError('');
       onChange({ ...draft, advanced: { ...draft.advanced, generic_spec: spec } });
-      Modal.success({ title: 'generic_spec 编译成功', content: '所有公式已编译为后端线性结构。' });
+      modal.success({ title: 'generic_spec 编译成功', content: '所有公式已编译为后端线性结构。' });
     } catch (error) {
       const text = String(error);
       setCompileError(text);
-      Modal.error({ title: '编译失败，已阻止发布', content: text });
+      modal.error({ title: '编译失败，已阻止发布', content: text });
     }
   };
 
@@ -631,6 +632,7 @@ export function Step3MathExpansion({ draft, onChange }: { draft: ModelDraft; onC
 
   return (
     <>
+      {modalContextHolder}
       <Space wrap>
         <Button type="primary" onClick={() => setEditing(newFormula('constraint'))}>新增约束公式</Button>
         <Button onClick={() => setEditing(newFormula('objective'))}>新增目标函数</Button>

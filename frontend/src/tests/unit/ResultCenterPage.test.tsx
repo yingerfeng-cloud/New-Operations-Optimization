@@ -1,6 +1,6 @@
 import { fireEvent, screen, waitFor } from '@testing-library/react';
 import { vi } from 'vitest';
-import { ResultCenterPage } from '../../pages/ResultCenter/ResultCenterPage';
+import { ResultCenterPage, resultTabKeys } from '../../pages/ResultCenter/ResultCenterPage';
 import type { SolveResult } from '../../types/result';
 import { renderWithQueryClient } from '../testUtils';
 
@@ -35,11 +35,28 @@ test('renders result center and structured report detail', async () => {
 
   fireEvent.click(screen.getByRole('button', { name: '查看报告' }));
 
-  await waitFor(() => expect(screen.getByText('objective_value')).toBeInTheDocument());
-  fireEvent.click(screen.getByText('变量表'));
-  expect(screen.getByText('p_grid')).toBeInTheDocument();
-  fireEvent.click(screen.getByText('约束检查'));
-  expect(screen.getByText('balance')).toBeInTheDocument();
-  fireEvent.click(screen.getByText('结论摘要'));
+  await waitFor(() => expect(screen.getByText('业务建议')).toBeInTheDocument());
+  fireEvent.click(screen.getByText('变量曲线'));
+  expect(screen.getByTestId('mock-echarts')).toBeInTheDocument();
+  fireEvent.click(screen.getByText('业务建议'));
   expect(screen.getByText('结果显示负荷平衡约束满足。')).toBeInTheDocument();
 }, 20000);
+
+test('result tabs are capability-data driven rather than model-code driven', () => {
+  expect(resultTabKeys(resultSample)).toEqual(expect.arrayContaining(['overview', 'curves', 'dispatch', 'advice', 'raw']));
+  expect(resultTabKeys({ status: 'SUCCESS', metrics: {} })).toEqual(['overview', 'raw']);
+  expect(resultTabKeys({ status: 'SUCCESS', metrics: { convergence: 'ok' } })).toContain('convergence');
+  expect(resultTabKeys({
+    result_capabilities: ['summary', 'hydro_process', 'dispatch_series', 'pwl_diagnostics', 'raw_result'],
+    business_output: {
+      storage_curve: [{ time: 1, storage: 2 }],
+      water_balance_check: [{ error: 0 }],
+      power_curve: [{ time: 1, power: 3 }],
+      function_asset_interpolation: [{ triangle: 1 }],
+    },
+  })).toEqual(['overview', 'reservoir', 'dispatch', 'pwl', 'raw']);
+  expect(resultTabKeys({
+    result_capabilities: ['summary', 'raw_result'],
+    business_output: { storage_curve: [{ time: 1, storage: 2 }] },
+  })).toEqual(['overview', 'raw']);
+});

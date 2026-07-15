@@ -35,13 +35,11 @@ test('dashboard renders React platform entries', async () => {
     </MemoryRouter>,
   );
 
-  expect(await screen.findByText('集团级运筹优化底座总览')).toBeInTheDocument();
-  expect(await screen.findByText('模型资产数')).toBeInTheDocument();
-  expect(await screen.findByText('主流程入口')).toBeInTheDocument();
-  expect(await screen.findByText('选择业务场景')).toBeInTheDocument();
-  expect(await screen.findByText('查看结果报告')).toBeInTheDocument();
-  expect(await screen.findByText('最近求解任务')).toBeInTheDocument();
-  expect(await screen.findByText('平台能力矩阵')).toBeInTheDocument();
-  expect(await screen.findByText('梯级水电优化调度')).toBeInTheDocument();
-  expect(await screen.findByText('非线性水电出力 NLP 演示')).toBeInTheDocument();
+  expect(await screen.findByText('生产运筹工作台')).toBeInTheDocument();
+  expect(screen.getByText('运行中任务')).toBeInTheDocument();
+  expect(screen.getByText('失败 / 无解')).toBeInTheDocument();
+  expect(screen.getByText('已发布模型')).toBeInTheDocument();
+  expect(screen.getByText('近 7 天任务')).toBeInTheDocument();
+  expect(screen.getByText('最近任务')).toBeInTheDocument();
+  expect(screen.getByText('求解能力摘要')).toBeInTheDocument();
 });

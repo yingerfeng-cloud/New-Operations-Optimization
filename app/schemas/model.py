@@ -113,6 +113,10 @@ class ModelPackage(BaseModel):
     name: str
     scene: str
     version: str = "v0.1"
+    model_family_id: str | None = None
+    supersedes_model_id: str | None = None
+    is_active_version: bool = False
+    published_by: str | None = None
     status: str = "developing"
     solver: str = "HiGHS"
     problem_type: str = "MILP"

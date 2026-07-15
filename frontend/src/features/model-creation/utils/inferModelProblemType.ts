@@ -20,19 +20,21 @@ function metadataProblemType(value: Record<string, unknown>) {
 }
 
 export function inferModelProblemType(draft: ModelDraft): 'LP' | 'MILP' | 'NLP' | 'MINLP_RESERVED' {
-  const modelCode = String(draft.basic_info.model_code || '');
-  if (modelCode.startsWith('cascade_hydro_dispatch')) {
-    return String(draft.runtime_parameters.hydro_power_mode || 'linear') === 'linear' ? 'LP' : 'MILP';
-  }
-  const componentTypes = draft.components.map(component => metadataProblemType(component)).filter(Boolean);
-  if (componentTypes.includes('MILP')) return 'MILP';
-
-  const draftMetadataType = metadataProblemType({
-    ...(draft.advanced || {}),
-    ...(draft.advanced.generic_spec || {}),
-    ...(draft.advanced.component_spec || {}),
+  const declaredType = metadataProblemType({
+    problem_type: (draft.basic_info as unknown as Record<string, unknown>).problem_type,
+    ...(draft.semantic.ui_metadata || {}),
+    ...(draft.advanced.ui_metadata || {}),
   });
-  if (draftMetadataType === 'MILP') return 'MILP';
+  if (declaredType) return declaredType;
+
+  const diagnosis = (
+    draft.advanced.component_spec?.problem_type_diagnosis
+    || draft.advanced.generic_spec?.problem_type_diagnosis
+    || draft.advanced.ui_metadata?.problem_type_diagnosis
+    || {}
+  ) as Record<string, unknown>;
+  const diagnosedType = normalizeProblemType(diagnosis.effective_problem_type || diagnosis.inferred_problem_type || diagnosis.recommended_problem_type);
+  if (diagnosedType) return diagnosedType;
 
   const hasIntegerVariable = draft.semantic.variables.some(variable => {
     const type = String(variable.variableType || variable.domain || '').toLowerCase();
@@ -44,5 +46,22 @@ export function inferModelProblemType(draft: ModelDraft): 'LP' | 'MILP' | 'NLP' 
   if (hasNlpHint) return 'NLP';
   if (hasIntegerVariable) return 'MILP';
 
-  return (componentTypes[0] as 'LP' | 'MILP' | 'NLP' | 'MINLP_RESERVED' | undefined) || draftMetadataType || 'LP';
+  const componentTypes = draft.components.map(component => metadataProblemType(component)).filter(Boolean);
+  if (componentTypes.includes('MINLP_RESERVED')) return 'MINLP_RESERVED';
+  if (componentTypes.includes('NLP')) return 'NLP';
+  if (componentTypes.includes('MILP')) return 'MILP';
+
+  const compiledType = metadataProblemType({
+    ...(draft.advanced || {}),
+    ...(draft.advanced.generic_spec || {}),
+    ...(draft.advanced.component_spec || {}),
+  });
+  if (compiledType) return compiledType;
+
+  const solveStrategies = [
+    draft.runtime_parameters.hydro_power_mode,
+    ...draft.components.flatMap(component => [component.solve_strategy, component.linearization_strategy]),
+  ].map(value => String(value || '').toLowerCase());
+  if (solveStrategies.some(value => value.includes('pwl_') || value.includes('piecewise_') || value.includes('sos2'))) return 'MILP';
+  return 'LP';
 }

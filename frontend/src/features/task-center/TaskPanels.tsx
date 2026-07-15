@@ -1,8 +1,10 @@
-import { Alert, Card, Descriptions, Empty, Progress, Table, Tag, Timeline } from 'antd';
+import { Alert, Button, Card, Descriptions, Empty, Progress, Space, Table, Tag, Timeline } from 'antd';
 import { JsonViewer } from '../../components/JsonViewer';
 import { StatusTag } from '../../components/StatusTag';
 import type { SolveResult } from '../../types/result';
 import type { SolveTask } from '../../types/task';
+import { isTaskRetryable, isTaskRunning } from './taskStatus';
+import { isTaskFailed } from './taskStatus';
 
 type Row = Record<string, unknown> & { __row_key?: string };
 
@@ -16,11 +18,11 @@ const stageLabels: Array<[string, string]> = [
 ];
 
 export function isRunningStatus(status?: string) {
-  return ['PENDING', 'VALIDATING', 'BUILDING_MODEL', 'SOLVING', 'FORMATTING_RESULT'].includes(String(status || '').toUpperCase());
+  return isTaskRunning(status);
 }
 
 export function isRetryableStatus(status?: string) {
-  return ['FAILED', 'TIMEOUT', 'CANCELLED'].includes(String(status || '').toUpperCase());
+  return isTaskRetryable(status);
 }
 
 function text(value: unknown) {
@@ -98,21 +100,17 @@ export function TaskTimelinePanel({ task }: { task?: SolveTask }) {
 
 export function TaskInputPanel({ task }: { task?: SolveTask }) {
   const trace = task?.trace || {};
+  const parameters = (task?.runtime_parameters || task?.parameters || trace.runtime_parameters || {}) as Record<string, unknown>;
+  const horizon = task?.horizon ?? parameters.horizon ?? trace.horizon;
   return (
-    <Table
-      size="small"
-      pagination={false}
-      rowKey="__row_key"
-      dataSource={[
-        { key: 'model_id', value: task?.model_id || task?.resolved_model_id, __row_key: 'model_id' },
-        { key: 'resolved_model_code', value: task?.resolved_model_code, __row_key: 'resolved_model_code' },
-        { key: 'trace', value: trace, __row_key: 'trace' },
-      ]}
-      columns={[
-        { title: '字段', dataIndex: 'key' },
-        { title: '值', dataIndex: 'value', render: text },
-      ]}
-    />
+    <><Descriptions bordered size="small" column={2} items={[
+      { key: 'model', label: '模型', children: task?.model || task?.model_id || '-' }, { key: 'scene', label: '场景', children: task?.scene || '-' },
+      { key: 'version', label: '版本', children: text(task?.model_version || trace.model_version) }, { key: 'solver', label: '求解器', children: task?.solver || '-' },
+      { key: 'horizon', label: 'horizon', children: text(horizon) }, { key: 'interval', label: '时间粒度', children: text(task?.interval_minutes || trace.interval_minutes) },
+      { key: 'source', label: '数据来源', children: text(task?.data_source || trace.data_source || '手工录入') }, { key: 'submitted', label: '提交时间', children: task?.created_at || '-' },
+    ]} />
+    <Card size="small" title="业务参数" className="section-gap"><Table size="small" pagination={false} rowKey="__row_key" dataSource={rowsFromObject(parameters)} columns={[{ title: '参数', dataIndex: 'key' }, { title: '规模', dataIndex: 'value', render: value => Array.isArray(value) ? `${value.length} 项` : typeof value === 'object' && value ? `${Object.keys(value).length} 项` : '-' }, { title: '值 / 预览', dataIndex: 'value', render: value => <JsonViewer value={value} /> }]} /></Card>
+    {Boolean(task?.advanced_config || trace.advanced_config) && <Card size="small" title="高级配置" className="section-gap"><JsonViewer value={task?.advanced_config || trace.advanced_config} /></Card>}</>
   );
 }
 
@@ -137,17 +135,21 @@ export function TaskResultPanel({ result }: { result?: SolveResult }) {
   );
 }
 
-export function TaskExplanationPanel({ result }: { result?: SolveResult }) {
-  const explanation = result?.business_explanation || result?.explanation;
-  if (!result) return <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无结果解释" />;
-  if (typeof explanation === 'string') return <Alert showIcon type="info" title="结果解释" description={explanation} />;
+export function TaskExplanationPanel({ task, result }: { task?: SolveTask; result?: SolveResult }) {
+  const taskError = task?.error && typeof task.error === 'object' ? (task.error as Record<string, unknown>).message : undefined;
+  const explanation = result?.business_explanation || result?.explanation || task?.business_explanation || task?.explanation || task?.structured_diagnostic || task?.diagnostics || taskError;
+  const supporting = { warnings: task?.warnings, risk_notes: task?.risk_notes, precheck_errors: task?.precheck_errors, infeasibility_diagnosis: task?.infeasibility_diagnosis, solver_diagnostic: task?.solver_diagnostic };
+  if (!explanation && !Object.values(supporting).some(value => value !== undefined && value !== null && value !== '')) return <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无业务解释，请查看技术日志" />;
+  const actions = task && isTaskFailed(task.status) ? <Space wrap className="section-gap"><Button href={`/tasks?create=1&model=${encodeURIComponent(String(task.model_id || task.resolved_model_id || ''))}`}>修改参数重新提交</Button><Button href={`/models/${encodeURIComponent(String(task.model_id || task.resolved_model_id || ''))}`}>查看模型</Button><Button href="/runtime">检查求解环境</Button></Space> : null;
+  if (typeof explanation === 'string') return <><Alert showIcon type="info" title="主要原因" description={explanation} />{actions}</>;
   const obj = explanation && typeof explanation === 'object' ? explanation as Record<string, unknown> : {};
   return (
     <>
-      <Alert showIcon type="info" title="结果解释" description={text(obj.summary || result.suggestion || '优化结果已生成，可结合目标值、变量和约束复核。')} />
-      <Card size="small" title="业务输出" className="section-gap">
-        <JsonViewer value={result.business_output || obj} />
+      <Alert showIcon type="info" title="结果解释" description={text(obj.summary || result?.suggestion || '已生成任务诊断，请结合参数、约束和技术日志复核。')} />
+      <Card size="small" title="诊断详情" className="section-gap">
+        <JsonViewer value={result?.business_output || (Object.keys(obj).length ? obj : supporting)} />
       </Card>
+      {actions}
     </>
   );
 }

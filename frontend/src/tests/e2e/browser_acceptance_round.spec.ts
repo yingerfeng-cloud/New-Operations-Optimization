@@ -8,7 +8,7 @@ test('browser acceptance covers scenario, model, component, task and result entr
   await expect(page.getByTestId('scenario-card-cascade_hydro_day_ahead')).toBeVisible();
   await page.getByTestId('scenario-enter-cascade_hydro_day_ahead').click();
   await expect(page).toHaveURL(/\/models\/create/);
-  await expect(page.getByText('模型创建').first()).toBeVisible();
+  await expect(page.getByText('从模板创建模型').first()).toBeVisible();
 
   await page.goto('/models');
   await expect(page.getByRole('heading', { name: '模型资产中心' })).toBeVisible();

@@ -84,6 +84,16 @@ def copy_model(model_id: str) -> ModelView:
     return model_service.copy_model(model_id)
 
 
+@router.get("/models/{model_id}/versions", response_model=list[ModelView])
+def list_model_versions(model_id: str) -> list[ModelView]:
+    return model_service.list_model_versions(model_id)
+
+
+@router.post("/models/{model_id}/versions", response_model=ModelView)
+def create_model_version(model_id: str, overrides: dict[str, Any] | None = None) -> ModelView:
+    return model_service.create_model_version(model_id, overrides)
+
+
 @router.get("/models/{model_id}/schema")
 def model_schema(model_id: str) -> dict:
     return invocation_service.model_schema(model_id)

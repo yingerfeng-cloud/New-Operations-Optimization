@@ -1,5 +1,5 @@
 import { Alert, Card, Col, Descriptions, Empty, Row, Space, Statistic, Table, Tag } from 'antd';
-import ReactECharts from 'echarts-for-react';
+import { LazyEChart } from '../../components/LazyEChart';
 import { JsonViewer } from '../../components/JsonViewer';
 import type { SolveResult } from '../../types/result';
 
@@ -65,7 +65,7 @@ export function ResultChartPanel({ result }: { result?: SolveResult }) {
   const series = firstNumericSeries(result);
   if (!series.values.length) return <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无可绘制数值序列" />;
   return (
-    <ReactECharts
+    <LazyEChart
       style={{ height: 400 }}
       option={{
         title: { text: series.name, left: 12, top: 10, textStyle: { fontSize: 14 } },
@@ -211,10 +211,10 @@ export function ResultCascadeHydroPanel({ result }: { result?: SolveResult }) {
         ]} />
       </Card>
       <Row gutter={[14, 14]}>
-        <Col xs={24} lg={12}><Card title="库容过程曲线"><ReactECharts style={{ height: 300 }} option={hydroChartOption('库容过程曲线', storageRows, storageRows[0]?.storage !== undefined ? 'storage' : 'volume_start_million_m3')} /></Card></Col>
-        <Col xs={24} lg={12}><Card title="出库流量曲线"><ReactECharts style={{ height: 300 }} option={hydroChartOption('出库流量曲线', outflowRows, outflowRows[0]?.outflow !== undefined ? 'outflow' : 'q_out_m3s')} /></Card></Col>
-        <Col xs={24} lg={12}><Card title="出力曲线"><ReactECharts style={{ height: 300 }} option={hydroChartOption('出力曲线', powerRows, powerRows[0]?.power !== undefined ? 'power' : 'station_power_MW')} /></Card></Col>
-        <Col xs={24} lg={12}><Card title="弃水曲线"><ReactECharts style={{ height: 300 }} option={hydroChartOption('弃水曲线', spillRows, spillRows[0]?.spill !== undefined ? 'spill' : 'q_spill_m3s')} /></Card></Col>
+        <Col xs={24} lg={12}><Card title="库容过程曲线"><LazyEChart style={{ height: 300 }} option={hydroChartOption('库容过程曲线', storageRows, storageRows[0]?.storage !== undefined ? 'storage' : 'volume_start_million_m3')} /></Card></Col>
+        <Col xs={24} lg={12}><Card title="出库流量曲线"><LazyEChart style={{ height: 300 }} option={hydroChartOption('出库流量曲线', outflowRows, outflowRows[0]?.outflow !== undefined ? 'outflow' : 'q_out_m3s')} /></Card></Col>
+        <Col xs={24} lg={12}><Card title="出力曲线"><LazyEChart style={{ height: 300 }} option={hydroChartOption('出力曲线', powerRows, powerRows[0]?.power !== undefined ? 'power' : 'station_power_MW')} /></Card></Col>
+        <Col xs={24} lg={12}><Card title="弃水曲线"><LazyEChart style={{ height: 300 }} option={hydroChartOption('弃水曲线', spillRows, spillRows[0]?.spill !== undefined ? 'spill' : 'q_spill_m3s')} /></Card></Col>
       </Row>
       {hasLoadCompare && <Card title="负荷跟踪解释"><Table size="small" pagination={{ pageSize: 6 }} rowKey="__row_key" dataSource={loadRows} columns={[
         { title: '时段', dataIndex: 'time_index' },

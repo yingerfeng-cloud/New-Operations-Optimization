@@ -3,6 +3,7 @@ import { Tag } from 'antd';
 const statusMap: Record<string, { color: string; label: string }> = {
   SUCCESS: { color: 'green', label: '成功' },
   RUNNING: { color: 'blue', label: '运行中' },
+  QUEUED: { color: 'gold', label: '排队' },
   VALIDATING: { color: 'blue', label: '参数校验' },
   BUILDING_MODEL: { color: 'blue', label: '建模中' },
   SOLVING: { color: 'blue', label: '求解中' },

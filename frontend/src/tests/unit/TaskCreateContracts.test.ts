@@ -1,11 +1,17 @@
 import { describe, expect, test } from 'vitest';
 import { buildTaskPayload } from '../../features/task-create/utils/buildTaskPayload';
+import { parseTaskRuntimeJson } from '../../features/task-create/TaskCreateWizard';
 import { deriveHorizon, managedTimeFields, validateRuntimeTimeDimension, type RuntimeField, type TimeDimensionConfig } from '../../features/time-dimension';
 
 const base = (overrides: Partial<TimeDimensionConfig>): TimeDimensionConfig => ({ enabled: true, policy: 'fixed', time_set: 'time', state_time_set: null, editable: false, allowed_horizons: [], interval_minutes_by_horizon: {}, delta_t_by_horizon: {}, ...overrides });
 const series: RuntimeField = { code: 'load_forecast', name: '负荷预测', required: true, dimension: ['time'] };
 
 describe('task create contract gate', () => {
+  test('runtime JSON import requires an object root', () => {
+    expect(parseTaskRuntimeJson('{"load":[1,2,3]}')).toEqual({ load: [1, 2, 3] });
+    expect(() => parseTaskRuntimeJson('[1,2,3]')).toThrow('运行参数 JSON 的根节点必须为对象，例如 {"load": [1,2,3]}。');
+    expect(() => parseTaskRuntimeJson('null')).toThrow('运行参数 JSON 的根节点必须为对象，例如 {"load": [1,2,3]}。');
+  });
   test('not_applicable never injects horizon', () => {
     const config = base({ enabled: false, policy: 'not_applicable' });
     const payload = buildTaskPayload({ model_id: 'm1', solver: 'HiGHS', horizon: 24, parameters: { demand: 100 } }, config);
@@ -55,6 +61,17 @@ describe('task create contract gate', () => {
     const timeStation: RuntimeField = { code: 'time_load', name: '时点负荷', required: false, dimension: ['time', 'station'] };
     expect(deriveHorizon(base({ policy: 'data_derived', derive_from: 'station_load' }), [stationTime], { station_load: [Array(24).fill(1), Array(24).fill(2)] })).toBe(24);
     expect(deriveHorizon(base({ policy: 'data_derived', derive_from: 'time_load' }), [timeStation], { time_load: Array.from({ length: 48 }, () => [1, 2]) })).toBe(48);
+  });
+
+  test.each([
+    [['station'], [100, 200]],
+    [['station', 'unit'], [[1, 2], [3, 4]]],
+    [[], [1, 2, 3]],
+  ])('data_derived rejects source dimension %j without time', (dimension, value) => {
+    const source: RuntimeField = { code: 'station_capacity', name: '电站容量', required: false, dimension };
+    const config = base({ policy: 'data_derived', derive_from: source.code, time_set: 'time' });
+    expect(deriveHorizon(config, [source], { [source.code]: value })).toBeUndefined();
+    expect(validateRuntimeTimeDimension(config, [source], { [source.code]: value }).join(' ')).toContain(dimension.length ? '未引用时间点集合 time' : '缺少维度声明');
   });
 
   test.each([

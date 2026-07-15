@@ -82,7 +82,7 @@ export function CommandSearch({ open, onClose }: { open: boolean; onClose: () =>
       <div onKeyDown={onKeyDown}>
         <Input autoFocus size="large" prefix={<SearchOutlined />} value={query} onChange={event => setQuery(event.target.value)} placeholder="搜索模型、场景、组件、函数、任务或报告" aria-label="全局搜索" allowClear />
         <div className="command-search-hint"><span>↑↓ 选择 · Enter 打开 · Esc 关闭</span><span>{displayed.length} 项结果</span></div>
-        {failedKinds.length > 0 && <Alert type="warning" showIcon message={`${failedKinds.join('、')}暂时不可搜索，其他结果仍可使用`} />}
+        {failedKinds.length > 0 && <Alert type="warning" showIcon title={`${failedKinds.join('、')}暂时不可搜索，其他结果仍可使用`} />}
         <div ref={resultsRef} className="command-search-results" role="listbox" aria-label="搜索结果">
           {loading ? <div className="command-search-loading"><Spin /><span>正在汇集平台资产…</span></div> : grouped.length ? grouped.map(group => (
             <section key={group.kind} className="command-search-group">

@@ -29,6 +29,7 @@ test('renders horizontal five-step progress with validation states', () => {
   expect(screen.getByText('五步建模流程')).toBeInTheDocument();
   expect(screen.getByText('校验发布')).toBeInTheDocument();
   expect(screen.getAllByText('待进行').length).toBeGreaterThan(0);
+  expect(screen.queryByText('待修复')).not.toBeInTheDocument();
   expect(screen.queryByText(/阻断项：第 2 步/)).not.toBeInTheDocument();
 });
 
@@ -45,5 +46,5 @@ test('shows completed state only for previous valid steps', () => {
   render(<ModelCreationProgress currentStep={1} steps={steps} validation={validation} onChange={vi.fn()} />);
 
   expect(screen.getByText('已完成')).toBeInTheDocument();
-  expect(screen.getByText('进行中')).toBeInTheDocument();
+  expect(screen.getByText('待修复')).toBeInTheDocument();
 });

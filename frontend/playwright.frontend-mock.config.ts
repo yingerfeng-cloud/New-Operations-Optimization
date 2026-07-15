@@ -7,7 +7,7 @@ const executablePath = !channel ? process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PAT
 
 export default defineConfig({
   testDir: './src/tests/e2e',
-  testIgnore: ['**/real_backend_smoke.spec.ts'],
+  testIgnore: ['**/real_backend_smoke.spec.ts', '**/real_production_gate.spec.ts'],
   workers: 1,
   timeout: 60_000,
   expect: { timeout: 15_000 },
@@ -17,6 +17,7 @@ export default defineConfig({
     baseURL: 'http://127.0.0.1:5178',
     trace: 'on',
     screenshot: 'on',
+    video: 'retain-on-failure',
     ...(channel ? { channel } : {}),
     ...(executablePath ? { launchOptions: { executablePath } } : {}),
   },

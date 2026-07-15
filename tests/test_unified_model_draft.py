@@ -103,16 +103,18 @@ def test_save_model_package_contains_full_draft_fields() -> None:
 
 def _component_package_with_constraint(expression: str) -> dict:
     template = get_template("cascade_hydro_dispatch")
+    custom_code = f"cascade_hydro_dispatch_custom_{uuid.uuid4().hex[:8]}"
     component_spec = deepcopy(template["component_spec"])
+    component_spec["model_code"] = custom_code
     component_spec["additional_custom_constraints"] = [{"name": "invalid_extra", "expression": expression, "scope": "station,time"}]
     return {
         "id": f"MODEL-TEST-{uuid.uuid4().hex[:8].upper()}",
-        "template_id": f"cascade_hydro_dispatch_custom_{uuid.uuid4().hex[:4]}",
+        "template_id": custom_code,
         "name": "invalid-constraint-publish-check",
         "scene": "梯级水电日前调度",
         "status": "developing",
         "build_mode": "component_based",
-        "semantic_spec": {**template, "component_spec": component_spec},
+        "semantic_spec": {**template, "code": custom_code, "model_code": custom_code, "component_spec": component_spec},
         "component_spec": component_spec,
         "parameters": template["sample_runtime_parameters"],
     }

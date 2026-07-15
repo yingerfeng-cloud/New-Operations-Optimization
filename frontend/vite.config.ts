@@ -23,8 +23,10 @@ export default defineConfig({
     globals: true,
     testTimeout: 40000,
     hookTimeout: 40000,
+    teardownTimeout: 10000,
+    isolate: true,
     fileParallelism: true,
-    maxWorkers: 4,
+    maxWorkers: 2,
     exclude: ['src/tests/e2e/**', 'node_modules/**', 'dist/**'],
   }
 });

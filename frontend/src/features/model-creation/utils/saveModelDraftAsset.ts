@@ -57,7 +57,7 @@ export function buildComponentSpecFromDraft(normalizedDraft: ModelDraft) {
   return {
     ...current,
     model_code: normalizedDraft.basic_info.model_code || current.model_code,
-    build_mode: 'component_based',
+    build_mode: normalizedDraft.basic_info.builder_mode,
     name: normalizedDraft.basic_info.name || current.name,
     sets: mergeByCode(normalizedDraft.semantic.sets || current.sets, componentItems(normalizedDraft, 'required_sets')),
     parameters: mergeByCode(normalizedDraft.semantic.parameters || current.parameters, componentItems(normalizedDraft, 'parameters')),

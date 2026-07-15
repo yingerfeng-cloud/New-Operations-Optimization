@@ -8,10 +8,10 @@ test('P4 cascade hydro demo route exposes delivery entry points', async ({ page 
   });
 
   await page.goto('/');
-  await expect(page.getByText('平台能力矩阵')).toBeVisible();
-  await expect(page.getByText('梯级水电优化调度')).toBeVisible();
-  await page.getByRole('button', { name: '查看模型' }).first().click();
-  await expect(page).toHaveURL(/\/models\/cascade_hydro_dispatch_v1/);
+  await expect(page.getByText('求解能力摘要')).toBeVisible();
+  await expect(page.getByText('HiGHS：可用')).toBeVisible();
+  await page.goto('/models/m2');
+  await expect(page).toHaveURL(/\/models\/m2/);
   await expect(page.getByRole('heading', { name: '模型资产中心' })).toBeVisible();
 
   await page.goto('/services');

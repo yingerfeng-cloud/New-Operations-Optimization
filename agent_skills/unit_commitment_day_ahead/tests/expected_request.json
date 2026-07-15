@@ -1,1 +1,11 @@
-{"ok":true,"api_skill_name":"run_unit_commitment_day_ahead"}
+{
+  "ok": true,
+  "api_skill_name": "run_unit_commitment_day_ahead",
+  "request": {
+    "parameters": {},
+    "options": {
+      "mode": "sync",
+      "explain": true
+    }
+  }
+}

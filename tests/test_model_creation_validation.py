@@ -19,12 +19,13 @@ def unique_id(prefix: str) -> str:
 
 
 def valid_custom_model(model_id: str | None = None) -> dict:
+    model_code = f"custom_optimization_model_{uuid.uuid4().hex[:8]}"
     return {
         "id": model_id,
         "name": f"valid-custom-{uuid.uuid4().hex[:6]}",
         "scene": "自定义模型",
         "semantic_spec": {
-            "model_code": "custom_optimization_model",
+            "model_code": model_code,
             "scenario": "自定义模型",
             "sets": [
                 {"key": "unit", "name": "机组集合", "values": ["U1", "U2"]},
@@ -56,6 +57,7 @@ def valid_custom_model(model_id: str | None = None) -> dict:
 
 
 def minimal_time_dispatch_model(model_id: str | None = None, *, include_defaults: bool = False) -> dict:
+    model_code = f"custom_time_dispatch_{uuid.uuid4().hex[:8]}"
     parameters = [
         {"key": "load_forecast", "math_param": "load_forecast", "dimension": ["time"], "runtime_injected": True, "validation": {"required": True, "type": "dict", "min": 0}},
         {"key": "fuel_cost", "math_param": "fuel_cost", "dimension": ["unit"], "runtime_injected": True, "validation": {"required": True, "type": "dict", "min": 0}},
@@ -70,7 +72,7 @@ def minimal_time_dispatch_model(model_id: str | None = None, *, include_defaults
         "name": f"minimal-time-dispatch-{uuid.uuid4().hex[:6]}",
         "scene": "自定义模型",
         "semantic_spec": {
-            "model_code": "custom_optimization_model",
+            "model_code": model_code,
             "scenario": "最小经济调度自定义模型",
             "sets": [
                 {"key": "unit", "name": "机组集合", "values": ["U1", "U2"]},

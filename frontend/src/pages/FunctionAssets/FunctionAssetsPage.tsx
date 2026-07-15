@@ -1,7 +1,7 @@
 import { MoreOutlined } from '@ant-design/icons';
 import { Alert, Button, Card, Col, Collapse, Descriptions, Drawer, Dropdown, Form, Input, InputNumber, Row, Select, Space, Table, Tag, Typography, Upload, message } from 'antd';
 import { useMemo, useState } from 'react';
-import ReactECharts from 'echarts-for-react';
+import { LazyEChart } from '../../components/LazyEChart';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { checkFunctionAssetApiReady, createFunctionAsset, getFunctionAssets, importFunctionAssetCsv, previewFunctionAsset, updateFunctionAsset, validateFunctionAsset } from '../../api/functionAssets';
 import { PageHeader } from '../../components/PageHeader';
@@ -802,7 +802,7 @@ export function FunctionAssetsPage() {
                   title="输入 x/y 后，平台返回插值 z、命中的三角形 triangle 和插值权重 lambda。"
                   description="triangle 表示当前点落在哪个二维曲面三角面片；lambda 表示当前点在三角形三个顶点上的插值权重。后端未返回时显示当前未返回该项。"
                 />
-                <ReactECharts option={surfaceChartOption(selected)} style={{ height: 320 }} />
+                <LazyEChart option={surfaceChartOption(selected)} style={{ height: 320 }} />
                 <Space className="section-gap" wrap>
                   <InputNumber value={previewInput.x} onChange={value => setPreviewInput(current => ({ ...current, x: Number(value) }))} addonBefore="x" />
                   <InputNumber value={previewInput.y} onChange={value => setPreviewInput(current => ({ ...current, y: Number(value) }))} addonBefore="y" />
@@ -818,7 +818,7 @@ export function FunctionAssetsPage() {
                 )}
               </Card>
             )}
-            {selected.validation_status !== 'invalid' && selected.function_type !== 'piecewise_2d' && (selected.points || []).length > 0 && <Card size="small" title="曲线图预览"><ReactECharts option={curveChartOption(selected, preview)} style={{ height: 280 }} /></Card>}
+            {selected.validation_status !== 'invalid' && selected.function_type !== 'piecewise_2d' && (selected.points || []).length > 0 && <Card size="small" title="曲线图预览"><LazyEChart option={curveChartOption(selected, preview)} style={{ height: 280 }} /></Card>}
             {selected.validation_status !== 'invalid' && preview?.values && <Table rowKey="x" size="small" pagination={false} dataSource={preview.values} columns={previewColumns} />}
 
             {(selected.referenced_by || []).length > 0 && (

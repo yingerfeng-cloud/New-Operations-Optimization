@@ -1,6 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { useState } from 'react';
-import { Step4RuntimeParams, buildRuntimeParameterRows, validateRuntimeParameters } from '../../features/model-creation/steps/Step4RuntimeParams';
+import { Step4RuntimeParams, buildRuntimeParameterRows, parseRuntimeParameterJson, validateRuntimeParameters } from '../../features/model-creation/steps/Step4RuntimeParams';
 import { createInitialDraft, type ModelDraft } from '../../features/model-creation/stores/modelCreationStore';
 
 function makeDraft() {
@@ -60,7 +60,22 @@ test('imports JSON runtime parameters and updates preview', () => {
   fireEvent.change(screen.getByLabelText('运行参数 JSON'), { target: { value: JSON.stringify({ horizon: 2, load: [100, 120] }) } });
   fireEvent.click(screen.getByText('导入并校验'));
   expect(screen.queryByText('缺少必填运行参数')).not.toBeInTheDocument();
-  expect(screen.getByText(/"load": \[/)).toBeInTheDocument();
+  expect(screen.getAllByText(/"load": \[/).length).toBeGreaterThan(0);
+  expect(screen.getByLabelText('load 当前值')).toHaveValue('[100,120]');
+});
+
+test('rejects non-object JSON roots with the product error message', () => {
+  expect(() => parseRuntimeParameterJson('[1,2,3]')).toThrow('运行参数 JSON 的根节点必须为对象，例如 {"load": [1,2,3]}。');
+  expect(() => parseRuntimeParameterJson('null')).toThrow('运行参数 JSON 的根节点必须为对象，例如 {"load": [1,2,3]}。');
+});
+
+test('controlled runtime input follows parent draft updates', () => {
+  const draft = makeDraft();
+  draft.runtime_parameters.load = [1, 2];
+  const view = render(<Step4RuntimeParams draft={draft} onChange={() => undefined} />);
+  expect(screen.getByLabelText('load 当前值')).toHaveValue('[1,2]');
+  view.rerender(<Step4RuntimeParams draft={{ ...draft, runtime_parameters: { ...draft.runtime_parameters, load: [3, 4] } }} onChange={() => undefined} />);
+  expect(screen.getByLabelText('load 当前值')).toHaveValue('[3,4]');
 });
 
 test('edits table value into runtime schema', () => {

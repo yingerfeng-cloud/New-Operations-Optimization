@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import logging
+import re
 import uuid
 from copy import deepcopy
 from typing import Any
@@ -20,6 +22,7 @@ from app.semantic.semantic_validator import RuntimeParameterValidator
 from app.services.function_asset_service import get_function_asset, validate_function_asset
 from app.services.model_time_dimension_service import normalize_model_time_dimension_contract, validate_model_time_dimension_contract
 from app.services.model_set_reference_validator import validate_set_references
+from app.services.model_version_service import model_version_service
 from app.solvers.solver_router import solver_router
 from app.storage.memory_store import STORE
 from app.templates.power_templates import power_template_library
@@ -27,6 +30,8 @@ from app.utils import has_pyomo, now_text, require_pyomo_for_publish
 
 
 CALLABLE_STATUSES = {"published", "trial", "tested", "已发布", "试运行", "已测试"}
+PUBLISHED_STATUSES = {"published", "已发布"}
+LOGGER = logging.getLogger(__name__)
 
 
 class ModelService:
@@ -39,16 +44,26 @@ class ModelService:
         with STORE.lock:
             if model.id and model.id in STORE.models:
                 raise HTTPException(status_code=409, detail=f"Model id already exists: {model.id}")
+        model = self._prepare_version_identity(model)
         warnings, dry_run_result = self._validate_model_package(model, require_publish_ready=model.status in CALLABLE_STATUSES)
         timestamp = now_text()
         view = ModelView(**model.model_dump(exclude={"id", "created_at", "updated_at", "validation_warnings", "dry_run_result"}), id=model_id, validation_warnings=warnings, dry_run_result=dry_run_result, created_at=model.created_at or timestamp, updated_at=model.updated_at or timestamp)
         with STORE.lock:
             STORE.models[model_id] = view
+            self._record_model_version_locked(view)
+            STORE.save_runtime()
         return view
 
     def list_models(self) -> list[ModelView]:
         with STORE.lock:
             return sorted(STORE.models.values(), key=lambda item: item.created_at, reverse=True)
+
+    def list_model_versions(self, model_id: str) -> list[ModelView]:
+        return model_version_service.list_versions(self.get_model(model_id))
+
+    def create_model_version(self, model_id: str, overrides: dict[str, Any] | None = None) -> ModelView:
+        source = self.get_model(model_id)
+        return self.create_model(model_version_service.new_version_package(source, overrides))
 
     def get_model(self, model_id: str) -> ModelView:
         with STORE.lock:
@@ -59,20 +74,23 @@ class ModelService:
 
     def update_model(self, model_id: str, model: ModelPackage) -> ModelView:
         existing = self.get_model(model_id)
-        if existing.status in CALLABLE_STATUSES:
+        if existing.status in PUBLISHED_STATUSES:
             raise HTTPException(status_code=409, detail="Published model must be copied or taken offline before editing")
         model = self._normalize_component_model(model)
         model = self._normalize_generic_formula_model(model)
         model = self._apply_generalized_top_level_fields(model)
         model = self._normalize_time_dimension_contract(model)
         warnings, dry_run_result = self._validate_model_package(model, require_publish_ready=model.status in CALLABLE_STATUSES)
-        updated = ModelView(**model.model_dump(exclude={"id", "created_at", "updated_at", "published_at", "validation_warnings", "dry_run_result"}), id=model_id, validation_warnings=warnings, dry_run_result=dry_run_result, created_at=existing.created_at, updated_at=now_text(), published_at=existing.published_at)
+        updated = ModelView(**model.model_dump(exclude={"id", "created_at", "updated_at", "published_at", "validation_warnings", "dry_run_result", "model_family_id", "supersedes_model_id", "is_active_version"}), id=model_id, model_family_id=existing.model_family_id, supersedes_model_id=existing.supersedes_model_id, is_active_version=existing.is_active_version, validation_warnings=warnings, dry_run_result=dry_run_result, created_at=existing.created_at, updated_at=now_text(), published_at=existing.published_at)
         with STORE.lock:
             STORE.models[model_id] = updated
+            self._record_model_version_locked(updated)
+            STORE.save_runtime()
         return updated
 
     def publish_model(self, model_id: str) -> ModelView:
         model = self.get_model(model_id)
+        self._validate_publish_code_ownership(model)
         normalized_model = self._normalize_component_model(ModelPackage(**model.model_dump()))
         normalized_model = self._normalize_generic_formula_model(normalized_model)
         normalized_model = self._apply_generalized_top_level_fields(normalized_model)
@@ -83,6 +101,7 @@ class ModelService:
             failed = model.model_copy(update={"status": "publish_failed", "updated_at": now_text()})
             with STORE.lock:
                 STORE.models[model_id] = failed
+                STORE.save_runtime()
             raise HTTPException(
                 status_code=422,
                 detail={
@@ -106,11 +125,14 @@ class ModelService:
             failed = model.model_copy(update={"status": "publish_failed", "updated_at": now_text()})
             with STORE.lock:
                 STORE.models[model_id] = failed
+                STORE.save_runtime()
             raise
         updated = model.model_copy(
             update={
                 **normalized_model.model_dump(exclude={"id", "created_at", "updated_at", "published_at", "status", "validation_warnings", "dry_run_result"}),
                 "status": "published",
+                "is_active_version": True,
+                "published_by": normalized_model.published_by or (normalized_model.ui_metadata or {}).get("published_by") or "system",
                 "published_at": now_text(),
                 "updated_at": now_text(),
                 "solver": diagnosis.get("recommended_solver") or normalized_model.solver,
@@ -130,40 +152,94 @@ class ModelService:
             }
         )
         with STORE.lock:
+            for candidate_id, candidate in list(STORE.models.items()):
+                if candidate_id == model_id or self._model_code(candidate) != self._model_code(updated):
+                    continue
+                if candidate.is_active_version:
+                    inactive = candidate.model_copy(update={"is_active_version": False, "updated_at": now_text()})
+                    STORE.models[candidate_id] = inactive
+                    if candidate.model_family_id and STORE.active_model_versions.get(candidate.model_family_id) == candidate_id:
+                        STORE.active_model_versions.pop(candidate.model_family_id, None)
+                    self._record_model_version_locked(inactive)
             STORE.models[model_id] = updated
+            STORE.active_model_versions[str(updated.model_family_id)] = model_id
+            self._record_model_version_locked(updated)
+            STORE.save_runtime()
         return updated
 
     def offline_model(self, model_id: str) -> ModelView:
         model = self.get_model(model_id)
-        updated = model.model_copy(update={"status": "offline", "updated_at": now_text()})
+        updated = model.model_copy(update={"status": "offline", "is_active_version": False, "updated_at": now_text()})
         with STORE.lock:
             STORE.models[model_id] = updated
+            if updated.model_family_id and STORE.active_model_versions.get(updated.model_family_id) == model_id:
+                STORE.active_model_versions.pop(updated.model_family_id, None)
+            self._record_model_version_locked(updated)
+            STORE.save_runtime()
         return updated
 
     def delete_model(self, model_id: str) -> dict[str, str]:
+        model = self.get_model(model_id)
+        if model.published_at:
+            raise HTTPException(status_code=409, detail="Published model versions are historical records and cannot be deleted")
         with STORE.lock:
             if model_id not in STORE.models:
                 raise HTTPException(status_code=404, detail="Model not found")
-            del STORE.models[model_id]
+            removed = STORE.models.pop(model_id)
+            family_id = str(removed.model_family_id or "")
+            if family_id and STORE.active_model_versions.get(family_id) == model_id:
+                STORE.active_model_versions.pop(family_id, None)
+            if family_id:
+                STORE.model_versions[family_id] = [item for item in STORE.model_versions.get(family_id, []) if item.get("model_id") != model_id]
+            STORE.save_runtime()
         return {"id": model_id, "status": "deleted"}
 
     def copy_model(self, model_id: str) -> ModelView:
         model = self.get_model(model_id)
-        copied = ModelPackage(**model.model_dump(exclude={"id", "created_at", "updated_at", "published_at"}))
+        copied = ModelPackage(**model.model_dump(exclude={"id", "created_at", "updated_at", "published_at", "model_family_id", "supersedes_model_id", "is_active_version", "published_by"}))
         new_code = self._custom_model_code(model)
         copied.name = f"{model.name}-copy"
         copied.version = f"{model.version}-copy"
         copied.status = "developing"
+        copied.ui_metadata = {
+            key: value
+            for key, value in (copied.ui_metadata or {}).items()
+            if key not in {
+                "supersedes_model_id", "model_family_id", "publish_info", "version_info",
+                "managed_default_template", "managed_template_version",
+            }
+        }
         copied.template_id = new_code
         self._replace_model_code(copied.semantic_spec, new_code)
         self._replace_model_code(copied.component_spec, new_code)
+        nested_component = (copied.semantic_spec or {}).get("component_spec")
+        if isinstance(nested_component, dict):
+            self._replace_model_code(nested_component, new_code)
+        draft_basic = (copied.model_draft or {}).get("basic_info")
+        if isinstance(draft_basic, dict):
+            draft_basic["model_code"] = new_code
+        draft_advanced_component = ((copied.model_draft or {}).get("advanced") or {}).get("component_spec")
+        if isinstance(draft_advanced_component, dict):
+            self._replace_model_code(draft_advanced_component, new_code)
         return self.create_model(copied)
 
     def find_model_by_code(self, model_code: str) -> ModelView:
+        return self.resolve_model(model_code=model_code)
+
+    def resolve_model(self, model_id: str | None = None, model_code: str | None = None, require_published: bool = True) -> ModelView:
+        if model_id:
+            model = self.get_model(model_id)
+            if require_published and model.status not in CALLABLE_STATUSES:
+                raise HTTPException(status_code=409, detail=f"Model is not callable in status: {model.status}")
+            return model
+        if not model_code:
+            raise HTTPException(status_code=422, detail="model_id or model_code is required")
         candidates = self.find_models_by_code(model_code)
-        if candidates:
-            return self._choose_model_for_code(model_code, candidates)
-        raise HTTPException(status_code=404, detail=f"Model code not found: {model_code}")
+        if require_published:
+            candidates = [model for model in candidates if model.status in CALLABLE_STATUSES]
+        if not candidates:
+            raise HTTPException(status_code=404, detail=f"Model code not found: {model_code}")
+        return self._choose_model_for_code(model_code, candidates)
 
     def find_models_by_code(self, model_code: str) -> list[ModelView]:
         with STORE.lock:
@@ -284,16 +360,41 @@ class ModelService:
         return False
 
     def _choose_model_for_code(self, model_code: str, candidates: list[ModelView]) -> ModelView:
-        default_id = f"MODEL-POWER-{model_code.upper().replace('_', '-')}"
-        for model in candidates:
-            if model.id == default_id:
-                return model
-
-        def score(model: ModelView) -> tuple[int, str]:
-            status_score = {"tested": 4, "published": 3, "trial": 2, "developing": 1}.get(str(model.status), 0)
-            return (status_score, str(model.updated_at or model.created_at or ""))
+        def score(model: ModelView) -> tuple[int, int, int, str, str]:
+            active_score = 1 if model.is_active_version or STORE.active_model_versions.get(str(model.model_family_id)) == model.id else 0
+            user_score = 0 if self._is_managed_default(model) else 1
+            status_score = {"published": 4, "tested": 3, "trial": 2, "developing": 1}.get(str(model.status), 0)
+            return (active_score, user_score, status_score, str(model.published_at or model.updated_at or model.created_at or ""), model.id)
 
         return sorted(candidates, key=score, reverse=True)[0]
+
+    def _prepare_version_identity(self, model: ModelPackage) -> ModelPackage:
+        metadata = model.ui_metadata or {}
+        supersedes_id = model.supersedes_model_id or metadata.get("supersedes_model_id")
+        source = None
+        if supersedes_id:
+            source = self.get_model(str(supersedes_id))
+            if self._model_code(source) != self._model_code(model):
+                raise HTTPException(status_code=409, detail="New version must preserve model_code")
+        return model_version_service.prepare_identity(model, source)
+
+    def _validate_publish_code_ownership(self, model: ModelView) -> None:
+        model_version_service.validate_publish_code_ownership(
+            model,
+            self.find_models_by_code(self._model_code(model)),
+            is_builtin=self._is_managed_default,
+        )
+
+    def _record_model_version_locked(self, model: ModelView) -> None:
+        model_version_service.record_locked(model, self._model_code(model))
+
+    def _model_code(self, model: ModelPackage | ModelView) -> str:
+        semantic = model.semantic_spec or {}
+        component = model.component_spec or {}
+        return str(semantic.get("model_code") or semantic.get("code") or component.get("model_code") or model.template_id or model.id or "")
+
+    def _is_managed_default(self, model: ModelPackage | ModelView) -> bool:
+        return bool((model.ui_metadata or {}).get("managed_default_template"))
 
     def _custom_model_code(self, model: ModelView) -> str:
         semantic = model.semantic_spec or {}
@@ -400,6 +501,7 @@ class ModelService:
         view = AssetView(**asset.model_dump(exclude={"id", "created_at"}), id=asset_id, created_at=asset.created_at or now_text())
         with STORE.lock:
             STORE.assets[asset_id] = view
+            STORE.save_runtime()
         return view
 
     def list_assets(self) -> list[AssetView]:
@@ -419,6 +521,8 @@ class ModelService:
         updated = model.model_copy(update={"status": "tested", "updated_at": now_text(), "tested_at": now_text(), "dry_run_result": dry_run_result, "validation_warnings": dry_run_result["solver_check"].get("warnings", [])})
         with STORE.lock:
             STORE.models[model_id] = updated
+            self._record_model_version_locked(updated)
+            STORE.save_runtime()
         return updated
 
     def _default_test_parameters(self, model: ModelPackage | ModelView) -> dict[str, Any]:
@@ -880,8 +984,9 @@ class ModelService:
                 dry_spec = deepcopy(model.generic_spec)
                 dry_parameters = {
                     **self._build_dry_run_parameters(model.semantic_spec or {}, dry_spec),
-                    **(test_parameters or {}),
                     **(dry_spec.get("parameters") or {}),
+                    **(model.parameters or {}),
+                    **(test_parameters or {}),
                 }
                 self._complete_generic_dry_parameters(dry_parameters, model.semantic_spec or {}, dry_spec)
                 dry_spec["parameters"] = dry_parameters
@@ -1335,6 +1440,7 @@ class ModelService:
         self._ensure_default_component_library()
         self._ensure_default_template_models_published()
         self._ensure_default_template_skills_enabled()
+        self.reconcile_version_state()
         with STORE.lock:
             if STORE.models:
                 return
@@ -1356,6 +1462,8 @@ class ModelService:
             models.append(
                 ModelView(
                     id=f"MODEL-POWER-{code.upper().replace('_', '-')}",
+                    model_family_id=f"builtin:{code}",
+                    is_active_version=True,
                     template_id=code,
                     name=template["name"],
                     scene=template.get("scenario", template["name"]),
@@ -1395,6 +1503,41 @@ class ModelService:
                 skill_name = f"run_{str(model.template_id).lower().replace('-', '_').replace(' ', '_')}"
             STORE.save_runtime()
 
+    def reconcile_version_state(self) -> None:
+        """Deterministically migrate legacy duplicate codes and rebuild version indexes."""
+        with STORE.lock:
+            normalized: dict[str, ModelView] = {}
+            by_code: dict[str, list[ModelView]] = {}
+            for model_id, model in STORE.models.items():
+                code = self._model_code(model)
+                family_id = model.model_family_id or (f"builtin:{code}" if self._is_managed_default(model) else f"legacy:{model.id}")
+                current = model if model.model_family_id else model.model_copy(update={"model_family_id": family_id})
+                normalized[model_id] = current
+                if current.status in CALLABLE_STATUSES:
+                    by_code.setdefault(code, []).append(current)
+
+            STORE.active_model_versions.clear()
+            for code, candidates in by_code.items():
+                def score(item: ModelView) -> tuple[int, int, int, int, str, str]:
+                    explicit_active = 1 if item.is_active_version else 0
+                    user_model = 0 if self._is_managed_default(item) else 1
+                    status_score = {"published": 3, "tested": 2, "trial": 1}.get(str(item.status), 0)
+                    return (explicit_active * user_model, user_model, explicit_active, status_score, str(item.published_at or item.updated_at or item.created_at or ""), item.id)
+
+                winner = sorted(candidates, key=score, reverse=True)[0]
+                if len(candidates) > 1:
+                    LOGGER.info("Resolved legacy duplicate model_code=%s to active model_id=%s", code, winner.id)
+                for candidate in candidates:
+                    normalized[candidate.id] = normalized[candidate.id].model_copy(update={"is_active_version": candidate.id == winner.id})
+                STORE.active_model_versions[str(winner.model_family_id)] = winner.id
+
+            STORE.models.clear()
+            STORE.models.update(normalized)
+            STORE.model_versions.clear()
+            for model in STORE.models.values():
+                self._record_model_version_locked(model)
+            STORE.save_runtime()
+
     def _ensure_default_template_skills_enabled(self) -> None:
         timestamp = now_text()
         template_codes = list(power_template_library().keys())
@@ -1432,6 +1575,8 @@ class ModelService:
                 else:
                     STORE.models[model_id] = ModelView(
                         id=model_id,
+                        model_family_id=f"builtin:{code}",
+                        is_active_version=True,
                         template_id=code,
                         name=template["name"],
                         scene=template.get("scenario", template["name"]),

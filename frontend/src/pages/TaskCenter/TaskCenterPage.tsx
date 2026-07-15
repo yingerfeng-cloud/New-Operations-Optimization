@@ -11,6 +11,7 @@ import { StatusTag } from '../../components/StatusTag';
 import { MetricCard, MetricGrid } from '../../components/WorkspaceUI';
 import { TaskCreateWizard } from '../../features/task-create/TaskCreateWizard';
 import { TaskExplanationPanel, TaskInputPanel, TaskLogsPanel, TaskOverviewPanel, TaskResultPanel, TaskTimelinePanel, isRetryableStatus, isRunningStatus } from '../../features/task-center/TaskPanels';
+import { isTaskFailed, normalizeTaskStatus, resolveTaskDetailDefaultTab, shouldPollTask } from '../../features/task-center/taskStatus';
 import type { SolveTask } from '../../types/task';
 import { validateRuntimeTimeDimension, type RuntimeField, type TimeDimensionConfig } from '../../features/time-dimension';
 
@@ -21,14 +22,10 @@ export function validateTimeSeriesFields(fields: RuntimeField[], parameters: Rec
   return validateRuntimeTimeDimension(config, fields, parameters, horizon)[0] || '';
 }
 
-const normalizedStatus = (status?: string) => String(status || '').toUpperCase();
-export const isPollingTaskStatus = (status?: string) => ['PENDING', 'QUEUED', 'RUNNING', 'VALIDATING', 'BUILDING_MODEL', 'SOLVING', 'FORMATTING_RESULT'].includes(normalizedStatus(status));
+export const isPollingTaskStatus = shouldPollTask;
 export function defaultTaskTab(status?: string, hasExplanation = true) {
-  const value = normalizedStatus(status);
-  if (isPollingTaskStatus(value)) return 'timeline';
-  if (value === 'SUCCESS') return 'result';
-  if (['FAILED', 'INFEASIBLE', 'TIMEOUT'].includes(value)) return hasExplanation ? 'explain' : 'logs';
-  return 'overview';
+  const task = { status, error: hasExplanation ? { message: '诊断' } : undefined } as SolveTask;
+  return resolveTaskDetailDefaultTab(task, normalizeTaskStatus(status) === 'SUCCESS' ? {} : undefined);
 }
 
 export function TaskCenterPage() {
@@ -38,12 +35,15 @@ export function TaskCenterPage() {
   const [activeTab, setActiveTab] = useState('overview');
   const tabInitializedFor = useRef('');
   const previousStatus = useRef('');
+  const query = new URLSearchParams(window.location.search);
+  const initialModelId = query.get('model') || undefined;
+  const initialScene = query.get('scene') || undefined;
   const refetchInterval = import.meta.env.MODE === 'test' ? false : 5000;
   const tasks = useQuery({ queryKey: ['tasks'], queryFn: getTasks, refetchInterval });
   const models = useQuery({ queryKey: ['models'], queryFn: getModels });
-  const detail = useQuery({ queryKey: ['task', viewId], queryFn: () => getTask(viewId!), enabled: !!viewId, refetchInterval: query => viewId && isPollingTaskStatus((query.state.data as SolveTask | undefined)?.status) ? 5000 : false });
-  const result = useQuery({ queryKey: ['result', viewId], queryFn: () => getResult(viewId!), enabled: !!viewId && normalizedStatus(detail.data?.status) === 'SUCCESS' });
-  useEffect(() => { const task = new URLSearchParams(window.location.search).get('task'); if (task) setViewId(task); }, []);
+  const detail = useQuery({ queryKey: ['task', viewId], queryFn: () => getTask(viewId!), enabled: !!viewId, refetchInterval: query => viewId && shouldPollTask((query.state.data as SolveTask | undefined)?.status) ? 5000 : false });
+  const result = useQuery({ queryKey: ['result', viewId], queryFn: () => getResult(viewId!), enabled: !!viewId && normalizeTaskStatus(detail.data?.status) === 'SUCCESS' });
+  useEffect(() => { const task = query.get('task'); if (task) setViewId(task); if (query.get('create') === '1') setCreateOpen(true); }, []);
   const refresh = (taskId?: string) => { qc.invalidateQueries({ queryKey: ['tasks'] }); if (taskId) { qc.invalidateQueries({ queryKey: ['task', taskId] }); qc.invalidateQueries({ queryKey: ['result', taskId] }); } };
   const openDetail = (id: string) => { tabInitializedFor.current = ''; previousStatus.current = ''; setActiveTab('overview'); setViewId(id); };
   const create = useMutation({ mutationFn: createTask, onSuccess: task => { message.success('求解任务已提交'); setCreateOpen(false); refresh(task.id); openDetail(task.id); } });
@@ -51,19 +51,20 @@ export function TaskCenterPage() {
   const retry = useMutation({ mutationFn: retryTask, onSuccess: task => { message.success('任务已重试'); refresh(task.id); openDetail(task.id); } });
   const rows = tasks.data || [];
   const running = rows.filter(task => isRunningStatus(task.status)).length;
-  const success = rows.filter(task => normalizedStatus(task.status) === 'SUCCESS').length;
-  const failed = rows.filter(task => ['FAILED', 'INFEASIBLE', 'TIMEOUT', 'CANCELLED'].includes(normalizedStatus(task.status))).length;
+  const success = rows.filter(task => normalizeTaskStatus(task.status) === 'SUCCESS').length;
+  const failed = rows.filter(task => isTaskFailed(task.status) || normalizeTaskStatus(task.status) === 'CANCELLED').length;
   const current = detail.data;
   useEffect(() => {
     if (!viewId) { tabInitializedFor.current = ''; previousStatus.current = ''; setActiveTab('overview'); return; }
     if (!current) return;
-    const status = normalizedStatus(current.status);
+    const status = normalizeTaskStatus(current.status);
+    if (status === 'SUCCESS' && !result.data) return;
     const firstLoad = tabInitializedFor.current !== viewId;
     const enteredTerminal = isPollingTaskStatus(previousStatus.current) && !isPollingTaskStatus(status);
-    if (firstLoad || enteredTerminal) setActiveTab(defaultTaskTab(status, true));
+    if (firstLoad || enteredTerminal) setActiveTab(resolveTaskDetailDefaultTab(current, result.data));
     tabInitializedFor.current = viewId;
     previousStatus.current = status;
-  }, [current, viewId]);
+  }, [current, result.data, viewId]);
   const closeDetail = () => { setViewId(undefined); tabInitializedFor.current = ''; previousStatus.current = ''; };
 
   return <>
@@ -71,11 +72,11 @@ export function TaskCenterPage() {
     <MetricGrid><MetricCard title="任务总数" value={rows.length} description="真实任务队列" tone="blue" /><MetricCard title="运行中" value={running} description="校验 / 建模 / 求解" tone="amber" /><MetricCard title="成功" value={success} description="可查看结果" tone="green" /><MetricCard title="异常" value={failed} description={failed ? '需要处理' : '暂无异常'} tone={failed ? 'red' : 'neutral'} /></MetricGrid>
     <Card className="content-card section-gap" title="求解任务列表"><DataTable<SolveTask> dataSource={rows} loading={tasks.isLoading} columns={[
       { title: '任务编号', dataIndex: 'id' }, { title: '模型', dataIndex: 'model' }, { title: '状态', dataIndex: 'status', render: (status: string) => <StatusTag status={status} /> }, { title: '进度', dataIndex: 'progress', render: (progress: number) => `${progress || 0}%` }, { title: '创建时间', dataIndex: 'created_at' }, { title: '求解器', dataIndex: 'solver' }, { title: '目标值', dataIndex: 'cost' },
-      { title: '操作', fixed: 'right' as const, render: (_: unknown, task: SolveTask) => <Space className="task-actions"><Button type="link" onClick={() => openDetail(task.id)}>查看</Button><Dropdown trigger={['click']} menu={{ items: [{ key: 'cancel', label: '取消任务', danger: true, disabled: !isRunningStatus(task.status) }, { key: 'retry', label: '重试任务', disabled: !isRetryableStatus(task.status) }, { key: 'result', label: '查看结果', disabled: normalizedStatus(task.status) !== 'SUCCESS' }], onClick: ({ key }) => { if (key === 'cancel') cancel.mutate(task.id); if (key === 'retry') retry.mutate(task.id); if (key === 'result') openDetail(task.id); } }}><Button type="link" icon={<MoreOutlined />} aria-label={`任务 ${task.id} 更多操作`}>更多</Button></Dropdown></Space> },
+      { title: '操作', fixed: 'right' as const, render: (_: unknown, task: SolveTask) => <Space className="task-actions"><Button type="link" onClick={() => openDetail(task.id)}>查看</Button><Dropdown trigger={['click']} menu={{ items: [{ key: 'cancel', label: '取消任务', danger: true, disabled: !isRunningStatus(task.status) }, { key: 'retry', label: '重试任务', disabled: !isRetryableStatus(task.status) }, { key: 'result', label: '查看结果', disabled: normalizeTaskStatus(task.status) !== 'SUCCESS' }], onClick: ({ key }) => { if (key === 'cancel') cancel.mutate(task.id); if (key === 'retry') retry.mutate(task.id); if (key === 'result') openDetail(task.id); } }}><Button type="link" icon={<MoreOutlined />} aria-label={`任务 ${task.id} 更多操作`}>更多</Button></Dropdown></Space> },
     ]} /></Card>
-    <TaskCreateWizard open={createOpen} models={models.data || []} submitting={create.isPending} onClose={() => setCreateOpen(false)} onSubmit={payload => create.mutateAsync(payload)} />
+    <TaskCreateWizard open={createOpen} models={models.data || []} initialModelId={initialModelId} initialScene={initialScene} submitting={create.isPending} onClose={() => setCreateOpen(false)} onSubmit={payload => create.mutateAsync(payload)} />
     <Drawer size="large" open={!!viewId} destroyOnHidden onClose={closeDetail} title={`任务 ${viewId || ''}`} footer={<Space style={{ width: '100%', justifyContent: 'flex-end' }}><Button onClick={closeDetail}>关闭</Button>{current && <Button danger disabled={!isRunningStatus(current.status)} title={!isRunningStatus(current.status) ? '仅运行中的任务可取消' : undefined} onClick={() => cancel.mutate(current.id)}>取消任务</Button>}{current && isRetryableStatus(current.status) && <Button type="primary" onClick={() => retry.mutate(current.id)}>重试任务</Button>}</Space>}>
-      <Tabs activeKey={activeTab} onChange={setActiveTab} items={[{ key: 'overview', label: '任务概览', children: <TaskOverviewPanel task={current} /> }, { key: 'timeline', label: '求解过程', children: <TaskTimelinePanel task={current} /> }, { key: 'input', label: '输入参数', children: <TaskInputPanel task={current} /> }, { key: 'logs', label: '技术日志', children: <TaskLogsPanel task={current} /> }, { key: 'result', label: '优化结果', children: <TaskResultPanel result={result.data} /> }, { key: 'explain', label: '业务解释', children: <TaskExplanationPanel result={result.data} /> }]} />
+      <Tabs activeKey={activeTab} onChange={setActiveTab} items={[{ key: 'overview', label: '任务概览', children: <TaskOverviewPanel task={current} /> }, { key: 'timeline', label: '求解过程', children: <TaskTimelinePanel task={current} /> }, { key: 'input', label: '输入参数', children: <TaskInputPanel task={current} /> }, { key: 'logs', label: '技术日志', children: <TaskLogsPanel task={current} /> }, { key: 'result', label: '优化结果', children: <TaskResultPanel result={result.data} /> }, { key: 'explain', label: '业务解释', children: <TaskExplanationPanel task={current} result={result.data} /> }]} />
     </Drawer>
   </>;
 }

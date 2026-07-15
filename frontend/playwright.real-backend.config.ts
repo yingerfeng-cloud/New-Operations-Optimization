@@ -4,9 +4,12 @@ declare const process: { env: Record<string, string | undefined> };
 
 const channel = process.env.PW_CHANNEL || undefined;
 const executablePath = !channel ? process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH || undefined : undefined;
+const runtimeStorePath = process.env.RUNTIME_STORE_PATH || 'test-results/real-backend/runtime-store.json';
+process.env.RUNTIME_STORE_PATH = runtimeStorePath;
 
 export default defineConfig({
   testDir: './src/tests/e2e',
+  globalSetup: './src/tests/e2e/real-global-setup.mjs',
   workers: 1,
   timeout: 60_000,
   expect: { timeout: 15_000 },
@@ -16,6 +19,7 @@ export default defineConfig({
     baseURL: 'http://127.0.0.1:5178',
     trace: 'on',
     screenshot: 'on',
+    video: 'retain-on-failure',
     ...(channel ? { channel } : {}),
     ...(executablePath ? { launchOptions: { executablePath } } : {}),
   },
@@ -26,7 +30,14 @@ export default defineConfig({
       port: 8000,
       reuseExistingServer: true,
       timeout: 120_000,
-      env: { PORT: '8000', COPT_SYNC_JOBS: 'true' },
+      env: {
+        ...process.env,
+        PORT: '8000',
+        COPT_SYNC_JOBS: 'true',
+        LLM_ENABLED: 'false',
+        AGENT_ALLOW_IN_PROCESS_PLATFORM_FALLBACK: 'true',
+        RUNTIME_STORE_PATH: runtimeStorePath,
+      },
     },
     {
       command: 'npx vite --host 127.0.0.1 --port 5178 --strictPort',

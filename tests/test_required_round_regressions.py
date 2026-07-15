@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import importlib
 import json
 import tempfile
 import uuid
@@ -128,10 +127,10 @@ def test_storage_parameter_extraction_keeps_price_clean_and_updates_power_pair()
 def test_llm_key_is_not_written_plaintext_to_runtime_store(monkeypatch) -> None:
     store_path = Path(tempfile.gettempdir()) / f"runtime_store_no_plain_key_{uuid.uuid4().hex}.json"
     monkeypatch.setenv("RUNTIME_STORE_PATH", str(store_path))
-    import app.storage.memory_store as memory_store
+    from app.storage.memory_store import MemoryStore
 
-    reloaded_store = importlib.reload(memory_store)
-    monkeypatch.setattr("app.services.llm_service.STORE", reloaded_store.STORE)
+    isolated_store = MemoryStore()
+    monkeypatch.setattr("app.services.llm_service.STORE", isolated_store)
     secret = "sk-test-secret-value"
     service = LLMService()
     saved = service.update_config({"provider": "openai_compatible", "base_url": "https://llm.example/v1", "model": "m", "enabled": True, "api_key": secret})
@@ -142,8 +141,8 @@ def test_llm_key_is_not_written_plaintext_to_runtime_store(monkeypatch) -> None:
     assert '"api_key"' not in text
     assert "key_ciphertext" in text
 
-    reloaded_store = importlib.reload(memory_store)
-    monkeypatch.setattr("app.services.llm_service.STORE", reloaded_store.STORE)
+    restored_store = MemoryStore()
+    monkeypatch.setattr("app.services.llm_service.STORE", restored_store)
     assert LLMService().config()["api_key_configured"] is True
 
 

@@ -17,6 +17,8 @@ const symbols = {
 
 function nonlinearDraft(): ModelDraft {
   const draft = createInitialDraft();
+  draft.basic_info.name = '非线性诊断测试模型';
+  draft.basic_info.scenario = '测试场景';
   draft.time_dimension = { schema_version: 1, enabled: true, policy: 'fixed', default_horizon: 1, time_set: 'time', state_time_set: null, editable: false };
   draft.basic_info.builder_mode = 'component_based';
   draft.semantic.sets = [{ code: 'time', name: '时段', values: [0], type: 'time_period', dimensionType: 'time_period', managed_by: 'time_dimension' }];

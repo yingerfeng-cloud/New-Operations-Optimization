@@ -13,9 +13,18 @@ const defaultsFrom = (...sources: unknown[]) => Object.assign({}, ...sources.map
   return { ...objectValue(semantic.sample_runtime_parameters), ...objectValue(draft.runtime_parameters), ...objectValue(record.parameters) };
 }));
 
-interface Props { open: boolean; models: ModelAsset[]; submitting?: boolean; onClose: () => void; onSubmit: (payload: Record<string, unknown>) => Promise<unknown> }
+interface Props { open: boolean; models: ModelAsset[]; initialModelId?: string; initialScene?: string; submitting?: boolean; onClose: () => void; onSubmit: (payload: Record<string, unknown>) => Promise<unknown> }
 
-export function TaskCreateWizard({ open, models, submitting = false, onClose, onSubmit }: Props) {
+export function parseTaskRuntimeJson(text: string): Record<string, unknown> {
+  const parsed: unknown = JSON.parse(text || '{}');
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    throw new Error('运行参数 JSON 的根节点必须为对象，例如 {"load": [1,2,3]}。');
+  }
+  return parsed as Record<string, unknown>;
+}
+
+export function TaskCreateWizard({ open, models, initialModelId, initialScene, submitting = false, onClose, onSubmit }: Props) {
+  const [modal, modalContextHolder] = Modal.useModal();
   const [step, setStep] = useState(0);
   const [modelId, setModelId] = useState('');
   const [solver, setSolver] = useState('HiGHS');
@@ -57,6 +66,7 @@ export function TaskCreateWizard({ open, models, submitting = false, onClose, on
     setDirty(false); setInitializedModelId(''); setEditorErrors({}); setSubmitError(''); setSubmitLocked(false);
   };
   useEffect(() => { if (!open) reset(); }, [open]);
+  useEffect(() => { if (open && initialModelId && !modelId) setModelId(initialModelId); }, [initialModelId, modelId, open]);
   useEffect(() => {
     if (!open || !modelId || !contractUsable || contractLoading || initializedModelId === modelId) return;
     const defaults = defaultsFrom(selected, detail.data, schema.data);
@@ -75,13 +85,13 @@ export function TaskCreateWizard({ open, models, submitting = false, onClose, on
   };
   const selectModel = (nextId: string) => {
     if (!dirty || !modelId || nextId === modelId) return applyModel(nextId);
-    Modal.confirm({ title: '切换模型将清空当前已填写参数，是否继续？', okText: '继续切换', cancelText: '取消', onOk: () => applyModel(nextId) });
+    modal.confirm({ title: '切换模型将清空当前已填写参数，是否继续？', okText: '继续切换', cancelText: '取消', onOk: () => applyModel(nextId) });
   };
   const update = (code: string, value: unknown) => { setDirty(true); setSubmitError(''); setParameters(current => ({ ...current, [code]: value })); };
   const importJson = () => {
     try {
-      const parsed = JSON.parse(jsonText || '{}'); if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new Error('JSON 必须为对象');
-      setParameters(current => ({ ...current, ...stripSystemTimeParameters(parsed as Record<string, unknown>, config) }));
+      const parsed = parseTaskRuntimeJson(jsonText);
+      setParameters(current => ({ ...current, ...stripSystemTimeParameters(parsed, config) }));
       setDirty(true); setSubmitError(''); message.success('参数已导入，系统时间字段已自动忽略');
     } catch (error) { message.error(`导入失败：${String(error)}`); }
   };
@@ -96,7 +106,9 @@ export function TaskCreateWizard({ open, models, submitting = false, onClose, on
     if (submitting || submitLocked || validationErrors.length || !contractUsable) return;
     setSubmitLocked(true); setSubmitError('');
     try {
-      await onSubmit(buildTaskPayload({ model_id: modelId, solver, horizon, parameters }, config));
+      const payload = buildTaskPayload({ model_id: modelId, solver, horizon, parameters }, config);
+      if (initialScene) payload.scene = initialScene;
+      await onSubmit(payload);
       reset();
       onClose();
     }
@@ -106,18 +118,19 @@ export function TaskCreateWizard({ open, models, submitting = false, onClose, on
   const retryContract = () => { schema.refetch(); detail.refetch(); };
 
   return <Drawer className="task-create-drawer" title="创建求解任务" open={open} destroyOnHidden size="large" maskClosable={!submitting} closable={!submitting} onClose={close} footer={<div className="wizard-footer"><Button disabled={submitting} onClick={close}>取消</Button><span className="wizard-footer-spacer" />{step > 0 && <Button disabled={submitting} onClick={() => setStep(value => value - 1)}>上一步</Button>}{step < 2 ? <Button type="primary" disabled={contractLoading || contractFailed} onClick={next}>下一步</Button> : <Button type="primary" loading={submitting || submitLocked} disabled={validationErrors.length > 0 || !contractUsable || submitting || submitLocked} title={validationErrors.length ? '请先修正参数问题' : undefined} onClick={submit}>提交求解并打开详情</Button>}</div>}>
+    {modalContextHolder}
     <Steps current={step} size="small" items={[{ title: '选择模型' }, { title: '填写运行数据' }, { title: '检查并提交' }]} />
-    {step === 0 && <div className="wizard-step"><Card title="选择可调用模型"><Select aria-label="选择模型" showSearch optionFilterProp="label" value={modelId || undefined} onChange={selectModel} placeholder="按名称选择已发布模型" style={{ width: '100%' }} options={models.filter(model => ['published', 'active', 'online', 'ready'].includes(String(model.status).toLowerCase()) || !model.status).map(model => ({ value: model.id, label: `${model.name} · ${model.version || '当前版本'}` }))} />{selected && <Descriptions className="section-gap" size="small" column={1} bordered items={[{ key: 'scene', label: '适用场景', children: selected.scene || '-' }, { key: 'problem', label: '问题类型', children: capability.problemType || selected.problem_type || '-' }, { key: 'time', label: '时间维度', children: contractUsable ? timeDimensionLabel(config, horizon) : contractLoading ? '正在读取契约' : '契约不可用' }, { key: 'solver', label: '默认求解器', children: capability.problemType === 'NLP' ? 'Ipopt' : 'HiGHS' }]} />}{contractFailed && <Alert className="section-gap" showIcon type="error" message="模型运行参数契约加载失败" description="当前无法确认输入参数和时间维度，请重新加载后再继续。" action={<Button onClick={retryContract}>重新加载契约</Button>} />}{contractPartial && <Alert className="section-gap" showIcon type="warning" message="部分契约接口不可用" description={`当前使用${detailUsable ? '模型详情' : '模型 Schema'}作为兼容契约来源，可继续创建任务。`} />}</Card></div>}
+    {step === 0 && <div className="wizard-step"><Card title="选择可调用模型"><Select aria-label="选择模型" showSearch optionFilterProp="label" value={modelId || undefined} onChange={selectModel} placeholder="按名称选择已发布模型" style={{ width: '100%' }} options={models.filter(model => ['published', 'active', 'online', 'ready'].includes(String(model.status).toLowerCase()) || !model.status).map(model => ({ value: model.id, label: `${model.name} · ${model.version || '当前版本'}` }))} />{selected && <Descriptions className="section-gap" size="small" column={1} bordered items={[{ key: 'scene', label: '适用场景', children: selected.scene || '-' }, { key: 'problem', label: '问题类型', children: capability.problemType || selected.problem_type || '-' }, { key: 'time', label: '时间维度', children: contractUsable ? timeDimensionLabel(config, horizon) : contractLoading ? '正在读取契约' : '契约不可用' }, { key: 'solver', label: '默认求解器', children: capability.problemType === 'NLP' ? 'Ipopt' : 'HiGHS' }]} />}{contractFailed && <Alert className="section-gap" showIcon type="error" title="模型运行参数契约加载失败" description="当前无法确认输入参数和时间维度，请重新加载后再继续。" action={<Button onClick={retryContract}>重新加载契约</Button>} />}{contractPartial && <Alert className="section-gap" showIcon type="warning" title="部分契约接口不可用" description={`当前使用${detailUsable ? '模型详情' : '模型 Schema'}作为兼容契约来源，可继续创建任务。`} />}</Card></div>}
     {step === 1 && <div className="wizard-step"><Card title="确认调度周期与求解器" loading={contractLoading}>
-      {config.policy === 'not_applicable' && <Alert showIcon type="info" message="该模型不使用调度周期" />}
-      {config.policy === 'fixed' && <Alert showIcon type="info" message={`固定调度周期：${config.default_horizon ?? '-'} 点（只读）`} />}
-      {config.policy === 'data_derived' && <Alert showIcon type={effectiveHorizon ? 'info' : 'warning'} message={effectiveHorizon ? `已从 ${config.derive_from || '主时间序列'} 推导 ${effectiveHorizon} 点` : `调度周期将由 ${config.derive_from || '主时间序列'} 自动推导，当前尚无法推导`} />}
+      {config.policy === 'not_applicable' && <Alert showIcon type="info" title="该模型不使用调度周期" />}
+      {config.policy === 'fixed' && <Alert showIcon type="info" title={`固定调度周期：${config.default_horizon ?? '-'} 点（只读）`} />}
+      {config.policy === 'data_derived' && <Alert showIcon type={effectiveHorizon ? 'info' : 'warning'} title={effectiveHorizon ? `已从 ${config.derive_from || '主时间序列'} 推导 ${effectiveHorizon} 点` : `调度周期将由 ${config.derive_from || '主时间序列'} 自动推导，当前尚无法推导`} />}
       {config.policy === 'runtime_variable' && <div className="runtime-control"><label>调度周期</label>{config.allowed_horizons.length ? <Select aria-label="调度周期" value={horizon} onChange={value => { setHorizon(value); setDirty(true); }} options={config.allowed_horizons.map(value => ({ value, label: `${value} 点${config.interval_minutes_by_horizon[String(value)] ? ` · ${config.interval_minutes_by_horizon[String(value)]} 分钟粒度` : ''}` }))} /> : <InputNumber aria-label="调度周期" value={horizon} min={config.min_horizon || 1} max={config.max_horizon} step={config.horizon_step || 1} onChange={value => { setHorizon(value ?? undefined); setDirty(true); }} />}</div>}
       <div className="runtime-control"><label>求解器</label><Select aria-label="求解器" value={solver} onChange={value => { setSolver(value); setDirty(true); }} options={capability.problemType === 'NLP' ? [{ value: 'Ipopt', label: 'Ipopt' }] : [{ value: 'HiGHS', label: 'HiGHS' }]} /></div>
     </Card><Card className="section-gap" title="填写业务输入" extra={<Tag>{visibleFields.length} 个字段</Tag>}>
-      <div className="parameter-field-list">{visibleFields.map(field => { const fieldError = editorErrors[field.code] || (config.policy === 'data_derived' && field.code === config.derive_from ? validateRuntimeTimeDimension(config, fields, parameters, horizon)[0] : ''); return <div className={`parameter-field${fieldError ? ' parameter-field-error' : ''}`} key={field.code}><div className="parameter-field-label"><strong>{field.name}</strong>{field.required && <Tag color="red">必填</Tag>}<code>{field.code}</code>{field.unit && <span>{field.unit}</span>}</div>{field.description && <p>{field.description}</p>}<ParameterEditor field={field} value={parameters[field.code]} onChange={value => update(field.code, value)} onValidityChange={error => setEditorErrors(current => ({ ...current, [field.code]: error || '' }))} expectedLength={field.dimension.includes(config.state_time_set || '__none__') ? effectiveHorizon ? effectiveHorizon + 1 : undefined : field.dimension.includes(config.time_set) ? effectiveHorizon : undefined} /></div>; })}</div>
-      {!visibleFields.length && contractUsable && !contractLoading && <Alert showIcon type="info" message="当前模型未声明需要手工填写的业务参数" />}
-    </Card><Card className="section-gap" title="高级输入（可选）"><Button onClick={() => setAdvancedOpen(value => !value)}>{advancedOpen ? '收起 JSON 导入' : '展开 JSON 导入'}</Button>{advancedOpen && <div className="section-gap-tight"><Input.TextArea rows={5} value={jsonText} onChange={event => { setJsonText(event.target.value); setDirty(true); }} placeholder='{"load_forecast":[100,120]}' /><Button className="section-gap-tight" onClick={importJson}>导入并合并</Button></div>}</Card>{validationErrors.length > 0 && <Alert className="section-gap" showIcon type="warning" message="请修正以下问题" description={<ul>{validationErrors.map(error => <li key={error}>{error}</li>)}</ul>} />}</div>}
-    {step === 2 && <div className="wizard-step"><Alert showIcon type={validationErrors.length ? 'warning' : 'success'} message={validationErrors.length ? `发现 ${validationErrors.length} 个待修正问题` : '参数检查通过，可以提交求解'} description={validationErrors.length ? validationErrors.join('；') : '系统时间字段将由模型契约管理，提交结构保持与现有接口兼容。'} />{submitError && <Alert className="section-gap" showIcon type="error" message={submitError} />}<Descriptions className="section-gap" bordered size="small" column={1} items={[{ key: 'model', label: '模型', children: selected?.name || modelId }, { key: 'time', label: '调度周期', children: timeDimensionLabel(config, effectiveHorizon) }, { key: 'solver', label: '求解器', children: solver }, { key: 'params', label: '业务参数', children: `${Object.keys(parameters).length} 项` }]} /><Card className="section-gap" size="small" title="提交内容预览"><pre className="payload-preview">{JSON.stringify(buildTaskPayload({ model_id: modelId, solver, horizon, parameters }, config), null, 2)}</pre></Card></div>}
+      <div className="parameter-field-list">{visibleFields.map(field => { const fieldError = editorErrors[field.code] || (config.policy === 'data_derived' && field.code === config.derive_from ? validateRuntimeTimeDimension(config, fields, parameters, horizon)[0] : ''); return <div className={`parameter-field${fieldError ? ' parameter-field-error' : ''}`} key={field.code}><div className="parameter-field-label"><strong>{field.name}</strong>{field.required && <Tag color="red">必填</Tag>}<code>{field.code}</code>{field.unit && <span>{field.unit}</span>}</div>{field.description && <p>{field.description}</p>}<ParameterEditor field={field} value={parameters[field.code]} onChange={value => update(field.code, value)} onValidityChange={error => setEditorErrors(current => ({ ...current, [field.code]: error || '' }))} expectedLength={field.dimension.includes(config.state_time_set || '__none__') ? effectiveHorizon ? effectiveHorizon + 1 : undefined : field.dimension.includes(config.time_set) ? effectiveHorizon : undefined} timeSet={config.time_set} stateTimeSet={config.state_time_set} intervalMinutes={effectiveHorizon ? config.interval_minutes_by_horizon[String(effectiveHorizon)] || config.interval_minutes : config.interval_minutes} labelFormat={config.label_format} /></div>; })}</div>
+      {!visibleFields.length && contractUsable && !contractLoading && <Alert showIcon type="info" title="当前模型未声明需要手工填写的业务参数" />}
+    </Card><Card className="section-gap" title="高级输入（可选）"><Button onClick={() => setAdvancedOpen(value => !value)}>{advancedOpen ? '收起 JSON 导入' : '展开 JSON 导入'}</Button>{advancedOpen && <div className="section-gap-tight"><Input.TextArea aria-label="高级参数 JSON" rows={5} value={jsonText} onChange={event => { setJsonText(event.target.value); setDirty(true); }} placeholder='{"load_forecast":[100,120]}' /><Button className="section-gap-tight" onClick={importJson}>导入并合并</Button></div>}</Card>{validationErrors.length > 0 && <Alert className="section-gap" showIcon type="warning" title="请修正以下问题" description={<ul>{validationErrors.map(error => <li key={error}>{error}</li>)}</ul>} />}</div>}
+    {step === 2 && <div className="wizard-step"><Alert showIcon type={validationErrors.length ? 'warning' : 'success'} title={validationErrors.length ? `发现 ${validationErrors.length} 个待修正问题` : '参数检查通过，可以提交求解'} description={validationErrors.length ? validationErrors.join('；') : '系统时间字段将由模型契约管理，提交结构保持与现有接口兼容。'} />{submitError && <Alert className="section-gap" showIcon type="error" title={submitError} />}<Descriptions className="section-gap" bordered size="small" column={1} items={[{ key: 'model', label: '模型', children: selected?.name || modelId }, { key: 'time', label: '调度周期', children: timeDimensionLabel(config, effectiveHorizon) }, { key: 'solver', label: '求解器', children: solver }, { key: 'params', label: '业务参数', children: `${Object.keys(parameters).length} 项` }]} /><Card className="section-gap" size="small" title="提交内容预览"><pre className="payload-preview">{JSON.stringify(buildTaskPayload({ model_id: modelId, solver, horizon, parameters }, config), null, 2)}</pre></Card></div>}
   </Drawer>;
 }

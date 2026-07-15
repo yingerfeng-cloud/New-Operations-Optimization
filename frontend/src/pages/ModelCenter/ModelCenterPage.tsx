@@ -1,9 +1,9 @@
 import { MoreOutlined } from '@ant-design/icons';
 import { Button, Card, Drawer, Dropdown, Input, Modal, Select, Space, Tabs, Tag, Tooltip, message } from 'antd';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate, useParams } from 'react-router-dom';
-import { copyModel, getModel, getModelAssetDetail, getModels, offlineModel, publishModel, testModel } from '../../api/models';
+import { getModel, getModelAssetDetail, getModels, offlineModel, publishModel, testModel } from '../../api/models';
 import { cloneTemplate, getTemplates } from '../../api/templates';
 import { DataTable } from '../../components/DataTable';
 import { PageHeader } from '../../components/PageHeader';
@@ -59,6 +59,17 @@ function isCallable(model: ModelAsset) {
   return callableStatuses.has(String(model.status));
 }
 
+function editAction(model: ModelAsset) {
+  const status = String(model.status || '');
+  if (status === 'published' || status === '已发布') {
+    return { label: '创建新版本', url: `/models/create?mode=version&source=${encodeURIComponent(model.id)}` };
+  }
+  return {
+    label: status === 'tested' || status === '已测试' ? '继续编辑' : '编辑草稿',
+    url: `/models/${encodeURIComponent(model.id)}/edit`,
+  };
+}
+
 function objectValue(value: unknown): Record<string, unknown> {
   return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {};
 }
@@ -92,13 +103,17 @@ export function ModelCenterPage() {
   const { id } = useParams();
   const [templateOpen, setTemplateOpen] = useState(false);
   const [template, setTemplate] = useState<string>();
-  const [viewId, setViewId] = useState(id);
+  const viewId = id;
   const [expertView, setExpertView] = useState(false);
   const [filters, setFilters] = useState<{ build?: string; problem?: string; status?: string; scene?: string; keyword?: string }>({});
   const models = useQuery({ queryKey: ['models'], queryFn: getModels });
   const templates = useQuery({ queryKey: ['templates'], queryFn: getTemplates });
   const detail = useQuery({ queryKey: ['model', viewId], queryFn: () => getModel(viewId!), enabled: !!viewId });
   const assetDetail = useQuery({ queryKey: ['model-asset-detail', viewId], queryFn: () => getModelAssetDetail(viewId!), enabled: !!viewId });
+
+  useEffect(() => {
+    setExpertView(false);
+  }, [viewId]);
 
   const refresh = (modelId?: string) => {
     qc.invalidateQueries({ queryKey: ['models'] });
@@ -112,7 +127,6 @@ export function ModelCenterPage() {
     mutationFn: ({ model, detail: testDetail = {} }: { model: ModelAsset; detail?: Record<string, unknown> }) => testModel(model.id, { parameters: defaultTestParameters(model, testDetail) }),
     onSuccess: model => { message.success('模型测试完成'); refresh(model.id); },
   });
-  const copy = useMutation({ mutationFn: copyModel, onSuccess: model => { message.success('模型复制成功'); refresh(model.id); setViewId(model.id); } });
   const offline = useMutation({ mutationFn: offlineModel, onSuccess: model => { message.success('模型已下线'); refresh(model.id); } });
   const clone = useMutation({
     mutationFn: cloneTemplate,
@@ -121,7 +135,6 @@ export function ModelCenterPage() {
       refresh(model.id);
       setTemplateOpen(false);
       nav(`/models/${model.id}`);
-      setViewId(model.id);
     },
   });
 
@@ -236,21 +249,21 @@ export function ModelCenterPage() {
               width: 140,
               render: (_: unknown, model: ModelAsset) => (
                 <Space className="asset-actions">
-                  <Button aria-label="查看" size="small" onClick={() => setViewId(model.id)}>查看</Button>
+                  <Button aria-label="查看" size="small" onClick={() => nav(`/models/${encodeURIComponent(model.id)}`)}>查看</Button>
                   <Dropdown
                     trigger={['click']}
                     menu={{
                       items: [
-                        { key: 'edit', label: '编辑' },
+                        { key: 'edit', label: editAction(model).label },
                         { key: 'test', label: '测试运行' },
                         { key: 'publish', label: isCallable(model) ? '下线模型' : '发布模型' },
-                        { key: 'copy', label: '复制版本' },
+                        { key: 'copy', label: '复制模型' },
                       ],
                       onClick: ({ key }) => {
-                        if (key === 'edit') nav(`/models/create?source=${encodeURIComponent(model.id)}`);
+                        if (key === 'edit') nav(editAction(model).url);
                         if (key === 'test') test.mutate({ model });
                         if (key === 'publish') (isCallable(model) ? offline : publish).mutate(model.id);
-                        if (key === 'copy') copy.mutate(model.id);
+                        if (key === 'copy') nav(`/models/create?mode=clone&source=${encodeURIComponent(model.id)}`);
                       },
                     }}
                   >
@@ -265,17 +278,18 @@ export function ModelCenterPage() {
       <Drawer
         size="large"
         open={!!viewId}
-        onClose={() => setViewId(undefined)}
+        onClose={() => nav('/models')}
         title={<Space>{current?.name || '模型详情'}<Button type="link" onClick={() => setExpertView(value => !value)}>{expertView ? '业务视图' : '专家视图'}</Button></Space>}
         footer={(
           <Space style={{ width: '100%', justifyContent: 'flex-end' }}>
-            <Button onClick={() => setViewId(undefined)}>关闭</Button>
+            <Button onClick={() => nav('/models')}>关闭</Button>
             {current && <Button onClick={() => test.mutate({ model: current, detail: currentAssetDetail })}>测试运行</Button>}
-            {current && <Button onClick={() => copy.mutate(current.id)}>复制版本</Button>}
+            {current && <Button onClick={() => nav(`/models/create?mode=clone&source=${encodeURIComponent(current.id)}`)}>复制模型</Button>}
             {current && <Button type="primary" onClick={() => isCallable(current) ? offline.mutate(current.id) : publish.mutate(current.id)}>{isCallable(current) ? '下线模型' : '发布模型'}</Button>}
           </Space>
         )}
       >
+        {!current && viewId && (detail.isLoading || detail.isFetching) && <Card loading />}
         {current && (
           <Tabs
             items={[
@@ -300,6 +314,7 @@ export function ModelCenterPage() {
             {(templates.data || []).map(item => {
               const capability = templateCapability(item);
               const deprecated = Boolean((item as Record<string, unknown>).deprecated);
+              const replacementCode = String((item as Record<string, unknown>).replacement_model_code || '');
               return (
                 <Card
                   key={item.code}
@@ -313,7 +328,7 @@ export function ModelCenterPage() {
                     <span>求解器：{capability.solver}</span>
                     <span>函数资产：{capability.functionAssets}</span>
                     <span>适用场景：{capability.useCase}</span>
-                    {deprecated && <span className="muted">替代模型：cascade_hydro_dispatch</span>}
+                    {deprecated && replacementCode && <span className="muted">替代模型：{replacementCode}</span>}
                     <span className="muted">{item.code}</span>
                   </Space>
                 </Card>

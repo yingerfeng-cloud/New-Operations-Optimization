@@ -6,11 +6,11 @@ import { blockerMessage, canEnterStep, firstStepError, type ModelCreationStepMet
 
 export type { ModelCreationStepMeta } from '../utils/workflowGuard';
 
-function stepVisualState(validation: DraftValidation, steps: ModelCreationStepMeta[], index: number, current: number) {
+function stepVisualState(validation: DraftValidation, steps: ModelCreationStepMeta[], index: number, current: number, visitedThrough: number) {
   const blocker = firstStepError(validation, steps[index], index);
-  if (index === current) return { text: '进行中', color: 'blue', icon: <SyncOutlined spin />, status: 'process' as const };
-  if (index > current) return { text: '待进行', color: 'default', icon: <ClockCircleOutlined />, status: 'wait' as const };
+  if (index > visitedThrough) return { text: '待进行', color: 'default', icon: <ClockCircleOutlined />, status: 'wait' as const };
   if (blocker) return { text: '待修复', color: 'red', icon: <ExclamationCircleOutlined />, status: 'error' as const };
+  if (index === current) return { text: '进行中', color: 'blue', icon: <SyncOutlined spin />, status: 'process' as const };
   return { text: '已完成', color: 'green', icon: <CheckCircleOutlined />, status: 'finish' as const };
 }
 
@@ -18,11 +18,13 @@ export function ModelCreationProgress({
   currentStep,
   steps,
   validation,
+  visitedThrough = currentStep,
   onChange,
 }: {
   currentStep: number;
   steps: ModelCreationStepMeta[];
   validation: DraftValidation;
+  visitedThrough?: number;
   onChange: (step: number) => void;
 }) {
   return (
@@ -44,7 +46,7 @@ export function ModelCreationProgress({
           onChange(target);
         }}
         items={steps.map((item, index) => {
-          const state = stepVisualState(validation, steps, index, currentStep);
+          const state = stepVisualState(validation, steps, index, currentStep, visitedThrough);
           return {
             title: (
               <Space size={6}>

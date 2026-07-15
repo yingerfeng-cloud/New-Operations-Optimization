@@ -1,17 +1,20 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
 import type { FormulaDef } from '../../../types/formula';
 import type { BuildMode } from '../../../types/model';
 import type { ModelTemplate } from '../../../types/template';
-import {
-  BLANK_MODEL_ID,
-  DEFAULT_SCENARIO_ID,
-  getDefaultScenario,
-  getDefaultScenarioModel,
-  getScenarioById,
-  getScenarioModelById,
-} from '../data/scenarioCatalog';
-import { migrateModelDraft } from '../utils/timeDimensionDraft';
+
+export type ModelWorkspaceMode = 'new' | 'template' | 'edit' | 'clone' | 'version';
+
+export interface ModelWorkspaceContext {
+  mode: ModelWorkspaceMode;
+  sourceModelId?: string;
+  templateCode?: string;
+  modelFamilyId?: string;
+  currentAssetId?: string;
+  sessionId: string;
+  initialized: boolean;
+  dirty: boolean;
+}
 
 export type TimeDimensionPolicy = 'not_applicable' | 'fixed' | 'runtime_variable' | 'data_derived';
 
@@ -38,7 +41,7 @@ export interface TimeDimensionConfig {
 }
 
 export interface ModelDraft {
-  basic_info: { name: string; model_code: string; scenario: string; builder_mode: BuildMode; solver: string; template_code?: string; modeling_skeleton?: string };
+  basic_info: { name: string; model_code: string; scenario: string; scenario_id?: string; builder_mode: BuildMode; solver: string; template_code?: string; modeling_skeleton?: string };
   semantic: {
     ui_metadata?: Record<string, unknown>;
     sets: Array<{
@@ -115,18 +118,25 @@ const createParameterGroups = (): ModelDraft['parameter_groups'] => ({
   objective_weights: {},
 });
 
-export function createInitialDraft(): ModelDraft {
-  const scenario = getDefaultScenario();
-  const model = getDefaultScenarioModel();
+function createSessionId() {
+  return `workspace_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+}
+
+function createModelCode() {
+  return `model_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`;
+}
+
+export function createBlankDraft(options: { generateCode?: boolean } = {}): ModelDraft {
   return {
     basic_info: {
-      name: model.name,
-      model_code: model.code,
-      scenario: scenario.name,
-      builder_mode: model.builderMode,
+      name: '',
+      model_code: options.generateCode === false ? '' : createModelCode(),
+      scenario: '',
+      scenario_id: undefined,
+      builder_mode: 'generic_linear',
       solver: 'HiGHS',
-      template_code: model.templateCode,
-      modeling_skeleton: 'dispatch_optimization',
+      template_code: undefined,
+      modeling_skeleton: undefined,
     },
     semantic: createBaseSemantic(),
     components: [],
@@ -136,6 +146,11 @@ export function createInitialDraft(): ModelDraft {
     parameter_groups: createParameterGroups(),
     advanced: {},
   };
+}
+
+/** @deprecated Prefer createBlankDraft. Kept for utility and test compatibility. */
+export function createInitialDraft(): ModelDraft {
+  return createBlankDraft();
 }
 
 export const initialDraft: ModelDraft = createInitialDraft();
@@ -150,36 +165,11 @@ function patchDraft(current: ModelDraft, patch: Partial<ModelDraft>): ModelDraft
   };
 }
 
-function createDraftForSelection(current: ModelDraft, scenarioId: string, modelId: string): ModelDraft {
-  const scenario = getScenarioById(scenarioId) || getDefaultScenario();
-  const selectedModel = getScenarioModelById(scenario.id, modelId) || scenario.models[0];
-  const isBlankModel = modelId === BLANK_MODEL_ID;
-  return {
-    basic_info: {
-      name: isBlankModel ? '' : selectedModel.name,
-      model_code: isBlankModel ? '' : selectedModel.code,
-      scenario: scenario.name,
-      builder_mode: isBlankModel ? 'component_based' : selectedModel.builderMode,
-      solver: current.basic_info.solver || 'HiGHS',
-      template_code: isBlankModel ? undefined : selectedModel.templateCode,
-      modeling_skeleton: current.basic_info.modeling_skeleton || 'dispatch_optimization',
-    },
-    semantic: createBaseSemantic(),
-    components: [],
-    formulas: [],
-    time_dimension: { schema_version: 1, enabled: false, policy: 'not_applicable', editable: false },
-    runtime_parameters: {},
-    parameter_groups: createParameterGroups(),
-    advanced: {},
-  };
-}
-
 interface State {
   draft: ModelDraft;
   modelDraft: ModelDraft;
+  workspace: ModelWorkspaceContext;
   step: number;
-  selectedScenarioId: string;
-  selectedModelId: string;
   builderMode: BuildMode;
   loadedTemplate: ModelTemplate | null;
   validationResult: ModelDraftValidationResult | null;
@@ -187,70 +177,60 @@ interface State {
   setStep: (n: number) => void;
   updateDraft: (patch: Partial<ModelDraft>) => void;
   setDraft: (d: ModelDraft) => void;
+  initializeWorkspace: (context: Omit<ModelWorkspaceContext, 'initialized' | 'dirty'>, draft: ModelDraft, step?: number) => void;
+  setWorkspace: (patch: Partial<ModelWorkspaceContext>) => void;
   setCurrentDraftModelId: (id?: string) => void;
-  selectCatalogModel: (scenarioId: string, modelId?: string) => void;
   setLoadedTemplate: (template: ModelTemplate | null) => void;
   setValidationResult: (result: ModelDraftValidationResult | null) => void;
   reset: () => void;
 }
 
-const selectedDefaultModel = getDefaultScenarioModel();
+function createWorkspace(mode: ModelWorkspaceMode = 'new'): ModelWorkspaceContext {
+  return { mode, sessionId: createSessionId(), initialized: false, dirty: false };
+}
 
-export const useModelCreationStore = create<State>()(persist((set) => ({
-  draft: createInitialDraft(),
-  modelDraft: createInitialDraft(),
+const blankDraft = createBlankDraft();
+
+export const useModelCreationStore = create<State>()((set) => ({
+  draft: blankDraft,
+  modelDraft: blankDraft,
+  workspace: createWorkspace(),
   step: 0,
-  selectedScenarioId: DEFAULT_SCENARIO_ID,
-  selectedModelId: selectedDefaultModel.id,
-  builderMode: selectedDefaultModel.builderMode,
+  builderMode: blankDraft.basic_info.builder_mode,
   loadedTemplate: null,
   validationResult: null,
   currentDraftModelId: undefined,
   setStep: step => set({ step }),
   updateDraft: patch => set(state => {
     const draft = patchDraft(state.draft, patch);
-    return { draft, modelDraft: draft, builderMode: draft.basic_info.builder_mode };
+    return { draft, modelDraft: draft, builderMode: draft.basic_info.builder_mode, workspace: { ...state.workspace, dirty: true } };
   }),
-  setDraft: draft => set({ draft, modelDraft: draft, builderMode: draft.basic_info.builder_mode }),
-  setCurrentDraftModelId: currentDraftModelId => set({ currentDraftModelId }),
-  selectCatalogModel: (scenarioId, modelId) => set(state => {
-    const scenario = getScenarioById(scenarioId) || getDefaultScenario();
-    const selectedModelId = modelId || scenario.models[0]?.id || BLANK_MODEL_ID;
-    const draft = createDraftForSelection(state.draft, scenario.id, selectedModelId);
-    return {
+  setDraft: draft => set(state => ({ draft, modelDraft: draft, builderMode: draft.basic_info.builder_mode, workspace: { ...state.workspace, dirty: true } })),
+  initializeWorkspace: (context, draft, step = 0) => set({
+    draft,
+    modelDraft: draft,
+    workspace: { ...context, initialized: true, dirty: false },
+    step,
+    builderMode: draft.basic_info.builder_mode,
+    loadedTemplate: null,
+    validationResult: null,
+    currentDraftModelId: context.currentAssetId,
+  }),
+  setWorkspace: patch => set(state => ({ workspace: { ...state.workspace, ...patch } })),
+  setCurrentDraftModelId: currentDraftModelId => set(state => ({ currentDraftModelId, workspace: { ...state.workspace, currentAssetId: currentDraftModelId } })),
+  setLoadedTemplate: loadedTemplate => set({ loadedTemplate }),
+  setValidationResult: validationResult => set({ validationResult }),
+  reset: () => {
+    const draft = createBlankDraft();
+    return set({
       draft,
       modelDraft: draft,
-      selectedScenarioId: scenario.id,
-      selectedModelId,
+      workspace: { ...createWorkspace('new'), initialized: true },
+      step: 0,
       builderMode: draft.basic_info.builder_mode,
       loadedTemplate: null,
       validationResult: null,
       currentDraftModelId: undefined,
-    };
-  }),
-  setLoadedTemplate: loadedTemplate => set({ loadedTemplate }),
-  setValidationResult: validationResult => set({ validationResult }),
-  reset: () => {
-    const draft = createInitialDraft();
-    return set({
-      draft,
-      modelDraft: draft,
-      step: 0,
-      selectedScenarioId: DEFAULT_SCENARIO_ID,
-      selectedModelId: selectedDefaultModel.id,
-      builderMode: selectedDefaultModel.builderMode,
-      loadedTemplate: null,
-      validationResult: null,
-      currentDraftModelId: undefined,
     });
-  },
-}), {
-  name: 'copt-model-creation-draft',
-  version: 1,
-  migrate: persisted => {
-    const state = (persisted || {}) as Partial<State>;
-    const fallback = createInitialDraft();
-    const draft = migrateModelDraft(state.draft || state.modelDraft, fallback);
-    return { ...state, draft, modelDraft: draft, builderMode: draft.basic_info.builder_mode } as State;
   },
 }));

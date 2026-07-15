@@ -1,9 +1,10 @@
 import { Alert, Button, Card, Collapse, Descriptions, Input, Segmented, Select, Space, Table, Tabs, Tag, message } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { ModelDraft } from '../stores/modelCreationStore';
 import { JsonViewer } from '../../../components/JsonViewer';
 import { systemTimeFieldCodes } from '../utils/timeDimensionDraft';
+import { inferModelProblemType } from '../utils/inferModelProblemType';
 
 type ParameterGroupKey = 'runtime' | 'static' | 'ledger' | 'system' | 'objective_weights';
 type ParameterDef = ModelDraft['semantic']['parameters'][number];
@@ -76,6 +77,31 @@ function hasValue(value: unknown) {
   return value !== undefined && value !== null && value !== '';
 }
 
+export function parseRuntimeParameterJson(text: string): Record<string, unknown> {
+  const parsed: unknown = JSON.parse(text);
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    throw new Error('运行参数 JSON 的根节点必须为对象，例如 {"load": [1,2,3]}。');
+  }
+  return parsed as Record<string, unknown>;
+}
+
+function RuntimeValueInput({ row, labelPrefix, onCommit }: { row: RuntimeParameterRow; labelPrefix: string; onCommit: (value: unknown) => void }) {
+  const externalText = valueToText(row.currentValue);
+  const [text, setText] = useState(externalText);
+  useEffect(() => setText(externalText), [externalText]);
+  return (
+    <Input
+      aria-label={`${labelPrefix}${row.code} 当前值`}
+      value={text}
+      placeholder={valueToText(row.defaultValue ?? row.exampleValue)}
+      disabled={row.disabled}
+      onChange={event => setText(event.target.value)}
+      onBlur={() => onCommit(parseValue(text))}
+      onPressEnter={() => onCommit(parseValue(text))}
+    />
+  );
+}
+
 export function buildRuntimeParameterRows(draft: ModelDraft): RuntimeParameterRow[] {
   const systemFields = systemTimeFieldCodes(draft.time_dimension);
   return draft.semantic.parameters.filter(parameter => !systemFields.has(parameter.code)).map(parameter => {
@@ -132,8 +158,16 @@ export function Step4RuntimeParams({ draft, onChange }: { draft: ModelDraft; onC
   const [json, setJson] = useState(JSON.stringify(businessRuntime, null, 2));
   const missing = validateRuntimeParameters(draft);
   const functionMappings = draft.components.filter(component => String(component.type || component.component_id) === 'function_mapping_component' || component.function_asset_id);
-  const isHydro = String(draft.basic_info.model_code || '').startsWith('cascade_hydro_dispatch');
-  const isDeprecatedV1 = draft.basic_info.model_code === 'cascade_hydro_dispatch_v1';
+  const parameterCodes = useMemo(() => new Set(draft.semantic.parameters.map(parameter => parameter.code)), [draft.semantic.parameters]);
+  const hasHydroPowerMode = parameterCodes.has('hydro_power_mode') || Object.prototype.hasOwnProperty.call(draft.runtime_parameters, 'hydro_power_mode');
+  const hasLoadTrackingMode = parameterCodes.has('load_tracking_mode') || Object.prototype.hasOwnProperty.call(draft.runtime_parameters, 'load_tracking_mode');
+  const showDispatchModes = hasHydroPowerMode || hasLoadTrackingMode;
+  const replacementCode = String(draft.advanced.ui_metadata?.replacement_model_code || draft.semantic.ui_metadata?.replacement_model_code || '');
+  const deprecated = Boolean(draft.advanced.ui_metadata?.deprecated || draft.semantic.ui_metadata?.deprecated);
+
+  useEffect(() => {
+    setJson(JSON.stringify(businessRuntime, null, 2));
+  }, [businessRuntime]);
 
   const updateHydroMode = (code: string, value: unknown) => {
     const runtimeParameters = { ...draft.runtime_parameters, [code]: value };
@@ -150,7 +184,7 @@ export function Step4RuntimeParams({ draft, onChange }: { draft: ModelDraft; onC
 
   const applyJson = () => {
     try {
-      const imported = JSON.parse(json) as Record<string, unknown>;
+      const imported = parseRuntimeParameterJson(json);
       const runtime = {
         ...Object.fromEntries(Object.entries(draft.runtime_parameters).filter(([key]) => systemFields.has(key))),
         ...Object.fromEntries(Object.entries(imported).filter(([key]) => !systemFields.has(key))),
@@ -161,8 +195,8 @@ export function Step4RuntimeParams({ draft, onChange }: { draft: ModelDraft; onC
         if (nextMissing.length) message.warning(`导入完成，但仍缺少 ${nextMissing.length} 个必填参数`);
         else message.success('JSON 参数导入并校验通过');
       }
-    } catch {
-      if (import.meta.env.MODE !== 'test') message.error('参数 JSON 格式错误');
+    } catch (error) {
+      if (import.meta.env.MODE !== 'test') message.error(error instanceof Error ? error.message : '参数 JSON 格式错误');
     }
   };
 
@@ -180,13 +214,7 @@ export function Step4RuntimeParams({ draft, onChange }: { draft: ModelDraft; onC
       dataIndex: 'currentValue',
       width: 180,
       render: (_value, row) => (
-        <Input
-          aria-label={`${labelPrefix}${row.code} 当前值`}
-          defaultValue={valueToText(row.currentValue)}
-          placeholder={valueToText(row.defaultValue || row.exampleValue)}
-          disabled={row.disabled}
-          onBlur={event => updateRuntimeValue(row, parseValue(event.target.value))}
-        />
+        <RuntimeValueInput row={row} labelPrefix={labelPrefix} onCommit={value => updateRuntimeValue(row, value)} />
       ),
     },
     {
@@ -206,31 +234,31 @@ export function Step4RuntimeParams({ draft, onChange }: { draft: ModelDraft; onC
 
   return (
     <>
-      {isDeprecatedV1 && <Alert className="compact-step-note" type="warning" showIcon title="该模板为兼容入口" description="新建模型请使用 cascade_hydro_dispatch，并选择二维三角片 PWL；旧调用将自动迁移到统一组件模型。" />}
-      {isHydro && (
+      {deprecated && replacementCode && <Alert className="compact-step-note" type="warning" showIcon title="该模板为兼容入口" description={`新建模型请使用 ${replacementCode}；旧调用将按版本治理规则解析到活动版本。`} />}
+      {showDispatchModes && (
         <Card size="small" title="梯级水电求解配置" className="section-gap">
           <Space wrap size={20}>
             <Space orientation="vertical" size={4}>
               <span>水电出力关系</span>
-              <Segmented
+              {hasHydroPowerMode && <Segmented
                 aria-label="水电出力关系"
                 value={String(draft.runtime_parameters.hydro_power_mode || 'linear')}
                 options={[{ label: '线性', value: 'linear' }, { label: '一维严格 PWL', value: 'pwl_1d' }, { label: '二维三角片 PWL', value: 'pwl_2d' }]}
                 onChange={value => updateHydroMode('hydro_power_mode', value)}
-              />
+              />}
             </Space>
             <Space orientation="vertical" size={4}>
               <span>负荷跟踪模式</span>
-              <Select
+              {hasLoadTrackingMode && <Select
                 aria-label="负荷跟踪模式"
                 style={{ width: 180 }}
                 value={String(draft.runtime_parameters.load_tracking_mode || 'soft')}
                 options={[{ label: '关闭', value: 'disabled' }, { label: '软约束', value: 'soft' }, { label: '硬约束', value: 'hard' }]}
                 onChange={value => updateHydroMode('load_tracking_mode', value)}
-              />
+              />}
             </Space>
             <Tag color={String(draft.runtime_parameters.hydro_power_mode || 'linear') === 'linear' ? 'blue' : 'gold'}>
-              {String(draft.runtime_parameters.hydro_power_mode || 'linear') === 'linear' ? 'LP / HiGHS' : 'MILP / HiGHS'}
+              {inferModelProblemType(draft)} / {draft.basic_info.solver || 'HiGHS'}
             </Tag>
           </Space>
           <Alert className="section-gap-tight" type="info" showIcon title="当前模型通过分段线性方式近似水电非线性特性，并由 HiGHS 按 LP/MILP 求解。" />

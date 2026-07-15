@@ -205,7 +205,7 @@ export function Step5ReviewPublish({
           showIcon
           title="当前模型被识别为 NLP，将使用 Ipopt 求解。"
           description={(
-            <Space direction="vertical">
+            <Space orientation="vertical">
               <Typography.Text>Ipopt 通常返回局部最优结果，结果依赖初值、变量上下界和模型缩放。请确认你理解该风险。</Typography.Text>
               <Checkbox checked={nlpRiskAcknowledged} onChange={event => setNlpRiskAcknowledged(event.target.checked)}>我理解 NLP 局部最优风险</Checkbox>
             </Space>

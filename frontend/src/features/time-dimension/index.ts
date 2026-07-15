@@ -10,7 +10,7 @@ export interface TimeDimensionConfig {
 }
 export interface RuntimeField {
   code: string; name: string; required: boolean; dimension: string[]; defaultValue?: unknown; exampleValue?: unknown;
-  type?: string; unit?: string; description?: string; enumValues?: unknown[];
+  type?: string; unit?: string; description?: string; enumValues?: unknown[]; dimensionValues?: Record<string, string[]>; min?: number; max?: number;
 }
 
 export const objectValue = (value: unknown): Record<string, unknown> => value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {};
@@ -49,21 +49,28 @@ export function resolveTimeDimension(...sources: unknown[]): TimeDimensionConfig
 
 export function runtimeFieldsFromContracts(...sources: unknown[]): RuntimeField[] {
   const rows = new Map<string, RuntimeField>();
+  const setValues: Record<string, string[]> = {};
   const seen = new Set<unknown>();
   const visit = (source: unknown) => {
     if (!source || typeof source !== 'object' || Array.isArray(source) || seen.has(source)) return;
     seen.add(source);
     const record = objectValue(source);
+    for (const item of records(record.sets)) {
+      const code = String(item.code || item.name || '');
+      const values = Array.isArray(item.values) ? item.values : Array.isArray(item.members) ? item.members : [];
+      if (code && values.length) setValues[code] = values.map(String);
+    }
+    for (const [code, value] of Object.entries(objectValue(record.sets))) if (Array.isArray(value)) setValues[code] = value.map(String);
     for (const item of [...records(record.parameters), ...records(record.runtime_parameters), ...records(record.parameter_bindings)]) {
       const code = String(item.code || item.math_param || item.key || item.parameter || item.parameter_code || item.model_parameter || '');
       if (!code) continue;
       const existing = rows.get(code);
-      rows.set(code, { code, name: String(item.name || item.label || item.display_name || existing?.name || code), required: Boolean(item.required ?? existing?.required), dimension: extractDimensions(item).length ? extractDimensions(item) : existing?.dimension || [], defaultValue: item.default ?? item.defaultValue ?? existing?.defaultValue, exampleValue: item.example ?? item.exampleValue ?? item.sample ?? existing?.exampleValue, type: String(item.type || item.value_type || existing?.type || ''), unit: String(item.unit || existing?.unit || ''), description: String(item.description || existing?.description || ''), enumValues: Array.isArray(item.enum) ? item.enum : existing?.enumValues } );
+      rows.set(code, { code, name: String(item.name || item.label || item.display_name || existing?.name || code), required: Boolean(item.required ?? existing?.required), dimension: extractDimensions(item).length ? extractDimensions(item) : existing?.dimension || [], defaultValue: item.default ?? item.defaultValue ?? existing?.defaultValue, exampleValue: item.example ?? item.exampleValue ?? item.sample ?? existing?.exampleValue, type: String(item.type || item.value_type || existing?.type || ''), unit: String(item.unit || existing?.unit || ''), description: String(item.description || existing?.description || ''), enumValues: Array.isArray(item.enum) ? item.enum : existing?.enumValues, min: item.min == null ? existing?.min : Number(item.min), max: item.max == null ? existing?.max : Number(item.max) } );
     }
     ['input_schema', 'parameter_schema', 'semantic_schema', 'input_contract', 'semantic_spec', 'component_spec'].forEach(key => visit(record[key]));
   };
   sources.forEach(visit);
-  return [...rows.values()];
+  return [...rows.values()].map(field => ({ ...field, dimensionValues: Object.fromEntries(field.dimension.filter(code => setValues[code]).map(code => [code, setValues[code]])) }));
 }
 
 export function managedTimeFields(config: TimeDimensionConfig) {
@@ -105,7 +112,8 @@ export function deriveHorizon(config: TimeDimensionConfig, fields: RuntimeField[
   if (config.policy === 'data_derived' && config.derive_from) {
     if (isRuntimeValueEmpty(parameters[config.derive_from])) return undefined;
     const field = fields.find(item => item.code === config.derive_from);
-    const axis = Math.max(0, field?.dimension.indexOf(config.time_set) ?? 0);
+    const axis = field?.dimension.indexOf(config.time_set) ?? -1;
+    if (axis < 0) return undefined;
     return axisLength(parameters[config.derive_from], axis);
   }
   return selected !== undefined ? selected : config.default_horizon;
@@ -115,6 +123,18 @@ export function validateRuntimeTimeDimension(config: TimeDimensionConfig, fields
   if (!config.enabled) return [];
   const errors: string[] = [];
   const horizon = deriveHorizon(config, fields, parameters, selected);
+  if (config.policy === 'data_derived') {
+    const source = config.derive_from || '未配置的推导来源';
+    const field = fields.find(item => item.code === config.derive_from);
+    if (!field || !field.dimension.length) {
+      errors.push(`参数 ${source} 缺少维度声明，未明确引用时间点集合 ${config.time_set}，不能作为 horizon 推导来源。请补充维度元数据或修改 derive_from。`);
+      return errors;
+    }
+    if (!field.dimension.includes(config.time_set)) {
+      errors.push(`参数 ${source} 的维度为 [${field.dimension.join(', ')}]，未引用时间点集合 ${config.time_set}，不能作为 horizon 推导来源。请修改模型时间维度契约中的 derive_from，或为该参数补充 ${config.time_set} 维度。`);
+      return errors;
+    }
+  }
   if (config.policy === 'data_derived' && (!Number.isFinite(horizon) || !Number.isInteger(horizon) || Number(horizon) <= 0)) {
     const source = config.derive_from || '未配置的推导来源';
     const field = fields.find(item => item.code === config.derive_from);

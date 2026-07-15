@@ -1,6 +1,6 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-import { vi } from 'vitest';
+import { beforeEach, vi } from 'vitest';
 import {
   ModelComponentPanel,
   ModelGenericPanel,
@@ -54,6 +54,7 @@ const testState = vi.hoisted(() => {
     },
   };
   return {
+    routeId: 'model_001' as string | undefined,
     modelSample,
     assetDetail: {
       basic_info: modelSample,
@@ -83,13 +84,15 @@ const testState = vi.hoisted(() => {
     testModel: vi.fn(async (id: string) => ({ ...modelSample, id, status: 'tested' })),
     copyModel: vi.fn(async (id: string) => ({ ...modelSample, id: `${id}_copy`, name: '日前调度模型 副本' })),
     offlineModel: vi.fn(async (id: string) => ({ ...modelSample, id, status: 'offline' })),
+    getModel: vi.fn(async (id: string) => ({ ...modelSample, id, name: id === 'model_002' ? '模型 B' : modelSample.name })),
+    getModelAssetDetail: vi.fn(async (id: string): Promise<any> => ({ ...modelSample, id })),
   };
 });
 
 vi.mock('../../api/models', () => ({
   getModels: async () => [testState.modelSample],
-  getModel: async () => testState.modelSample,
-  getModelAssetDetail: async () => testState.assetDetail,
+  getModel: testState.getModel,
+  getModelAssetDetail: testState.getModelAssetDetail,
   publishModel: testState.publishModel,
   testModel: testState.testModel,
   copyModel: testState.copyModel,
@@ -104,7 +107,7 @@ vi.mock('../../api/templates', () => ({
 const navigate = vi.fn();
 vi.mock('react-router-dom', async importOriginal => {
   const actual = await importOriginal<typeof import('react-router-dom')>();
-  return { ...actual, useNavigate: () => navigate };
+  return { ...actual, useNavigate: () => navigate, useParams: () => ({ id: testState.routeId }) };
 });
 
 function renderPage() {
@@ -115,10 +118,21 @@ function renderPage() {
   );
 }
 
+beforeEach(() => {
+  navigate.mockReset();
+  testState.routeId = 'model_001';
+  testState.getModel.mockClear();
+  testState.getModelAssetDetail.mockClear();
+  testState.getModelAssetDetail.mockImplementation(async (id: string) => ({
+    ...testState.assetDetail,
+    basic_info: { ...testState.modelSample, id },
+  }));
+});
+
 test('renders model center metrics and basic asset detail', async () => {
   renderPage();
   expect(screen.getByText('模型资产中心')).toBeInTheDocument();
-  expect(await screen.findByText('日前调度模型')).toBeInTheDocument();
+  expect((await screen.findAllByText('日前调度模型')).length).toBeGreaterThan(0);
   expect(screen.getByText('可调用模型')).toBeInTheDocument();
   expect(screen.getByText(/组件化\s*0\s*\/\s*通用线性\s*1/)).toBeInTheDocument();
 
@@ -192,18 +206,30 @@ test('renders governance and history model panels', () => {
 }, 30000);
 
 test('runs model asset operations from list', async () => {
+  testState.routeId = undefined;
   renderPage();
-  expect(await screen.findByText('日前调度模型')).toBeInTheDocument();
+  expect((await screen.findAllByText('日前调度模型')).length).toBeGreaterThan(0);
 
   fireEvent.click(screen.getByRole('button', { name: /更多/ }));
-  fireEvent.click(await screen.findByText('测试运行'));
+  fireEvent.click((await screen.findAllByText('测试运行')).at(-1) as HTMLElement);
   await waitFor(() => expect(testState.testModel).toHaveBeenCalledWith('model_001', { parameters: { load: [10, 12] } }));
 
   fireEvent.click(screen.getByRole('button', { name: /更多/ }));
-  fireEvent.click(await screen.findByText('下线模型'));
+  fireEvent.click((await screen.findAllByText('下线模型')).at(-1) as HTMLElement);
   await waitFor(() => expect(testState.offlineModel.mock.calls[0]?.[0]).toBe('model_001'));
 
   fireEvent.click(screen.getByRole('button', { name: /更多/ }));
-  fireEvent.click(await screen.findByText('复制版本'));
-  await waitFor(() => expect(testState.copyModel.mock.calls[0]?.[0]).toBe('model_001'));
+  fireEvent.click((await screen.findAllByText('复制模型')).at(-1) as HTMLElement);
+  expect(navigate).toHaveBeenCalledWith('/models/create?mode=clone&source=model_001');
+}, 30000);
+
+test('model detail follows route id changes and close returns to models', async () => {
+  const view = renderPage();
+  await waitFor(() => expect(testState.getModel).toHaveBeenCalledWith('model_001'));
+  testState.routeId = 'model_002';
+  view.rerender(<MemoryRouter><ModelCenterPage /></MemoryRouter>);
+  await waitFor(() => expect(testState.getModel).toHaveBeenCalledWith('model_002'));
+  expect(await screen.findByText('模型 B')).toBeInTheDocument();
+  fireEvent.click(document.querySelector('.ant-drawer-close') as HTMLButtonElement);
+  expect(navigate).toHaveBeenCalledWith('/models');
 }, 30000);

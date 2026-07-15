@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 import { mockApi } from './fixtures';
 
-test('scenario library opens model creation with selected cascade hydro context', async ({ page }) => {
+test('scenario library opens explicit backend template mode with complete content', async ({ page }) => {
   await mockApi(page);
   await page.goto('/scenarios');
 
@@ -9,9 +9,10 @@ test('scenario library opens model creation with selected cascade hydro context'
   await expect(card).toBeVisible();
   await page.getByTestId('scenario-enter-cascade_hydro_day_ahead').click();
 
-  await expect(page).toHaveURL(/\/models\/create\?scenarioId=cascade_hydro_day_ahead&modelId=cascade_hydro_dispatch_lp/);
+  await expect(page).toHaveURL(/\/models\/create\?mode=template&template=cascade_hydro_dispatch/);
+  await expect(page.getByText('从模板创建模型', { exact: true })).toBeVisible();
   await expect(page.getByTestId('scenario-select')).toContainText('梯级水电日前调度');
-  await expect(page.getByTestId('model-select')).toContainText('梯级水电日前调度模型');
-  await expect(page.getByText('组件化 / 梯级水电调度')).toBeVisible();
-  await expect(page.getByText('MILP / 机组组合')).toHaveCount(0);
+  await expect(page.getByTestId('builder-mode-select')).toContainText('组件化 Builder');
+  await page.getByRole('button', { name: /模型语义/ }).click();
+  await expect(page.getByText('hydro_reservoir_balance').first()).toBeVisible();
 });

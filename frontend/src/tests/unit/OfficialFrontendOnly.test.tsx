@@ -5,6 +5,7 @@ import { Header } from '../../app/layout/Header';
 import { navEntries } from '../../app/navigation';
 import { SettingsPage } from '../../pages/Settings/SettingsPage';
 import { renderWithQueryClient } from '../testUtils';
+import { AudienceProvider } from '../../app/audience';
 
 vi.mock('../../api/client', () => ({
   apiClient: {
@@ -17,9 +18,9 @@ vi.mock('../../api/client', () => ({
 
 test('header exposes only the React model creation entry', async () => {
   renderWithQueryClient(
-    <MemoryRouter>
+    <AudienceProvider><MemoryRouter>
       <Header pathname="/" />
-    </MemoryRouter>,
+    </MemoryRouter></AudienceProvider>,
   );
 
   expect(screen.getByRole('button', { name: /新建模型/ })).toBeInTheDocument();

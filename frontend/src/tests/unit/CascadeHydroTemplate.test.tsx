@@ -49,6 +49,10 @@ const cascadeTemplate: ModelTemplate = {
     objective: { sense: 'maximize', terms: [] },
     runtime_parameters: { horizon: 2, time: [0, 1], hydro_power_mode: 'pwl_2d', load_tracking_mode: 'soft', load_forecast: [100, 100], station: ['R1', 'R2'] },
     advanced: {
+      ui_metadata: {
+        deprecated: true,
+        replacement_model_code: 'cascade_hydro_dispatch',
+      },
       component_spec: {
         model_problem_type: 'MILP',
         problem_type_diagnosis: {
@@ -123,6 +127,18 @@ test('Step3 展示梯级水电核心组件', () => {
 
 test('负荷跟踪关闭时负荷预测非必填，出力模式决定 LP/MILP', () => {
   const draft = cascadeDraft();
+  // This case exercises inference without an explicit/compiled declaration.
+  // Declared problem_type intentionally has higher priority in production.
+  delete (draft.basic_info as unknown as Record<string, unknown>).problem_type;
+  delete draft.semantic.ui_metadata?.problem_type;
+  delete draft.advanced.ui_metadata?.problem_type;
+  delete draft.advanced.component_spec?.model_problem_type;
+  delete draft.advanced.component_spec?.problem_type_diagnosis;
+  draft.components = draft.components.map(component => ({
+    ...component,
+    solve_strategy: undefined,
+    linearization_strategy: undefined,
+  }));
   draft.runtime_parameters.load_tracking_mode = 'disabled';
   draft.runtime_parameters.hydro_power_mode = 'linear';
   const loadRow = buildRuntimeParameterRows(draft).find(row => row.code === 'load_forecast');

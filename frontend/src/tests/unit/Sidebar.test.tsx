@@ -1,9 +1,10 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter, useLocation } from 'react-router-dom';
 import { Sidebar } from '../../app/layout/Sidebar';
+import { AudienceProvider } from '../../app/audience';
 
 function Probe() { return <span data-testid="path">{useLocation().pathname}</span>; }
-const renderSidebar = (path = '/', collapsed = false) => render(<MemoryRouter initialEntries={[path]}><Sidebar collapsed={collapsed} /><Probe /></MemoryRouter>);
+const renderSidebar = (path = '/', collapsed = false, audience: 'business' | 'expert' = 'expert') => { localStorage.setItem('copt.platform.audience', audience); return render(<AudienceProvider><MemoryRouter initialEntries={[path]}><Sidebar collapsed={collapsed} /><Probe /></MemoryRouter></AudienceProvider>); };
 
 test('renders the product information architecture and removes model creation from persistent navigation', () => {
   renderSidebar();
@@ -28,6 +29,14 @@ test('navigates and preserves semantic current state', () => {
 
 test('collapsed sidebar keeps accessible titles and hides visual labels', () => {
   renderSidebar('/', true);
+  expect(screen.getByLabelText('安全生产运筹优化平台')).toBeInTheDocument();
   expect(screen.getByTitle('求解任务')).toBeInTheDocument();
   expect(screen.queryByText('优化运行')).not.toBeInTheDocument();
+});
+
+test('business view hides expert navigation without blocking routes', () => {
+  renderSidebar('/functions', false, 'business');
+  expect(screen.queryByTitle('函数与曲线')).not.toBeInTheDocument();
+  expect(screen.getByTestId('path')).toHaveTextContent('/functions');
+  expect(screen.getByTitle('求解任务')).toBeInTheDocument();
 });

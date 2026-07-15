@@ -155,15 +155,17 @@ def test_cascade_hydro_invoke_horizon_96_regenerates_time_sets_success() -> None
 
 def test_publish_component_model_infers_build_mode_from_component_spec() -> None:
     template = deepcopy(get_template("cascade_hydro_dispatch"))
+    custom_code = f"cascade_hydro_infer_{int(time.time() * 1000)}"
     payload = {
         "id": f"MODEL-CASCADE-HYDRO-INFER-{int(time.time() * 1000)}",
         "name": "cascade-hydro-infer-component-mode",
         "scene": "梯级水电日前调度",
         "status": "developing",
         "build_mode": "generic_linear",
-        "semantic_spec": {**template, "build_mode": "generic_linear"},
+        "template_id": custom_code,
+        "semantic_spec": {**template, "code": custom_code, "model_code": custom_code, "build_mode": "generic_linear"},
         "generic_spec": {},
-        "component_spec": {**template["component_spec"], "build_mode": "component_based"},
+        "component_spec": {**template["component_spec"], "model_code": custom_code, "build_mode": "component_based"},
         "component_schema": template.get("component_schema", {}),
         "parameters": template["sample_runtime_parameters"],
     }

@@ -62,7 +62,26 @@ export async function mockApi(page: Page) {
     const method = route.request().method();
     let body: unknown = [];
     if (url.endsWith('/api/health')) body = { ok: true };
-    else if (url.includes('/api/templates/')) body = { code: 'economic_dispatch', name: '经济调度', scenario: 'economic_dispatch', build_mode: 'generic_linear', model_draft: {} };
+    else if (url.includes('/api/templates/')) {
+      const code = decodeURIComponent(url.split('/api/templates/')[1].split('?')[0]);
+      const isHydro = code === 'cascade_hydro_dispatch';
+      body = {
+        code,
+        name: isHydro ? '梯级水电日前调度模板' : '经济调度',
+        scenario: isHydro ? '梯级水电日前调度' : '经济负荷分配',
+        build_mode: isHydro ? 'component_based' : 'generic_linear',
+        model_draft: {
+          semantic: {
+            sets: [{ code: 'time', name: '时段' }],
+            parameters: [{ code: 'load', name: '负荷' }],
+            variables: [{ code: 'p', name: '出力', variableType: 'continuous' }],
+          },
+          components: isHydro ? [{ component_id: 'hydro_reservoir_balance', enabled: true }] : [],
+          formulas: [{ formula_id: 'balance', name: '平衡约束', kind: 'constraint', display_formula: 'p=load', dsl_formula: 'p=load', tokens: [], foreach: [], referenced_sets: [], referenced_parameters: [], referenced_variables: [], free_indices: [], compile_status: 'ready' }],
+          runtime_parameters: { horizon: 24 },
+        },
+      };
+    }
     else if (url.endsWith('/api/templates')) body = [{ code: 'economic_dispatch', name: '经济调度', scenario: 'economic_dispatch' }];
     else if (url.endsWith('/api/models') && method === 'GET') body = [
       { id: 'm1', name: '示例模型', scene: 'power', version: 'v1', status: 'developing', solver: 'HiGHS', problem_type: 'LP', build_mode: 'generic_linear', updated_at: '2026-06-22' },
@@ -72,6 +91,8 @@ export async function mockApi(page: Page) {
     else if (url.endsWith('/api/models') && method === 'POST') {
       const payload = JSON.parse(route.request().postData() || '{}');
       savedModel = { ...savedModel, ...payload, id: 'MODEL-DRAFT-1', status: 'draft', updated_at: '2026-06-24' };
+      body = savedModel;
+    } else if (url.endsWith('/api/models/MODEL-DRAFT-1') && method === 'GET') {
       body = savedModel;
     } else if (url.endsWith('/api/models/MODEL-DRAFT-1') && method === 'PUT') {
       const payload = JSON.parse(route.request().postData() || '{}');

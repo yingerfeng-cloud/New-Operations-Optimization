@@ -1,4 +1,4 @@
-import { Button, Dropdown, Space, Tooltip } from 'antd';
+import { Button, Dropdown, Segmented, Space, Tooltip } from 'antd';
 import { useQuery } from '@tanstack/react-query';
 import { MenuFoldOutlined, MenuOutlined, MenuUnfoldOutlined, PlusOutlined, SearchOutlined } from '@ant-design/icons';
 import { useEffect, useState } from 'react';
@@ -6,12 +6,14 @@ import { useNavigate } from 'react-router-dom';
 import { apiClient, unwrap } from '../../api/client';
 import { titleForPath } from '../navigation';
 import { CommandSearch } from './CommandSearch';
+import { useAudience } from '../audience';
 
 interface HealthResponse { ok: boolean; service?: string; solver?: string; pyomo_installed?: boolean; highspy_installed?: boolean }
 interface HeaderProps { pathname: string; mobile?: boolean; medium?: boolean; sidebarCollapsed?: boolean; onOpenMenu?: () => void; onToggleSidebar?: () => void }
 
 export function Header({ pathname, mobile = false, medium = false, sidebarCollapsed = false, onOpenMenu = () => undefined, onToggleSidebar = () => undefined }: HeaderProps) {
   const nav = useNavigate();
+  const { audience, setAudience } = useAudience();
   const [searchOpen, setSearchOpen] = useState(false);
   const refetchInterval = import.meta.env.MODE === 'test' ? false : 30000;
   const { data, isError, isFetching } = useQuery({ queryKey: ['health'], queryFn: () => unwrap<HealthResponse>(apiClient.get('/api/health')), refetchInterval });
@@ -39,15 +41,16 @@ export function Header({ pathname, mobile = false, medium = false, sidebarCollap
         <div className="top-search-area">
           {mobile && <Button type="text" icon={<MenuOutlined />} onClick={onOpenMenu} aria-label="打开主导航" />}
           {medium && <Tooltip title={sidebarCollapsed ? '展开侧栏' : '折叠侧栏'}><Button type="text" icon={sidebarCollapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />} onClick={onToggleSidebar} aria-label={sidebarCollapsed ? '展开侧栏' : '折叠侧栏'} /></Tooltip>}
-          <span className="current-page-chip">{current.label}</span>
+          {!mobile && <span className="current-page-chip">{current.label}</span>}
           <button className="global-search" type="button" onClick={() => setSearchOpen(true)} aria-label="打开全局搜索">
             <SearchOutlined /><span>{mobile ? '搜索' : '搜索模型、场景、任务或报告'}</span><kbd>{mobile ? '' : 'Ctrl K'}</kbd>
           </button>
         </div>
         <div className="top-actions">
           <Space size={8}>
+            {!mobile && <Segmented aria-label="平台视图" size="small" value={audience} onChange={value => setAudience(value as 'business' | 'expert')} options={[{ label: '业务视图', value: 'business' }, { label: '专家视图', value: 'expert' }]} />}
             {!mobile && <Dropdown menu={{ items: statusItems }} trigger={['click']}><button className={`status-pill ${backendOnline ? 'status-pill-green' : isError ? 'status-pill-red' : 'status-pill-amber'}`} type="button">{statusText}</button></Dropdown>}
-            <Button type="primary" icon={<PlusOutlined />} onClick={() => nav('/models/create')}>{mobile ? '' : '新建模型'}</Button>
+            {!mobile && <Button type="primary" icon={<PlusOutlined />} onClick={() => nav('/models/create')}>新建模型</Button>}
           </Space>
         </div>
       </header>

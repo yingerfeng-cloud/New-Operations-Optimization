@@ -25,6 +25,7 @@ class JobService:
         record = TaskRecord(id=task_id, request=req, max_retries=max(0, req.max_retries))
         with STORE.lock:
             STORE.tasks[task_id] = record
+            STORE.save_runtime()
         if os.getenv("COPT_SYNC_JOBS") == "true" or req.async_run is False:
             job_runner.run(task_id)
         else:
@@ -44,26 +45,30 @@ class JobService:
 
     def cancel_task(self, task_id: str) -> TaskView:
         task = self.get_task(task_id)
-        if task.status not in {"PENDING", "VALIDATING", "BUILDING_MODEL", "SOLVING", "FORMATTING_RESULT"}:
+        if task.status not in {"PENDING", "QUEUED", "RUNNING", "VALIDATING", "BUILDING_MODEL", "SOLVING", "FORMATTING_RESULT"}:
             raise HTTPException(status_code=409, detail=f"Cannot cancel task in status {task.status}")
-        task.status = "CANCELLED"
-        task.progress = 100
-        task.finished_at = now_text()
-        task.error = "Task cancelled by user"
+        with STORE.lock:
+            task.status = "CANCELLED"
+            task.progress = 100
+            task.finished_at = now_text()
+            task.error = "Task cancelled by user"
+            STORE.save_runtime()
         return task.view()
 
     def retry_task(self, task_id: str) -> TaskView:
         task = self.get_task(task_id)
-        if task.status not in {"FAILED", "TIMEOUT", "CANCELLED"}:
+        if task.status not in {"FAILED", "TIMEOUT", "CANCELLED", "INTERRUPTED"}:
             raise HTTPException(status_code=409, detail=f"Cannot retry task in status {task.status}")
-        task.error = None
-        task.result = None
-        task.progress = 5
-        task.status = "PENDING"
-        task.retry_count += 1
-        task.started_at = None
-        task.finished_at = None
-        task.duration_seconds = None
+        with STORE.lock:
+            task.error = None
+            task.result = None
+            task.progress = 5
+            task.status = "PENDING"
+            task.retry_count += 1
+            task.started_at = None
+            task.finished_at = None
+            task.duration_seconds = None
+            STORE.save_runtime()
         if os.getenv("COPT_SYNC_JOBS") == "true" or task.request.async_run is False:
             job_runner.run(task_id)
         else:
@@ -90,7 +95,7 @@ class JobService:
             req.parameters = {**req.parameters, **req.runtime_parameters}
         if req.model_code and not req.model_id:
             try:
-                resolved = model_service.find_model_by_code(req.model_code)
+                resolved = model_service.resolve_model(model_code=req.model_code)
                 req.model_id = resolved.id
                 req.payload = {
                     **req.payload,
@@ -100,7 +105,9 @@ class JobService:
                 warning = model_service.model_code_resolution_warning(req.model_code, resolved)
                 if warning:
                     req.payload["resolution_warning"] = warning
-            except HTTPException:
+            except HTTPException as exc:
+                if exc.status_code != 404:
+                    raise
                 template = deepcopy(template_library.get_template(req.model_code))
                 component_spec = deepcopy(template.get("component_spec") or {})
                 generic_spec = deepcopy(template.get("generic_spec") or {})
@@ -147,7 +154,7 @@ class JobService:
                 return
             raise HTTPException(status_code=422, detail="model_id or model_code is required for semantic optimization")
 
-        model = model_service.get_model(req.model_id)
+        model = model_service.resolve_model(model_id=req.model_id)
         if model.status not in CALLABLE_STATUSES:
             raise HTTPException(status_code=409, detail=f"Model is not callable in status: {model.status}")
         req.scene = model.scene

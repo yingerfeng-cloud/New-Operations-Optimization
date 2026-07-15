@@ -1,0 +1,52 @@
+name: real-e2e-release-gate
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  real-e2e:
+    name: Controlled Real E2E
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      COPT_SYNC_JOBS: 'true'
+      LLM_ENABLED: 'false'
+      AGENT_ALLOW_IN_PROCESS_PLATFORM_FALLBACK: 'true'
+      RUNTIME_STORE_PATH: ${{ runner.temp }}/copt-real-e2e-runtime.json
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.17.0'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13.5'
+          cache: pip
+      - run: pip install -r requirements.txt
+      - run: npm ci
+        working-directory: frontend
+      - run: npx playwright install --with-deps chromium
+        working-directory: frontend
+      - name: Verify controlled environment
+        run: python scripts/verify_e2e_environment.py
+      - name: Run Real E2E
+        run: npm run test:e2e:real
+        working-directory: frontend
+      - name: Upload Real E2E diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: real-e2e-${{ github.run_id }}
+          retention-days: 14
+          if-no-files-found: ignore
+          path: |
+            frontend/playwright-report-real-backend/
+            frontend/test-results/real-backend/

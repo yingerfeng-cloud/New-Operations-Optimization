@@ -2,6 +2,8 @@ import '@testing-library/jest-dom/vitest';
 import { afterEach, vi } from 'vitest';
 import { message, notification } from 'antd';
 import { cleanupTestEnv } from './test-utils';
+import { queryClient } from '../app/providers';
+import { useModelCreationStore } from '../features/model-creation/stores/modelCreationStore';
 
 vi.mock('echarts-for-react', async () => {
   const React = await import('react');
@@ -23,6 +25,11 @@ vi.mock('echarts', () => ({
   })),
   use: vi.fn(),
   registerTheme: vi.fn(),
+}));
+
+vi.mock('echarts/core', () => ({
+  init: vi.fn(() => ({ setOption: vi.fn(), resize: vi.fn(), dispose: vi.fn() })),
+  use: vi.fn(),
 }));
 
 vi.mock('antd', async importOriginal => {
@@ -132,5 +139,10 @@ if (testProcess?.stderr && nativeStderrWrite) {
 afterEach(async () => {
   message.destroy();
   notification.destroy();
+  await queryClient.cancelQueries();
+  queryClient.clear();
+  useModelCreationStore.getState().reset();
   await cleanupTestEnv();
+  localStorage.clear();
+  sessionStorage.clear();
 });
