@@ -219,21 +219,14 @@ finally {
   }
 }
 
-$archive = [System.IO.Compression.ZipFile]::OpenRead($OutputFullPath)
+$verificationDir = Join-Path $env:TEMP ("copt-500-package-verify-" + [guid]::NewGuid().ToString("N"))
+New-Item -ItemType Directory -Path $verificationDir | Out-Null
 try {
-  $archiveEntryNames = [System.Collections.Generic.HashSet[string]]::new(
-    [System.StringComparer]::OrdinalIgnoreCase
-  )
-  foreach ($entry in $archive.Entries) {
-    $normalizedEntryName = $entry.FullName.Replace("\", "/").TrimStart("/")
-    [void]$archiveEntryNames.Add($normalizedEntryName)
-  }
-  if ($archiveEntryNames.Count -eq 0) {
-    throw "Package self-check failed after compression. Archive contains no files."
-  }
+  [System.IO.Compression.ZipFile]::ExtractToDirectory($OutputFullPath, $verificationDir)
+  $separator = [System.IO.Path]::DirectorySeparatorChar.ToString()
   $missingFromArchive = @($RequiredPackageItems | Where-Object {
-    $requiredEntryName = $_.Replace("\", "/").TrimStart("/")
-    -not $archiveEntryNames.Contains($requiredEntryName)
+    $requiredRelativePath = $_.Replace("/", $separator).Replace("\", $separator)
+    -not (Test-Path -LiteralPath (Join-Path $verificationDir $requiredRelativePath) -PathType Leaf)
   })
   if ($missingFromArchive.Count -gt 0) {
     Remove-Item -LiteralPath $OutputFullPath -Force -ErrorAction SilentlyContinue
@@ -241,7 +234,9 @@ try {
   }
 }
 finally {
-  $archive.Dispose()
+  if (Test-Path -LiteralPath $verificationDir) {
+    Remove-Item -LiteralPath $verificationDir -Recurse -Force
+  }
 }
 
 Write-Output "PACKAGE_SELF_CHECK_OK"

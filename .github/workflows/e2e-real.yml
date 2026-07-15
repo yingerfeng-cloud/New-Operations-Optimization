@@ -18,7 +18,7 @@ jobs:
       COPT_SYNC_JOBS: 'true'
       LLM_ENABLED: 'false'
       AGENT_ALLOW_IN_PROCESS_PLATFORM_FALLBACK: 'true'
-      RUNTIME_STORE_PATH: ${{ github.workspace }}/copt-real-e2e-runtime.json
+      RUNTIME_STORE_PATH: /tmp/copt-real-e2e-runtime.json
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
