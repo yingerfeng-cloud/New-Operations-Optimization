@@ -221,8 +221,20 @@ finally {
 
 $archive = [System.IO.Compression.ZipFile]::OpenRead($OutputFullPath)
 try {
-  $entryNames = @($archive.Entries | ForEach-Object { $_.FullName })
-  $missingFromArchive = @($RequiredPackageItems | Where-Object { $_ -notin $entryNames })
+  $archiveEntryNames = [System.Collections.Generic.HashSet[string]]::new(
+    [System.StringComparer]::OrdinalIgnoreCase
+  )
+  foreach ($entry in $archive.Entries) {
+    $normalizedEntryName = $entry.FullName.Replace("\", "/").TrimStart("/")
+    [void]$archiveEntryNames.Add($normalizedEntryName)
+  }
+  if ($archiveEntryNames.Count -eq 0) {
+    throw "Package self-check failed after compression. Archive contains no files."
+  }
+  $missingFromArchive = @($RequiredPackageItems | Where-Object {
+    $requiredEntryName = $_.Replace("\", "/").TrimStart("/")
+    -not $archiveEntryNames.Contains($requiredEntryName)
+  })
   if ($missingFromArchive.Count -gt 0) {
     Remove-Item -LiteralPath $OutputFullPath -Force -ErrorAction SilentlyContinue
     throw "Package self-check failed after compression. Missing: $($missingFromArchive -join ', ')"
