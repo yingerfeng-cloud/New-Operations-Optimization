@@ -128,9 +128,9 @@ class SkillRegistry:
             existing = STORE.skills.get(skill["skill_name"], {})
             STORE.skills[skill["skill_name"]] = {
                 **existing,
-                "agent_enabled": is_valid,
+                "agent_enabled": False,
                 "agent_skill_name": agent_skill.get("name") or agent_skill_name or skill["model_code"],
-                "agent_package_status": "enabled" if is_valid else "invalid",
+                "agent_package_status": "draft" if is_valid else "invalid",
                 "agent_validation": validation,
                 "updated_at": now_text(),
             }
@@ -158,6 +158,30 @@ class SkillRegistry:
             parameters = {**self._sample_parameters(schema), **(parameters or {})}
         elif options.get("strict_runtime_parameters", True):
             runtime_analysis = invocation_service.analyze_parameters(schema, parameters or {})
+            if runtime_analysis.get("invalid_parameters"):
+                absent_default_candidates = [
+                    {
+                        "key": item.get("key"),
+                        "name": item.get("name") or item.get("key"),
+                        "default_available": True,
+                    }
+                    for item in runtime_analysis.get("can_use_default", [])
+                    if item.get("key") not in (parameters or {})
+                ]
+                raise HTTPException(
+                    status_code=422,
+                    detail={
+                        "status": "PARAMETER_INVALID",
+                        "missing_required": [
+                            *(runtime_analysis.get("missing_required", [])),
+                            *absent_default_candidates,
+                        ],
+                        "invalid_parameters": runtime_analysis.get("invalid_parameters", []),
+                        "can_use_default": runtime_analysis.get("can_use_default", []),
+                        "requires_default_confirmation": runtime_analysis.get("requires_default_confirmation", False),
+                        "message": "运行参数类型、维度或取值不符合 input_schema，不能开始求解。",
+                    },
+                )
             if skill_name == "run_cascade_hydro_dispatch" and not runtime_analysis.get("ready"):
                 raise HTTPException(
                     status_code=422,
@@ -537,7 +561,7 @@ class SkillRegistry:
     def _base_skill_name(self, model) -> str:
         semantic = model.semantic_spec or {}
         code = semantic.get("skill_code") or semantic.get("model_code") or semantic.get("code") or model.template_id or model.id
-        if code == "custom_optimization_model":
+        if str(code).startswith("custom_optimization_model"):
             scene = f"{model.name} {model.scene}".lower()
             if "economic" in scene or "dispatch" in scene or "经济调度" in model.name or "经济" in model.scene:
                 code = "economic_dispatch"

@@ -49,7 +49,7 @@ class AgentSkillRouter:
             return self._result("confirm_defaults", current_agent_skill or mentioned, skills, 0.9, False, "用户确认默认值")
         if any(marker in compact for marker in CONFIRM_INVOKE_MARKERS):
             return self._result("confirm_invoke", current_agent_skill or mentioned, skills, 0.9, True, "用户确认调用")
-        if any(marker in compact for marker in RESULT_MARKERS):
+        if any(marker in compact for marker in RESULT_MARKERS) or ("解释" in compact and "结果" in compact):
             return self._result("result_explanation", current_agent_skill or mentioned, skills, 0.85, False, "用户要求解释已有结果")
         if any(marker in compact for marker in REQUIRED_MARKERS):
             chosen = mentioned or current_agent_skill or self._agent_skill_from_api(current_api_skill, skills)

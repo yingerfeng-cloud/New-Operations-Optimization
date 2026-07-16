@@ -2,9 +2,12 @@ name: real-e2e-release-gate
 
 on:
   push:
-    branches: [main]
     tags: ['v*']
   workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read

@@ -10,6 +10,7 @@ from fastapi.testclient import TestClient
 from app.main import app
 from app.schemas.time_dimension import validate_time_dimension_contract
 from app.templates.power_templates import apply_time_dimension_metadata
+from tests.test_helpers import test_and_publish_model
 
 
 client = TestClient(app)
@@ -118,7 +119,7 @@ def test_free_runtime_horizon_contract_publishes_and_runtime_accepts_48() -> Non
     payload = _generic_payload(_config("runtime_variable", 24, min_horizon=1, max_horizon=168, horizon_step=1, allowed_horizons=[]))
     created = client.post("/api/models", json=payload)
     assert created.status_code == 200, created.text
-    published = client.post(f"/api/models/{created.json()['id']}/publish")
+    published = test_and_publish_model(client, created.json()["id"], created.json()["parameters"])
     assert published.status_code == 200, published.text
     task = client.post("/api/tasks", json={"model_id": created.json()["id"], "horizon": 48, "runtime_parameters": {"horizon": 48, "load_forecast": [1.0] * 48}, "async_run": False})
     assert task.status_code == 200, task.text
@@ -130,7 +131,7 @@ def test_choice_horizon_publishes_accepts_48_and_rejects_36() -> None:
     payload = _generic_payload(config)
     created = client.post("/api/models", json=payload)
     assert created.status_code == 200, created.text
-    assert client.post(f"/api/models/{created.json()['id']}/publish").status_code == 200
+    test_and_publish_model(client, created.json()["id"], created.json()["parameters"])
     valid = client.post("/api/tasks", json={"model_id": created.json()["id"], "horizon": 48, "runtime_parameters": {"horizon": 48, "load_forecast": [1.0] * 48}, "async_run": False})
     invalid = client.post("/api/tasks", json={"model_id": created.json()["id"], "horizon": 36, "runtime_parameters": {"horizon": 36, "load_forecast": [1.0] * 36}, "async_run": False})
     assert valid.status_code == 200, valid.text
@@ -144,7 +145,7 @@ def test_data_derived_requires_runtime_time_parameter() -> None:
     assert not _contract_errors(valid)
     created = client.post("/api/models", json=valid)
     assert created.status_code == 200, created.text
-    published = client.post(f"/api/models/{created.json()['id']}/publish")
+    published = test_and_publish_model(client, created.json()["id"], created.json()["parameters"])
     assert published.status_code == 200, published.text
     invalid = deepcopy(valid)
     invalid["ui_metadata"]["time_dimension"]["derive_from"] = "missing"
@@ -244,7 +245,7 @@ def test_model_contract_round_trip_create_get_update_publish_get() -> None:
     fetched["name"] = "往返后的模型"
     updated = client.put(f"/api/models/{model_id}", json=fetched)
     assert updated.status_code == 200, updated.text
-    published = client.post(f"/api/models/{model_id}/publish")
+    published = test_and_publish_model(client, model_id, updated.json()["parameters"])
     assert published.status_code == 200, published.text
     final = client.get(f"/api/models/{model_id}").json()
     assert final["ui_metadata"]["time_dimension"] == authoritative

@@ -1,8 +1,9 @@
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-import { vi } from 'vitest';
-import { ModelServicesPage } from '../../pages/ModelServices/ModelServicesPage';
+import { beforeAll, vi } from 'vitest';
 import { renderWithQueryClient } from '../testUtils';
+
+let ModelServicesPage: typeof import('../../pages/ModelServices/ModelServicesPage')['ModelServicesPage'];
 
 const state = vi.hoisted(() => ({
   createTask: vi.fn(async () => ({
@@ -29,6 +30,11 @@ vi.mock('../../api/models', () => ({
   getModelAssetDetail: async () => ({ sample_runtime_parameters: { horizon: 3, time: [0, 1, 2], k: 0.9, flow_min: 10, flow_max: 100, head_min: 20, head_max: 80, power_max: 5000 } }),
 }));
 vi.mock('../../api/tasks', () => ({ createTask: state.createTask }));
+
+beforeAll(async () => {
+  vi.resetModules();
+  ({ ModelServicesPage } = await import('../../pages/ModelServices/ModelServicesPage'));
+});
 
 test('model services shows NLP sample and enriched debug response', async () => {
   renderWithQueryClient(<MemoryRouter><ModelServicesPage /></MemoryRouter>);

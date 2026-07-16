@@ -1,0 +1,13 @@
+{
+  "profile_name": "retail_da_spot_bidding",
+  "applies_to": {"tags": ["retail_bidding", "售电日前申报"]},
+  "key_metrics": [
+    {"name": "total_bid_energy", "label": "申报电量", "expression": "sum(day_ahead_bid)", "unit": "MWh"},
+    {"name": "max_deviation", "label": "最大偏差", "expression": "max(deviation)", "unit": "MWh"}
+  ],
+  "risk_rules": [
+    {"name": "deviation_warning", "condition": "deviation_max > 0", "level": "medium", "message": "存在申报偏差风险，请人工复核。"}
+  ],
+  "manual_review_points": ["复核价格预测、用户负荷和合约边界。", "提交申报前必须完成人工审批。"],
+  "explanation_limits": ["收益或成本变化只有在 evidence 包含基准方案时才能比较。"]
+}

@@ -2,6 +2,7 @@ import { apiClient, unwrap } from './client'; import type { ModelAsset, ModelPay
 export const getModels = () => unwrap<ModelAsset[]>(apiClient.get('/api/models'));
 export const getModel = (id: string, signal?: AbortSignal) => unwrap<ModelAsset>(apiClient.get(`/api/models/${id}`, { signal }));
 export const createModel = (payload: ModelPayload) => unwrap<ModelAsset>(apiClient.post('/api/models', payload));
+export const createModelVersion = (id: string, payload: ModelPayload) => unwrap<ModelAsset>(apiClient.post(`/api/models/${id}/versions`, payload));
 export const updateModel = (id: string, payload: ModelPayload) => unwrap<ModelAsset>(apiClient.put(`/api/models/${id}`, payload));
 export const publishModel = (id: string) => unwrap<ModelAsset>(apiClient.post(`/api/models/${id}/publish`));
 export const testModel = (id: string, params: Record<string, unknown>) => unwrap<ModelAsset>(apiClient.post(`/api/models/${id}/test`, params));

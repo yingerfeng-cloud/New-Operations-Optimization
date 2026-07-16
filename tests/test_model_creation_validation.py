@@ -9,6 +9,7 @@ from fastapi.testclient import TestClient
 
 from app.main import app
 from app.utils import has_pyomo
+from tests.test_helpers import test_and_publish_model
 
 
 client = TestClient(app)
@@ -110,18 +111,15 @@ def minimal_time_dispatch_model(model_id: str | None = None, *, include_defaults
 
 
 class ModelCreationValidationTest(unittest.TestCase):
-    def test_create_empty_model_as_draft_allowed_but_publish_rejected(self) -> None:
+    def test_create_empty_model_as_draft_allowed_but_untested_publish_rejected(self) -> None:
         payload = {"id": unique_id("MODEL-EMPTY"), "name": "空白测试", "scene": "自定义模型"}
         created = client.post("/api/models", json=payload)
         self.assertEqual(created.status_code, 200, created.text)
 
         published = client.post(f"/api/models/{created.json()['id']}/publish")
-        self.assertEqual(published.status_code, 422)
+        self.assertEqual(published.status_code, 409)
         detail = published.json()["detail"]
-        self.assertEqual(detail["message"], "模型发布失败")
-        fields = [item["field"] for item in detail["errors"]]
-        self.assertIn("semantic_spec", fields)
-        self.assertIn("generic_spec", fields)
+        self.assertEqual(detail["code"], "MODEL_NOT_TESTED")
 
     def test_create_duplicate_model_id_rejected(self) -> None:
         model_id = unique_id("MODEL-DUP")
@@ -172,7 +170,7 @@ class ModelCreationValidationTest(unittest.TestCase):
         payload = valid_custom_model(unique_id("MODEL-VALID"))
         created = client.post("/api/models", json=payload)
         self.assertEqual(created.status_code, 200, created.text)
-        published = client.post(f"/api/models/{created.json()['id']}/publish")
+        published = test_and_publish_model(client, created.json()["id"])
         self.assertEqual(published.status_code, 200, published.text)
         self.assertEqual(published.json()["status"], "published")
 
@@ -218,17 +216,22 @@ class ModelCreationValidationTest(unittest.TestCase):
         created = client.post("/api/models", json=payload)
         self.assertEqual(created.status_code, 200, created.text)
         with patch("app.services.model_service.has_pyomo", return_value=False), patch("app.services.model_service.require_pyomo_for_publish", return_value=False):
-            published = client.post(f"/api/models/{created.json()['id']}/publish")
+            published = client.post(f"/api/models/{created.json()['id']}/test", json={})
         self.assertEqual(published.status_code, 422, published.text)
         detail = published.json()["detail"]
-        self.assertEqual(detail["dry_run_result"]["solver_check"]["status"], "skipped")
-        self.assertTrue(any(item.get("field") == "environment.pyomo" and item.get("level") == "warning" for item in detail["errors"]))
+        self.assertEqual(detail["solver_check"]["status"], "skipped")
+        self.assertTrue(any(item.get("field") == "environment.pyomo" and item.get("level") == "warning" for item in detail["solver_check"]["warnings"]))
 
     def test_publish_generic_model_uses_dry_run_parameters_from_semantic_spec(self) -> None:
         payload = minimal_time_dispatch_model(unique_id("MODEL-DRY-RUNTIME"), include_defaults=False)
         created = client.post("/api/models", json=payload)
         self.assertEqual(created.status_code, 200, created.text)
-        published = client.post(f"/api/models/{created.json()['id']}/publish")
+        runtime = {
+            "load_forecast": {"T0": 100, "T1": 120, "T2": 90},
+            "fuel_cost": {"U1": 10, "U2": 20},
+            "unit_max_output": {"U1": 80, "U2": 100},
+        }
+        published = test_and_publish_model(client, created.json()["id"], runtime)
         self.assertEqual(published.status_code, 200, published.text)
         self.assertEqual(published.json()["status"], "published")
 
@@ -243,7 +246,12 @@ class ModelCreationValidationTest(unittest.TestCase):
         payload = minimal_time_dispatch_model(unique_id("MODEL-TIME-DICT"), include_defaults=False)
         created = client.post("/api/models", json=payload)
         self.assertEqual(created.status_code, 200, created.text)
-        published = client.post(f"/api/models/{created.json()['id']}/publish")
+        runtime = {
+            "load_forecast": {"T0": 100, "T1": 120, "T2": 90},
+            "fuel_cost": {"U1": 10, "U2": 20},
+            "unit_max_output": {"U1": 80, "U2": 100},
+        }
+        published = test_and_publish_model(client, created.json()["id"], runtime)
         self.assertEqual(published.status_code, 200, published.text)
 
         task = client.post(

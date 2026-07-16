@@ -22,6 +22,11 @@ const templateApi = vi.hoisted(() => ({
   })),
 }));
 vi.mock('../../api/templates', () => ({ getTemplates: async () => [], getTemplateDetail: templateApi.getTemplateDetail }));
+const systemApi = vi.hoisted(() => ({
+  scenarioItems: [{ code: 'day_ahead_unit_commitment', label: '日前机组组合优化', enabled: true, sort_order: 1 }],
+  getSystemConfig: vi.fn(async () => ({ dictionaries: { business_scenarios: systemApi.scenarioItems } })),
+}));
+vi.mock('../../api/systemConfig', () => ({ getSystemConfig: systemApi.getSystemConfig }));
 const modelApi = vi.hoisted(() => ({
   getModel: vi.fn(async (id = 'MODEL-POWER-UNIT-COMMITMENT-DAY-AHEAD') => ({
     id,
@@ -63,6 +68,7 @@ const modelApi = vi.hoisted(() => ({
     },
   })),
   createModel: vi.fn(async () => ({ id: 'MODEL-1', status: 'draft' })),
+  createModelVersion: vi.fn(async () => ({ id: 'MODEL-VERSION-1', status: 'draft' })),
   updateModel: vi.fn(async (id: string) => ({ id, status: 'draft' })),
   publishModel: vi.fn(async (id: string) => ({ id, status: 'published' })),
   testModel: vi.fn(async (id: string) => ({ id, status: 'tested' })),
@@ -71,6 +77,7 @@ const modelApi = vi.hoisted(() => ({
 vi.mock('../../api/models', () => ({
   getModel: modelApi.getModel,
   createModel: modelApi.createModel,
+  createModelVersion: modelApi.createModelVersion,
   updateModel: modelApi.updateModel,
   publishModel: modelApi.publishModel,
   testModel: modelApi.testModel,
@@ -79,17 +86,23 @@ vi.mock('../../api/models', () => ({
 beforeEach(() => {
   useModelCreationStore.getState().reset();
   modelApi.createModel.mockClear();
+  modelApi.createModelVersion.mockClear();
   modelApi.getModel.mockClear();
   modelApi.updateModel.mockClear();
   modelApi.publishModel.mockClear();
   modelApi.testModel.mockClear();
   templateApi.getTemplateDetail.mockClear();
+  systemApi.scenarioItems = [{ code: 'day_ahead_unit_commitment', label: '日前机组组合优化', enabled: true, sort_order: 1 }];
+  systemApi.getSystemConfig.mockClear();
 });
 
 function renderPage(initialEntries = ['/models/create']) {
   return renderWithQueryClient(
     <MemoryRouter initialEntries={initialEntries}>
-      <ModelCreationPage />
+      <Routes>
+        <Route path="/models/create" element={<ModelCreationPage />} />
+        <Route path="/models/:id/edit" element={<ModelCreationPage />} />
+      </Routes>
     </MemoryRouter>,
   );
 }
@@ -114,6 +127,16 @@ function getTestRunButton() {
 
 function clickTestRun() {
   fireEvent.click(getTestRunButton());
+}
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise;
+    reject = rejectPromise;
+  });
+  return { promise, resolve, reject };
 }
 
 test('renders five-step model creation', async () => {
@@ -168,6 +191,209 @@ test('test run saves draft before invoking backend test', async () => {
   expect(modelApi.testModel).toHaveBeenCalledWith('MODEL-1', expect.any(Object));
   expect(modelApi.createModel).toHaveBeenCalledTimes(1);
   expect(modelApi.updateModel).not.toHaveBeenCalled();
+});
+
+test('save test and publish use one asset without creating a second model', async () => {
+  renderPage();
+  await screen.findByText('新建模型');
+  act(() => {
+    const state = useModelCreationStore.getState();
+    const nextDraft = {
+      ...state.draft,
+      basic_info: { ...state.draft.basic_info, name: '一致性模型', scenario: '测试场景', builder_mode: 'component_based' as const },
+      components: [{ component_id: 'power_balance', enabled: true }],
+    };
+    useModelCreationStore.setState({ step: 4, draft: nextDraft, modelDraft: nextDraft });
+  });
+
+  fireEvent.click(getTestRunButton());
+  await waitFor(() => expect(modelApi.testModel).toHaveBeenCalledWith('MODEL-1', expect.any(Object)));
+  const publishButton = screen.getByRole('button', { name: /发布模型/ });
+  await waitFor(() => expect(publishButton).not.toBeDisabled());
+  expect(screen.getAllByRole('button', { name: /发布模型/ })).toHaveLength(1);
+  fireEvent.click(publishButton);
+
+  await waitFor(() => expect(modelApi.publishModel).toHaveBeenCalledWith('MODEL-1'));
+  expect(modelApi.createModel).toHaveBeenCalledTimes(1);
+  expect(modelApi.createModelVersion).not.toHaveBeenCalled();
+});
+
+test('editing while a test is running keeps the returned snapshot outdated', async () => {
+  const pendingTest = deferred<{ id: string; status: string }>();
+  modelApi.testModel.mockImplementationOnce(() => pendingTest.promise);
+  renderPage();
+  await screen.findByText('新建模型');
+  act(() => {
+    const state = useModelCreationStore.getState();
+    const nextDraft = {
+      ...state.draft,
+      basic_info: { ...state.draft.basic_info, name: '测试快照 A', scenario: '测试场景', builder_mode: 'component_based' as const },
+      semantic: { ...state.draft.semantic, parameters: [{ code: 'limit', name: '限制', dimension: [], required: true, default_value: 24 }] },
+      components: [{ component_id: 'power_balance', enabled: true }],
+      runtime_parameters: { limit: 24 },
+    };
+    useModelCreationStore.setState({ step: 4, draft: nextDraft, modelDraft: nextDraft });
+  });
+
+  fireEvent.click(getTestRunButton());
+  await waitFor(() => expect(modelApi.testModel).toHaveBeenCalledTimes(1));
+  act(() => {
+    const state = useModelCreationStore.getState();
+    state.setDraft({
+      ...state.draft,
+      semantic: { ...state.draft.semantic, parameters: [{ code: 'limit', name: '限制', dimension: [], required: true, default_value: 48 }] },
+      runtime_parameters: { limit: 48 },
+    });
+  });
+  await act(async () => pendingTest.resolve({ id: 'MODEL-1', status: 'tested' }));
+
+  expect(await screen.findByText('测试状态：已失效')).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: /发布模型/ })).toBeDisabled();
+});
+
+test('the latest test request wins when responses arrive out of order', async () => {
+  const testA = deferred<{ id: string; status: string; marker: string }>();
+  const testB = deferred<{ id: string; status: string; marker: string }>();
+  modelApi.testModel
+    .mockImplementationOnce(() => testA.promise)
+    .mockImplementationOnce(() => testB.promise);
+  renderPage();
+  await screen.findByText('新建模型');
+  act(() => {
+    const state = useModelCreationStore.getState();
+    const nextDraft = {
+      ...state.draft,
+      basic_info: { ...state.draft.basic_info, name: '乱序测试', scenario: '测试场景', builder_mode: 'component_based' as const },
+      semantic: { ...state.draft.semantic, parameters: [{ code: 'limit', name: '限制', dimension: [], required: true, default_value: 24 }] },
+      components: [{ component_id: 'power_balance', enabled: true }],
+      runtime_parameters: { limit: 24 },
+    };
+    useModelCreationStore.setState({ step: 4, draft: nextDraft, modelDraft: nextDraft });
+  });
+
+  fireEvent.click(getTestRunButton());
+  await waitFor(() => expect(modelApi.testModel).toHaveBeenCalledTimes(1));
+  act(() => {
+    const state = useModelCreationStore.getState();
+    state.setDraft({
+      ...state.draft,
+      semantic: { ...state.draft.semantic, parameters: [{ code: 'limit', name: '限制', dimension: [], required: true, default_value: 48 }] },
+      runtime_parameters: { limit: 48 },
+    });
+  });
+  fireEvent.click(getTestRunButton());
+  await waitFor(() => expect(modelApi.testModel).toHaveBeenCalledTimes(2));
+
+  await act(async () => testB.resolve({ id: 'MODEL-1', status: 'tested', marker: 'B' }));
+  await waitFor(() => expect(screen.getByRole('button', { name: /发布模型/ })).not.toBeDisabled());
+  await act(async () => testA.resolve({ id: 'MODEL-1', status: 'tested', marker: 'A' }));
+
+  expect(screen.getByRole('button', { name: /发布模型/ })).not.toBeDisabled();
+  expect(screen.getByText(/"marker": "B"/)).toBeInTheDocument();
+  expect(screen.queryByText(/"marker": "A"/)).not.toBeInTheDocument();
+});
+
+test('editing after a successful test invalidates publish without creating another asset', async () => {
+  renderPage();
+  await screen.findByText('新建模型');
+  act(() => {
+    const state = useModelCreationStore.getState();
+    const nextDraft = {
+      ...state.draft,
+      basic_info: { ...state.draft.basic_info, name: '待失效模型', scenario: '测试场景', builder_mode: 'component_based' as const },
+      components: [{ component_id: 'power_balance', enabled: true }],
+    };
+    useModelCreationStore.setState({ step: 4, draft: nextDraft, modelDraft: nextDraft });
+  });
+  fireEvent.click(getTestRunButton());
+  await waitFor(() => expect(screen.getByRole('button', { name: /发布模型/ })).not.toBeDisabled());
+
+  act(() => {
+    const state = useModelCreationStore.getState();
+    state.setDraft({ ...state.draft, basic_info: { ...state.draft.basic_info, name: '测试后已修改' } });
+  });
+
+  expect(screen.getByRole('button', { name: /发布模型/ })).toBeDisabled();
+  expect(screen.getByText('测试状态：已失效')).toBeInTheDocument();
+  expect(modelApi.createModel).toHaveBeenCalledTimes(1);
+  expect(modelApi.publishModel).not.toHaveBeenCalled();
+});
+
+test('retesting a changed draft updates and publishes the same asset', async () => {
+  renderPage();
+  await screen.findByText('新建模型');
+  act(() => {
+    const state = useModelCreationStore.getState();
+    const nextDraft = {
+      ...state.draft,
+      basic_info: { ...state.draft.basic_info, name: '重新测试模型', scenario: '测试场景', builder_mode: 'component_based' as const },
+      semantic: { ...state.draft.semantic, parameters: [{ code: 'limit', name: '限制', dimension: [], required: true, default_value: 24 }] },
+      components: [{ component_id: 'power_balance', enabled: true }],
+      runtime_parameters: { limit: 24 },
+    };
+    useModelCreationStore.setState({ step: 4, draft: nextDraft, modelDraft: nextDraft });
+  });
+  fireEvent.click(getTestRunButton());
+  await waitFor(() => expect(modelApi.testModel).toHaveBeenCalledTimes(1));
+
+  act(() => {
+    const state = useModelCreationStore.getState();
+    state.setDraft({
+      ...state.draft,
+      semantic: { ...state.draft.semantic, parameters: [{ code: 'limit', name: '限制', dimension: [], required: true, default_value: 48 }] },
+      runtime_parameters: { limit: 48 },
+    });
+  });
+  await waitFor(() => expect(screen.getByRole('button', { name: /发布模型/ })).toBeDisabled());
+
+  fireEvent.click(getTestRunButton());
+  await waitFor(() => expect(modelApi.testModel).toHaveBeenCalledTimes(2));
+  fireEvent.click(screen.getByRole('button', { name: /发布模型/ }));
+  await waitFor(() => expect(modelApi.publishModel).toHaveBeenCalledWith('MODEL-1'));
+  expect(modelApi.createModel).toHaveBeenCalledTimes(1);
+  expect(modelApi.updateModel).toHaveBeenCalledWith('MODEL-1', expect.any(Object));
+});
+
+test('version mode creates its first saved asset through the version endpoint', async () => {
+  renderPage(['/models/create?mode=version&source=MODEL-POWER-UNIT-COMMITMENT-DAY-AHEAD']);
+  await screen.findByText('创建模型新版本');
+  fireEvent.click(screen.getByRole('button', { name: '保存草稿' }));
+  await waitFor(() => expect(modelApi.createModelVersion).toHaveBeenCalledWith('MODEL-POWER-UNIT-COMMITMENT-DAY-AHEAD', expect.any(Object)));
+  expect(modelApi.createModel).not.toHaveBeenCalled();
+});
+
+test('empty backend scenario dictionary does not fall back to static catalog', async () => {
+  systemApi.scenarioItems = [];
+  renderPage();
+  expect(await screen.findByText('当前没有可用业务场景')).toBeInTheDocument();
+  expect(screen.getByTestId('scenario-select')).toHaveClass('ant-select-disabled');
+});
+
+test('asset custom scenario remains visible when absent from current dictionary', async () => {
+  const base = await modelApi.getModel('MODEL-B');
+  modelApi.getModel.mockClear();
+  modelApi.getModel.mockResolvedValueOnce({
+    ...base,
+    scene: '用户自定义场景',
+    model_draft: {
+      ...base.model_draft,
+      basic_info: { ...base.model_draft.basic_info, scenario: '用户自定义场景' },
+    },
+  });
+  renderPage(['/models/MODEL-B/edit']);
+  await waitFor(() => expect(useModelCreationStore.getState().workspace.initialized).toBe(true));
+  act(() => useModelCreationStore.getState().setStep(0));
+  expect(await screen.findByText('用户自定义场景（历史/自定义场景）')).toBeInTheDocument();
+  expect(screen.queryByText('业务场景未选择')).not.toBeInTheDocument();
+});
+
+test('creation method control changes the actual workspace mode', async () => {
+  renderPage();
+  await screen.findByText('新建模型');
+  fireEvent.click(screen.getByText('从模板创建'));
+  expect(await screen.findByText('从模板创建模型')).toBeInTheDocument();
+  expect(useModelCreationStore.getState().workspace.mode).toBe('template');
+  expect(useModelCreationStore.getState().workspace.templateCode).toBeUndefined();
 });
 
 test('editing published unit commitment opens as a new draft source', async () => {

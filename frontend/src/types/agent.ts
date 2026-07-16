@@ -39,6 +39,15 @@ export interface AgentSkill {
   input_schema?: Array<Record<string, unknown>>;
   required_parameters?: string[];
   optional_parameters?: string[];
+  schema_version?: string;
+  state?: string;
+  business_domain?: Record<string, unknown>;
+  supported_intents?: string[];
+  business_goals?: string[];
+  positive_examples?: string[];
+  negative_examples?: string[];
+  do_not_invoke_examples?: string[];
+  explanation_profile?: string;
   validation?: {
     status?: string;
     errors?: unknown[];
@@ -113,6 +122,9 @@ export interface AgentAnalyzeResponse {
   normalized_parameters?: Record<string, unknown>;
   parameter_draft?: Record<string, unknown>;
   parameter_sources?: Record<string, unknown>;
+  parameter_completeness?: number;
+  schema_fit_score?: number;
+  parameter_confidence?: Record<string, number>;
   missing_required?: Array<Record<string, unknown> | string>;
   invalid_parameters?: unknown[];
   can_use_default?: unknown[];
@@ -122,6 +134,11 @@ export interface AgentAnalyzeResponse {
   result?: Record<string, unknown>;
   objective_value?: number;
   explanation?: unknown;
+  route_confidence?: number;
+  candidate_skills?: Array<Record<string, unknown>>;
+  selection_reason?: string;
+  needs_clarification?: boolean;
+  clarification_question?: string;
   invocation_id?: string;
   [key: string]: unknown;
 }

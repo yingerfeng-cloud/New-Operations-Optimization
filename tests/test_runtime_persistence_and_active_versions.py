@@ -239,8 +239,10 @@ def test_publish_new_version_switches_skill_and_agent_to_new_asset(monkeypatch) 
     code = f"active_version_{uuid.uuid4().hex[:8]}"
     payload["semantic_spec"]["model_code"] = code
     first_draft = model_service.create_model(ModelPackage.model_validate(payload))
+    model_service.run_model_test_case(first_draft.id, {"parameters": first_draft.parameters})
     first = model_service.publish_model(first_draft.id)
     second_draft = model_service.create_model_version(first.id, {"name": f"{first.name}-v2"})
+    model_service.run_model_test_case(second_draft.id, {"parameters": second_draft.parameters})
     second = model_service.publish_model(second_draft.id)
     skill_name = f"run_{code}"
 

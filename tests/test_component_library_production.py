@@ -7,6 +7,7 @@ from fastapi.testclient import TestClient
 
 from app.main import app
 from app.templates.power_templates import get_template
+from tests.test_helpers import test_and_publish_model
 
 
 client = TestClient(app)
@@ -107,7 +108,7 @@ def test_published_custom_component_can_generate_dry_run_model() -> None:
     assert created.status_code == 200, created.text
     assert any(item["name"] == "soc" for item in created.json()["component_spec"]["variables"])
 
-    published = client.post(f"/api/models/{model_id}/publish")
+    published = test_and_publish_model(client, model_id)
     assert published.status_code == 200, published.text
     assert published.json()["dry_run_result"]["structure_check"]["status"] == "passed"
 
@@ -225,7 +226,7 @@ def test_default_frontend_sample_formula_alias_compiles_and_dry_runs() -> None:
     }
     created_model = client.post("/api/models", json={"id": model_id, "name": "x limit", "scene": "公式测试", "status": "developing", "build_mode": "component_based", "model_draft": draft, "parameters": {"horizon": 3, "time": [0, 1, 2], "limit": [10, 20, 30]}})
     assert created_model.status_code == 200, created_model.text
-    published = client.post(f"/api/models/{model_id}/publish")
+    published = test_and_publish_model(client, model_id)
     assert published.status_code == 200, published.text
 
 
@@ -284,5 +285,5 @@ def test_mip_capability_is_normalized_to_milp_for_publish() -> None:
     }
     created_model = client.post("/api/models", json={"id": model_id, "name": "mip alias", "scene": "公式测试", "status": "developing", "build_mode": "component_based", "model_draft": draft, "parameters": {"horizon": 3, "time": [0, 1, 2], "M": 100}})
     assert created_model.status_code == 200, created_model.text
-    published = client.post(f"/api/models/{model_id}/publish")
+    published = test_and_publish_model(client, model_id)
     assert published.status_code == 200, published.text

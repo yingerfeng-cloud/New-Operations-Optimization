@@ -171,14 +171,16 @@ export function getScenarioById(id: string) {
 }
 
 export function scenariosFromDictionary(items?: DictionaryItem[]) {
-  if (!items?.length) return scenarioCatalog;
-  const dictByCode = new Map(items.map(item => [item.code, item]));
-  const enabledCodes = new Set(items.filter(item => item.enabled !== false).map(item => item.code));
-  return scenarioCatalog
-    .filter(item => enabledCodes.has(item.id) || !dictByCode.has(item.id))
+  if (items === undefined) return scenarioCatalog;
+  return items
+    .filter(item => item.enabled !== false)
     .map(item => {
-      const dict = dictByCode.get(item.id);
-      return { ...item, name: dict?.label || item.name, sortOrder: dict?.sort_order ?? 9999 };
+      const catalogItem = scenarioCatalog.find(scenario => scenario.id === item.code);
+      return {
+        ...(catalogItem || { id: item.code, name: item.label, description: '', status: 'published' as const, models: [] }),
+        name: item.label || catalogItem?.name || item.code,
+        sortOrder: item.sort_order ?? 9999,
+      };
     })
     .sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name))
     .map(({ sortOrder: _sortOrder, ...item }) => item);

@@ -68,6 +68,26 @@ os.environ.setdefault("LLM_ENABLED", "false")
 os.environ.setdefault("AGENT_ALLOW_IN_PROCESS_PLATFORM_FALLBACK", "true")
 os.environ.setdefault("COPT_SYNC_JOBS", "true")
 
+
+def pytest_configure(config: pytest.Config) -> None:
+    """Give every xdist worker an independent persistent runtime file.
+
+    The application seeds its global store while test modules are imported.  If
+    workers share the controller process' RUNTIME_STORE_PATH, those imports race
+    on the same ``.tmp`` file and Windows rejects the atomic replace.  Configure
+    the path before collection imports application modules so parallel test
+    execution remains process-isolated.
+    """
+
+    worker_input = getattr(config, "workerinput", None)
+    if not worker_input:
+        return
+    worker_id = worker_input.get("workerid", "worker")
+    os.environ["RUNTIME_STORE_PATH"] = str(
+        Path(tempfile.gettempdir())
+        / f"copt_runtime_store_pytest_{worker_id}_{uuid.uuid4().hex}.json"
+    )
+
 try:
     faulthandler.enable()
 except Exception:
@@ -107,11 +127,31 @@ SLOW_TESTS = {
     "tests/test_pv_storage_sizing_compare_lite.py::test_pv_storage_sizing_compare_lite_adjusts_small_capacity_soc",
 }
 
+# These modules exercise multi-stage API workflows, fresh-process persistence,
+# or repeated solver-backed scenarios.  They remain covered by the nightly
+# ``-m slow`` suite instead of consuming the fast contract-suite time budget.
+SLOW_TEST_FILES = {
+    "test_20260605_acceptance_round.py",
+    "test_agent_production_fixes.py",
+    "test_agent_state_machine_iteration.py",
+    "test_agent_task_session_chain.py",
+    "test_cascade_hydro_dispatch_v1.py",
+    "test_component_based_hydro_model.py",
+    "test_component_builder_e2e.py",
+    "test_hydro_p0_closure.py",
+    "test_market_trading_contract_spot.py",
+    "test_market_trading_da_bidding.py",
+    "test_market_trading_templates.py",
+    "test_model_skill_invocation.py",
+    "test_pv_storage_intraday_rolling.py",
+    "test_runtime_persistence_and_active_versions.py",
+}
+
 
 def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
     slow = pytest.mark.slow
     for item in items:
-        if item.nodeid in SLOW_TESTS:
+        if item.nodeid in SLOW_TESTS or Path(str(item.path)).name in SLOW_TEST_FILES:
             item.add_marker(slow)
 
 

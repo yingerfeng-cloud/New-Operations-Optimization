@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import hashlib
+import json
 import logging
 import re
 import uuid
@@ -45,10 +47,12 @@ class ModelService:
             if model.id and model.id in STORE.models:
                 raise HTTPException(status_code=409, detail=f"Model id already exists: {model.id}")
         model = self._prepare_version_identity(model)
+        model = model.model_copy(update={"content_hash": self._content_hash(model)})
         warnings, dry_run_result = self._validate_model_package(model, require_publish_ready=model.status in CALLABLE_STATUSES)
         timestamp = now_text()
         view = ModelView(**model.model_dump(exclude={"id", "created_at", "updated_at", "validation_warnings", "dry_run_result"}), id=model_id, validation_warnings=warnings, dry_run_result=dry_run_result, created_at=model.created_at or timestamp, updated_at=model.updated_at or timestamp)
         with STORE.lock:
+            self._validate_version_uniqueness_locked(view)
             STORE.models[model_id] = view
             self._record_model_version_locked(view)
             STORE.save_runtime()
@@ -62,8 +66,10 @@ class ModelService:
         return model_version_service.list_versions(self.get_model(model_id))
 
     def create_model_version(self, model_id: str, overrides: dict[str, Any] | None = None) -> ModelView:
-        source = self.get_model(model_id)
-        return self.create_model(model_version_service.new_version_package(source, overrides))
+        with STORE.lock:
+            source = self.get_model(model_id)
+            package = model_version_service.new_version_package(source, overrides, STORE.models.values())
+            return self.create_model(package)
 
     def get_model(self, model_id: str) -> ModelView:
         with STORE.lock:
@@ -80,8 +86,11 @@ class ModelService:
         model = self._normalize_generic_formula_model(model)
         model = self._apply_generalized_top_level_fields(model)
         model = self._normalize_time_dimension_contract(model)
+        content_hash = self._content_hash(model)
+        existing_hash = existing.content_hash or self._content_hash(ModelPackage.model_validate(existing.model_dump()))
+        content_changed = content_hash != existing_hash
         warnings, dry_run_result = self._validate_model_package(model, require_publish_ready=model.status in CALLABLE_STATUSES)
-        updated = ModelView(**model.model_dump(exclude={"id", "created_at", "updated_at", "published_at", "validation_warnings", "dry_run_result", "model_family_id", "supersedes_model_id", "is_active_version"}), id=model_id, model_family_id=existing.model_family_id, supersedes_model_id=existing.supersedes_model_id, is_active_version=existing.is_active_version, validation_warnings=warnings, dry_run_result=dry_run_result, created_at=existing.created_at, updated_at=now_text(), published_at=existing.published_at)
+        updated = ModelView(**model.model_dump(exclude={"id", "created_at", "updated_at", "published_at", "validation_warnings", "dry_run_result", "model_family_id", "supersedes_model_id", "is_active_version", "content_hash", "tested_content_hash", "tested_model_id", "tested_at", "status"}), id=model_id, model_family_id=existing.model_family_id, supersedes_model_id=existing.supersedes_model_id, is_active_version=existing.is_active_version, status="developing" if content_changed else existing.status, content_hash=content_hash, tested_content_hash=existing.tested_content_hash, tested_model_id=existing.tested_model_id, tested_at=existing.tested_at, validation_warnings=warnings, dry_run_result=dry_run_result if content_changed else existing.dry_run_result, created_at=existing.created_at, updated_at=now_text(), published_at=existing.published_at)
         with STORE.lock:
             STORE.models[model_id] = updated
             self._record_model_version_locked(updated)
@@ -90,6 +99,7 @@ class ModelService:
 
     def publish_model(self, model_id: str) -> ModelView:
         model = self.get_model(model_id)
+        current_hash = self._content_hash(ModelPackage.model_validate(model.model_dump()))
         self._validate_publish_code_ownership(model)
         normalized_model = self._normalize_component_model(ModelPackage(**model.model_dump()))
         normalized_model = self._normalize_generic_formula_model(normalized_model)
@@ -118,6 +128,43 @@ class ModelService:
                     "problem_type_diagnosis": diagnosis,
                 },
             )
+        semantic_content = {
+            key: value
+            for key, value in (normalized_model.semantic_spec or {}).items()
+            if key not in {"ui_metadata", "time_dimension"} and value not in (None, {}, [], "")
+        }
+        draft_content = {
+            key: value
+            for key, value in (normalized_model.model_draft or {}).items()
+            if key != "time_dimension" and value not in (None, {}, [], "")
+        }
+        has_model_definition = any(
+            (
+                semantic_content,
+                normalized_model.generic_spec,
+                normalized_model.component_spec,
+                draft_content,
+                normalized_model.mathematical_expansion,
+            )
+        )
+        if has_model_definition:
+            try:
+                # Structural and semantic errors are intrinsic to a populated
+                # model and must be reported before lifecycle state such as
+                # "not tested".  This pass deliberately avoids the solver.
+                self._validate_model_package(normalized_model, require_publish_ready=True, run_solver=False)
+            except HTTPException:
+                failed = model.model_copy(update={"status": "publish_failed", "updated_at": now_text()})
+                with STORE.lock:
+                    STORE.models[model_id] = failed
+                    STORE.save_runtime()
+                raise
+        if model.tested_model_id and model.tested_model_id != model.id:
+            raise HTTPException(status_code=409, detail={"code": "MODEL_TEST_MISMATCH", "message": "测试资产与发布资产不一致，请重新测试当前模型。"})
+        if not model.tested_model_id or not model.tested_content_hash:
+            raise HTTPException(status_code=409, detail={"code": "MODEL_NOT_TESTED", "message": "模型尚未通过测试，请先测试后再发布。"})
+        if model.tested_content_hash != current_hash or model.status != "tested":
+            raise HTTPException(status_code=409, detail={"code": "MODEL_TEST_OUTDATED", "message": "模型在测试通过后发生了修改，请重新测试后再发布。"})
         require_publish_ready = True
         try:
             warnings, dry_run_result = self._validate_model_package(normalized_model, require_publish_ready=require_publish_ready)
@@ -196,11 +243,22 @@ class ModelService:
 
     def copy_model(self, model_id: str) -> ModelView:
         model = self.get_model(model_id)
-        copied = ModelPackage(**model.model_dump(exclude={"id", "created_at", "updated_at", "published_at", "model_family_id", "supersedes_model_id", "is_active_version", "published_by"}))
+        copied = ModelPackage(**model.model_dump(exclude={
+            "id", "created_at", "updated_at", "published_at", "model_family_id",
+            "supersedes_model_id", "is_active_version", "published_by", "tested_at",
+            "content_hash", "tested_content_hash", "tested_model_id", "validation_warnings",
+            "dry_run_result",
+        }))
         new_code = self._custom_model_code(model)
         copied.name = f"{model.name}-copy"
         copied.version = f"{model.version}-copy"
         copied.status = "developing"
+        copied.tested_at = None
+        copied.content_hash = None
+        copied.tested_content_hash = None
+        copied.tested_model_id = None
+        copied.validation_warnings = []
+        copied.dry_run_result = {}
         copied.ui_metadata = {
             key: value
             for key, value in (copied.ui_metadata or {}).items()
@@ -376,7 +434,32 @@ class ModelService:
             source = self.get_model(str(supersedes_id))
             if self._model_code(source) != self._model_code(model):
                 raise HTTPException(status_code=409, detail="New version must preserve model_code")
-        return model_version_service.prepare_identity(model, source)
+        with STORE.lock:
+            family_models = list(STORE.models.values())
+        return model_version_service.prepare_identity(model, source, family_models)
+
+    def _validate_version_uniqueness_locked(self, model: ModelView) -> None:
+        family_id = str(model.model_family_id or f"legacy-{model.id}")
+        for candidate in STORE.models.values():
+            candidate_family = str(candidate.model_family_id or f"legacy-{candidate.id}")
+            if candidate.id != model.id and candidate_family == family_id and candidate.version == model.version:
+                raise HTTPException(status_code=409, detail={"code": "MODEL_VERSION_CONFLICT", "message": "同一模型家族中版本号必须唯一。"})
+
+    def _content_hash(self, model: ModelPackage | ModelView) -> str:
+        payload = model.model_dump(
+            mode="json",
+            exclude={
+                "id", "status", "model_family_id", "supersedes_model_id", "is_active_version",
+                "published_by", "published_at", "tested_at", "created_at", "updated_at",
+                "validation_warnings", "dry_run_result", "content_hash", "tested_content_hash", "tested_model_id",
+            },
+        )
+        metadata = deepcopy(payload.get("ui_metadata") or {})
+        for key in ("publish_info", "test_result", "version_info"):
+            metadata.pop(key, None)
+        payload["ui_metadata"] = metadata
+        encoded = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
+        return hashlib.sha256(encoded).hexdigest()
 
     def _validate_publish_code_ownership(self, model: ModelView) -> None:
         model_version_service.validate_publish_code_ownership(
@@ -518,7 +601,8 @@ class ModelService:
         dry_run_result = self._dry_run_model(model, test_parameters=params, run_solver=True)
         if dry_run_result["structure_check"]["status"] != "passed" or dry_run_result["solver_check"]["status"] != "passed":
             raise HTTPException(status_code=422, detail={"message": "模型测试用例执行失败", **dry_run_result})
-        updated = model.model_copy(update={"status": "tested", "updated_at": now_text(), "tested_at": now_text(), "dry_run_result": dry_run_result, "validation_warnings": dry_run_result["solver_check"].get("warnings", [])})
+        content_hash = self._content_hash(ModelPackage.model_validate(model.model_dump()))
+        updated = model.model_copy(update={"status": "tested", "content_hash": content_hash, "tested_content_hash": content_hash, "tested_model_id": model.id, "updated_at": now_text(), "tested_at": now_text(), "dry_run_result": dry_run_result, "validation_warnings": dry_run_result["solver_check"].get("warnings", [])})
         with STORE.lock:
             STORE.models[model_id] = updated
             self._record_model_version_locked(updated)
@@ -545,7 +629,14 @@ class ModelService:
             parameters.pop("semantic_spec", None)
         return parameters
 
-    def _validate_model_package(self, model: ModelPackage, require_publish_ready: bool = False) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    def _validate_model_package(
+        self,
+        model: ModelPackage,
+        require_publish_ready: bool = False,
+        *,
+        run_solver: bool | None = None,
+    ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+        solver_required = require_publish_ready if run_solver is None else run_solver
         errors: list[dict[str, Any]] = []
         warnings: list[dict[str, Any]] = []
         dry_run_result: dict[str, Any] = {}
@@ -611,11 +702,11 @@ class ModelService:
             if not is_component_based and not is_template_backed and not ((generic_spec.get("objective") or {}).get("terms") or []):
                 errors.append({"field": "generic_spec.objective.terms", "error": "objective terms are required before publish"})
             if not has_function_binding_errors:
-                dry_run_result = self._dry_run_model(model, run_solver=require_publish_ready)
+                dry_run_result = self._dry_run_model(model, run_solver=solver_required)
                 dry_run_result["problem_type_diagnosis"] = diagnosis
                 if dry_run_result["structure_check"]["status"] == "failed":
                     errors.extend(dry_run_result["structure_check"].get("errors", []))
-                if require_publish_ready and dry_run_result["solver_check"]["status"] != "passed":
+                if solver_required and dry_run_result["solver_check"]["status"] != "passed":
                     solver_warnings = dry_run_result["solver_check"].get("warnings", [])
                     errors.extend(solver_warnings or [{"field": "solver_check", "error": "solver dry-run did not pass", "actual": dry_run_result["solver_check"].get("status")}])
                 warnings.extend(dry_run_result["solver_check"].get("warnings", []))

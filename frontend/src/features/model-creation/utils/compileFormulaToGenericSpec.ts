@@ -8,7 +8,7 @@ type ParamTerm = { param: string; key: string[]; coef?: number; sign?: string };
 type LinearExpr = { terms: Term[]; paramTerms: ParamTerm[]; constant: number };
 type SemanticSpec = {
   sets?: { code: string; values?: unknown[] }[];
-  parameters?: { code: string; default?: unknown; defaultValue?: unknown; dimension?: string[]; dimensions?: string[]; indices?: string[]; index_sets?: string[] }[];
+  parameters?: { code: string; default?: unknown; defaultValue?: unknown; default_value?: unknown; dimension?: string[]; dimensions?: string[]; indices?: string[]; index_sets?: string[] }[];
   variables?: { code: string; dimension?: string[]; dimensions?: string[]; indices?: string[]; index_sets?: string[]; domain?: string; variableType?: string; lowerBound?: string | number; upperBound?: string | number }[];
 };
 
@@ -183,7 +183,7 @@ export function compileFormulaToGenericSpec(formulas: FormulaDef[], semantic: Se
   if (!objectiveTerms.length) throw new Error('至少需要一个可编译目标函数');
   return {
     sets: Object.fromEntries((semantic.sets || []).map(s => [s.code, defaultSetValues(s.code, s.values)])),
-    parameters: Object.fromEntries((semantic.parameters || []).map(p => [p.code, p.defaultValue ?? p.default ?? 0])),
+    parameters: Object.fromEntries((semantic.parameters || []).map(p => [p.code, p.defaultValue ?? p.default_value ?? p.default ?? 0])),
     variables: (semantic.variables || []).map(v => ({
       name: v.code,
       indices: extractDimensions(v as unknown as Record<string, unknown>),

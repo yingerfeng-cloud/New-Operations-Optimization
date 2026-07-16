@@ -7,6 +7,7 @@ from pathlib import Path
 from app.builders.generic_linear_builder import GenericLinearBuilder
 from app.generic_formula_compiler import compile_generic_formula_spec
 from app.services.template_service import template_library
+from tests.test_helpers import test_and_publish_model
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -99,9 +100,9 @@ def test_generic_builder_formula_constraint_can_solve() -> None:
 def test_generic_builder_formula_objective_can_solve(client) -> None:
     created = client.post("/api/models", json=_generic_formula_payload())
     assert created.status_code == 200, created.text
-    published = client.post(f"/api/models/{created.json()['id']}/publish")
+    published = test_and_publish_model(client, created.json()["id"], _generic_formula_payload()["generic_spec"]["parameters"])
     assert published.status_code == 200, published.text
-    tested = client.post(f"/api/models/{created.json()['id']}/test", json={"parameters": _generic_formula_payload()["generic_spec"]["parameters"]})
+    tested = client.get(f"/api/models/{created.json()['id']}")
     assert tested.status_code == 200, tested.text
     assert tested.json()["dry_run_result"]["solver_check"]["status"] == "passed"
 
@@ -121,7 +122,7 @@ def test_all_template_based_models_clone_publish_test_success(client) -> None:
         cloned = client.post(f"/api/templates/{code}/clone")
         assert cloned.status_code == 200, cloned.text
         model_id = cloned.json()["id"]
-        published = client.post(f"/api/models/{model_id}/publish")
+        published = test_and_publish_model(client, model_id)
         assert published.status_code == 200, published.text
         if code != representative:
             continue
@@ -135,7 +136,7 @@ def test_all_pv_storage_component_templates_publish_success(client) -> None:
         cloned = client.post(f"/api/templates/{code}/clone")
         assert cloned.status_code == 200, cloned.text
         model_id = cloned.json()["id"]
-        published = client.post(f"/api/models/{model_id}/publish")
+        published = test_and_publish_model(client, model_id)
         assert published.status_code == 200, published.text
         if code != representative:
             continue

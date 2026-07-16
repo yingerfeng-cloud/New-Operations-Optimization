@@ -85,10 +85,9 @@ class ModelTemplateLibrary:
 
     def publish(self, template_code: str) -> dict[str, Any]:
         model = self.clone_template(template_code)
-        published = model_service.publish_model(model.id)
         sample = self.sample_runtime_parameters(template_code)
-        if sample:
-            model_service.run_model_test_case(published.id, {"parameters": sample})
+        model_service.run_model_test_case(model.id, {"parameters": sample})
+        published = model_service.publish_model(model.id)
         with STORE.lock:
             STORE.template_status[template_code] = "published"
         template = self.get_template(template_code)

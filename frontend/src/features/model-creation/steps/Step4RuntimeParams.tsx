@@ -108,7 +108,7 @@ export function buildRuntimeParameterRows(draft: ModelDraft): RuntimeParameterRo
     const source = sourceOf(parameter);
     const code = parameter.code;
     const currentValue = draft.runtime_parameters[code] ?? draft.parameter_groups[source]?.[code];
-    const defaultValue = parameter.defaultValue ?? parameter.default;
+    const defaultValue = parameter.defaultValue ?? parameter.default_value ?? parameter.default;
     const loadDisabled = code === 'load_forecast' && draft.runtime_parameters.load_tracking_mode === 'disabled';
     const required = loadDisabled ? false : Boolean(parameter.required ?? source === 'runtime');
     const status: RuntimeParameterRow['status'] = hasValue(currentValue)

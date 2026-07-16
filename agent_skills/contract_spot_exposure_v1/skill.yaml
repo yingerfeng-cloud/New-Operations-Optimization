@@ -1,3 +1,18 @@
+negative_examples: ["仅咨询模型原理"]
+do_not_invoke_examples: ["只咨询业务知识，不运行优化"]
+positive_examples: ["合约敞口压到20%以下", "合约现货敞口控制在20%以内"]
+schema_version: "2.0"
+state: enabled
+business_domain:
+  primary: contract_spot_exposure_v1
+  secondary: ["optimization"]
+model_family: optimization
+supported_intents: ["optimization_run", "parameter_check", "result_explanation"]
+business_goals: ["optimize"]
+explanation_profile: contract_spot_exposure
+parameter_policy: {"allow_defaults": true, "require_default_confirmation": true, "allow_sample_data": true, "sample_data_must_be_confirmed": true}
+intent_policy: {"router_mode": "llm_plus_rules", "confidence_threshold": 0.75, "clarify_threshold": 0.6, "clarify_when_top_scores_close": true, "top_score_margin_threshold": 0.15}
+safety_policy: {"disallow_auto_control": true, "disclaimer_required": true}
 name: contract_spot_exposure_v1
 display_name: 中长期合约分解与现货暴露控制模型
 canonical_api_skill_name: run_contract_spot_exposure_v1

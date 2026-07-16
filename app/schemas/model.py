@@ -145,6 +145,9 @@ class ModelPackage(BaseModel):
     output_contract: dict[str, Any] = Field(default_factory=dict)
     validation_warnings: list[dict[str, Any]] = Field(default_factory=list)
     dry_run_result: dict[str, Any] = Field(default_factory=dict)
+    content_hash: str | None = None
+    tested_content_hash: str | None = None
+    tested_model_id: str | None = None
     tested_at: str | None = None
     created_at: str | None = None
     updated_at: str | None = None

@@ -70,6 +70,7 @@ export interface ModelDraft {
       sourceType?: 'runtime' | 'static' | 'ledger' | 'system';
       source_type?: 'runtime' | 'static' | 'ledger' | 'system';
       defaultValue?: unknown;
+      default_value?: unknown;
       default?: unknown;
       exampleValue?: unknown;
       required?: boolean;

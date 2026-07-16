@@ -40,10 +40,10 @@ function validDraft(): ModelDraft {
 test('disables publish and test actions when validation has blockers', () => {
   const draft = createInitialDraft();
   const validation = validateModelDraft(draft);
-  render(<Step5ReviewPublish draft={draft} validation={validation} onPublish={vi.fn()} onTest={vi.fn()} />);
+  render(<Step5ReviewPublish draft={draft} validation={validation} onTest={vi.fn()} />);
   expect(screen.getByText('存在阻断项，不能发布')).toBeInTheDocument();
   expect(screen.getByRole('button', { name: '测试运行' })).toBeDisabled();
-  expect(screen.getByRole('button', { name: '发布模型' })).toBeDisabled();
+  expect(screen.queryByRole('button', { name: '发布模型' })).not.toBeInTheDocument();
 });
 
 test('runs test callback and renders dry-run result summary', async () => {
@@ -56,7 +56,7 @@ test('runs test callback and renders dry-run result summary', async () => {
       solver_check: { status: 'passed', objective_value: 12 },
     },
   });
-  render(<Step5ReviewPublish draft={draft} validation={validateModelDraft(draft)} onPublish={vi.fn()} onTest={onTest} />);
+  render(<Step5ReviewPublish draft={draft} validation={validateModelDraft(draft)} onTest={onTest} />);
 
   fireEvent.click(screen.getByText('测试运行'));
 
@@ -80,7 +80,7 @@ test('renders 2D PWL MILP risk diagnostics', () => {
   }];
   draft.runtime_parameters = { horizon: 24, time: Array.from({ length: 24 }, (_, index) => index), load: [100] };
 
-  render(<Step5ReviewPublish draft={draft} validation={validateModelDraft(draft)} onPublish={vi.fn()} onTest={vi.fn()} />);
+  render(<Step5ReviewPublish draft={draft} validation={validateModelDraft(draft)} onTest={vi.fn()} />);
 
   expect(screen.getByText('二维 PWL 风险诊断')).toBeInTheDocument();
   expect(screen.getByText('hydro_power_surface_001')).toBeInTheDocument();

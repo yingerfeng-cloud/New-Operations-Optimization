@@ -8,6 +8,7 @@ from fastapi.testclient import TestClient
 
 from app.main import app
 from app.utils import has_highspy, has_pyomo
+from tests.test_helpers import test_and_publish_model
 
 client = TestClient(app)
 
@@ -56,8 +57,7 @@ def create_published_skill() -> tuple[str, str]:
     created = client.post("/api/models", json=minimal_dispatch_payload())
     assert created.status_code == 200, created.text
     model_id = created.json()["id"]
-    published = client.post(f"/api/models/{model_id}/publish")
-    assert published.status_code == 200, published.text
+    test_and_publish_model(client, model_id)
     generated = client.post(f"/api/models/{model_id}/skills/generate")
     assert generated.status_code == 200, generated.text
     return model_id, generated.json()["skill_name"]
@@ -162,8 +162,7 @@ class ModelSkillInvocationTest(unittest.TestCase):
         created = client.post("/api/models", json=minimal_dispatch_payload())
         self.assertEqual(created.status_code, 200, created.text)
         model_id = created.json()["id"]
-        published = client.post(f"/api/models/{model_id}/publish")
-        self.assertEqual(published.status_code, 200, published.text)
+        test_and_publish_model(client, model_id)
 
         generated = client.post(f"/api/models/{model_id}/skills/generate")
         self.assertEqual(generated.status_code, 200, generated.text)

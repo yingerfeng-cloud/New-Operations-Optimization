@@ -12,6 +12,7 @@ from app.main import app
 from app.storage.memory_store import STORE
 from app.utils import has_highspy, has_pyomo
 from tests.test_model_skill_invocation import minimal_dispatch_payload
+from tests.test_helpers import test_and_publish_model
 
 
 client = TestClient(app)
@@ -58,7 +59,7 @@ def test_agent_analyze_invalid_load_length_not_ready() -> None:
     created = client.post("/api/models", json=payload)
     assert created.status_code == 200, created.text
     model_id = created.json()["id"]
-    assert client.post(f"/api/models/{model_id}/publish").status_code == 200
+    test_and_publish_model(client, model_id)
     skill = client.get("/api/skills/run_economic_dispatch").json()
     analyzed = client.post(
         f"/api/skills/{skill['canonical_skill_name']}/analyze-input",
@@ -77,7 +78,7 @@ def test_agent_confirm_uses_resolved_skill_not_alias() -> None:
     created = client.post("/api/models", json=payload)
     assert created.status_code == 200, created.text
     model_id = created.json()["id"]
-    assert client.post(f"/api/models/{model_id}/publish").status_code == 200
+    test_and_publish_model(client, model_id)
 
     message = "帮我跑一下 U1、U2 两台机组三个时段的经济调度，负荷是100、120、90，U1最大80成本10，U2最大100成本20。"
     analyzed = client.post("/api/agent/analyze", json={"conversation_id": "CONV-ALIAS-FIX", "message": message, "skill_name": "run_economic_dispatch"})

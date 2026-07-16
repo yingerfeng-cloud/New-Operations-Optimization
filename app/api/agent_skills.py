@@ -32,6 +32,16 @@ def validate_agent_skill(name: str) -> dict:
     return agent_skill_service.validate_skill(name)
 
 
+@router.post("/{name}/enable")
+def enable_agent_skill(name: str) -> dict:
+    return agent_skill_service.set_state(name, "enabled")
+
+
+@router.post("/{name}/disable")
+def disable_agent_skill(name: str) -> dict:
+    return agent_skill_service.set_state(name, "disabled")
+
+
 @router.post("/{name}/dry-run")
 def dry_run(name: str, body: dict) -> dict:
     return agent_skill_service.dry_run(name, body)

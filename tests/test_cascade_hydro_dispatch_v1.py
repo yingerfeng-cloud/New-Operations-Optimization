@@ -10,6 +10,7 @@ from app.main import app
 from app.services.function_asset_service import function_asset_service
 from app.solvers.solver_router import solver_router
 from app.templates.power_templates import get_power_templates, get_template
+from tests.test_helpers import test_and_publish_model
 
 
 client = TestClient(app)
@@ -90,7 +91,7 @@ def test_cascade_hydro_v1_model_service_publish_and_invoke() -> None:
     clone = client.post("/api/templates/cascade_hydro_dispatch_v1/clone")
     assert clone.status_code == 200, clone.text
     model_id = clone.json()["id"]
-    publish = client.post(f"/api/models/{model_id}/publish")
+    publish = test_and_publish_model(client, model_id, _short_params())
     assert publish.status_code == 200, publish.text
     assert publish.json()["problem_type"] == "MILP"
     invoke = client.post(

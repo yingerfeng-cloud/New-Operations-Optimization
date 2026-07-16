@@ -8,6 +8,7 @@ from typing import Any
 
 from fastapi import HTTPException
 
+from app.agent.agent_skill_schema import AgentSkillState, normalize_agent_skill_v2
 from app.services.skill_registry import skill_registry
 
 
@@ -65,12 +66,14 @@ class AgentSkillRegistry:
             input_schema = api_skill.get("input_schema", [])
         if api_skill and not output_schema:
             output_schema = api_skill.get("output_schema", {})
+        v2 = normalize_agent_skill_v2(meta, input_schema, examples)
         platform_fields = self._platform_fields(api_skill_name, api_skill, input_schema, output_schema)
         return {
             **meta,
+            **v2,
             **platform_fields,
             "path": str(path),
-            "enabled": bool(meta.get("enabled", True)),
+            "enabled": v2["state"] == AgentSkillState.ENABLED.value,
             "instruction": instruction,
             "input_schema": input_schema,
             "output_schema": output_schema,
@@ -128,6 +131,16 @@ class AgentSkillRegistry:
             errors.append({"code": "missing_parameter_example", "message": "examples.json requires one parameter_example"})
         if not examples.get("negative_examples"):
             errors.append({"code": "missing_negative_example", "message": "examples.json requires at least one negative example"})
+        try:
+            v2 = normalize_agent_skill_v2(meta, input_schema or api_input_schema, examples)
+        except Exception as exc:
+            errors.append({"code": "invalid_agent_skill_v2", "message": str(exc)})
+            v2 = {}
+        for field in ("business_domain", "supported_intents", "required_data", "execution_policy", "explanation_profile"):
+            if not v2.get(field):
+                errors.append({"code": f"missing_{field}", "message": f"Agent Skill v2 requires {field}"})
+        if not v2.get("do_not_invoke_examples"):
+            errors.append({"code": "missing_do_not_invoke_example", "message": "Agent Skill v2 requires do_not_invoke_examples"})
         if "confirmation_required" not in meta:
             errors.append({"code": "missing_confirmation_required", "message": "confirmation_required is required"})
         api_policy = api_skill.get("execution_policy") if api_skill else None
@@ -135,6 +148,32 @@ class AgentSkillRegistry:
         if api_policy and agent_policy and api_policy != agent_policy:
             errors.append({"code": "execution_policy_conflict", "message": "Agent Skill execution_policy conflicts with API Skill"})
         return self._validation(errors, raise_on_missing)
+
+    def set_state(self, name: str, state: str) -> dict[str, Any]:
+        allowed = {item.value for item in AgentSkillState}
+        if state not in allowed:
+            raise HTTPException(status_code=422, detail=f"Invalid Agent Skill state: {state}")
+        if state == AgentSkillState.ENABLED.value:
+            validation = self.validate_skill(name, raise_on_missing=False)
+            if validation.get("status") != "valid":
+                raise HTTPException(status_code=409, detail={"message": "Agent Skill must validate before enable", "validation": validation})
+            local = self.load_skill(name, include_api=True, validate=False)
+            if local.get("platform_skill_status") != "enabled":
+                raise HTTPException(status_code=409, detail="Bound platform Skill is not enabled")
+        path = self.root / name / "skill.yaml"
+        if not path.is_file():
+            raise HTTPException(status_code=404, detail=f"Agent Skill not found: {name}")
+        lines = path.read_text(encoding="utf-8").splitlines()
+        replaced = False
+        for index, line in enumerate(lines):
+            if line.startswith("state:"):
+                lines[index] = f"state: {state}"
+                replaced = True
+                break
+        if not replaced:
+            lines.insert(1, f"state: {state}")
+        path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+        return self.load_skill(name)
 
     def sync_schema(self, name: str) -> dict[str, Any]:
         skill = self.load_skill(name)
@@ -273,6 +312,15 @@ class AgentSkillRegistry:
             "canonical_api_skill_name": skill.get("canonical_api_skill_name"),
             "api_skill_available": skill.get("api_skill_available"),
             "enabled": skill.get("enabled", True),
+            "schema_version": skill.get("schema_version"),
+            "state": skill.get("state"),
+            "business_domain": skill.get("business_domain"),
+            "supported_intents": skill.get("supported_intents") or [],
+            "business_goals": skill.get("business_goals") or [],
+            "positive_examples": skill.get("positive_examples") or [],
+            "negative_examples": skill.get("negative_examples") or [],
+            "do_not_invoke_examples": skill.get("do_not_invoke_examples") or [],
+            "explanation_profile": skill.get("explanation_profile"),
             "trigger_intents": skill.get("trigger_intents") or [],
             "required_parameters": skill.get("required_parameters") or [],
             "optional_parameters": skill.get("optional_parameters") or [],
@@ -299,6 +347,8 @@ class AgentSkillRegistry:
         ]
         has_instruction = (path / "SKILL.md").is_file()
         has_examples = (path / "examples.json").is_file()
+        examples = self._read_json(path / "examples.json", {})
+        v2 = normalize_agent_skill_v2(meta, input_schema, examples)
         validation_status = self.validate_skill(name, raise_on_missing=False).get("status", "invalid")
         return {
             "name": name,
@@ -306,7 +356,22 @@ class AgentSkillRegistry:
             "canonical_api_skill_name": api_skill_name,
             **self._platform_fields(api_skill_name, self._safe_api_skill(api_skill_name), input_schema, output_schema),
             "api_skill_available": bool(api_skill_name),
-            "enabled": bool(meta.get("enabled", meta.get("status", "enabled") != "disabled")),
+            "enabled": v2["state"] == AgentSkillState.ENABLED.value,
+            "schema_version": v2["schema_version"],
+            "state": v2["state"],
+            "business_domain": v2["business_domain"],
+            "model_family": v2["model_family"],
+            "supported_intents": v2["supported_intents"],
+            "business_goals": v2["business_goals"],
+            "positive_examples": v2["positive_examples"],
+            "negative_examples": v2["negative_examples"],
+            "do_not_invoke_examples": v2["do_not_invoke_examples"],
+            "required_data": v2["required_data"],
+            "parameter_policy": v2["parameter_policy"],
+            "intent_policy": v2["intent_policy"],
+            "execution_policy": v2["execution_policy"],
+            "explanation_profile": v2["explanation_profile"],
+            "safety_policy": v2["safety_policy"],
             "trigger_intents": meta.get("trigger_intents") or [],
             "scenario_tags": meta.get("scenario_tags") or [],
             "required_parameters": [item for item in required_parameters if item],
@@ -387,7 +452,15 @@ class AgentSkillRegistry:
             if value:
                 container[key] = self._parse_scalar(value)
             else:
-                next_container: Any = {} if key in {"execution_policy", "result_explanation", "error_handling"} else []
+                next_container: Any = {} if key in {
+                    "business_domain",
+                    "parameter_policy",
+                    "intent_policy",
+                    "execution_policy",
+                    "safety_policy",
+                    "result_explanation",
+                    "error_handling",
+                } else []
                 container[key] = next_container
                 stack.append((indent, next_container))
                 last_key_at_indent[indent] = key
@@ -446,10 +519,19 @@ class AgentSkillRegistry:
             if isinstance(item, dict) and item.get("key") and item.get("required", True) is False
         ]
         lines = [
+            'schema_version: "2.0"',
             f"name: {name}",
+            f"agent_skill_name: {name}",
             f"display_name: {api_skill.get('display_name') or name}",
             f"canonical_api_skill_name: {api_skill.get('skill_name')}",
-            f"enabled: {'true' if enabled else 'false'}",
+            f"platform_skill_name: {api_skill.get('skill_name')}",
+            "state: draft",
+            "enabled: false",
+            f"business_domain: {api_skill.get('model_code') or name}",
+            "model_family: optimization",
+            "supported_intents: [\"optimization_run\", \"parameter_check\", \"result_explanation\"]",
+            "business_goals: [\"optimize\"]",
+            f"explanation_profile: {api_skill.get('model_code') or name}",
             "confirmation_required: true",
             "execution_policy:",
             "  mode: advisory_only",

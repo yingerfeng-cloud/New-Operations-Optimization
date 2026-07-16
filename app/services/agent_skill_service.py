@@ -16,7 +16,13 @@ class AgentSkillService:
         return agent_skill_registry.get_skill_local(name)
 
     def validate_skill(self, name: str) -> dict[str, Any]:
-        return agent_skill_registry.validate_skill(name)
+        validation = agent_skill_registry.validate_skill(name)
+        local = agent_skill_registry.get_skill_local(name)
+        state = local.get("state")
+        if validation.get("status") == "valid" and state == "draft":
+            local = agent_skill_registry.set_state(name, "valid")
+            state = local.get("state")
+        return {**validation, "state": state}
 
     def sync_schema(self, name: str) -> dict[str, Any]:
         return agent_skill_registry.sync_schema(name)
@@ -32,6 +38,9 @@ class AgentSkillService:
 
     def dry_run_dialog(self, name: str, body: dict[str, Any]) -> dict[str, Any]:
         return agent_skill_registry.dry_run_dialog(name, body)
+
+    def set_state(self, name: str, state: str) -> dict[str, Any]:
+        return agent_skill_registry.set_state(name, state)
 
 
 agent_skill_service = AgentSkillService()

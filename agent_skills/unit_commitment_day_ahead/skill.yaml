@@ -1,3 +1,17 @@
+negative_examples: ["仅咨询模型原理"]
+do_not_invoke_examples: ["只咨询业务知识，不运行优化"]
+schema_version: "2.0"
+state: enabled
+business_domain:
+  primary: unit_commitment_day_ahead
+  secondary: ["optimization"]
+model_family: optimization
+supported_intents: ["optimization_run", "parameter_check", "result_explanation"]
+business_goals: ["optimize"]
+explanation_profile: generic
+parameter_policy: {"allow_defaults": true, "require_default_confirmation": true, "allow_sample_data": true, "sample_data_must_be_confirmed": true}
+intent_policy: {"router_mode": "llm_plus_rules", "confidence_threshold": 0.75, "clarify_threshold": 0.6, "clarify_when_top_scores_close": true, "top_score_margin_threshold": 0.15}
+safety_policy: {"disallow_auto_control": true, "disclaimer_required": true}
 name: unit_commitment_day_ahead
 display_name: 日前机组组合 Agent Skill
 description: 调用日前机组组合 API Skill，形成机组启停、备用和出力计划建议。

@@ -10,6 +10,7 @@ from app.builders.pyomo_builder import PyomoModelBuilder
 from app.semantic.semantic_validator import RuntimeParameterValidator
 from app.solvers.highs_adapter import HiGHSAdapter
 from app.templates.power_templates import get_template
+from tests.test_helpers import test_and_publish_model
 
 
 client = TestClient(app)
@@ -113,7 +114,7 @@ def test_custom_cascade_hydro_model_does_not_override_default_skill() -> None:
     custom_code = copied_body["semantic_spec"]["model_code"]
     assert custom_code.startswith("cascade_hydro_dispatch_custom_")
 
-    published = client.post(f"/api/models/{custom_id}/publish")
+    published = test_and_publish_model(client, custom_id, _sample_params())
     assert published.status_code == 200, published.text
     generated = client.post(f"/api/models/{custom_id}/skills/generate")
     assert generated.status_code == 200, generated.text
@@ -172,7 +173,7 @@ def test_publish_component_model_infers_build_mode_from_component_spec() -> None
     created = client.post("/api/models", json=payload)
     assert created.status_code == 200, created.text
 
-    published = client.post(f"/api/models/{payload['id']}/publish")
+    published = test_and_publish_model(client, payload["id"], payload["parameters"])
     assert published.status_code == 200, published.text
     body = published.json()
     assert body["status"] == "published"

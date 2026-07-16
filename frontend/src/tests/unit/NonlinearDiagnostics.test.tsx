@@ -61,12 +61,12 @@ test('Step5 展示非线性诊断并阻断未转换双线性', () => {
   const draft = nonlinearDraft();
   const validation = validateModelDraft(draft);
 
-  render(<Step5ReviewPublish draft={draft} validation={validation} onPublish={vi.fn()} onTest={vi.fn()} />);
+  render(<Step5ReviewPublish draft={draft} validation={validation} onTest={vi.fn()} />);
 
   expect(screen.getByText('非线性诊断')).toBeInTheDocument();
   expect(screen.getByText('bilinear')).toBeInTheDocument();
   expect(screen.getByText('存在未转换非线性，已阻断发布')).toBeInTheDocument();
-  expect(screen.getByRole('button', { name: '发布模型' })).toBeDisabled();
+  expect(screen.getByRole('button', { name: '测试运行' })).toBeDisabled();
 });
 
 test('缺少上下界时阻断发布', () => {
@@ -80,10 +80,10 @@ test('缺少上下界时阻断发布', () => {
   }];
   const validation = validateModelDraft(draft);
 
-  render(<Step5ReviewPublish draft={draft} validation={validation} onPublish={vi.fn()} onTest={vi.fn()} />);
+  render(<Step5ReviewPublish draft={draft} validation={validation} onTest={vi.fn()} />);
 
   expect(screen.getAllByText(/McCormick 缺少 x\/y 有限上下界/).length).toBeGreaterThan(0);
-  expect(screen.getByRole('button', { name: '发布模型' })).toBeDisabled();
+  expect(screen.getByRole('button', { name: '测试运行' })).toBeDisabled();
 });
 
 test('已转换 McCormick 后允许发布', () => {
@@ -101,9 +101,9 @@ test('已转换 McCormick 后允许发布', () => {
   }];
   const validation = validateModelDraft(draft);
 
-  render(<Step5ReviewPublish draft={draft} validation={validation} onPublish={vi.fn()} onTest={vi.fn()} />);
+  render(<Step5ReviewPublish draft={draft} validation={validation} onTest={vi.fn()} />);
 
   expect(validation.valid).toBe(true);
   expect(screen.getAllByText(/双线性项已配置 McCormick 松弛/).length).toBeGreaterThan(0);
-  expect(screen.getByRole('button', { name: '发布模型' })).not.toBeDisabled();
+  expect(screen.getByRole('button', { name: '测试运行' })).not.toBeDisabled();
 });

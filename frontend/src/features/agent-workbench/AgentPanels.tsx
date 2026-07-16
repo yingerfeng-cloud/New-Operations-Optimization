@@ -1,4 +1,4 @@
-import { Alert, Card, Descriptions, Empty, Space, Table, Tag } from 'antd';
+import { Alert, Card, Collapse, Descriptions, Empty, Space, Table, Tag } from 'antd';
 import { JsonViewer } from '../../components/JsonViewer';
 import { StatusTag } from '../../components/StatusTag';
 import type { AgentAnalyzeResponse, AgentConversation, AgentMessage, AgentSkill, AgentStatus } from '../../types/agent';
@@ -85,7 +85,12 @@ export function AgentWorkflowPanel({ response }: { response?: AgentAnalyzeRespon
         <Descriptions.Item label="工作流"><StatusTag status={response.workflow_state || response.status} /></Descriptions.Item>
         <Descriptions.Item label="Agent Skill">{valueText(response.agent_skill_name)}</Descriptions.Item>
         <Descriptions.Item label="平台 Skill">{valueText(response.resolved_skill_name || response.api_skill_name)}</Descriptions.Item>
+        <Descriptions.Item label="路由置信度">{response.route_confidence === undefined ? '-' : `${Math.round(response.route_confidence * 100)}%`}</Descriptions.Item>
+        <Descriptions.Item label="选择理由">{valueText(response.selection_reason)}</Descriptions.Item>
+        <Descriptions.Item label="需要澄清"><Tag color={response.needs_clarification ? 'orange' : 'green'}>{response.needs_clarification ? '是' : '否'}</Tag></Descriptions.Item>
       </Descriptions>
+      {Boolean(response.candidate_skills?.length) && <Card size="small" title="候选 Skill Top 3" className="section-gap"><Table size="small" pagination={false} rowKey={(row) => String(row.agent_skill_name || row.platform_skill_name)} dataSource={response.candidate_skills} columns={[{ title: 'Skill', render: (_, row) => valueText(row.display_name || row.agent_skill_name || row.platform_skill_name) }, { title: '分数', render: (_, row) => valueText(row.final_score) }, { title: '理由', render: (_, row) => valueText(row.reason) }]} /></Card>}
+      {response.clarification_question && <Alert showIcon type="warning" title="需要澄清" description={response.clarification_question} className="section-gap" />}
       {responseMessage(response) && <Alert showIcon type="info" title="Agent 回复" description={responseMessage(response)} className="section-gap" />}
     </>
   );
@@ -100,6 +105,10 @@ export function AgentParameterPanel({ response }: { response?: AgentAnalyzeRespo
       {missing.length > 0 && <Alert showIcon type="warning" title="缺失必填参数" description={missing.map(valueText).join('；')} className="section-gap" />}
       {invalid.length > 0 && <Alert showIcon type="error" title="参数校验失败" description={invalid.map(valueText).join('；')} className="section-gap" />}
       <Card size="small" title="参数草稿">
+        <Descriptions size="small" bordered column={1} className="section-gap">
+          <Descriptions.Item label="参数完整度">{response.parameter_completeness === undefined ? '-' : `${Math.round(response.parameter_completeness * 100)}%`}</Descriptions.Item>
+          <Descriptions.Item label="Schema 适配度">{response.schema_fit_score === undefined ? '-' : `${Math.round(response.schema_fit_score * 100)}%`}</Descriptions.Item>
+        </Descriptions>
         <Table
           size="small"
           pagination={false}
@@ -108,6 +117,7 @@ export function AgentParameterPanel({ response }: { response?: AgentAnalyzeRespo
           columns={[
             { title: '参数', dataIndex: 'key' },
             { title: '值', dataIndex: 'value', render: valueText },
+            { title: '来源', dataIndex: 'key', render: (key: string) => valueText(response.parameter_sources?.[key]) },
           ]}
           locale={{ emptyText: '暂无参数' }}
         />
@@ -124,6 +134,15 @@ export function AgentParameterPanel({ response }: { response?: AgentAnalyzeRespo
 export function AgentResultPanel({ response }: { response?: AgentAnalyzeResponse }) {
   const result = response?.result || response?.task_session?.result;
   if (!response || (!result && !response.task_session && response.objective_value === undefined)) return <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="调用完成后展示结果" />;
+  const resultRecord = (result && typeof result === 'object' ? result : {}) as Record<string, unknown>;
+  const structured = ((resultRecord.explanation_structured || (typeof response.explanation === 'object' ? response.explanation : {})) || {}) as Record<string, unknown>;
+  const facts = Array.isArray(structured.facts) ? structured.facts : [];
+  const inferences = Array.isArray(structured.inferences) ? structured.inferences : [];
+  const recommendations = Array.isArray(structured.recommendations) ? structured.recommendations : [];
+  const risks = Array.isArray(structured.risk_notes) ? structured.risk_notes : [];
+  const manual = Array.isArray(structured.manual_review_points) ? structured.manual_review_points : [];
+  const limitations = Array.isArray(structured.limitations) ? structured.limitations : [];
+  const evidence = resultRecord.evidence_package;
   return (
     <>
       <Descriptions size="small" bordered column={1}>
@@ -132,6 +151,15 @@ export function AgentResultPanel({ response }: { response?: AgentAnalyzeResponse
         <Descriptions.Item label="任务编号">{valueText(response.task_session?.task_id)}</Descriptions.Item>
         <Descriptions.Item label="目标值">{valueText(response.objective_value)}</Descriptions.Item>
       </Descriptions>
+      {(facts.length + inferences.length + recommendations.length + risks.length + manual.length + limitations.length > 0) && <Space orientation="vertical" size={8} className="full-width section-gap">
+        <Card size="small" title="事实">{facts.length ? facts.map((item, index) => <div key={`fact-${index}`}>{valueText(item)}</div>) : '无'}</Card>
+        <Card size="small" title="推断">{inferences.length ? inferences.map((item, index) => <div key={`inference-${index}`}>{valueText(item)}</div>) : '无'}</Card>
+        <Card size="small" title="建议">{recommendations.length ? recommendations.map((item, index) => <div key={`recommendation-${index}`}>{valueText(item)}</div>) : '无'}</Card>
+        <Card size="small" title="风险提示">{risks.length ? risks.map((item, index) => <div key={`risk-${index}`}>{valueText(item)}</div>) : '无'}</Card>
+        <Card size="small" title="人工复核点">{manual.length ? manual.map((item, index) => <div key={`manual-${index}`}>{valueText(item)}</div>) : '无'}</Card>
+        <Card size="small" title="解释限制">{limitations.length ? limitations.map((item, index) => <div key={`limit-${index}`}>{valueText(item)}</div>) : '无'}</Card>
+      </Space>}
+      {evidence !== undefined && <Collapse className="section-gap" items={[{ key: 'evidence', label: '查看原始 evidence package', children: <JsonViewer value={evidence} /> }]} />}
       {result !== undefined && <Card size="small" title="原始结果" className="section-gap"><JsonViewer value={result} /></Card>}
     </>
   );

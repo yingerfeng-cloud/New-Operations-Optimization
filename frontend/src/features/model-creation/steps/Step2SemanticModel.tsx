@@ -89,7 +89,7 @@ export function Step2SemanticModel({ draft, onChange }: { draft: ModelDraft; onC
     form.setFieldsValue({
       ...next,
       dimensionText: formatList(('indices' in next ? next.indices : undefined) || ('dimension' in next ? next.dimension : undefined)),
-      defaultText: 'defaultValue' in next || 'default' in next ? String((next as ParameterRow).defaultValue ?? (next as ParameterRow).default ?? '') : '',
+      defaultText: 'defaultValue' in next || 'default_value' in next || 'default' in next ? String((next as ParameterRow).defaultValue ?? (next as ParameterRow).default_value ?? (next as ParameterRow).default ?? '') : '',
       exampleText: 'exampleValue' in next ? String((next as ParameterRow).exampleValue ?? '') : '',
     });
   };
@@ -204,7 +204,7 @@ export function Step2SemanticModel({ draft, onChange }: { draft: ModelDraft; onC
     { title: '维度', render: (_, row) => formatList(row.indices || row.dimension) || '标量' },
     { title: '单位', dataIndex: 'unit', render: value => value || '-' },
     { title: '必填', dataIndex: 'required', render: value => value ? <Tag color="red">必填</Tag> : <Tag>可选</Tag> },
-    { title: '默认值', render: (_, row) => String(row.defaultValue ?? row.default ?? '-') },
+    { title: '默认值', render: (_, row) => String(row.defaultValue ?? row.default_value ?? row.default ?? '-') },
     { title: '示例值', dataIndex: 'exampleValue', render: value => String(value ?? '-') },
     actionColumn('parameters') as ColumnsType<ParameterRow>[number],
   ];

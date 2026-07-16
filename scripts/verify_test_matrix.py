@@ -33,6 +33,7 @@ REQUIRED_E2E_COVERAGE = {
 REQUIRED_DELIVERY_FILES = [
     ".github/workflows/ci.yml",
     ".github/workflows/e2e-real.yml",
+    ".github/workflows/nightly-stability.yml",
     "package.ps1",
     "启动前后端.ps1",
     "停用前后端.ps1",
@@ -89,7 +90,12 @@ def main() -> int:
 
     require_snippets(
         ROOT / ".github" / "workflows" / "ci.yml",
-        ["npm run test:unit", "python -m pytest -q", "npm run test:e2e:mock", "python -m pytest -q -m slow", "package.ps1"],
+        ["npm run typecheck", "npm run build", "npm run test:unit", "python -m pytest -q", "npm run test:e2e:mock", "package.ps1", "cancel-in-progress: true"],
+        failures,
+    )
+    require_snippets(
+        ROOT / ".github" / "workflows" / "nightly-stability.yml",
+        ["schedule:", "workflow_dispatch:", "for run in 1 2 3", "python -m pytest -q -m slow", "npm run test:e2e:real", "cancel-in-progress: true"],
         failures,
     )
     require_snippets(

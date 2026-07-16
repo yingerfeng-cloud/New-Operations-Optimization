@@ -8,8 +8,11 @@ from fastapi import HTTPException
 
 from app.agent.conversation_store import conversation_store
 from app.agent.parameter_extractor import parameter_extractor
+from app.agent.parameter_extractor_v2 import parameter_extractor_v2
 from app.agent.platform_client import platform_client
 from app.agent.skill_router import agent_skill_router
+from app.agent.intent_router_v2 import intent_router_v2
+from app.agent.llm_intent_parser_v2 import llm_intent_parser_v2
 from app.services.agent_skill_service import agent_skill_service
 from app.services.function_asset_service import function_asset_service
 from app.services.invocation_service import invocation_service
@@ -89,9 +92,56 @@ class AgentOrchestrator:
         manual_skill = body.get("skill_name")
         router_started = time.perf_counter()
         available_agent_skills = agent_skill_service.list_skills()
-        router_result = agent_skill_router.route(message, existing, available_agent_skills)
+        legacy_router_result = agent_skill_router.route(message, existing, available_agent_skills)
+        llm_intent_parse = llm_intent_parser_v2.parse(message, existing, available_agent_skills)
+        v2_router_result = intent_router_v2.route(message, existing, available_agent_skills, llm_parse=llm_intent_parse)
+        v2_router_result["llm_intent_parse"] = llm_intent_parse
+        legacy_intent = legacy_router_result.get("intent")
+        legacy_compat_intents = {
+            "how_to_use", "explain_required_parameters", "parameter_example", "skill_availability_query",
+            "switch_skill", "confirm_defaults", "confirm_invoke", "result_explanation",
+            "confirm_switch_clear", "confirm_switch_migrate", "cancel_switch", "parameter_supplement",
+        }
+        if legacy_intent in legacy_compat_intents:
+            router_result = legacy_router_result
+        elif legacy_intent == "optimization_request" and legacy_router_result.get("agent_skill_name"):
+            # Preserve deterministic, explicit scenario aliases while exposing
+            # the v2 ranking evidence for diagnostics.  A weak/close v2 score
+            # must not turn a known storage or hydro request into clarification.
+            router_result = {
+                **v2_router_result,
+                **legacy_router_result,
+                "need_clarification": False,
+                "clarification_question": None,
+                "router_version": v2_router_result.get("router_version", "2.0"),
+                "candidate_skills": v2_router_result.get("candidate_skills", []),
+                "audit": {
+                    **(v2_router_result.get("audit") or {}),
+                    "compatibility_fallback": "legacy_explicit_skill_match",
+                },
+            }
+        else:
+            router_result = v2_router_result
         timing["router_ms"] = self._elapsed_ms(router_started)
         fallback_intent = self.intent_router(message, existing, body)
+        if (
+            fallback_intent == "parameter_supplement"
+            and existing.get("resolved_skill_name")
+            and router_result.get("intent") not in legacy_compat_intents
+        ):
+            router_result = {
+                **v2_router_result,
+                "intent": "parameter_supplement",
+                "agent_skill_name": existing.get("agent_skill_name") or self._agent_skill_for_api(existing.get("resolved_skill_name")),
+                "api_skill_name": existing.get("resolved_skill_name"),
+                "platform_skill_name": existing.get("resolved_skill_name"),
+                "need_clarification": False,
+                "clarification_question": None,
+                "audit": {
+                    **(v2_router_result.get("audit") or {}),
+                    "compatibility_fallback": "active_task_parameter_supplement",
+                },
+            }
         router_intent = router_result.get("intent")
         intent = router_intent if router_intent in {
             "how_to_use",
@@ -107,7 +157,44 @@ class AgentOrchestrator:
             "confirm_switch_migrate",
             "cancel_switch",
             "skill_selection_required",
+            "knowledge_question",
+            "safety_refusal",
         } else fallback_intent
+
+        if intent == "safety_refusal":
+            return self._finalize_analyze_response(
+                self._policy_chat_response(
+                    conversation_id,
+                    existing,
+                    message,
+                    "平台当前仅支持辅助分析和决策建议，不支持绕过人工审批直接下发生产控制或交易申报指令。",
+                    intent,
+                    router_result,
+                ),
+                timing,
+                started_at,
+            )
+        if intent == "knowledge_question":
+            return self._finalize_analyze_response(
+                self._policy_chat_response(conversation_id, existing, message, self._rule_chat_reply(message), intent, router_result),
+                timing,
+                started_at,
+            )
+        if self._is_casual_chat(message) and not manual_skill:
+            return self._finalize_analyze_response(self._chat_only(conversation_id, existing, message, preserve_task=self._has_active_optimization(existing)), timing, started_at)
+        if router_result.get("need_clarification") and not manual_skill:
+            return self._finalize_analyze_response(
+                self._policy_chat_response(
+                    conversation_id,
+                    existing,
+                    message,
+                    str(router_result.get("clarification_question") or "请补充具体优化场景和业务目标。"),
+                    "clarification_required",
+                    router_result,
+                ),
+                timing,
+                started_at,
+            )
 
         if intent in {"confirm_switch_clear", "confirm_switch_migrate", "cancel_switch"}:
             return self._finalize_analyze_response(self._handle_switch_confirmation(conversation_id, existing, message, intent), timing, started_at)
@@ -131,9 +218,6 @@ class AgentOrchestrator:
             return self._finalize_analyze_response(self._skill_availability_response(conversation_id, existing, message, agent_skill), timing, started_at)
         if intent in {"confirm_invoke", "confirm_defaults"} and not self._has_active_optimization(existing):
             return self._finalize_analyze_response(self._no_active_task_response(conversation_id, existing, message, intent), timing, started_at)
-        if self._is_casual_chat(message) and not manual_skill:
-            return self._finalize_analyze_response(self._chat_only(conversation_id, existing, message, preserve_task=self._has_active_optimization(existing)), timing, started_at)
-
         default_confirmed = bool(body.get("confirm_defaults") or body.get("use_defaults") or intent == "confirm_defaults")
         skill_name = (
             manual_skill
@@ -178,12 +262,26 @@ class AgentOrchestrator:
                 return self._finalize_analyze_response(self._platform_unavailable_response(conversation_id, existing, message, skill_name, router_result.get("agent_skill_name")), timing, started_at)
             resolved_skill_name = skill.get("canonical_skill_name") or skill.get("skill_name") or skill_name
             input_schema = skill.get("input_schema") or []
-        extract_meta = {"llm_timeout": False, "fallback_mode": None, "llm_extract_ms": 0}
+        extract_meta = {"llm_timeout": False, "fallback_mode": None, "llm_extract_ms": 0, "schema_fit_score": 0.0, "parameter_sources": {}}
         extract_started = time.perf_counter()
         allow_extract = not default_confirmed and intent in {"optimization_request", "parameter_supplement", "confirm_defaults"} and self.should_extract_parameters(message, intent, input_schema)
         if allow_extract:
-            extract_meta = parameter_extractor.extract_with_meta(message, input_schema, allow_llm=True)
-            extracted = extract_meta["parameters"]
+            parameter_policy = {}
+            if agent_skill_name:
+                try:
+                    parameter_policy = agent_skill_service.get_skill_local(agent_skill_name).get("parameter_policy") or {}
+                except Exception:
+                    parameter_policy = {}
+            v2_extract = parameter_extractor_v2.extract(message, input_schema, parameter_policy, previous_draft, allow_llm=True)
+            extracted = v2_extract["updates"]
+            extract_meta = {
+                "llm_timeout": v2_extract.get("llm_timeout", False),
+                "fallback_mode": v2_extract.get("fallback_mode"),
+                "llm_extract_ms": 0,
+                "schema_fit_score": v2_extract.get("schema_fit_score", 0.0),
+                "parameter_sources": v2_extract.get("parameter_sources") or {},
+                "parameter_confidence": v2_extract.get("parameter_confidence") or {},
+            }
         else:
             extracted = {}
         sample_run_requested = self._is_sample_run_request(message, intent)
@@ -230,6 +328,7 @@ class AgentOrchestrator:
                 "invalid_parameters": analysis.get("invalid_parameters", []),
                 "can_use_default": analysis.get("can_use_default", []),
                 "last_questions": analysis.get("questions", []),
+                "last_router_audit": router_result.get("audit"),
                 "status": workflow_state,
                 "last_response_type": "analysis",
                 "messages": self._append_messages(existing.get("messages") or [], message, agent_text, default_confirmed),
@@ -260,6 +359,9 @@ class AgentOrchestrator:
             "default_candidates": analysis.get("can_use_default", []),
             "requires_default_confirmation": requires_default,
             "questions": analysis.get("questions", []),
+            "parameter_completeness": round(1 - len(analysis.get("missing_required", [])) / max(1, len([item for item in input_schema if item.get("required", True) is not False])), 4),
+            "schema_fit_score": extract_meta.get("schema_fit_score", 0.0),
+            "parameter_confidence": extract_meta.get("parameter_confidence", {}),
             "ready_to_invoke": ready,
             "llm_enabled": llm_service.enabled(),
             "messages": conversation.get("messages", []),
@@ -267,6 +369,12 @@ class AgentOrchestrator:
             "agent_message": agent_text,
             "llm_timeout": bool(extract_meta.get("llm_timeout")),
             "fallback_mode": extract_meta.get("fallback_mode"),
+            "route_confidence": router_result.get("final_score", 0.0),
+            "candidate_skills": router_result.get("candidate_skills", []),
+            "selection_reason": router_result.get("selection_reason"),
+            "needs_clarification": router_result.get("need_clarification", False),
+            "clarification_question": router_result.get("clarification_question"),
+            "audit": router_result.get("audit"),
         }
         return self._finalize_analyze_response(response, timing, started_at)
 
@@ -904,6 +1012,22 @@ class AgentOrchestrator:
         if not skill_name:
             return skill_name
         skills = platform_client.list_skills()
+        if prefer_custom and skill_name == "run_economic_dispatch":
+            custom_economic_skills = [
+                item
+                for item in skills
+                if not str(item.get("model_id") or "").startswith("MODEL-POWER-")
+                and self._is_economic_dispatch_skill(item)
+            ]
+            if custom_economic_skills:
+                custom_economic_skills.sort(
+                    key=lambda item: (
+                        str(item.get("updated_at") or item.get("published_at") or ""),
+                        str(item.get("skill_name") or ""),
+                    ),
+                    reverse=True,
+                )
+                return str(custom_economic_skills[0].get("skill_name") or skill_name)
         matches = [
             item
             for item in skills
@@ -916,6 +1040,14 @@ class AgentOrchestrator:
         else:
             matches.sort(key=lambda item: (not str(item.get("model_id") or "").startswith("MODEL-POWER-"), str(item.get("skill_name") or "")))
         return str(matches[0].get("skill_name") or skill_name)
+
+    @staticmethod
+    def _is_economic_dispatch_skill(skill: dict[str, Any]) -> bool:
+        searchable = " ".join(
+            str(skill.get(key) or "")
+            for key in ("skill_name", "display_name", "name", "description", "model_code")
+        ).lower()
+        return any(marker in searchable for marker in ("经济调度", "economic dispatch", "economic_dispatch"))
 
     def _select_skill(self, message: str) -> str | None:
         compact = "".join(str(message or "").lower().split())
@@ -1002,6 +1134,39 @@ class AgentOrchestrator:
             "messages": conversation.get("messages", []),
             "workflow_state": conversation.get("status", "CHAT_IDLE"),
             "status": conversation.get("status", "CHAT_IDLE"),
+        }
+
+    def _policy_chat_response(
+        self,
+        conversation_id: str | None,
+        existing: dict[str, Any],
+        message: str,
+        agent_text: str,
+        intent: str,
+        router_result: dict[str, Any],
+    ) -> dict[str, Any]:
+        conversation = conversation_store.upsert(
+            conversation_id,
+            {
+                "status": "CLARIFICATION_REQUIRED" if intent == "clarification_required" else "CHAT",
+                "last_response_type": intent,
+                "messages": self._append_messages(existing.get("messages") or [], message, agent_text, False),
+                "recent_turns": self._recent_turns(existing, message, intent, intent, agent_text),
+                "last_router_audit": router_result.get("audit"),
+            },
+        )
+        return {
+            **self._chat_response(conversation, agent_text, preserve_task=self._has_active_optimization(existing)),
+            "intent": intent,
+            "response_type": intent,
+            "workflow_state": "CLARIFICATION_REQUIRED" if intent == "clarification_required" else "CHAT",
+            "router_result": router_result,
+            "route_confidence": router_result.get("final_score", 0.0),
+            "candidate_skills": router_result.get("candidate_skills", []),
+            "selection_reason": router_result.get("selection_reason"),
+            "needs_clarification": bool(router_result.get("need_clarification")),
+            "clarification_question": router_result.get("clarification_question"),
+            "ready_to_invoke": False,
         }
 
     def _platform_unavailable_response(self, conversation_id: str | None, existing: dict[str, Any], message: str, api_skill_name: str | None = None, agent_skill_name: str | None = None) -> dict[str, Any]:
@@ -1196,7 +1361,7 @@ class AgentOrchestrator:
             sources[key] = "user_provided"
         for key, source in (analysis.get("parameter_sources") or {}).items():
             if key not in sources:
-                sources[key] = "default_suggested" if source in {"default_value", "sample_value"} else str(source)
+                sources[key] = "default_suggested" if str(source).upper() in {"DEFAULT_VALUE", "SAMPLE_VALUE"} else str(source)
         return sources
 
     def _apply_confirmed_defaults(self, draft: dict[str, Any], sources: dict[str, str], analysis: dict[str, Any]) -> tuple[dict[str, Any], dict[str, str]]:

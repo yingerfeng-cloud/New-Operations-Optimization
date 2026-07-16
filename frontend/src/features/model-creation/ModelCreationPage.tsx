@@ -3,7 +3,7 @@ import { MoreOutlined } from '@ant-design/icons';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { createModel, getModel, publishModel, testModel, updateModel } from '../../api/models';
+import { createModel, createModelVersion, getModel, publishModel, testModel, updateModel } from '../../api/models';
 import { getSystemConfig } from '../../api/systemConfig';
 import { getTemplateDetail, getTemplates } from '../../api/templates';
 import { PageHeader } from '../../components/PageHeader';
@@ -33,6 +33,19 @@ const stepMeta: ModelCreationStepMeta[] = [
   { title: '校验发布', description: '完成 dry-run、兼容性检查、测试运行和模型发布。', sectionKeys: ['solver_compatibility'] },
 ];
 
+interface ModelTestRequestContext {
+  sequence: number;
+  draft: ReturnType<typeof normalizeModelDraft>;
+  testedSnapshot: string;
+}
+
+interface ModelTestSuccessContext {
+  sequence: number;
+  modelId: string;
+  testedSnapshot: string;
+  model: Awaited<ReturnType<typeof testModel>>;
+}
+
 export function ModelCreationPage() {
   const [modal, modalContextHolder] = Modal.useModal();
   const nav = useNavigate();
@@ -41,11 +54,13 @@ export function ModelCreationPage() {
   const initializedKeyRef = useRef('');
   const [visitedThrough, setVisitedThrough] = useState(0);
   const [showAllValidation, setShowAllValidation] = useState(false);
-  const testedAssetRef = useRef<{ id: string; snapshot: string } | undefined>(undefined);
+  const [testedAsset, setTestedAsset] = useState<{ id: string; snapshot: string }>();
+  const testRequestSequenceRef = useRef(0);
   const {
     draft,
     step,
     workspace,
+    currentDraftModelId,
     setStep,
     setDraft,
     initializeWorkspace,
@@ -59,6 +74,10 @@ export function ModelCreationPage() {
   const systemConfig = useQuery({ queryKey: ['system-config'], queryFn: getSystemConfig, retry: false });
   const scenarioDictionary = systemConfig.data?.dictionaries?.business_scenarios;
   const configuredScenarios = useMemo(() => scenariosFromDictionary(scenarioDictionary), [scenarioDictionary]);
+  const availableScenarios = useMemo(
+    () => systemConfig.isError ? scenarioCatalog : scenarioDictionary === undefined ? [] : configuredScenarios,
+    [configuredScenarios, scenarioDictionary, systemConfig.isError],
+  );
   const request = useMemo(() => parseWorkspaceRequest(searchParams, routeModelId), [routeModelId, searchParams]);
   const sourceModel = useQuery({
     queryKey: ['model-workspace-source', request.sourceModelId],
@@ -78,6 +97,8 @@ export function ModelCreationPage() {
   useEffect(() => {
     setVisitedThrough(0);
     setShowAllValidation(false);
+    setTestedAsset(undefined);
+    testRequestSequenceRef.current += 1;
   }, [requestKey]);
 
   useEffect(() => {
@@ -96,6 +117,7 @@ export function ModelCreationPage() {
     setWorkspace({ mode: resolvedMode, sourceModelId: request.sourceModelId, templateCode: request.templateCode, initialized: false, dirty: false });
 
     if (request.legacySource) return () => { active = false; };
+    if (systemConfig.isPending) return () => { active = false; };
     if (resolvedMode === 'new') {
       const blank = createBlankDraft();
       initializedKeyRef.current = requestKey;
@@ -103,8 +125,7 @@ export function ModelCreationPage() {
       return () => { active = false; };
     }
     if (resolvedMode === 'template' && templateDetail.data) {
-      const templateScenario = configuredScenarios.find(item => item.id === templateDetail.data.scenario || item.name === templateDetail.data.scenario)
-        || scenarioCatalog.find(item => item.id === templateDetail.data.scenario || item.name === templateDetail.data.scenario);
+      const templateScenario = availableScenarios.find(item => item.id === templateDetail.data.scenario || item.name === templateDetail.data.scenario);
       const blank = createBlankDraft();
       const next = applyTemplateToDraft(blank, templateDetail.data, templateScenario?.name || templateDetail.data.scenario || '');
       next.basic_info.scenario_id = templateScenario?.id;
@@ -115,11 +136,17 @@ export function ModelCreationPage() {
       }
       return () => { active = false; };
     }
+    if (resolvedMode === 'template' && !request.templateCode) {
+      const blank = createBlankDraft();
+      initializedKeyRef.current = requestKey;
+      initializeWorkspace({ mode: 'template', sessionId: requestKey }, blank);
+      return () => { active = false; };
+    }
     if (request.sourceModelId && sourceModel.data) {
       const next = assetToWorkspaceDraft(sourceModel.data, resolvedMode);
-      const scenario = configuredScenarios.find(item => item.id === next.basic_info.scenario || item.name === next.basic_info.scenario)
-        || scenarioCatalog.find(item => item.id === next.basic_info.scenario || item.name === next.basic_info.scenario);
-      next.basic_info.scenario_id = scenario?.id;
+      const scenario = availableScenarios.find(item => item.id === next.basic_info.scenario || item.name === next.basic_info.scenario);
+      const disabledScenario = scenarioDictionary?.find(item => item.enabled === false && (item.code === next.basic_info.scenario || item.label === next.basic_info.scenario));
+      next.basic_info.scenario_id = scenario?.id || disabledScenario?.code || next.basic_info.scenario || undefined;
       const currentAssetId = resolvedMode === 'edit' ? sourceModel.data.id : undefined;
       if (active) {
         initializedKeyRef.current = requestKey;
@@ -133,7 +160,7 @@ export function ModelCreationPage() {
       }
     }
     return () => { active = false; };
-  }, [configuredScenarios, initializeWorkspace, request.legacySource, request.sourceModelId, request.templateCode, requestKey, resolvedMode, setLoadedTemplate, setWorkspace, sourceModel.data, templateDetail.data]);
+  }, [availableScenarios, initializeWorkspace, request.legacySource, request.sourceModelId, request.templateCode, requestKey, resolvedMode, scenarioDictionary, setLoadedTemplate, setWorkspace, sourceModel.data, systemConfig.isPending, templateDetail.data]);
 
   useEffect(() => {
     const onBeforeUnload = (event: BeforeUnloadEvent) => {
@@ -144,10 +171,14 @@ export function ModelCreationPage() {
     return () => window.removeEventListener('beforeunload', onBeforeUnload);
   }, []);
 
-  const saveDraftModel = async (requireValid = false) => {
+  const saveDraftModel = async (requireValid = false, draftOverride?: ReturnType<typeof normalizeModelDraft>) => {
     const state = useModelCreationStore.getState();
-    const model = await saveModelDraftAsset(state.draft, state.currentDraftModelId, { createModel, updateModel }, requireValid);
+    const createAsset = state.workspace.mode === 'version' && state.workspace.sourceModelId
+      ? (payload: Parameters<typeof createModel>[0]) => createModelVersion(state.workspace.sourceModelId!, payload)
+      : createModel;
+    const model = await saveModelDraftAsset(draftOverride || state.draft, state.currentDraftModelId, { createModel: createAsset, updateModel }, requireValid);
     state.setCurrentDraftModelId(model.id);
+    state.setWorkspace({ dirty: false, currentAssetId: model.id });
     return model;
   };
   const saveDraft = useMutation({ mutationFn: () => saveDraftModel(false), onSuccess: () => message.success('草稿已保存') });
@@ -155,14 +186,9 @@ export function ModelCreationPage() {
     mutationFn: async () => {
       const state = useModelCreationStore.getState();
       const snapshot = JSON.stringify(normalizeModelDraft(state.draft));
-      if (state.currentDraftModelId && testedAssetRef.current?.id === state.currentDraftModelId) {
-        if (testedAssetRef.current.snapshot === snapshot) return publishModel(state.currentDraftModelId);
-        const copied = await saveModelDraftAsset(state.draft, undefined, { createModel, updateModel }, true);
-        state.setCurrentDraftModelId(copied.id);
-        return publishModel(copied.id);
-      }
-      const model = await saveDraftModel(true);
-      return publishModel(model.id);
+      if (!state.currentDraftModelId || testedAsset?.id !== state.currentDraftModelId) throw new Error('当前模型资产尚未通过测试，请先保存并测试。');
+      if (testedAsset.snapshot !== snapshot) throw new Error('模型在上次测试通过后发生了修改，请重新保存并测试后再发布。');
+      return publishModel(state.currentDraftModelId);
     },
     onSuccess: model => {
       message.success('模型流程执行成功');
@@ -170,16 +196,36 @@ export function ModelCreationPage() {
       nav(`/models/${model.id}`);
     },
   });
-  const testRun = useMutation({
-    mutationFn: async () => {
-      const model = await saveDraftModel(true);
-      return testModel(model.id, normalizeModelDraft(draft).runtime_parameters);
-    },
-    onSuccess: model => {
-      testedAssetRef.current = { id: model.id, snapshot: JSON.stringify(normalizeModelDraft(useModelCreationStore.getState().draft)) };
-      message.success('模型测试运行完成');
+  const testRun = useMutation<ModelTestSuccessContext, Error, ModelTestRequestContext>({
+    mutationFn: async requestContext => {
+      const model = await saveDraftModel(true, requestContext.draft);
+      const testedModel = await testModel(model.id, requestContext.draft.runtime_parameters);
+      return {
+        sequence: requestContext.sequence,
+        modelId: model.id,
+        testedSnapshot: requestContext.testedSnapshot,
+        model: testedModel,
+      };
     },
   });
+
+  const runModelTest = async () => {
+    const capturedDraft = normalizeModelDraft(useModelCreationStore.getState().draft);
+    const requestContext: ModelTestRequestContext = {
+      sequence: ++testRequestSequenceRef.current,
+      draft: capturedDraft,
+      testedSnapshot: JSON.stringify(capturedDraft),
+    };
+    try {
+      const result = await testRun.mutateAsync(requestContext);
+      if (result.sequence !== testRequestSequenceRef.current) return undefined;
+      setTestedAsset({ id: result.modelId, snapshot: result.testedSnapshot });
+      return result.model;
+    } catch (error) {
+      if (requestContext.sequence !== testRequestSequenceRef.current) return undefined;
+      throw error;
+    }
+  };
 
   const confirmSourceSwitch = () => new Promise<boolean>(resolve => {
     if (!useModelCreationStore.getState().workspace.dirty) {
@@ -198,7 +244,7 @@ export function ModelCreationPage() {
 
   const handleScenarioSelection = async (scenarioId: string) => {
     if (!(await confirmSourceSwitch())) return;
-    const scenario = configuredScenarios.find(item => item.id === scenarioId) || scenarioCatalog.find(item => item.id === scenarioId);
+    const scenario = availableScenarios.find(item => item.id === scenarioId);
     const current = useModelCreationStore.getState().draft;
     const next = createBlankDraft({ generateCode: false });
     next.basic_info = {
@@ -216,21 +262,26 @@ export function ModelCreationPage() {
   const handleTemplateSelection = async (code: string) => {
     if (!(await confirmSourceSwitch())) return;
     if (!code) {
-      nav('/models/create?mode=new');
+      nav('/models/create?mode=template');
       return;
     }
     nav(`/models/create?mode=template&template=${encodeURIComponent(code)}`);
   };
 
+  const handleCreationMode = async (mode: 'new' | 'template') => {
+    if ((mode === 'new' && workspace.mode === 'new') || (mode === 'template' && workspace.mode === 'template')) return;
+    if (!(await confirmSourceSwitch())) return;
+    nav(mode === 'template' ? '/models/create?mode=template' : '/models/create?mode=new');
+  };
+
   const missingSource = (resolvedMode === 'edit' || resolvedMode === 'clone' || resolvedMode === 'version') && !request.sourceModelId;
-  const missingTemplate = resolvedMode === 'template' && !request.templateCode;
   const loadError = sourceModel.error || templateDetail.error;
-  if (missingSource || missingTemplate || loadError) {
+  if (missingSource || loadError) {
     return (
       <PageShell className="model-creation-page">
         <ErrorState
           title={sourceModel.error ? '目标模型加载失败' : templateDetail.error ? '模型模板加载失败' : '工作台地址不完整'}
-          description={missingSource ? '当前模式缺少来源模型 ID。' : missingTemplate ? '模板创建模式缺少模板编码。' : '目标数据未能加载，旧草稿不会继续显示。'}
+          description={missingSource ? '当前模式缺少来源模型 ID。' : '目标数据未能加载，旧草稿不会继续显示。'}
           retry={loadError ? () => void (sourceModel.error ? sourceModel.refetch() : templateDetail.refetch()) : undefined}
           actions={[{ label: '返回模型资产', onClick: () => nav('/models') }]}
         />
@@ -239,8 +290,9 @@ export function ModelCreationPage() {
   }
 
   const waitingForData = request.legacySource
+    || systemConfig.isPending
     || (!!request.sourceModelId && sourceModel.isPending)
-    || (resolvedMode === 'template' && templateDetail.isPending)
+    || (resolvedMode === 'template' && !!request.templateCode && templateDetail.isPending)
     || initializedKeyRef.current !== requestKey
     || !workspace.initialized;
   if (waitingForData) {
@@ -248,6 +300,8 @@ export function ModelCreationPage() {
   }
 
   const normalized = normalizeModelDraft(draft);
+  const currentSnapshot = JSON.stringify(normalized);
+  const testIsCurrent = Boolean(currentDraftModelId && testedAsset?.id === currentDraftModelId && testedAsset.snapshot === currentSnapshot);
   const validation = validateModelDraft(normalized);
   const visibleStepLimit = showAllValidation ? stepMeta.length - 1 : Math.max(step, visitedThrough);
   const visibleSteps = stepMeta.slice(0, visibleStepLimit + 1);
@@ -268,15 +322,24 @@ export function ModelCreationPage() {
       workspace={workspace}
       sourceAsset={sourceModel.data}
       templates={templates.data || []}
-      scenarios={configuredScenarios}
+      scenarios={availableScenarios}
       onChange={setDraft}
       onScenario={handleScenarioSelection}
       onTemplate={handleTemplateSelection}
+      onModeChange={handleCreationMode}
+      disabledScenarios={(scenarioDictionary || []).filter(item => item.enabled === false)}
     />,
     <Step2SemanticModel draft={draft} onChange={setDraft} />,
     <Step3MathExpansion draft={draft} onChange={setDraft} />,
     <Step4RuntimeParams draft={draft} onChange={setDraft} />,
-    <Step5ReviewPublish draft={normalized} validation={validation} onPublish={() => publish.mutateAsync()} onTest={() => testRun.mutateAsync()} pending={publish.isPending || testRun.isPending} onFixStep={setStep} />,
+    <Step5ReviewPublish
+      draft={normalized}
+      validation={validation}
+      onTest={runModelTest}
+      pending={false}
+      testRevisionState={!testedAsset ? 'untested' : testIsCurrent ? 'current' : 'outdated'}
+      onFixStep={setStep}
+    />,
   ];
 
   const validateCurrentDraft = () => {
@@ -336,7 +399,7 @@ export function ModelCreationPage() {
       <ActionFooter left={<Space wrap><Button disabled={step === 0} onClick={() => setStep(step - 1)}>上一步</Button><Button type="primary" disabled={step === 4} onClick={() => enterStep(step + 1)}>下一步</Button></Space>}>
         <Button onClick={validateCurrentDraft}>校验模型</Button>
         <Button loading={saveDraft.isPending} onClick={() => saveDraft.mutate()}>保存草稿</Button>
-        <Button type={step === 4 || validation.valid ? 'primary' : 'default'} disabled={!validation.valid} loading={publish.isPending} onClick={() => publish.mutate()}>发布模型</Button>
+        <Button type={step === 4 || validation.valid ? 'primary' : 'default'} disabled={!validation.valid || !testIsCurrent || testRun.isPending} loading={publish.isPending} title={!testIsCurrent ? '请先保存并测试当前修订' : undefined} onClick={() => publish.mutate()}>发布模型</Button>
       </ActionFooter>
     </PageShell>
   );

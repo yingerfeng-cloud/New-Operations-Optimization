@@ -15,6 +15,7 @@ from app.services.llm_service import LLMService
 from app.storage.memory_store import STORE
 from app.utils import has_highspy, has_pyomo
 from tests.test_model_skill_invocation import minimal_dispatch_payload
+from tests.test_helpers import test_and_publish_model
 
 
 client = TestClient(app)
@@ -63,7 +64,7 @@ def test_agent_multiturn_parameter_merge() -> None:
     created = client.post("/api/models", json=payload)
     assert created.status_code == 200, created.text
     model_id = created.json()["id"]
-    assert client.post(f"/api/models/{model_id}/publish").status_code == 200
+    test_and_publish_model(client, model_id)
 
     cid = f"CONV-MULTI-{uuid.uuid4().hex[:8].upper()}"
     first = client.post(
@@ -101,7 +102,7 @@ def test_agent_default_requires_confirmation() -> None:
     created = client.post("/api/models", json=payload)
     assert created.status_code == 200, created.text
     model_id = created.json()["id"]
-    assert client.post(f"/api/models/{model_id}/publish").status_code == 200
+    test_and_publish_model(client, model_id)
 
     cid = f"CONV-DEFAULT-{uuid.uuid4().hex[:8].upper()}"
     analyzed = client.post(
@@ -124,7 +125,7 @@ def test_template_model_offline_then_republish() -> None:
     assert offline.status_code == 200, offline.text
     assert offline.json()["status"] == "offline"
 
-    republished = client.post(f"/api/models/{model['id']}/publish")
+    republished = test_and_publish_model(client, model["id"])
     assert republished.status_code == 200, republished.text
     assert republished.json()["status"] == "published"
 

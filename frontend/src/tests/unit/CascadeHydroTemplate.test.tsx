@@ -164,7 +164,6 @@ test('Step5 展示函数资产和 MILP 风险诊断', () => {
     <Step5ReviewPublish
       draft={draft}
       validation={{ valid: true, sections: {} }}
-      onPublish={vi.fn()}
       onTest={vi.fn()}
     />,
   );

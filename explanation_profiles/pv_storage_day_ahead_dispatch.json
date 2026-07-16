@@ -1,0 +1,13 @@
+{
+  "profile_name": "pv_storage_day_ahead_dispatch",
+  "applies_to": {"tags": ["pv_storage_day_ahead", "光储日前"]},
+  "key_metrics": [
+    {"name": "total_curtailment", "label": "弃电量", "expression": "sum(pv_curtailment)", "unit": "MWh"},
+    {"name": "storage_contribution", "label": "储能放电贡献", "expression": "sum(storage_discharge)", "unit": "MWh"}
+  ],
+  "risk_rules": [
+    {"name": "grid_limit_binding", "condition": "grid_export_max > 0", "level": "medium", "message": "请复核并网边界及可能触边时段。"}
+  ],
+  "manual_review_points": ["复核光伏预测、负荷和电价曲线。", "复核并网约束与末端 SOC。"],
+  "explanation_limits": ["日前结果基于当前预测输入，不代表实际运行时必然最优。"]
+}

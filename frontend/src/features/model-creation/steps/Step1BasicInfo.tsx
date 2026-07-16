@@ -1,7 +1,6 @@
 import { Alert, Card, Col, Collapse, Descriptions, Form, Input, Radio, Row, Select, Space, Tag, Typography } from 'antd';
 import type { ModelTemplate } from '../../../types/template';
 import type { ModelAsset } from '../../../types/model';
-import { scenarioCatalog } from '../data/scenarioCatalog';
 import type { ModelDraft, ModelWorkspaceContext } from '../stores/modelCreationStore';
 import type { ScenarioCatalogItem } from '../../../types/scenario';
 
@@ -14,6 +13,8 @@ export function Step1BasicInfo({
   onChange,
   onScenario,
   onTemplate,
+  onModeChange,
+  disabledScenarios = [],
 }: {
   draft: ModelDraft;
   workspace: ModelWorkspaceContext;
@@ -23,9 +24,17 @@ export function Step1BasicInfo({
   onChange: (d: ModelDraft) => void;
   onScenario: (scenarioId: string) => void;
   onTemplate: (code: string) => void;
+  onModeChange: (mode: 'new' | 'template') => void;
+  disabledScenarios?: Array<{ code: string; label: string }>;
 }) {
   const b = draft.basic_info;
-  const scenarioOptions = scenarios?.length ? scenarios : scenarioCatalog;
+  const scenarioOptions = scenarios ?? [];
+  const disabledScenario = disabledScenarios.find(item => item.code === b.scenario_id || item.label === b.scenario);
+  const assetScenarioMissing = Boolean(b.scenario) && !scenarioOptions.some(item => item.id === b.scenario_id || item.name === b.scenario);
+  const selectOptions = [
+    ...scenarioOptions.map(item => ({ value: item.id, label: item.name })),
+    ...(assetScenarioMissing ? [{ value: b.scenario_id || b.scenario, label: `${b.scenario}${disabledScenario ? '（已停用）' : '（历史/自定义场景）'}` }] : []),
+  ];
   const set = (p: Partial<typeof b>) => onChange({ ...draft, basic_info: { ...b, ...p } });
   const objectiveCount = draft.formulas.filter(formula => formula.kind === 'objective').length;
   const isAssetMode = workspace.mode === 'edit' || workspace.mode === 'clone' || workspace.mode === 'version';
@@ -40,7 +49,7 @@ export function Step1BasicInfo({
                 className="creation-mode-group"
                 value={workspace.mode === 'template' ? 'template' : 'blank'}
                 onChange={event => {
-                  if (event.target.value === 'blank') onTemplate('');
+                  onModeChange(event.target.value === 'template' ? 'template' : 'new');
                 }}
                 disabled={isAssetMode}
                 options={[
@@ -56,8 +65,9 @@ export function Step1BasicInfo({
           <Col xs={24} lg={8}>
             <Card title="模型定位" className="model-step-block">
               <Form.Item label="业务场景" required>
-                <Select data-testid="scenario-select" aria-label="当前场景" disabled={isAssetMode} value={b.scenario_id ?? null} placeholder="未选择" options={scenarioOptions.map(item => ({ value: item.id, label: item.name }))} onChange={onScenario} />
+                <Select data-testid="scenario-select" aria-label="当前场景" disabled={isAssetMode || scenarioOptions.length === 0} value={b.scenario_id ?? null} placeholder="未选择" options={selectOptions} onChange={onScenario} />
               </Form.Item>
+              {scenarioOptions.length === 0 && !isAssetMode && <Alert showIcon type="warning" title="当前没有可用业务场景" description="系统配置未启用任何业务场景；不会回退到静态场景目录。" />}
               <Form.Item label="建模骨架">
                 <Select
                   value={b.modeling_skeleton || 'dispatch_optimization'}

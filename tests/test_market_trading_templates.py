@@ -7,6 +7,7 @@ from app.services.model_service import model_service
 from app.services.template_service import template_library
 from app.storage.memory_store import STORE
 from app.templates.power_templates import get_power_templates
+from tests.test_helpers import test_and_publish_model
 
 
 MARKET_TRADING_TEMPLATES = ["contract_spot_exposure_v1", "retail_da_spot_bidding_v1"]
@@ -42,13 +43,10 @@ def test_market_trading_templates_clone_publish_and_test(client) -> None:
         assert cloned.status_code == 200, cloned.text
         model_id = cloned.json()["id"]
 
-        published = client.post(f"/api/models/{model_id}/publish")
+        published = test_and_publish_model(client, model_id, deepcopy(template_library.sample_runtime_parameters(code)))
         assert published.status_code == 200, published.text
 
-        tested = client.post(
-            f"/api/models/{model_id}/test",
-            json={"parameters": deepcopy(template_library.sample_runtime_parameters(code))},
-        )
+        tested = client.get(f"/api/models/{model_id}")
         assert tested.status_code == 200, tested.text
         assert tested.json()["dry_run_result"]["solver_check"]["status"] == "passed"
 

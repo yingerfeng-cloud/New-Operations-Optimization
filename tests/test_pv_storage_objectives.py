@@ -11,6 +11,7 @@ from app.explain.result_formatter import SolveResultFormatter
 from app.services.model_service import model_service
 from app.solvers.highs_adapter import HiGHSAdapter
 from app.templates.power_templates import get_template
+from tests.test_helpers import test_and_publish_model
 
 
 client = TestClient(app)
@@ -173,7 +174,7 @@ def test_pv_storage_capacity_can_create_publish_invoke_from_template() -> None:
         },
     )
     assert created.status_code == 200, created.text
-    published = client.post(f"/api/models/{model_id}/publish")
+    published = test_and_publish_model(client, model_id)
     assert published.status_code == 200, published.text
 
     invoked = client.post(

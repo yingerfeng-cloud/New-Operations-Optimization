@@ -15,6 +15,7 @@ import {
   type PlatformSkill,
   type SkillInputField,
 } from '../../api/skills';
+import { getAgentSkill } from '../../api/agents';
 import { JsonViewer } from '../../components/JsonViewer';
 import { PageHeader } from '../../components/PageHeader';
 
@@ -60,6 +61,7 @@ export function SkillCenterPage() {
   const [debugResult, setDebugResult] = useState<Record<string, unknown>>();
   const skills = useQuery({ queryKey: ['platform-skills'], queryFn: getSkills });
   const selected = useQuery({ queryKey: ['platform-skill', selectedName], queryFn: () => getSkill(selectedName!), enabled: !!selectedName });
+  const agentDetail = useQuery({ queryKey: ['agent-skill-v2', selected.data?.agent_skill_name], queryFn: () => getAgentSkill(String(selected.data?.agent_skill_name)), enabled: Boolean(selected.data?.agent_skill_name) });
   const invocations = useQuery({ queryKey: ['skill-invocations', selectedName], queryFn: () => getSkillInvocations(selectedName!), enabled: !!selectedName });
 
   const rows = skills.data || [];
@@ -216,7 +218,7 @@ export function SkillCenterPage() {
               {
                 key: 'agent',
                 label: 'Agent 绑定',
-                children: <JsonViewer value={{ agent_enabled: detail.agent_enabled, agent_skill_name: detail.agent_skill_name, has_agent_package: detail.has_agent_package, agent_package_status: detail.agent_package_status }} />,
+                children: <Space orientation="vertical" size={12} style={{ width: '100%' }}><JsonViewer value={{ agent_enabled: detail.agent_enabled, agent_skill_name: detail.agent_skill_name, has_agent_package: detail.has_agent_package, agent_package_status: detail.agent_package_status }} />{agentDetail.data && <><Descriptions bordered size="small" column={2} items={[{ key: 'schema', label: 'schema_version', children: agentDetail.data.schema_version }, { key: 'state', label: 'state', children: agentDetail.data.state }, { key: 'profile', label: 'explanation_profile', children: agentDetail.data.explanation_profile }, { key: 'validation', label: 'validation', children: agentDetail.data.validation?.status }]} /><JsonViewer value={{ business_domain: agentDetail.data.business_domain, supported_intents: agentDetail.data.supported_intents, business_goals: agentDetail.data.business_goals, positive_examples: agentDetail.data.positive_examples, negative_examples: agentDetail.data.negative_examples, do_not_invoke_examples: agentDetail.data.do_not_invoke_examples }} /></>}</Space>,
               },
               {
                 key: 'invocations',

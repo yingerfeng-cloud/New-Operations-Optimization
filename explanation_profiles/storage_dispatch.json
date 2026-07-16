@@ -1,0 +1,14 @@
+{
+  "profile_name": "storage_dispatch",
+  "applies_to": {"tags": ["storage", "储能调度"], "business_domains": ["energy_storage"]},
+  "key_metrics": [
+    {"name": "total_charge_energy", "label": "总充电量", "expression": "sum(charge_power)", "unit": "MWh"},
+    {"name": "total_discharge_energy", "label": "总放电量", "expression": "sum(discharge_power)", "unit": "MWh"},
+    {"name": "max_soc", "label": "最高 SOC", "expression": "max(soc)", "unit": "MWh"}
+  ],
+  "risk_rules": [
+    {"name": "soc_upper_warning", "condition": "soc_max >= storage_capacity", "level": "medium", "message": "SOC 达到容量边界，请复核安全裕度。"}
+  ],
+  "manual_review_points": ["复核末端 SOC 是否满足次日运行要求。", "复核高价时段电价预测和电池循环寿命约束。"],
+  "llm_summary_policy": {"allow_inference": "limited", "require_evidence_reference": true}
+}

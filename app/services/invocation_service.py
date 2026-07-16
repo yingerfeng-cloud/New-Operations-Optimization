@@ -14,6 +14,9 @@ from app.services.result_interpreter import result_interpreter
 from app.services.result_service import result_service
 from app.storage.memory_store import STORE
 from app.utils import now_text
+from app.explainers.base import ADVISORY_DISCLAIMER
+from app.explainers.evidence_builder import evidence_builder
+from app.explainers.generic_explainer import generic_explainer
 
 
 class InvocationService:
@@ -128,6 +131,14 @@ class InvocationService:
                 record["status"] = task.status
                 record["duration_seconds"] = round(time.monotonic() - started, 4)
                 self._save(record)
+                pending_evidence = evidence_builder.build(
+                    result={"status": task.status, "message": "异步任务已提交，尚未返回求解结果。"},
+                    model=model,
+                    skill_name=options.get("skill_name"),
+                    parameters=parameters,
+                    parameter_sources=options.get("parameter_sources") or {key: "USER_INPUT" for key in parameters},
+                    skill_metadata=self._agent_skill_metadata(options.get("skill_name")),
+                )
                 return {
                     "invocation_id": invocation_id,
                     "status": task.status,
@@ -137,16 +148,30 @@ class InvocationService:
                     "resolved_model_code": resolved_model_code,
                     "execution_policy": "advisory_only",
                     "requires_human_review": True,
+                    "evidence_package": pending_evidence,
+                    "explanation_structured": generic_explainer.explain(pending_evidence),
+                    "explanation": "异步任务已提交，等待求解结果后生成完整解释。",
+                    "disclaimer": ADVISORY_DISCLAIMER,
                 }
             current = self._wait(task.id)
             if current.status in {"FAILED", "INFEASIBLE", "TIMEOUT", "CANCELLED"}:
                 error = self._structured_error(self._task_failure_message(current), error_type=current.status.lower())
-                response = self._failed_response(invocation_id, model.id, task.id, error, status=current.status)
+                response = self._failed_response(invocation_id, model.id, task.id, error, status=current.status, model=model, parameters=parameters, skill_name=options.get("skill_name"))
                 record.update({"status": current.status, "finished_at": now_text(), "duration_seconds": round(time.monotonic() - started, 4), "error": error, "response": response})
                 self._save(record)
                 return response
             result = result_service.get_result(task.id)
             interpreted = result_interpreter.interpret(model.semantic_spec, result)
+            skill_metadata = self._agent_skill_metadata(options.get("skill_name"))
+            evidence_package = evidence_builder.build(
+                result=result,
+                model=model,
+                skill_name=options.get("skill_name"),
+                parameters=parameters,
+                parameter_sources=options.get("parameter_sources") or {key: "USER_INPUT" for key in parameters},
+                skill_metadata=skill_metadata,
+            )
+            grounded_explanation = generic_explainer.explain(evidence_package)
             response = {
                 "invocation_id": invocation_id,
                 "task_id": task.id,
@@ -162,7 +187,9 @@ class InvocationService:
                 "constraint_checks": result.get("constraint_checks", result.get("constraint_violation_summary", [])),
                 "business_variables": interpreted["business_variables"],
                 "explanation": interpreted["explanation"],
-                "explanation_structured": self._structured_explanation(interpreted["explanation"], result),
+                "explanation_structured": grounded_explanation,
+                "evidence_package": evidence_package,
+                "disclaimer": ADVISORY_DISCLAIMER,
                 "warnings": result.get("warnings", result.get("diagnosis", [])),
                 "execution_policy": "advisory_only",
                 "requires_human_review": True,
@@ -173,13 +200,13 @@ class InvocationService:
             return response
         except HTTPException as exc:
             error = self._structured_error(exc)
-            response = self._failed_response(invocation_id, model.id, record.get("task_id"), error)
+            response = self._failed_response(invocation_id, model.id, record.get("task_id"), error, model=model, parameters=parameters, skill_name=options.get("skill_name"))
             record.update({"status": "FAILED", "finished_at": now_text(), "duration_seconds": round(time.monotonic() - started, 4), "error": error, "response": response})
             self._save(record)
             return response
         except Exception as exc:
             error = self._structured_error(exc)
-            response = self._failed_response(invocation_id, model.id, record.get("task_id"), error)
+            response = self._failed_response(invocation_id, model.id, record.get("task_id"), error, model=model, parameters=parameters, skill_name=options.get("skill_name"))
             record.update({"status": "FAILED", "finished_at": now_text(), "duration_seconds": round(time.monotonic() - started, 4), "error": error, "response": response})
             self._save(record)
             return response
@@ -204,7 +231,7 @@ class InvocationService:
         can_use_default = []
         questions = []
         normalized_parameters = dict(partial_parameters)
-        parameter_sources = {key: "user_provided" for key in partial_parameters.keys()}
+        parameter_sources = {key: "USER_INPUT" for key in partial_parameters.keys()}
         for item in input_schema or []:
             key = item.get("key")
             if not key:
@@ -215,7 +242,7 @@ class InvocationService:
             if not has_value:
                 default_policy = item.get("default_policy") or "sample_only"
                 fallback = item.get("default_value") if default_policy == "default_allowed" else None
-                source = "default_value"
+                source = "DEFAULT_VALUE"
                 if fallback is not None:
                     can_use_default.append({"key": key, "name": item.get("name") or key, "value": fallback, "source": source})
                     normalized_parameters.setdefault(key, fallback)
@@ -314,7 +341,7 @@ class InvocationService:
     def _default_policy_for_param(self, code: str, semantic_spec: dict[str, Any] | None = None) -> str:
         semantic_spec = semantic_spec or {}
         model_code = str(semantic_spec.get("model_code") or semantic_spec.get("code") or "")
-        if model_code == "custom_optimization_model":
+        if model_code.startswith("custom_optimization_model"):
             return "user_required" if code == "load_forecast" else "default_allowed"
         if model_code == "unit_commitment_day_ahead" and code in {"unit_min_output", "unit_max_output", "ramp_up_limit", "ramp_down_limit", "fuel_cost", "startup_cost", "initial_unit_status", "initial_unit_output"}:
             return "default_allowed"
@@ -428,9 +455,40 @@ class InvocationService:
     def _error_type_from_status(self, status_code: int) -> str:
         return {409: "model_or_task_state_error", 422: "parameter_validation_error", 404: "not_found", 408: "timeout"}.get(status_code, "api_error")
 
-    def _failed_response(self, invocation_id: str, model_id: str | None, task_id: str | None, error: dict[str, Any], status: str = "FAILED") -> dict[str, Any]:
+    def _failed_response(
+        self,
+        invocation_id: str,
+        model_id: str | None,
+        task_id: str | None,
+        error: dict[str, Any],
+        status: str = "FAILED",
+        model: Any | None = None,
+        parameters: dict[str, Any] | None = None,
+        skill_name: str | None = None,
+    ) -> dict[str, Any]:
         error_message = str(error.get("message") or "Skill invocation failed")
         explanation = self._failure_explanation(error)
+        evidence_package = evidence_builder.build(
+            result={"status": status, "error": error, "message": error_message},
+            model=model or {"model_id": model_id},
+            skill_name=skill_name,
+            parameters=parameters,
+            parameter_sources={key: "USER_INPUT" for key in (parameters or {})},
+            skill_metadata=self._agent_skill_metadata(skill_name),
+        )
+        grounded = generic_explainer.explain(evidence_package)
+        # The legacy top-level explanation is still part of the public
+        # contract.  Keep the grounded summary/fact identical so clients do not
+        # receive two conflicting descriptions of the same failure.
+        grounded["summary"] = explanation
+        if grounded.get("facts"):
+            grounded["facts"][0] = explanation
+        risk_notes = list(grounded.get("risk_notes") or [])
+        if error_message and error_message not in risk_notes:
+            risk_notes.append(error_message)
+        if "结果未生成，不能用于生产调度。" not in risk_notes:
+            risk_notes.append("结果未生成，不能用于生产调度。")
+        grounded["risk_notes"] = risk_notes
         return {
             "invocation_id": invocation_id,
             "task_id": task_id,
@@ -444,12 +502,9 @@ class InvocationService:
             "charts": [],
             "constraint_checks": [],
             "warnings": [error_message],
-            "explanation_structured": {
-                "summary": explanation,
-                "key_findings": [],
-                "risk_notes": [error_message, "结果未生成，不能用于生产调度。"],
-                "manual_review_points": ["检查 error.details、输入参数和模型状态。"],
-            },
+            "explanation_structured": grounded,
+            "evidence_package": evidence_package,
+            "disclaimer": ADVISORY_DISCLAIMER,
             "execution_policy": "advisory_only",
             "requires_human_review": True,
         }
@@ -460,6 +515,19 @@ class InvocationService:
         if "ipopt" in lowered and ("solver_unavailable" in lowered or "unavailable" in lowered or "not found" in lowered):
             return "本次非线性水电模型未完成求解，原因是 NLP 求解器 Ipopt 不可用，平台未启用替代求解器。当前结果不是有效优化方案。请安装 Ipopt，或切换为线性化 / 分段线性近似模型后重试。"
         return "Skill 调用失败，需要先修正错误后重新求解。当前结果不是有效优化方案。"
+
+    def _agent_skill_metadata(self, skill_name: str | None) -> dict[str, Any]:
+        if not skill_name:
+            return {}
+        try:
+            from app.agent_skill_registry import agent_skill_registry
+
+            for item in agent_skill_registry.list_skills():
+                if item.get("platform_skill_name") == skill_name or item.get("canonical_api_skill_name") == skill_name:
+                    return agent_skill_registry.get_skill_local(str(item.get("name")))
+        except Exception:
+            return {}
+        return {}
 
     def _structured_explanation(self, explanation: Any, result: dict[str, Any]) -> dict[str, Any]:
         summary = str(explanation or "优化结果已生成。")

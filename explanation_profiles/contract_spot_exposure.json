@@ -1,0 +1,12 @@
+{
+  "profile_name": "contract_spot_exposure",
+  "applies_to": {"tags": ["contract_spot", "合约现货"]},
+  "key_metrics": [
+    {"name": "total_exposure", "label": "现货敞口规模", "expression": "sum(spot_exposure)", "unit": "MWh"},
+    {"name": "max_exposure", "label": "最大时段敞口", "expression": "max(spot_exposure)", "unit": "MWh"}
+  ],
+  "risk_rules": [
+    {"name": "exposure_limit_warning", "condition": "spot_exposure_max > 0", "level": "high", "message": "存在现货敞口，请复核高风险时段和限额。"}
+  ],
+  "manual_review_points": ["复核合约电量、负荷预测与现货价格预测。", "复核敞口限额和高风险时段。"]
+}

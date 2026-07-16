@@ -39,6 +39,7 @@ $IncludeItems = @(
 $RequiredPackageItems = @(
   ".github/workflows/ci.yml",
   ".github/workflows/e2e-real.yml",
+  ".github/workflows/nightly-stability.yml",
   "frontend/package.json",
   "requirements.txt",
   "server.py",

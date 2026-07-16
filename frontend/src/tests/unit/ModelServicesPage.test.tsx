@@ -1,9 +1,10 @@
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-import { vi } from 'vitest';
-import { ModelServicesPage } from '../../pages/ModelServices/ModelServicesPage';
+import { beforeAll, vi } from 'vitest';
 import type { ModelAsset } from '../../types/model';
 import { renderWithQueryClient } from '../testUtils';
+
+let ModelServicesPage: typeof import('../../pages/ModelServices/ModelServicesPage')['ModelServicesPage'];
 
 const testState = vi.hoisted(() => {
   const modelSample: ModelAsset = {
@@ -48,6 +49,11 @@ vi.mock('../../api/models', () => ({
 vi.mock('../../api/tasks', () => ({
   createTask: testState.createTask,
 }));
+
+beforeAll(async () => {
+  vi.resetModules();
+  ({ ModelServicesPage } = await import('../../pages/ModelServices/ModelServicesPage'));
+});
 
 function renderPage() {
   return renderWithQueryClient(

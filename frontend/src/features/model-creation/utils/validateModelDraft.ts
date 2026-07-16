@@ -39,7 +39,7 @@ function runtimeParameterErrors(draft: ModelDraft) {
     .filter(parameter => !systemFields.has(parameter.code))
     .filter(parameter => (parameter.sourceType || parameter.source_type || 'runtime') === 'runtime')
     .filter(parameter => parameter.required !== false)
-    .filter(parameter => !hasBindingValue(draft.runtime_parameters[parameter.code]) && !hasBindingValue(parameter.defaultValue ?? parameter.default))
+    .filter(parameter => !hasBindingValue(draft.runtime_parameters[parameter.code]) && !hasBindingValue(parameter.defaultValue ?? parameter.default_value ?? parameter.default))
     .map(parameter => `运行参数 ${parameter.name || parameter.code} ${parameter.code} 缺少必填值`);
 }
 

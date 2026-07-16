@@ -1,3 +1,17 @@
+negative_examples: ["仅咨询模型原理"]
+do_not_invoke_examples: ["只咨询业务知识，不运行优化"]
+schema_version: "2.0"
+state: enabled
+business_domain:
+  primary: economic_dispatch
+  secondary: ["optimization"]
+model_family: optimization
+supported_intents: ["optimization_run", "parameter_check", "result_explanation"]
+business_goals: ["optimize"]
+explanation_profile: generic
+parameter_policy: {"allow_defaults": true, "require_default_confirmation": true, "allow_sample_data": true, "sample_data_must_be_confirmed": true}
+intent_policy: {"router_mode": "llm_plus_rules", "confidence_threshold": 0.75, "clarify_threshold": 0.6, "clarify_when_top_scores_close": true, "top_score_margin_threshold": 0.15}
+safety_policy: {"disallow_auto_control": true, "disclaimer_required": true}
 name: economic_dispatch
 display_name: 经济调度优化 Agent Skill
 description: 根据负荷预测、机组出力上限和燃料成本，调用经济调度 API Skill 计算低成本出力方案。

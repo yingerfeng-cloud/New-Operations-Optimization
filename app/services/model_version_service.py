@@ -14,7 +14,7 @@ from app.storage.memory_store import STORE
 class ModelVersionService:
     """Owns model-family identity, version indexes, and publish-code governance."""
 
-    def prepare_identity(self, model: ModelPackage, source: ModelView | None = None) -> ModelPackage:
+    def prepare_identity(self, model: ModelPackage, source: ModelView | None = None, family_models: Iterable[ModelView] = ()) -> ModelPackage:
         metadata = model.ui_metadata or {}
         supersedes_id = model.supersedes_model_id or metadata.get("supersedes_model_id")
         family_id = model.model_family_id or metadata.get("model_family_id")
@@ -22,7 +22,7 @@ class ModelVersionService:
         if source is not None:
             family_id = source.model_family_id or f"legacy-{source.id}"
             if not version or version == source.version or version == "v0.1":
-                version = self.next_version(source.version)
+                version = self.next_family_version(source, family_models)
         family_id = str(family_id or f"FAMILY-{uuid.uuid4().hex[:12].upper()}")
         return model.model_copy(
             update={
@@ -73,11 +73,12 @@ class ModelVersionService:
             versions = [item for item in STORE.models.values() if str(item.model_family_id or f"legacy-{item.id}") == family_id]
         return sorted(versions, key=lambda item: (self.version_key(item.version), str(item.updated_at or ""), item.id), reverse=True)
 
-    def new_version_package(self, source: ModelView, overrides: dict[str, Any] | None = None) -> ModelPackage:
+    def new_version_package(self, source: ModelView, overrides: dict[str, Any] | None = None, family_models: Iterable[ModelView] = ()) -> ModelPackage:
         data = source.model_dump(
             exclude={
                 "id", "created_at", "updated_at", "published_at", "tested_at", "validation_warnings",
-                "dry_run_result", "is_active_version", "published_by",
+                "dry_run_result", "is_active_version", "published_by", "content_hash",
+                "tested_content_hash", "tested_model_id",
             }
         )
         data.update(deepcopy(overrides or {}))
@@ -85,11 +86,14 @@ class ModelVersionService:
             {
                 "model_family_id": source.model_family_id or f"legacy-{source.id}",
                 "supersedes_model_id": source.id,
-                "version": self.next_version(source.version),
+                "version": self.next_family_version(source, family_models),
                 "status": "developing",
                 "is_active_version": False,
                 "published_at": None,
                 "tested_at": None,
+                "content_hash": None,
+                "tested_content_hash": None,
+                "tested_model_id": None,
                 "validation_warnings": [],
                 "dry_run_result": {},
             }
@@ -102,13 +106,23 @@ class ModelVersionService:
         data["ui_metadata"] = metadata
         return ModelPackage.model_validate(data)
 
+    def next_family_version(self, source: ModelView, family_models: Iterable[ModelView]) -> str:
+        family_id = str(source.model_family_id or f"legacy-{source.id}")
+        versions = [source.version]
+        versions.extend(
+            item.version
+            for item in family_models
+            if str(item.model_family_id or f"legacy-{item.id}") == family_id
+        )
+        latest = max(versions, key=self.version_key)
+        return self.next_version(latest)
+
     @staticmethod
     def next_version(version: str | None) -> str:
-        text = str(version or "v0.0")
-        match = re.search(r"(\d+)(?!.*\d)", text)
-        if not match:
-            return f"{text}-v2"
-        return f"{text[:match.start()]}{int(match.group(1)) + 1}{text[match.end():]}"
+        values = [int(value) for value in re.findall(r"\d+", str(version or ""))]
+        major = values[0] if values else 0
+        minor = values[1] if len(values) > 1 else 0
+        return f"v{major}.{minor + 1}"
 
     @staticmethod
     def version_key(version: str | None) -> tuple[int, ...]:

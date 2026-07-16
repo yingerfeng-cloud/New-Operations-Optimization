@@ -1,0 +1,1 @@
+{"utterance": "储能容量100MWh，充放电功率50MW，电价0.3、0.6、1.1", "skill": "run_storage_dispatch", "expected_params": {"storage_capacity": 100, "charge_power_max": 50, "discharge_power_max": 50, "electricity_price": [0.3, 0.6, 1.1]}}

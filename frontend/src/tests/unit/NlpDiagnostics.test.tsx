@@ -57,32 +57,32 @@ const ipoptUnavailable = {
 
 test('Ipopt 可用时 NLP 可发布但必须确认风险', () => {
   const draft = nlpDraft();
-  const onPublish = vi.fn();
-  render(<Step5ReviewPublish draft={draft} validation={validateModelDraft(draft)} onPublish={onPublish} onTest={vi.fn()} solverStatus={ipoptAvailable} />);
+  const onTest = vi.fn();
+  render(<Step5ReviewPublish draft={draft} validation={validateModelDraft(draft)} onTest={onTest} solverStatus={ipoptAvailable} />);
 
   expect(screen.getByText('当前模型被识别为 NLP，将使用 Ipopt 求解。')).toBeInTheDocument();
-  expect(screen.getByRole('button', { name: '发布模型' })).toBeDisabled();
+  expect(screen.getByRole('button', { name: '测试运行' })).toBeDisabled();
 
   fireEvent.click(screen.getByLabelText('我理解 NLP 局部最优风险'));
 
-  expect(screen.getByRole('button', { name: '发布模型' })).not.toBeDisabled();
-  fireEvent.click(screen.getByRole('button', { name: '发布模型' }));
-  expect(onPublish).toHaveBeenCalledTimes(1);
+  expect(screen.getByRole('button', { name: '测试运行' })).not.toBeDisabled();
+  fireEvent.click(screen.getByRole('button', { name: '测试运行' }));
+  expect(onTest).toHaveBeenCalledTimes(1);
 });
 
 test('Ipopt 不可用时 NLP 阻断发布', () => {
   const draft = nlpDraft();
-  render(<Step5ReviewPublish draft={draft} validation={validateModelDraft(draft)} onPublish={vi.fn()} onTest={vi.fn()} solverStatus={ipoptUnavailable} />);
+  render(<Step5ReviewPublish draft={draft} validation={validateModelDraft(draft)} onTest={vi.fn()} solverStatus={ipoptUnavailable} />);
 
   expect(screen.getByText('NLP 发布被阻断')).toBeInTheDocument();
   expect(screen.getByText(/Ipopt executable not found/)).toBeInTheDocument();
-  expect(screen.getByRole('button', { name: '发布模型' })).toBeDisabled();
+  expect(screen.getByRole('button', { name: '测试运行' })).toBeDisabled();
 });
 
 test('MINLP_RESERVED 阻断发布', () => {
   const draft = nlpDraft('MINLP_RESERVED');
-  render(<Step5ReviewPublish draft={draft} validation={validateModelDraft(draft)} onPublish={vi.fn()} onTest={vi.fn()} solverStatus={ipoptAvailable} />);
+  render(<Step5ReviewPublish draft={draft} validation={validateModelDraft(draft)} onTest={vi.fn()} solverStatus={ipoptAvailable} />);
 
   expect(screen.getByText('MINLP_RESERVED 发布被阻断')).toBeInTheDocument();
-  expect(screen.getByRole('button', { name: '发布模型' })).toBeDisabled();
+  expect(screen.getByRole('button', { name: '测试运行' })).toBeDisabled();
 });

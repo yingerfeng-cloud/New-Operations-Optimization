@@ -16,6 +16,39 @@ from app.services.template_service import template_library
 from app.solvers.highs_adapter import HiGHSAdapter
 
 
+def test_and_publish_model(client, model_id: str, runtime_parameters: dict | None = None):
+    """Exercise the production test and publish APIs without forging store state."""
+    if runtime_parameters is None:
+        fetched = client.get(f"/api/models/{model_id}")
+        assert fetched.status_code == 200, fetched.text
+        model = fetched.json()
+        semantic = model.get("semantic_spec") or {}
+        draft = model.get("model_draft") or {}
+        runtime_parameters = {
+            **(semantic.get("sample_runtime_parameters") or {}),
+            **(draft.get("runtime_parameters") or {}),
+            **(model.get("parameters") or {}),
+        }
+        for parameter in semantic.get("parameters") or []:
+            key = parameter.get("key") or parameter.get("code")
+            if not key or key in runtime_parameters:
+                continue
+            validation = parameter.get("validation") or {}
+            value = parameter.get("sample_value", parameter.get("default_value", validation.get("default")))
+            if value is not None:
+                runtime_parameters[key] = value
+    test_payload = {"parameters": runtime_parameters} if runtime_parameters is not None else {}
+    tested = client.post(f"/api/models/{model_id}/test", json=test_payload)
+    assert tested.status_code == 200, tested.text
+    assert tested.json()["status"] == "tested", tested.text
+    published = client.post(f"/api/models/{model_id}/publish")
+    assert published.status_code == 200, published.text
+    return published
+
+
+test_and_publish_model.__test__ = False
+
+
 def solve_template(code: str) -> dict:
     template = template_library.get_template(code)
     params = template_library.sample_runtime_parameters(code)

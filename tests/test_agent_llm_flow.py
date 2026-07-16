@@ -7,6 +7,7 @@ from fastapi.testclient import TestClient
 from app.main import app
 from app.utils import has_highspy, has_pyomo
 from tests.test_model_skill_invocation import minimal_dispatch_payload
+from tests.test_helpers import test_and_publish_model
 
 
 client = TestClient(app)
@@ -23,8 +24,7 @@ class TestAgentLLMFlow(unittest.TestCase):
         created = client.post("/api/models", json=minimal_dispatch_payload())
         self.assertEqual(created.status_code, 200, created.text)
         model_id = created.json()["id"]
-        published = client.post(f"/api/models/{model_id}/publish")
-        self.assertEqual(published.status_code, 200, published.text)
+        test_and_publish_model(client, model_id)
 
         message = "帮我跑一下 U1、U2 两台机组三个时段的经济调度，负荷是100、120、90，U1最大80成本10，U2最大100成本20。"
         analyzed = client.post(

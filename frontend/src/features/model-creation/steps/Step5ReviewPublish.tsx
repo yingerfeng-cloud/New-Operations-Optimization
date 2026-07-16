@@ -65,17 +65,17 @@ function pwl2dRiskRows(draft: ModelDraft) {
 export function Step5ReviewPublish({
   draft,
   validation,
-  onPublish,
   onTest,
   pending,
+  testRevisionState = 'untested',
   onFixStep,
   solverStatus: solverStatusOverride,
 }: {
   draft: ModelDraft;
   validation: DraftValidation;
-  onPublish: () => Promise<ModelAsset | unknown> | void;
   onTest: () => Promise<ModelAsset | unknown> | void;
   pending?: boolean;
+  testRevisionState?: 'untested' | 'current' | 'outdated';
   onFixStep?: (step: number) => void;
   solverStatus?: SolverStatusResponse;
 }) {
@@ -84,6 +84,10 @@ export function Step5ReviewPublish({
   const [nlpRiskAcknowledged, setNlpRiskAcknowledged] = useState(false);
   const [solverStatus, setSolverStatus] = useState<SolverStatusResponse | undefined>(solverStatusOverride);
   const [solverStatusError, setSolverStatusError] = useState('');
+
+  useEffect(() => {
+    if (testRevisionState === 'outdated') setTestResult(undefined);
+  }, [testRevisionState]);
 
   useEffect(() => {
     if (solverStatusOverride) {
@@ -138,19 +142,9 @@ export function Step5ReviewPublish({
     setError('');
     try {
       const result = await onTest();
+      if (result === undefined) return;
       setTestResult(result);
       message.success('测试运行完成');
-    } catch (exc) {
-      const text = String(exc);
-      setError(text);
-      message.error(text);
-    }
-  };
-
-  const publish = async () => {
-    setError('');
-    try {
-      await onPublish();
     } catch (exc) {
       const text = String(exc);
       setError(text);
@@ -168,6 +162,15 @@ export function Step5ReviewPublish({
         description="语义、公式、组件依赖、参数绑定、问题类型与求解器兼容性已统一检查。"
       />
       {error && <Alert className="section-gap" showIcon type="error" title="发布前检查未通过" description={`请根据检查清单修复模型配置后重试。原始错误：${error}`} />}
+      {testRevisionState === 'outdated' && (
+        <Alert
+          className="section-gap"
+          showIcon
+          type="warning"
+          title="测试状态：已失效"
+          description="模型在上次测试通过后发生了修改，请重新保存并测试后再发布。"
+        />
+      )}
       <div className="validation-list section-gap">
         {Object.entries(validation.sections).map(([name, result]) => (
           <div className="validation-row" key={name}>
@@ -328,7 +331,6 @@ export function Step5ReviewPublish({
       )}
       <Space className="section-gap" wrap>
         <Button data-testid="model-test-run-button" onClick={runTest} disabled={publishBlocked} loading={pending}>测试运行</Button>
-        <Button type="primary" onClick={publish} disabled={publishBlocked} loading={pending}>发布模型</Button>
         {publishBlocked && (
           <Typography.Text type="secondary">
             不可发布原因：{publishBlockReason}

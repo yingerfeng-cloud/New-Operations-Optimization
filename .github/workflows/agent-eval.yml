@@ -1,0 +1,25 @@
+name: agent-eval
+
+on:
+  pull_request:
+    paths:
+      - "app/agent/**"
+      - "app/explainers/**"
+      - "agent_skills/**"
+      - "explanation_profiles/**"
+      - "tests/agent_eval/**"
+  workflow_dispatch:
+
+jobs:
+  quick-agent-eval:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - name: Run offline Agent evaluation
+        run: python -m pytest tests/agent_eval tests/test_intent_router_v2.py tests/test_agent_safety_boundary.py -q

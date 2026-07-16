@@ -1,0 +1,100 @@
+name: Nightly Stability
+
+on:
+  schedule:
+    - cron: '20 18 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PYTHONUNBUFFERED: '1'
+  COPT_SYNC_JOBS: 'true'
+  LLM_ENABLED: 'false'
+
+jobs:
+  frontend-stability:
+    name: Frontend Unit x3
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.17.0'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+        working-directory: frontend
+      - name: Full unit lifecycle (3 consecutive runs)
+        shell: bash
+        run: |
+          for run in 1 2 3; do
+            echo "unit lifecycle run ${run}/3"
+            npm run test:unit
+          done
+        working-directory: frontend
+
+  backend-stability:
+    name: Backend Non-slow x3
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13.5'
+          cache: pip
+      - run: pip install -r requirements.txt
+      - name: Default non-slow lifecycle (3 consecutive runs)
+        shell: bash
+        run: |
+          for run in 1 2 3; do
+            echo "backend default lifecycle run ${run}/3"
+            python -m pytest -q -m "not slow"
+          done
+
+  backend-slow:
+    name: Backend Slow
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13.5'
+          cache: pip
+      - run: pip install -r requirements.txt
+      - run: python -m pytest -q -m slow
+
+  real-e2e:
+    name: Controlled Real E2E
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      AGENT_ALLOW_IN_PROCESS_PLATFORM_FALLBACK: 'true'
+      RUNTIME_STORE_PATH: /tmp/copt-nightly-real-e2e-runtime.json
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.17.0'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13.5'
+          cache: pip
+      - run: pip install -r requirements.txt
+      - run: npm ci
+        working-directory: frontend
+      - run: npx playwright install --with-deps chromium
+        working-directory: frontend
+      - run: python scripts/verify_e2e_environment.py
+      - run: npm run test:e2e:real
+        working-directory: frontend

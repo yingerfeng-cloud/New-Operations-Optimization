@@ -24,9 +24,13 @@ export default defineConfig({
     testTimeout: 40000,
     hookTimeout: 40000,
     teardownTimeout: 10000,
-    isolate: true,
+    // Reuse the expensive Ant Design/jsdom module graph inside each worker.
+    // Test files that mock the same page reset modules before their dynamic
+    // import, so file-specific API mocks remain deterministic.
+    isolate: false,
     fileParallelism: true,
-    maxWorkers: 2,
+    pool: 'threads',
+    maxWorkers: 4,
     exclude: ['src/tests/e2e/**', 'node_modules/**', 'dist/**'],
   }
 });

@@ -158,7 +158,7 @@ function derivePreviewHorizon(draft: ModelDraft, config: TimeDimensionConfig) {
   const definition = draft.semantic.parameters.find(item => item.code === config.derive_from);
   const dims = definition ? extractDimensions(definition as unknown as Record<string, unknown>) : [];
   const timeIndex = dims.indexOf(config.time_set || 'time');
-  const value = draft.runtime_parameters[config.derive_from] ?? definition?.exampleValue ?? definition?.defaultValue ?? definition?.default;
+  const value = draft.runtime_parameters[config.derive_from] ?? definition?.exampleValue ?? definition?.defaultValue ?? definition?.default_value ?? definition?.default;
   if (timeIndex <= 0) return setValues(value).length || undefined;
   const first = setValues(value)[0];
   return setValues(first).length || undefined;
