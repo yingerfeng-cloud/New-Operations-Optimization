@@ -7,7 +7,8 @@ const executablePath = !channel ? process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PAT
 
 export default defineConfig({
   testDir: './src/tests/e2e',
-  testIgnore: ['**/real_backend_smoke.spec.ts', '**/real_production_gate.spec.ts'],
+  // Mock is the default classification; any spec explicitly tagged @real is excluded.
+  grepInvert: /@real/,
   workers: 1,
   timeout: 60_000,
   expect: { timeout: 15_000 },

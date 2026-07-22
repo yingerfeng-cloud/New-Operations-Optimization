@@ -1,4 +1,4 @@
-﻿
+
 body {
   width: 100%;
   max-width: 100%;
@@ -10,7 +10,6 @@ body {
   color: var(--proto-text);
   font-family: "Microsoft YaHei", "PingFang SC", Arial, sans-serif;
 }
-
 .app {
   width: 100%;
   max-width: 100vw;
@@ -568,6 +567,48 @@ body {
   gap: 16px;
 }
 
+.formula-builder.is-focus-mode {
+  position: fixed;
+  inset: 12px;
+  z-index: 1200;
+  overflow: auto;
+  padding: 18px;
+  border: 1px solid var(--proto-line);
+  border-radius: 12px;
+  background: #f5f7fa;
+  box-shadow: 0 20px 60px rgba(15, 35, 60, .2);
+}
+
+.formula-code-editor {
+  overflow: hidden;
+  border: 1px solid var(--proto-line);
+  border-radius: 8px;
+  background: #fff;
+}
+
+.formula-code-editor:focus-within {
+  border-color: #4096ff;
+}
+
+.formula-code-editor-hint {
+  padding: 6px 10px;
+  border-top: 1px solid var(--proto-line);
+  color: var(--proto-muted);
+  background: #f7f9fc;
+  font-size: 12px;
+  text-align: right;
+}
+
+.formula-diagnostic-link {
+  padding: 0;
+  border: 0;
+  color: inherit;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  text-decoration: underline dotted;
+}
+
 .formula-builder-head,
 .formula-builder-actions {
   display: flex;
@@ -890,9 +931,27 @@ body {
   overflow-wrap: anywhere;
 }
 
+.settings-table-card {
+  overflow: hidden;
+}
+
+.content-card.settings-table-card > .ant-card-body {
+  padding: 0 !important;
+}
+
+.settings-table-stack {
+  min-width: 0;
+}
+
+.settings-table-actions {
+  padding: 12px 16px 16px;
+  border-top: 1px solid #edf1f6;
+}
+
 .settings-compact-table .ant-table {
-  border: 1px solid var(--proto-line);
-  border-radius: 8px;
+  border: 0;
+  border-radius: 0;
+  overflow: hidden;
 }
 
 .settings-compact-table .ant-table-thead > tr > th,
@@ -901,8 +960,22 @@ body {
 }
 
 .settings-form-table .ant-table {
-  border: 1px solid var(--proto-line);
-  border-radius: 8px;
+  border: 0;
+  border-radius: 0;
+  overflow: hidden;
+}
+
+.settings-compact-table .ant-table-container,
+.settings-form-table .ant-table-container {
+  overflow: hidden;
+  border-radius: 0 !important;
+}
+
+.settings-compact-table .ant-table-thead > tr > th:first-child,
+.settings-compact-table .ant-table-thead > tr > th:last-child,
+.settings-form-table .ant-table-thead > tr > th:first-child,
+.settings-form-table .ant-table-thead > tr > th:last-child {
+  border-radius: 0 !important;
 }
 
 .settings-form-table .ant-table-thead > tr > th {
@@ -964,61 +1037,6 @@ body {
   background: #fbfdff;
 }
 
-.math-expansion-workbench {
-  display: grid;
-  grid-template-columns: 300px minmax(0, 1fr);
-  gap: 14px;
-  align-items: start;
-}
-
-.component-list-panel .ant-card-body {
-  display: grid;
-  gap: 8px;
-}
-
-.component-list-item {
-  width: 100%;
-  min-height: 58px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  padding: 10px;
-  border: 1px solid var(--proto-line);
-  border-radius: 8px;
-  background: #fff;
-  text-align: left;
-  cursor: pointer;
-}
-
-.component-list-item.active {
-  border-color: #8bb8ef;
-  background: var(--proto-soft-blue);
-}
-
-.component-list-item strong,
-.component-list-item small {
-  display: block;
-}
-
-.component-list-item small {
-  margin-top: 4px;
-  color: var(--proto-muted);
-}
-
-.component-config-panel {
-  min-width: 0;
-}
-
-.model-step-block {
-  height: 100%;
-}
-
-.creation-mode-group {
-  display: grid;
-  gap: 8px;
-}
-
 .muted {
   color: var(--proto-muted);
 }
@@ -1039,8 +1057,6 @@ body {
   overflow-wrap: anywhere;
 }
 
-.semantic-detail-table .ant-table-cell,
-.runtime-parameter-table .ant-table-cell,
 .import-preview-table .ant-table-cell {
   white-space: normal;
   overflow-wrap: anywhere;
@@ -1200,33 +1216,6 @@ button.metric-card-v2:hover {
   border: 1px solid #f1d4a4;
   border-radius: 8px;
   background: #fffaf1;
-}
-
-.model-build-summary-progress {
-  display: none;
-}
-
-.model-creation-page > .page-hero .page-hero-main .ant-tag {
-  display: none;
-}
-
-.model-progress-alert.ant-alert {
-  margin-top: 10px;
-  padding: 8px 12px;
-  border-radius: 8px;
-}
-
-.model-progress-alert .ant-alert-message {
-  margin-bottom: 0;
-  font-size: 13px;
-}
-
-.model-progress-alert .ant-alert-description {
-  display: none;
-}
-
-.step-guidance-panel {
-  display: none;
 }
 
 .business-empty-card {

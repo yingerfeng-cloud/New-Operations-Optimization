@@ -1,0 +1,17 @@
+.ant-card,
+.content-card,
+.section-card,
+.table-card,
+.form-card,
+.soft-panel,
+.panel,
+.card {
+  border: 1px solid var(--proto-line) !important;
+  border-radius: 8px !important;
+  background: #fff !important;
+  box-shadow: none !important;
+}
+
+.ant-card-head { min-height: 44px !important; }
+.ant-card-body { padding: 16px !important; }
+.ant-card .ant-card { background: #fafbfc !important; }

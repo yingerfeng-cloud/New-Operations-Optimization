@@ -7,7 +7,7 @@ const mount = (node: React.ReactNode) => render(<AppProviders>{node}</AppProvide
 
 it('exposes accessible loading and processing states', () => {
   mount(<><PageLoading /><TaskProcessingState status="求解" /></>);
-  expect(screen.getByRole('main')).toHaveAttribute('aria-busy', 'true');
+  expect(screen.getByRole('status', { name: '' })).toHaveAttribute('aria-busy', 'true');
   expect(screen.getByText('任务正在求解')).toBeInTheDocument();
 });
 

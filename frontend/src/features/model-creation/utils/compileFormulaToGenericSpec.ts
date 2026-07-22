@@ -146,11 +146,17 @@ function defaultSetValues(code: string, values?: unknown[]): unknown[] {
   return [];
 }
 
+/**
+ * @deprecated Compatibility-only compiler for historical migration tests.
+ * Production model creation must consume backend authoritative artifacts via
+ * composeAuthoritativeGenericSpec and must never call this function.
+ */
 export function compileFormulaToGenericSpec(formulas: FormulaDef[], semantic: SemanticSpec, objectiveSense: 'minimize' | 'maximize' = 'minimize') {
   const variables = new Set((semantic.variables || []).map(v => v.code));
   const parameters = new Set((semantic.parameters || []).map(p => p.code));
   const constraints: Record<string, unknown>[] = []; const objectiveTerms: Term[] = [];
   for (const formula of formulas) {
+    if ((formula.solve_participation || 'solve_active') !== 'solve_active') continue;
     const check = validateFormula(formula.dsl_formula, formula.kind, formula.tokens, {}, formula.foreach.length ? formula.foreach : formula.free_indices);
     if (!check.valid) throw new Error(`${formula.name}: ${check.errors.join('；')}`);
     if (formula.kind === 'objective') {
@@ -165,6 +171,10 @@ export function compileFormulaToGenericSpec(formulas: FormulaDef[], semantic: Se
     const movedTerms = [...lhs.terms, ...rhs.terms.map(negateTerm)];
     const row: Record<string, unknown> = {
       name: formula.name,
+      formula_id: formula.formula_id,
+      source_formula_id: formula.formula_id,
+      source_formula_name: formula.name,
+      source_span: { start: 0, end: formula.dsl_formula.length },
       foreach: formula.foreach.length ? formula.foreach : formula.free_indices,
       terms: movedTerms,
       sense: relation.sense,
@@ -182,6 +192,29 @@ export function compileFormulaToGenericSpec(formulas: FormulaDef[], semantic: Se
   }
   if (!objectiveTerms.length) throw new Error('至少需要一个可编译目标函数');
   return {
+    formula_ast_version: '1.0',
+    formula_compiler: 'frontend_provisional_backend_authoritative_required',
+    formula_definitions: formulas.map(formula => ({
+      formula_id: formula.formula_id,
+      name: formula.name,
+      kind: formula.kind,
+      solve_participation: formula.solve_participation || 'solve_active',
+      objective_direction: formula.objective_direction,
+      business_group: formula.business_group,
+      created_at: formula.created_at,
+      updated_at: formula.updated_at,
+      ast_version: formula.ast_version,
+      compiler_version: formula.compiler_version,
+      migration_status: formula.migration_status,
+      last_saved_version: formula.last_saved_version,
+      last_compiled_version: formula.last_compiled_version,
+      ...(formula.weight !== undefined ? { weight: formula.weight } : {}),
+      ...(formula.priority !== undefined ? { priority: formula.priority } : {}),
+      dsl_formula: formula.dsl_formula,
+      display_formula: formula.display_formula,
+      scope: formula.scope || formula.free_indices.map((alias, index) => ({ alias, set: formula.foreach[index] || alias })),
+      foreach: formula.foreach,
+    })),
     sets: Object.fromEntries((semantic.sets || []).map(s => [s.code, defaultSetValues(s.code, s.values)])),
     parameters: Object.fromEntries((semantic.parameters || []).map(p => [p.code, p.defaultValue ?? p.default_value ?? p.default ?? 0])),
     variables: (semantic.variables || []).map(v => ({
@@ -192,7 +225,7 @@ export function compileFormulaToGenericSpec(formulas: FormulaDef[], semantic: Se
       ...(v.upperBound !== undefined && v.upperBound !== '' ? { ub: Number(v.upperBound) } : {}),
     })),
     constraints,
-    objective: { sense: objectiveSense, terms: objectiveTerms },
-    sense: objectiveSense,
+    objective: { sense: formulas.find(item => item.kind === 'objective' && (item.solve_participation || 'solve_active') === 'solve_active')?.objective_direction || objectiveSense, terms: objectiveTerms },
+    sense: formulas.find(item => item.kind === 'objective' && (item.solve_participation || 'solve_active') === 'solve_active')?.objective_direction || objectiveSense,
   };
 }

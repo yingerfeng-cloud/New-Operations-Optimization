@@ -1,9 +1,11 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
+import { EditorView } from '@codemirror/view';
 import { vi } from 'vitest';
 import { FormulaEditor } from '../../features/formula-editor/FormulaEditor';
 import { Step5ReviewPublish } from '../../features/model-creation/steps/Step5ReviewPublish';
 import { createInitialDraft, type ModelDraft } from '../../features/model-creation/stores/modelCreationStore';
 import { validateModelDraft } from '../../features/model-creation/utils/validateModelDraft';
+import { analyzeFormulaText } from '../../features/model-creation/utils/nonlinearDiagnostics';
 
 const symbols = {
   variables: {
@@ -14,6 +16,14 @@ const symbols = {
   parameters: { k: { label: '系数' } },
   sets: { time: '时段' },
 };
+
+test('state recursion with parameter-scaled flows is not misclassified as bilinear', () => {
+  const diagnostics = analyzeFormulaText(
+    'state[t+1] == state[t] + eta_in * input[t] * delta_t - output[t] / eta_out * delta_t',
+    ['state', 'input', 'output'],
+  );
+  expect(diagnostics.some(item => item.nonlinear_type === 'bilinear')).toBe(false);
+});
 
 function nonlinearDraft(): ModelDraft {
   const draft = createInitialDraft();
@@ -45,14 +55,15 @@ function nonlinearDraft(): ModelDraft {
   return draft;
 }
 
-test('Formula Builder 输入双线性公式时给出提示', () => {
+test('Formula Builder 输入双线性公式时给出提示', async () => {
   render(<FormulaEditor symbols={symbols} />);
-
-  fireEvent.change(screen.getByPlaceholderText('sum(unit_output[u,t] for u in unit) >= load_forecast[t]'), {
-    target: { value: 'power[t] == k * flow[t] * head[t]' },
+  const view = EditorView.findFromDOM(screen.getByLabelText('公式表达式'));
+  if (!view) throw new Error('CodeMirror editor view not found');
+  await act(async () => {
+    view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: 'power[t] == k * flow[t] * head[t]' } });
   });
 
-  expect(screen.getByText('非线性转换建议')).toBeInTheDocument();
+  await waitFor(() => expect(screen.getByText('非线性转换建议')).toBeInTheDocument());
   expect(screen.getByText(/检测到双线性项 flow\[t\] \* head\[t\]/)).toBeInTheDocument();
   expect(screen.getByText(/McCormick 松弛/)).toBeInTheDocument();
 });

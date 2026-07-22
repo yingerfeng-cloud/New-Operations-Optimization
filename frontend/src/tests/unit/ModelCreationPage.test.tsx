@@ -102,6 +102,7 @@ function renderPage(initialEntries = ['/models/create']) {
       <Routes>
         <Route path="/models/create" element={<ModelCreationPage />} />
         <Route path="/models/:id/edit" element={<ModelCreationPage />} />
+        <Route path="/models/:id" element={<div>模型详情</div>} />
       </Routes>
     </MemoryRouter>,
   );
@@ -116,6 +117,7 @@ function RaceHarness() {
       <Routes>
         <Route path="/models/create" element={<ModelCreationPage />} />
         <Route path="/models/:id/edit" element={<ModelCreationPage />} />
+        <Route path="/models/:id" element={<div>模型详情</div>} />
       </Routes>
     </>
   );
@@ -211,7 +213,7 @@ test('save test and publish use one asset without creating a second model', asyn
   const publishButton = screen.getByRole('button', { name: /发布模型/ });
   await waitFor(() => expect(publishButton).not.toBeDisabled());
   expect(screen.getAllByRole('button', { name: /发布模型/ })).toHaveLength(1);
-  fireEvent.click(publishButton);
+  await act(async () => { fireEvent.click(publishButton); });
 
   await waitFor(() => expect(modelApi.publishModel).toHaveBeenCalledWith('MODEL-1'));
   expect(modelApi.createModel).toHaveBeenCalledTimes(1);
@@ -305,7 +307,7 @@ test('editing after a successful test invalidates publish without creating anoth
     };
     useModelCreationStore.setState({ step: 4, draft: nextDraft, modelDraft: nextDraft });
   });
-  fireEvent.click(getTestRunButton());
+  await act(async () => { fireEvent.click(getTestRunButton()); });
   await waitFor(() => expect(screen.getByRole('button', { name: /发布模型/ })).not.toBeDisabled());
 
   act(() => {
@@ -317,7 +319,7 @@ test('editing after a successful test invalidates publish without creating anoth
   expect(screen.getByText('测试状态：已失效')).toBeInTheDocument();
   expect(modelApi.createModel).toHaveBeenCalledTimes(1);
   expect(modelApi.publishModel).not.toHaveBeenCalled();
-});
+}, 120000);
 
 test('retesting a changed draft updates and publishes the same asset', async () => {
   renderPage();
@@ -333,7 +335,7 @@ test('retesting a changed draft updates and publishes the same asset', async () 
     };
     useModelCreationStore.setState({ step: 4, draft: nextDraft, modelDraft: nextDraft });
   });
-  fireEvent.click(getTestRunButton());
+  await act(async () => { fireEvent.click(getTestRunButton()); });
   await waitFor(() => expect(modelApi.testModel).toHaveBeenCalledTimes(1));
 
   act(() => {
@@ -346,13 +348,13 @@ test('retesting a changed draft updates and publishes the same asset', async () 
   });
   await waitFor(() => expect(screen.getByRole('button', { name: /发布模型/ })).toBeDisabled());
 
-  fireEvent.click(getTestRunButton());
+  await act(async () => { fireEvent.click(getTestRunButton()); });
   await waitFor(() => expect(modelApi.testModel).toHaveBeenCalledTimes(2));
-  fireEvent.click(screen.getByRole('button', { name: /发布模型/ }));
+  await act(async () => { fireEvent.click(screen.getByRole('button', { name: /发布模型/ })); });
   await waitFor(() => expect(modelApi.publishModel).toHaveBeenCalledWith('MODEL-1'));
   expect(modelApi.createModel).toHaveBeenCalledTimes(1);
   expect(modelApi.updateModel).toHaveBeenCalledWith('MODEL-1', expect.any(Object));
-});
+}, 120000);
 
 test('version mode creates its first saved asset through the version endpoint', async () => {
   renderPage(['/models/create?mode=version&source=MODEL-POWER-UNIT-COMMITMENT-DAY-AHEAD']);

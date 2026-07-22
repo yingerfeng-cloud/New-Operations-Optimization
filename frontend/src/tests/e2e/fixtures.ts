@@ -62,6 +62,11 @@ export async function mockApi(page: Page) {
     const method = route.request().method();
     let body: unknown = [];
     if (url.endsWith('/api/health')) body = { ok: true };
+    else if (url.endsWith('/api/system-config')) body = { dictionaries: { business_scenarios: [
+      { code: 'day_ahead_unit_commitment', label: '日前机组组合优化', enabled: true, sort_order: 10 },
+      { code: 'economic_dispatch', label: '经济负荷分配', enabled: true, sort_order: 20 },
+      { code: 'cascade_hydro_day_ahead', label: '梯级水电日前调度', enabled: true, sort_order: 30 },
+    ] } };
     else if (url.includes('/api/templates/')) {
       const code = decodeURIComponent(url.split('/api/templates/')[1].split('?')[0]);
       const isHydro = code === 'cascade_hydro_dispatch';
@@ -77,12 +82,30 @@ export async function mockApi(page: Page) {
             variables: [{ code: 'p', name: '出力', variableType: 'continuous' }],
           },
           components: isHydro ? [{ component_id: 'hydro_reservoir_balance', enabled: true }] : [],
-          formulas: [{ formula_id: 'balance', name: '平衡约束', kind: 'constraint', display_formula: 'p=load', dsl_formula: 'p=load', tokens: [], foreach: [], referenced_sets: [], referenced_parameters: [], referenced_variables: [], free_indices: [], compile_status: 'ready' }],
+          formulas: [{ formula_id: 'balance', name: '平衡约束', kind: 'constraint', business_group: '平衡约束', display_formula: 'p ≥ load', dsl_formula: 'p >= load', tokens: [], foreach: [], referenced_sets: [], referenced_parameters: ['load'], referenced_variables: ['p'], free_indices: [], compile_status: 'draft', migration_status: 'needs_review' }],
           runtime_parameters: { horizon: 24 },
         },
       };
     }
     else if (url.endsWith('/api/templates')) body = [{ code: 'economic_dispatch', name: '经济调度', scenario: 'economic_dispatch' }];
+    else if (url.endsWith('/api/formulas/analyze') || url.endsWith('/api/formulas/expand') || url.endsWith('/api/formulas/compile') || url.endsWith('/api/formulas/validate') || url.endsWith('/api/formulas/parse')) {
+      const payload = JSON.parse(route.request().postData() || '{}');
+      const previewOnly = payload.participation === 'preview_only';
+      body = {
+        success: true,
+        ast_version: '1.0',
+        compiler_version: '2.0.0',
+        ast: { type: payload.formula_type === 'constraint' ? 'ComparisonExpression' : 'SymbolReference', start: 0, end: String(payload.formula || '').length },
+        normalized_expression: payload.formula,
+        expression_class: 'linear',
+        diagnostics: previewOnly ? [{ code: 'FORMULA_PREVIEW_ONLY_EXCLUDED', severity: 'info', stage: 'compile', message: '仅预览，不进入求解', start: 0, end: String(payload.formula || '').length }] : [],
+        references: [], scope: payload.scope || [], participation: payload.participation || 'solve_active',
+        compiled_fragment: previewOnly ? null : { type: payload.formula_type, constraints: payload.formula_type === 'constraint' ? [{ source_formula_id: payload.formula_id, split_sequence: 1, terms: [] }] : undefined },
+        estimated_expansion: { constraint_count: payload.formula_type === 'constraint' ? 1 : 0, term_count: 1, exact: false },
+        status: previewOnly ? 'preview_only' : 'compile_valid',
+        checks: { syntax: 'passed', symbol_dimension_unit: 'passed', classification: 'linear', compile: previewOnly ? 'not_applicable' : 'passed' },
+      };
+    }
     else if (url.endsWith('/api/models') && method === 'GET') body = [
       { id: 'm1', name: '示例模型', scene: 'power', version: 'v1', status: 'developing', solver: 'HiGHS', problem_type: 'LP', build_mode: 'generic_linear', updated_at: '2026-06-22' },
       { id: 'm2', name: '梯级水电模型', scene: '梯级水电日前调度', version: 'v1', status: 'published', solver: 'HiGHS', problem_type: 'LP', build_mode: 'component_based', template_id: 'cascade_hydro_dispatch', updated_at: '2026-06-22' },

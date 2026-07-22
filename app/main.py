@@ -7,7 +7,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
-from app.api import components, demo, function_assets, invocations, jobs, llm, models, optimize, pv_storage, reports, results, rolling, solvers, system_config, tasks, templates
+from app.api import components, demo, formulas, function_assets, invocations, jobs, llm, models, optimize, pv_storage, reports, results, rolling, solvers, system_config, tasks, templates
 from app.agent.platform_gateway import service_mode
 from app.services.model_service import model_service
 from app.frontend import mount_frontends
@@ -79,6 +79,7 @@ def create_app() -> FastAPI:
         app.include_router(templates.router)
         app.include_router(components.router)
         app.include_router(function_assets.router)
+        app.include_router(formulas.router)
         app.include_router(jobs.router)
         app.include_router(rolling.router)
         app.include_router(pv_storage.router)

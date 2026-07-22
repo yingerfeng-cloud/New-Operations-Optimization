@@ -294,7 +294,7 @@ export function Step4RuntimeParams({ draft, onChange }: { draft: ModelDraft; onC
         </Card>
       )}
       <Alert className="compact-step-note" type="info" showIcon title="运行参数按来源分类，发布前验证必填项、默认值和示例值。" />
-      {missing.length > 0 && <Alert className="section-gap" type="warning" showIcon title="缺少必填运行参数" description={missing.join('；')} />}
+      {missing.length > 0 && <Alert className="section-gap compact-step-note" type="warning" showIcon title="缺少必填运行参数" description={missing.join('；')} />}
       <Card className="section-gap" title="基础参数绑定">
         <Descriptions size="small" column={5} items={groups.map(group => ({ key: group.key, label: group.label, children: rows.filter(row => row.source === group.key).length }))} />
       </Card>

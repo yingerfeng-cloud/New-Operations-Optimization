@@ -11,6 +11,8 @@ export interface TimeDimensionConfig {
 export interface RuntimeField {
   code: string; name: string; required: boolean; dimension: string[]; defaultValue?: unknown; exampleValue?: unknown;
   type?: string; unit?: string; description?: string; enumValues?: unknown[]; dimensionValues?: Record<string, string[]>; min?: number; max?: number;
+  groupKey?: string; groupLabel?: string; groupOrder?: number; fieldOrder?: number;
+  editorHint?: string; helpText?: string; dataSourceLabel?: string;
 }
 
 export const objectValue = (value: unknown): Record<string, unknown> => value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {};
@@ -50,11 +52,20 @@ export function resolveTimeDimension(...sources: unknown[]): TimeDimensionConfig
 export function runtimeFieldsFromContracts(...sources: unknown[]): RuntimeField[] {
   const rows = new Map<string, RuntimeField>();
   const setValues: Record<string, string[]> = {};
+  const explicitGroups = new Map<string, { key: string; label: string; order: number }>();
   const seen = new Set<unknown>();
   const visit = (source: unknown) => {
     if (!source || typeof source !== 'object' || Array.isArray(source) || seen.has(source)) return;
     seen.add(source);
     const record = objectValue(source);
+    const uiMetadata = objectValue(record.ui_metadata);
+    for (const group of records(uiMetadata.runtime_parameter_groups)) {
+      const key = String(group.key || '');
+      if (!key) continue;
+      const metadata = { key, label: String(group.label || key), order: Number(group.order ?? 100) };
+      const parameterCodes = Array.isArray(group.parameter_codes) ? group.parameter_codes : [];
+      parameterCodes.forEach(code => explicitGroups.set(String(code), metadata));
+    }
     for (const item of records(record.sets)) {
       const code = String(item.code || item.name || '');
       const values = Array.isArray(item.values) ? item.values : Array.isArray(item.members) ? item.members : [];
@@ -65,12 +76,31 @@ export function runtimeFieldsFromContracts(...sources: unknown[]): RuntimeField[
       const code = String(item.code || item.math_param || item.key || item.parameter || item.parameter_code || item.model_parameter || '');
       if (!code) continue;
       const existing = rows.get(code);
-      rows.set(code, { code, name: String(item.name || item.label || item.display_name || existing?.name || code), required: Boolean(item.required ?? existing?.required), dimension: extractDimensions(item).length ? extractDimensions(item) : existing?.dimension || [], defaultValue: item.default ?? item.defaultValue ?? existing?.defaultValue, exampleValue: item.example ?? item.exampleValue ?? item.sample ?? existing?.exampleValue, type: String(item.type || item.value_type || existing?.type || ''), unit: String(item.unit || existing?.unit || ''), description: String(item.description || existing?.description || ''), enumValues: Array.isArray(item.enum) ? item.enum : existing?.enumValues, min: item.min == null ? existing?.min : Number(item.min), max: item.max == null ? existing?.max : Number(item.max) } );
+      rows.set(code, {
+        code, name: String(item.name || item.label || item.display_name || existing?.name || code), required: Boolean(item.required ?? existing?.required),
+        dimension: extractDimensions(item).length ? extractDimensions(item) : existing?.dimension || [], defaultValue: item.default ?? item.defaultValue ?? existing?.defaultValue,
+        exampleValue: item.example ?? item.exampleValue ?? item.sample ?? existing?.exampleValue, type: String(item.type || item.value_type || existing?.type || ''),
+        unit: String(item.unit || existing?.unit || ''), description: String(item.description || existing?.description || ''), enumValues: Array.isArray(item.enum) ? item.enum : existing?.enumValues,
+        min: item.min == null ? existing?.min : Number(item.min), max: item.max == null ? existing?.max : Number(item.max),
+        groupKey: String(item.ui_group || existing?.groupKey || '') || undefined, groupLabel: String(item.ui_group_label || existing?.groupLabel || '') || undefined,
+        groupOrder: item.ui_group_order == null ? existing?.groupOrder : Number(item.ui_group_order), fieldOrder: item.ui_order == null ? existing?.fieldOrder : Number(item.ui_order),
+        editorHint: String(item.ui_editor || existing?.editorHint || '') || undefined, helpText: String(item.ui_help || existing?.helpText || '') || undefined,
+        dataSourceLabel: String(item.ui_data_source || existing?.dataSourceLabel || '') || undefined,
+      });
     }
     ['input_schema', 'parameter_schema', 'semantic_schema', 'input_contract', 'semantic_spec', 'component_spec'].forEach(key => visit(record[key]));
   };
   sources.forEach(visit);
-  return [...rows.values()].map(field => ({ ...field, dimensionValues: Object.fromEntries(field.dimension.filter(code => setValues[code]).map(code => [code, setValues[code]])) }));
+  return [...rows.values()].map(field => {
+    const explicit = explicitGroups.get(field.code);
+    return {
+      ...field,
+      groupKey: explicit?.key || field.groupKey,
+      groupLabel: explicit?.label || field.groupLabel,
+      groupOrder: explicit?.order ?? field.groupOrder,
+      dimensionValues: Object.fromEntries(field.dimension.filter(code => setValues[code]).map(code => [code, setValues[code]])),
+    };
+  });
 }
 
 export function managedTimeFields(config: TimeDimensionConfig) {

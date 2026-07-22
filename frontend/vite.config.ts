@@ -9,7 +9,9 @@ export default defineConfig({
       output: {
         manualChunks(id) {
           if (id.indexOf('node_modules') === -1) return undefined;
-          if (id.indexOf('antd') >= 0 || id.indexOf('@ant-design') >= 0 || id.indexOf('rc-') >= 0) return 'vendor-antd';
+          // Let Rollup keep Ant Design components with their lazy route graph.
+          // A single forced vendor chunk made every Ant component used anywhere
+          // in the application part of the initial-page preload.
           if (id.indexOf('echarts') >= 0) return 'vendor-echarts';
           return undefined;
         },
@@ -24,13 +26,14 @@ export default defineConfig({
     testTimeout: 40000,
     hookTimeout: 40000,
     teardownTimeout: 10000,
-    // Reuse the expensive Ant Design/jsdom module graph inside each worker.
-    // Test files that mock the same page reset modules before their dynamic
-    // import, so file-specific API mocks remain deterministic.
-    isolate: false,
+    // File-level API mocks and Zustand/module state must not leak into the
+    // next suite. Keep two-way parallelism, but give every file a fresh graph.
+    isolate: true,
     fileParallelism: true,
     pool: 'threads',
-    maxWorkers: 4,
+    // Ant Design/jsdom page suites are CPU-heavy; two workers keep the
+    // standard test command deterministic on developer workstations.
+    maxWorkers: 2,
     exclude: ['src/tests/e2e/**', 'node_modules/**', 'dist/**'],
   }
 });

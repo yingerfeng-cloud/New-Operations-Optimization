@@ -17,7 +17,7 @@ vi.mock('../../api/templates', () => ({
 }));
 
 vi.mock('../../api/tasks', () => ({
-  getTasks: async () => [{ id: 'T-1', model: '模型一', scene: '日前调度', solver: 'HiGHS', status: 'SUCCESS', progress: 100, created_at: '2026-06-23' }],
+  getTasks: async () => [{ id: 'T-1', model: '模型一', scene: '日前调度', solver: 'HiGHS', status: 'SUCCESS', progress: 100, created_at: '2026-06-23', duration_seconds: 0 }],
 }));
 
 vi.mock('../../api/solvers', () => ({
@@ -26,6 +26,10 @@ vi.mock('../../api/solvers', () => ({
     ipopt: { available: true, path: '/usr/bin/ipopt', version: 'Ipopt 3.x' },
     status: 'OK',
   }),
+}));
+
+vi.mock('../../api/systemConfig', () => ({
+  getSystemConfig: async () => ({ dictionaries: { business_scenarios: [] } }),
 }));
 
 test('dashboard renders React platform entries', async () => {
@@ -41,5 +45,6 @@ test('dashboard renders React platform entries', async () => {
   expect(screen.getByText('已发布模型')).toBeInTheDocument();
   expect(screen.getByText('近 7 天任务')).toBeInTheDocument();
   expect(screen.getByText('最近任务')).toBeInTheDocument();
+  expect(screen.getByText('< 1 ms')).toBeInTheDocument();
   expect(screen.getByText('求解能力摘要')).toBeInTheDocument();
 });

@@ -1,0 +1,6 @@
+.ant-drawer-content,
+.ant-modal-content { border-radius: 8px !important; }
+.ant-drawer-header,
+.ant-modal-header { border-bottom: 1px solid var(--proto-line); }
+.runtime-validation-drawer .ant-drawer-body,
+.model-inspection-drawer .ant-drawer-body { background: #f8fafc; }

@@ -44,7 +44,8 @@ $RequiredPackageItems = @(
   "requirements.txt",
   "server.py",
   "frontend/src/main.tsx",
-  "OPERATION_MANUAL.md"
+  "OPERATION_MANUAL.md",
+  "docs/visual-acceptance/ui-special-iteration/README.md"
 )
 
 $LauncherScripts = @(Get-ChildItem -LiteralPath $Root -File -Filter "*.ps1" |
@@ -179,6 +180,9 @@ try {
   })
   if ($missingFromStaging.Count -gt 0) {
     throw "Package self-check failed before compression. Missing: $($missingFromStaging -join ', ')"
+  }
+  if (-not (Test-Path (Join-Path $staging "docs\visual-acceptance\ui-special-iteration\README.md"))) {
+    throw "UI visual acceptance evidence is missing"
   }
 
   Get-ChildItem -LiteralPath $staging -Recurse -Force |

@@ -80,6 +80,26 @@ test('infers MILP when integer variables exist and respects LP otherwise', () =>
   expect(inferModelProblemType({ ...componentLp, basic_info: { ...componentLp.basic_info, model_code: 'unit_commitment_day_ahead' } })).toBe('LP');
 });
 
+test('problem type inference distinguishes parameter scaling from variable products', () => {
+  const base = normalizeModelDraft({
+    ...initialDraft,
+    semantic: {
+      ...initialDraft.semantic,
+      parameters: [{ code: 'eta', dimension: [] }],
+      variables: [{ code: 'state', dimension: ['time'] }, { code: 'input', dimension: ['time'] }],
+    },
+    formulas: [{
+      formula_id: 'state', name: 'state', kind: 'constraint', display_formula: 'state[t+1] == state[t] + eta * input[t]', dsl_formula: 'state[t+1] == state[t] + eta * input[t]',
+      tokens: [], foreach: ['time'], referenced_sets: [], referenced_parameters: ['eta'], referenced_variables: ['state', 'input'], free_indices: ['time'], compile_status: 'ready',
+    }],
+  });
+  expect(inferModelProblemType(base)).toBe('LP');
+  expect(inferModelProblemType({
+    ...base,
+    formulas: [{ ...base.formulas[0], dsl_formula: 'state[t] * input[t] >= 0', display_formula: 'state[t] * input[t] >= 0' }],
+  })).toBe('NLP');
+});
+
 test('saving an existing draft asset updates instead of creating a duplicate', async () => {
   const draft = useModelCreationStore.getState().draft;
   const asset = {

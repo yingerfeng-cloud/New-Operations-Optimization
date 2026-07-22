@@ -161,10 +161,10 @@ export function Step5ReviewPublish({
         title={validation.valid ? '发布前校验全部通过' : '存在阻断项，不能发布'}
         description="语义、公式、组件依赖、参数绑定、问题类型与求解器兼容性已统一检查。"
       />
-      {error && <Alert className="section-gap" showIcon type="error" title="发布前检查未通过" description={`请根据检查清单修复模型配置后重试。原始错误：${error}`} />}
+      {error && <Alert className="section-gap compact-step-note" showIcon type="error" title="发布前检查未通过" description={`请根据检查清单修复模型配置后重试。原始错误：${error}`} />}
       {testRevisionState === 'outdated' && (
         <Alert
-          className="section-gap"
+          className="section-gap compact-step-note"
           showIcon
           type="warning"
           title="测试状态：已失效"
@@ -203,7 +203,7 @@ export function Step5ReviewPublish({
       </Card>
       {isNlp && ipoptAvailable && (
         <Alert
-          className="section-gap"
+          className="section-gap model-interactive-alert"
           type="warning"
           showIcon
           title="当前模型被识别为 NLP，将使用 Ipopt 求解。"
@@ -231,7 +231,7 @@ export function Step5ReviewPublish({
       )}
       {isNlp && !ipoptAvailable && (
         <Alert
-          className="section-gap"
+          className="section-gap compact-step-note"
           type="error"
           showIcon
           title={nlpStatusPending ? '正在检测 Ipopt 状态' : 'NLP 发布被阻断'}
@@ -240,7 +240,7 @@ export function Step5ReviewPublish({
       )}
       {isMinlpReserved && (
         <Alert
-          className="section-gap"
+          className="section-gap compact-step-note"
           type="error"
           showIcon
           title="MINLP_RESERVED 发布被阻断"
@@ -250,6 +250,7 @@ export function Step5ReviewPublish({
       {pwl2dRows.length > 0 && (
         <Card title="二维 PWL 风险诊断" className="section-gap">
           <Alert
+            className="compact-step-note"
             showIcon
             type={hasBlockingPwl2dScale ? 'error' : 'warning'}
             title={hasBlockingPwl2dScale ? '二维分段线性函数规模过大' : '二维分段线性函数会提升 MILP 复杂度'}
@@ -282,7 +283,7 @@ export function Step5ReviewPublish({
           { key: 'blocking', label: '阻断项', children: nonlinearReport.blocking_items.length },
           { key: 'solver', label: '当前求解器', children: draft.basic_info.solver || 'HiGHS' },
         ]} />
-        {hasBlockingNonlinear && <Alert className="section-gap" type="error" showIcon title="存在未转换非线性，已阻断发布" description={nonlinearReport.blocking_items[0]?.message} />}
+        {hasBlockingNonlinear && <Alert className="section-gap compact-step-note" type="error" showIcon title="存在未转换非线性，已阻断发布" description={nonlinearReport.blocking_items[0]?.message} />}
         {nonlinearReport.count > 0 ? (
           <Table
             className="section-gap"

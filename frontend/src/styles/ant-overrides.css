@@ -1,0 +1,5 @@
+.ant-btn { border-radius: 6px; box-shadow: none !important; }
+.ant-modal-mask,
+.ant-drawer-mask { backdrop-filter: none; }
+.ant-segmented { border-radius: 6px; background: #eaecf0; }
+.ant-segmented-item { border-radius: 5px; }

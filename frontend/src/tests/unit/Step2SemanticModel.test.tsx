@@ -46,6 +46,16 @@ test('validates duplicate semantic codes', () => {
   expect(screen.getByText(/参数编码重复：load/)).toBeInTheDocument();
 });
 
+test('opens safely when a historical semantic row has no code', () => {
+  const draft = createInitialDraft();
+  draft.semantic.parameters = [
+    { name: 'legacy parameter', sourceType: 'runtime' } as ModelDraft['semantic']['parameters'][number],
+  ];
+
+  expect(() => render(<Step2Harness initial={draft} />)).not.toThrow();
+  expect(screen.getByText('legacy parameter')).toBeInTheDocument();
+});
+
 test('opens semantic item editor from overview card', () => {
   const draft = createInitialDraft();
   draft.semantic.sets = [{ code: 'unit', name: '机组集合', values: ['U1'] }];

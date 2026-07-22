@@ -94,8 +94,16 @@ export function validateModelDraft(d: ModelDraft): DraftValidation {
   if (!d.semantic.variables.length && d.basic_info.builder_mode === 'generic_linear') semanticStructureErrors.push('通用线性 Builder 至少需要一个变量');
 
   const formulaErrors = d.formulas.flatMap(f => validateFormulaDef(f).errors.map(e => `${f.name}: ${e}`));
-  if (d.basic_info.builder_mode === 'generic_linear' && !d.formulas.some(f => f.kind === 'objective')) formulaErrors.push('通用线性 Builder 至少需要一个目标公式');
+  const activeObjectives = d.formulas.filter(f => f.kind === 'objective' && (f.solve_participation || 'solve_active') === 'solve_active');
+  const objectiveMode = d.objective?.mode || (d.objective?.type === 'weighted_sum' ? 'weighted_sum' : 'single');
+  if (d.basic_info.builder_mode === 'generic_linear' && !activeObjectives.length) formulaErrors.push('通用线性 Builder 至少需要一个参与求解的目标公式');
+  if (d.basic_info.builder_mode === 'generic_linear' && objectiveMode === 'single' && activeObjectives.length !== 1) formulaErrors.push(`single 模式仅允许一个参与求解的目标，实际为 ${activeObjectives.length} 个`);
+  activeObjectives.forEach(objective => {
+    if (!['minimize', 'maximize'].includes(String(objective.objective_direction || ''))) formulaErrors.push(`${objective.name}: 必须明确选择 minimize 或 maximize`);
+    if (objectiveMode === 'weighted_sum' && (typeof objective.weight !== 'number' || !Number.isFinite(objective.weight))) formulaErrors.push(`${objective.name}: weighted_sum 权重必须显式填写为有限数值`);
+  });
   if (d.basic_info.builder_mode === 'generic_linear' && !d.advanced.generic_spec) formulaErrors.push('generic_spec 尚未编译');
+  if (d.basic_info.builder_mode === 'generic_linear' && d.advanced.generic_spec && d.advanced.generic_spec.formula_compiler !== 'backend_authoritative_v2') formulaErrors.push('generic_spec 不是后端权威编译产物，请重新编译');
   if ((d.advanced.generic_spec?.constraints as Array<Record<string, unknown>> | undefined)?.some(row => row.compile_status === 'unsupported')) formulaErrors.push('generic_spec 中存在无法编译的约束公式');
 
   const componentErrors = d.basic_info.builder_mode === 'component_based' && !d.components.length ? ['组件化 Builder 至少选择一个组件'] : dependencyErrors(d);

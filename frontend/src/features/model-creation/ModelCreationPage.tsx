@@ -9,7 +9,7 @@ import { getTemplateDetail, getTemplates } from '../../api/templates';
 import { PageHeader } from '../../components/PageHeader';
 import { ErrorState, PageLoading } from '../../components/PageStates';
 import { ActionFooter, PageShell, StepBody } from '../../components/LayoutPrimitives';
-import { createBlankDraft, useModelCreationStore } from './stores/modelCreationStore';
+import { createBlankDraft, useModelCreationStore, type ModelDraft } from './stores/modelCreationStore';
 import { scenarioCatalog, scenariosFromDictionary } from './data/scenarioCatalog';
 import { applyTemplateToDraft } from './utils/applyTemplateToDraft';
 import { normalizeModelDraft } from './utils/normalizeModelDraft';
@@ -22,8 +22,13 @@ import { Step4RuntimeParams } from './steps/Step4RuntimeParams';
 import { Step5ReviewPublish } from './steps/Step5ReviewPublish';
 import { ModelBuildSummaryBar } from './components/ModelBuildSummaryBar';
 import { ModelCreationProgress, type ModelCreationStepMeta } from './components/ModelCreationProgress';
-import { blockerMessage, canEnterStep, firstStepError } from './utils/workflowGuard';
+import { ModelInspectionDrawer } from './components/ModelInspectionDrawer';
+import { FocusEditor } from './components/FocusEditor';
+import { StepSectionNav, type StepSectionItem } from './components/StepSectionNav';
+import { blockerMessage, canEnterStep, firstStepError, type ModelValidationIssue } from './utils/workflowGuard';
 import { assetToWorkspaceDraft, effectiveAssetMode, parseWorkspaceRequest, workspaceTitles } from './utils/workspaceMode';
+import { useFocusEditorContext } from './hooks/useFocusEditorContext';
+import { executeModelNavigationCommand, type ModelNavigationCommand } from './navigation/modelNavigationCommand';
 
 const stepMeta: ModelCreationStepMeta[] = [
   { title: '基础信息', description: '选择业务场景、模型编码、建模模式和求解器。', sectionKeys: ['basic_info'] },
@@ -31,6 +36,14 @@ const stepMeta: ModelCreationStepMeta[] = [
   { title: '数学展开', description: '将业务语义展开为目标函数、约束条件和可编译公式。', sectionKeys: ['formula', 'problem_type'] },
   { title: '运行参数', description: '配置运行时输入、组件参数和函数资产绑定。', sectionKeys: ['runtime_parameters'] },
   { title: '校验发布', description: '完成 dry-run、兼容性检查、测试运行和模型发布。', sectionKeys: ['solver_compatibility'] },
+];
+
+const stepSections: StepSectionItem[][] = [
+  [{ key: 'creation', label: '创建方式' }, { key: 'scenario', label: '业务场景', aliases: ['模型定位'] }, { key: 'model', label: '模型信息' }, { key: 'mode', label: '建模模式', aliases: ['创建方式'] }, { key: 'objective', label: '目标策略' }],
+  [{ key: 'overview', label: '语义概览' }, { key: 'dependencies', label: '组件依赖' }, { key: 'time', label: '时间维度' }, { key: 'sets', label: '集合' }, { key: 'parameters', label: '参数' }, { key: 'variables', label: '变量' }, { key: 'rules', label: '业务规则' }],
+  [{ key: 'objective', label: '目标函数' }, { key: 'constraints', label: '约束条件' }, { key: 'mapping', label: '函数映射' }, { key: 'expansion', label: '组件展开' }, { key: 'compile', label: '编译预览', aliases: ['展开预览'] }, { key: 'debug', label: '高级调试' }],
+  [{ key: 'time', label: '时间维度摘要' }, { key: 'basic', label: '基础参数', aliases: ['基础参数绑定'] }, { key: 'series', label: '时间序列' }, { key: 'functions', label: '函数资产', aliases: ['函数/曲线资产绑定'] }, { key: 'bindings', label: '参数绑定' }, { key: 'preview', label: '结构预览', aliases: ['运行参数结构预览'] }],
+  [{ key: 'validation', label: '模型校验', aliases: ['发布前校验'] }, { key: 'test', label: '测试运行' }, { key: 'compatibility', label: '兼容性', aliases: ['模型求解路径'] }, { key: 'publish-info', label: '发布信息', aliases: ['发布诊断'] }, { key: 'publish', label: '发布操作' }],
 ];
 
 interface ModelTestRequestContext {
@@ -55,7 +68,15 @@ export function ModelCreationPage() {
   const [visitedThrough, setVisitedThrough] = useState(0);
   const [showAllValidation, setShowAllValidation] = useState(false);
   const [testedAsset, setTestedAsset] = useState<{ id: string; snapshot: string }>();
+  const [inspectionOpen, setInspectionOpen] = useState(false);
+  const [focusOpen, setFocusOpen] = useState(false);
+  const [mainScrollContainer, setMainScrollContainer] = useState<HTMLElement | null>(null);
+  const [activeSection, setActiveSection] = useState<string>();
+  const [lastSavedAt, setLastSavedAt] = useState<string>();
   const testRequestSequenceRef = useRef(0);
+  const issueNavigationTimerRef = useRef<number | undefined>(undefined);
+  const focusStartDraftRef = useRef<ModelDraft | undefined>(undefined);
+  const focusStartSnapshotRef = useRef<string | undefined>(undefined);
   const {
     draft,
     step,
@@ -70,6 +91,7 @@ export function ModelCreationPage() {
     setValidationResult,
     reset,
   } = useModelCreationStore();
+  const focusContext = useFocusEditorContext({ scrollContainer: mainScrollContainer, stepIndex: step, sectionKey: activeSection, onRestoreStep: setStep });
   const templates = useQuery({ queryKey: ['templates'], queryFn: getTemplates });
   const systemConfig = useQuery({ queryKey: ['system-config'], queryFn: getSystemConfig, retry: false });
   const scenarioDictionary = systemConfig.data?.dictionaries?.business_scenarios;
@@ -93,6 +115,10 @@ export function ModelCreationPage() {
   });
   const resolvedMode = sourceModel.data ? effectiveAssetMode(request.mode, sourceModel.data) : request.mode;
   const requestKey = `${resolvedMode}:${request.sourceModelId || ''}:${request.templateCode || ''}`;
+
+  useEffect(() => {
+    setMainScrollContainer(document.querySelector<HTMLElement>('.main-content'));
+  }, []);
 
   useEffect(() => {
     setVisitedThrough(0);
@@ -171,6 +197,10 @@ export function ModelCreationPage() {
     return () => window.removeEventListener('beforeunload', onBeforeUnload);
   }, []);
 
+  useEffect(() => () => {
+    if (issueNavigationTimerRef.current !== undefined) window.clearTimeout(issueNavigationTimerRef.current);
+  }, []);
+
   const saveDraftModel = async (requireValid = false, draftOverride?: ReturnType<typeof normalizeModelDraft>) => {
     const state = useModelCreationStore.getState();
     const createAsset = state.workspace.mode === 'version' && state.workspace.sourceModelId
@@ -181,7 +211,7 @@ export function ModelCreationPage() {
     state.setWorkspace({ dirty: false, currentAssetId: model.id });
     return model;
   };
-  const saveDraft = useMutation({ mutationFn: () => saveDraftModel(false), onSuccess: () => message.success('草稿已保存') });
+  const saveDraft = useMutation({ mutationFn: () => saveDraftModel(false), onSuccess: () => { setLastSavedAt(new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })); message.success('草稿已保存'); } });
   const publish = useMutation({
     mutationFn: async () => {
       const state = useModelCreationStore.getState();
@@ -301,6 +331,7 @@ export function ModelCreationPage() {
 
   const normalized = normalizeModelDraft(draft);
   const currentSnapshot = JSON.stringify(normalized);
+  const focusDirty = Boolean(focusStartSnapshotRef.current && focusStartSnapshotRef.current !== currentSnapshot);
   const testIsCurrent = Boolean(currentDraftModelId && testedAsset?.id === currentDraftModelId && testedAsset.snapshot === currentSnapshot);
   const validation = validateModelDraft(normalized);
   const visibleStepLimit = showAllValidation ? stepMeta.length - 1 : Math.max(step, visitedThrough);
@@ -315,6 +346,20 @@ export function ModelCreationPage() {
     }
     setVisitedThrough(current => Math.max(current, targetStep));
     setStep(targetStep);
+  };
+  const navigateIssue = (issue: ModelValidationIssue) => {
+    setInspectionOpen(false);
+    setVisitedThrough(current => Math.max(current, issue.stepIndex));
+    setStep(issue.stepIndex);
+    if (issueNavigationTimerRef.current !== undefined) window.clearTimeout(issueNavigationTimerRef.current);
+    issueNavigationTimerRef.current = window.setTimeout(() => {
+      issueNavigationTimerRef.current = undefined;
+      const command: ModelNavigationCommand = { ...issue.location, requestId: `${issue.code}-${Date.now()}` };
+      void executeModelNavigationCommand(command, document.getElementById('model-step-content')).then(result => {
+        if (result === 'section') message.warning('已定位到对应章节，未找到可精确聚焦的字段。');
+        if (result === 'missing') message.warning('目标当前不可见，请在对应步骤中检查该阻断项。');
+      });
+    }, 120);
   };
   const pages = [
     <Step1BasicInfo
@@ -349,6 +394,21 @@ export function ModelCreationPage() {
     const firstError = Object.values(validation.sections).flatMap(section => section.errors)[0];
     if (validation.valid) message.success('模型校验通过');
     else message.error(firstError || '模型校验未通过');
+  };
+
+  const openFocusEditor = () => {
+    focusContext.capture();
+    focusStartDraftRef.current = structuredClone(draft);
+    focusStartSnapshotRef.current = currentSnapshot;
+    setFocusOpen(true);
+  };
+
+  const closeFocusEditor = (discard = false) => {
+    if (discard && focusStartDraftRef.current) setDraft(structuredClone(focusStartDraftRef.current));
+    setFocusOpen(false);
+    focusContext.restore();
+    focusStartDraftRef.current = undefined;
+    focusStartSnapshotRef.current = undefined;
   };
 
   const confirmReset = () => {
@@ -387,20 +447,23 @@ export function ModelCreationPage() {
         )}
       />
 
-      <ModelBuildSummaryBar draft={draft} validation={validation} blocker={firstBlocker} visibleSectionKeys={visibleSectionKeys} />
+      <ModelBuildSummaryBar draft={draft} validation={validation} blocker={firstBlocker} visibleSectionKeys={visibleSectionKeys} dirty={workspace.dirty} currentStepTitle={stepMeta[step].title} onInspection={() => setInspectionOpen(true)} />
       <ModelCreationProgress currentStep={step} visitedThrough={visibleStepLimit} steps={stepMeta} validation={validation} onChange={enterStep} />
       <StepBody
         title={stepMeta[step].title}
         description={stepMeta[step].description}
       >
-        {pages[step]}
+        <StepSectionNav items={stepSections[step]} containerId="model-step-content" scrollContainer={mainScrollContainer} resetKey={step} onActiveChange={setActiveSection} onFocus={step >= 1 && step <= 3 ? openFocusEditor : undefined} />
+        <div id="model-step-content">{focusOpen ? <div className="focus-editor-placeholder">当前步骤已在聚焦编辑模式中打开。</div> : pages[step]}</div>
       </StepBody>
 
-      <ActionFooter left={<Space wrap><Button disabled={step === 0} onClick={() => setStep(step - 1)}>上一步</Button><Button type="primary" disabled={step === 4} onClick={() => enterStep(step + 1)}>下一步</Button></Space>}>
+      <ActionFooter left={<div className="model-footer-left"><Space wrap><Button disabled={step === 0} onClick={() => setStep(step - 1)}>上一步</Button><Button type="primary" disabled={step === 4} onClick={() => enterStep(step + 1)}>下一步</Button></Space><span className="model-footer-status">{workspace.dirty ? '未保存' : lastSavedAt ? `已保存于 ${lastSavedAt}` : '已保存'} · {validation.valid ? '无阻断项' : `${Object.values(validation.sections).flatMap(section => section.errors).length} 项阻断`} · {testIsCurrent ? '最近测试通过' : '当前版本待测试'}</span></div>}>
         <Button onClick={validateCurrentDraft}>校验模型</Button>
         <Button loading={saveDraft.isPending} onClick={() => saveDraft.mutate()}>保存草稿</Button>
         <Button type={step === 4 || validation.valid ? 'primary' : 'default'} disabled={!validation.valid || !testIsCurrent || testRun.isPending} loading={publish.isPending} title={!testIsCurrent ? '请先保存并测试当前修订' : undefined} onClick={() => publish.mutate()}>发布模型</Button>
       </ActionFooter>
+      {inspectionOpen && <ModelInspectionDrawer open draft={draft} workspace={workspace} validation={validation} steps={stepMeta} tested={testIsCurrent} onClose={() => setInspectionOpen(false)} onNavigate={navigateIssue} />}
+      {focusOpen && <FocusEditor open modelName={draft.basic_info.name} objectName={stepMeta[step].title} dirty={focusDirty} onClose={() => closeFocusEditor()} onDiscard={() => closeFocusEditor(true)} onSave={async () => { await saveDraft.mutateAsync(); }} onValidate={validateCurrentDraft}>{pages[step]}</FocusEditor>}
     </PageShell>
   );
 }

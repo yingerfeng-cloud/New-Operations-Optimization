@@ -1,5 +1,5 @@
 import { MoreOutlined } from '@ant-design/icons';
-import { Alert, Button, Card, Col, Collapse, Descriptions, Drawer, Dropdown, Form, Input, InputNumber, Row, Select, Space, Table, Tag, Typography, Upload, message } from 'antd';
+import { Alert, Button, Card, Col, Collapse, Descriptions, Drawer, Dropdown, Form, Input, InputNumber, Row, Segmented, Select, Space, Table, Tag, Typography, Upload, message } from 'antd';
 import { useMemo, useState } from 'react';
 import { LazyEChart } from '../../components/LazyEChart';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -168,45 +168,259 @@ function schemaName(asset: FunctionAsset, kind: 'input' | 'output', index = 0) {
   return String(asset.output_schema?.name || asset.output_schema?.code || 'z');
 }
 
-function curveChartOption(asset: FunctionAsset, preview?: FunctionAssetPreview) {
+type CurveChartMode = 'curve' | 'segments';
+
+function curveChartOption(asset: FunctionAsset, preview: FunctionAssetPreview | undefined, mode: CurveChartMode) {
   const originalPoints = (asset.points || []).map(point => [Number(point[0]), Number(point[1])]);
   const previewPoints = (preview?.values || []).map(point => [Number(point.x), Number(point.y)]);
+  const xName = schemaName(asset, 'input');
+  const yName = schemaName(asset, 'output');
+  const segments = originalPoints.slice(0, -1).map((start, index) => {
+    const end = originalPoints[index + 1];
+    const slope = end[0] === start[0] ? null : (end[1] - start[1]) / (end[0] - start[0]);
+    return { index, start, end, slope, midpoint: [(start[0] + end[0]) / 2, (start[1] + end[1]) / 2] };
+  });
+  const segmentColors = ['#1769d2', '#00a6a6', '#6c63d9', '#f28c28', '#2f9e64', '#d0568c'];
+  const gradient = { type: 'linear', x: 0, y: 0, x2: 1, y2: 0, colorStops: [{ offset: 0, color: '#2468d8' }, { offset: 0.52, color: '#18a6b8' }, { offset: 1, color: '#31b77a' }] };
+  const mainSeries = mode === 'curve' ? [{
+    name: '原始曲线',
+    type: 'line',
+    data: originalPoints,
+    showSymbol: false,
+    smooth: false,
+    lineStyle: { width: 3, color: gradient, shadowBlur: 8, shadowColor: 'rgba(31, 112, 190, 0.22)' },
+    areaStyle: { color: { type: 'linear', x: 0, y: 0, x2: 0, y2: 1, colorStops: [{ offset: 0, color: 'rgba(42, 153, 180, 0.24)' }, { offset: 1, color: 'rgba(42, 153, 180, 0.015)' }] } },
+    z: 2,
+  }] : segments.map((segment, index) => ({
+    name: `分段 S${index + 1}`,
+    type: 'line',
+    data: [segment.start, segment.end],
+    showSymbol: false,
+    smooth: false,
+    lineStyle: { width: 3, color: segmentColors[index % segmentColors.length] },
+    emphasis: { lineStyle: { width: 5, shadowBlur: 10, shadowColor: `${segmentColors[index % segmentColors.length]}66` } },
+    z: 2,
+  }));
   return {
-    color: ['#1677ff', '#fa8c16'],
-    tooltip: { trigger: 'axis' },
-    legend: { top: 0 },
-    grid: { top: 44, left: 54, right: 18, bottom: 42 },
-    xAxis: { type: 'value', name: schemaName(asset, 'input') },
-    yAxis: { type: 'value', name: schemaName(asset, 'output') },
+    animationDuration: 500,
+    tooltip: {
+      trigger: 'axis',
+      axisPointer: { type: 'cross', lineStyle: { color: '#7f96ad', type: 'dashed' }, label: { backgroundColor: '#183b5b' } },
+      borderWidth: 0,
+      backgroundColor: 'rgba(10, 31, 55, 0.94)',
+      textStyle: { color: '#fff' },
+      formatter: (params: Array<{ data?: number[]; seriesName?: string }>) => {
+        const current = params.find(item => Array.isArray(item.data));
+        if (!current?.data) return '';
+        return `<strong>${current.seriesName || '曲线数据'}</strong><br/>${xName}：${current.data[0]}<br/>${yName}：${current.data[1]}`;
+      },
+    },
+    grid: { top: 22, left: 64, right: 28, bottom: 58, containLabel: true },
+    xAxis: {
+      type: 'value',
+      scale: true,
+      name: xName,
+      nameLocation: 'middle',
+      nameGap: 32,
+      axisLine: { lineStyle: { color: '#8ba0b8' } },
+      axisTick: { lineStyle: { color: '#8ba0b8' } },
+      splitLine: { lineStyle: { color: '#e7eef6', type: 'dashed' } },
+    },
+    yAxis: {
+      type: 'value',
+      scale: true,
+      name: yName,
+      nameLocation: 'middle',
+      nameGap: 44,
+      axisLine: { lineStyle: { color: '#8ba0b8' } },
+      axisTick: { lineStyle: { color: '#8ba0b8' } },
+      splitLine: { lineStyle: { color: '#e7eef6', type: 'dashed' } },
+    },
+    dataZoom: [{ type: 'inside', xAxisIndex: 0, filterMode: 'none' }, { type: 'inside', yAxisIndex: 0, filterMode: 'none' }],
     series: [
-      { name: '原始断点', type: 'line', data: originalPoints, symbol: 'circle', symbolSize: 8, lineStyle: { width: 2 } },
-      previewPoints.length ? { name: 'preview 插值点', type: 'line', data: previewPoints, symbol: 'diamond', symbolSize: 7, lineStyle: { width: 2, type: 'dashed' } } : undefined,
+      ...mainSeries,
+      previewPoints.length ? {
+        name: '预览插值',
+        type: 'line',
+        data: previewPoints,
+        showSymbol: false,
+        lineStyle: { width: 2, type: 'dashed', color: '#ff8a34' },
+        z: 3,
+      } : undefined,
+      {
+        name: '原始断点',
+        type: 'scatter',
+        data: originalPoints,
+        symbolSize: 10,
+        itemStyle: { color: '#fff', borderColor: '#1e5f9f', borderWidth: 2.5, shadowBlur: 6, shadowColor: 'rgba(21, 73, 126, 0.28)' },
+        emphasis: { scale: 1.5, itemStyle: { color: '#eaf5ff', borderColor: '#ff7a45', borderWidth: 3 } },
+        z: 5,
+      },
+      mode === 'segments' ? {
+        name: '分段斜率',
+        type: 'scatter',
+        data: segments.map(segment => ({ value: segment.midpoint, segment })),
+        symbolSize: 6,
+        itemStyle: { color: 'transparent', borderColor: 'transparent' },
+        label: {
+          show: true,
+          position: 'top',
+          distance: 9,
+          formatter: (params: { data?: { segment?: { index: number; slope: number | null } } }) => {
+            const segment = params.data?.segment;
+            if (!segment) return '';
+            return `S${segment.index + 1}  k=${segment.slope === null ? '∞' : Number(segment.slope.toPrecision(4))}`;
+          },
+          color: '#365b7f',
+          fontSize: 11,
+          fontWeight: 650,
+          padding: [4, 7],
+          borderRadius: 5,
+          backgroundColor: 'rgba(255, 255, 255, 0.92)',
+          borderColor: '#d7e4f0',
+          borderWidth: 1,
+        },
+        tooltip: { show: false },
+        z: 6,
+      } : undefined,
     ].filter(Boolean),
   };
 }
 
-function surfaceChartOption(asset: FunctionAsset) {
+type SurfaceChartMode = 'surface' | 'mesh';
+
+function surfaceChartOption(asset: FunctionAsset, preview: FunctionAssetPreview | undefined, previewInput: { x: number; y: number }, mode: SurfaceChartMode) {
   const points = asset.points_2d || [];
   const triangles = asset.triangles || [];
   const zValues = points.map(point => Number(point[2])).filter(Number.isFinite);
-  const edgeData = triangles.flatMap(triangle => {
+  const previewTriangleKey = preview?.triangle?.slice().sort((a, b) => a - b).join('-');
+  const triangleData = triangles.flatMap((triangle, triangleIndex) => {
     const vertices = triangle.map(index => points[index]).filter(Boolean);
     if (vertices.length !== 3) return [];
-    return [
-      [[vertices[0][0], vertices[0][1]], [vertices[1][0], vertices[1][1]]],
-      [[vertices[1][0], vertices[1][1]], [vertices[2][0], vertices[2][1]]],
-      [[vertices[2][0], vertices[2][1]], [vertices[0][0], vertices[0][1]]],
-    ];
+    const values = vertices.map(vertex => Number(vertex[2]));
+    const selected = triangle.slice().sort((a, b) => a - b).join('-') === previewTriangleKey;
+    return [[
+      Number(vertices[0][0]), Number(vertices[0][1]),
+      Number(vertices[1][0]), Number(vertices[1][1]),
+      Number(vertices[2][0]), Number(vertices[2][1]),
+      values.reduce((sum, value) => sum + value, 0) / 3,
+      triangleIndex,
+      values[0], values[1], values[2],
+      selected ? 1 : 0,
+    ]];
   });
+  const xName = schemaName(asset, 'input', 0);
+  const yName = schemaName(asset, 'input', 1);
+  const zName = schemaName(asset, 'output');
   return {
-    tooltip: { formatter: (params: { data?: number[] }) => params.data ? `x=${params.data[0]}<br/>y=${params.data[1]}<br/>z=${params.data[2]}` : '' },
-    visualMap: zValues.length ? { min: Math.min(...zValues), max: Math.max(...zValues), dimension: 2, orient: 'horizontal', left: 'center', bottom: 0, inRange: { color: ['#2f54eb', '#13c2c2', '#fadb14', '#fa541c'] } } : undefined,
-    grid: { top: 24, left: 54, right: 18, bottom: 64 },
-    xAxis: { type: 'value', name: schemaName(asset, 'input', 0) },
-    yAxis: { type: 'value', name: schemaName(asset, 'input', 1) },
+    animationDuration: 500,
+    tooltip: {
+      trigger: 'item',
+      confine: true,
+      borderWidth: 0,
+      backgroundColor: 'rgba(10, 31, 55, 0.94)',
+      textStyle: { color: '#fff' },
+      formatter: (params: { seriesName?: string; data?: number[] }) => {
+        const data = params.data;
+        if (!data) return '';
+        if (params.seriesName === '插值结果') {
+          return `<strong>插值结果</strong><br/>${xName}：${data[0]}<br/>${yName}：${data[1]}<br/>${zName}：${data[2]}`;
+        }
+        if (params.seriesName === '采样点') return `${xName}：${data[0]}<br/>${yName}：${data[1]}<br/>${zName}：${data[2]}`;
+        const zMin = Math.min(data[8], data[9], data[10]);
+        const zMax = Math.max(data[8], data[9], data[10]);
+        return `<strong>三角面片 #${data[7] + 1}</strong><br/>平均 ${zName}：${data[6].toFixed(3)}<br/>数值范围：${zMin.toFixed(3)} – ${zMax.toFixed(3)}`;
+      },
+    },
+    visualMap: zValues.length ? {
+      show: mode === 'surface',
+      min: Math.min(...zValues),
+      max: Math.max(...zValues),
+      dimension: 6,
+      seriesIndex: 0,
+      orient: 'horizontal',
+      left: 'center',
+      bottom: 2,
+      itemWidth: 14,
+      itemHeight: 150,
+      text: [`高 ${zName}`, `低 ${zName}`],
+      textGap: 8,
+      calculable: false,
+      inRange: { color: ['#2356d8', '#18a0c9', '#29c48a', '#f2c94c', '#f06b45'] },
+    } : undefined,
+    grid: { top: 20, left: 62, right: 26, bottom: mode === 'surface' ? 72 : 48, containLabel: true },
+    xAxis: {
+      type: 'value',
+      name: xName,
+      nameLocation: 'middle',
+      nameGap: 30,
+      axisLine: { lineStyle: { color: '#8ba0b8' } },
+      splitLine: { lineStyle: { color: '#e8eef6', type: 'dashed' } },
+    },
+    yAxis: {
+      type: 'value',
+      name: yName,
+      nameLocation: 'middle',
+      nameGap: 42,
+      axisLine: { lineStyle: { color: '#8ba0b8' } },
+      splitLine: { lineStyle: { color: '#e8eef6', type: 'dashed' } },
+    },
+    dataZoom: [{ type: 'inside', xAxisIndex: 0, filterMode: 'none' }, { type: 'inside', yAxisIndex: 0, filterMode: 'none' }],
     series: [
-      { name: 'z 值', type: 'scatter', data: points.map(point => [Number(point[0]), Number(point[1]), Number(point[2])]), symbolSize: 10 },
-      ...edgeData.map((line, index) => ({ name: `triangle_${index}`, type: 'line', data: line, showSymbol: false, lineStyle: { color: '#595959', width: 1 }, tooltip: { show: false } })),
+      {
+        name: '曲面面片',
+        type: 'custom',
+        coordinateSystem: 'cartesian2d',
+        clip: true,
+        dimensions: ['x1', 'y1', 'x2', 'y2', 'x3', 'y3', 'z', 'triangle', 'z1', 'z2', 'z3', 'selected'],
+        encode: { x: [0, 2, 4], y: [1, 3, 5], tooltip: [6, 7, 8, 9, 10] },
+        renderItem: (_params: unknown, api: { value: (dimension: number) => unknown; coord: (value: number[]) => number[]; visual: (key: string) => unknown }) => {
+          const selected = Number(api.value(11)) === 1;
+          const polygonPoints = [
+            api.coord([Number(api.value(0)), Number(api.value(1))]),
+            api.coord([Number(api.value(2)), Number(api.value(3))]),
+            api.coord([Number(api.value(4)), Number(api.value(5))]),
+          ];
+          return {
+            type: 'polygon',
+            shape: { points: polygonPoints },
+            style: {
+              fill: mode === 'surface' ? String(api.visual('color')) : 'rgba(48, 112, 210, 0.05)',
+              stroke: selected ? '#ff7a45' : mode === 'surface' ? 'rgba(255, 255, 255, 0.68)' : '#527dab',
+              lineWidth: selected ? 3 : mode === 'surface' ? 1.2 : 1.5,
+              opacity: selected ? 1 : mode === 'surface' ? 0.9 : 0.82,
+              shadowBlur: selected ? 14 : 0,
+              shadowColor: selected ? 'rgba(255, 122, 69, 0.45)' : 'transparent',
+            },
+            emphasis: {
+              style: { stroke: '#1677ff', lineWidth: 3, opacity: 1, shadowBlur: 12, shadowColor: 'rgba(22, 119, 255, 0.35)' },
+            },
+          };
+        },
+        data: triangleData,
+        z: 1,
+      },
+      {
+        name: '采样点',
+        type: 'scatter',
+        clip: true,
+        data: points.map(point => [Number(point[0]), Number(point[1]), Number(point[2])]),
+        symbolSize: mode === 'surface' ? 7 : 9,
+        itemStyle: { color: '#ffffff', borderColor: '#234f86', borderWidth: 2, shadowBlur: 4, shadowColor: 'rgba(15, 55, 95, 0.24)' },
+        emphasis: { scale: 1.6 },
+        z: 3,
+      },
+      preview?.status ? {
+        name: '插值结果',
+        type: 'scatter',
+        clip: true,
+        data: [[preview.x ?? previewInput.x, preview.y ?? previewInput.y, preview.z ?? '-']],
+        symbol: 'pin',
+        symbolSize: 48,
+        itemStyle: { color: preview.status === 'inside_domain' ? '#ff7a45' : '#ff4d4f', borderColor: '#fff', borderWidth: 2, shadowBlur: 10, shadowColor: 'rgba(255, 122, 69, 0.42)' },
+        label: { show: true, formatter: preview.z === undefined ? '' : Number(preview.z).toFixed(2), color: '#fff', fontSize: 10, fontWeight: 700 },
+        z: 5,
+      } : undefined,
     ],
   };
 }
@@ -250,6 +464,8 @@ export function FunctionAssetsPage() {
   const [manualPoints, setManualPoints] = useState<ManualPoint[]>([]);
   const [pastePointsText, setPastePointsText] = useState('');
   const [previewInput, setPreviewInput] = useState({ x: 5, y: 5 });
+  const [surfaceChartMode, setSurfaceChartMode] = useState<SurfaceChartMode>('surface');
+  const [curveChartMode, setCurveChartMode] = useState<CurveChartMode>('curve');
   const [form] = Form.useForm();
   const [importForm] = Form.useForm();
   const list = useQuery({ queryKey: ['function-assets'], queryFn: getFunctionAssets });
@@ -627,8 +843,9 @@ export function FunctionAssetsPage() {
                 label: '高级配置',
                 children: (
                   <>
-                    <Alert
-                      type="info"
+                <Alert
+                  className="compact-notice"
+                  type="info"
                       showIcon
                       title="自定义技术标识"
                       description="函数 ID 是系统技术标识，默认自动生成；仅在需要外部 API、模型模板或组件绑定时手工修改。"
@@ -795,15 +1012,18 @@ export function FunctionAssetsPage() {
             {validation && <Alert type={validation.valid ? 'success' : 'error'} showIcon title={validation.valid ? '校验通过' : '校验失败'} description={validation.valid ? '函数资产可用于模型绑定。' : validationList(validation.errors)} />}
 
             {selected.validation_status !== 'invalid' && selected.function_type === 'piecewise_2d' && (
-              <Card size="small" title="二维曲面预览">
-                <Alert
-                  showIcon
-                  type="info"
-                  title="输入 x/y 后，平台返回插值 z、命中的三角形 triangle 和插值权重 lambda。"
-                  description="triangle 表示当前点落在哪个二维曲面三角面片；lambda 表示当前点在三角形三个顶点上的插值权重。后端未返回时显示当前未返回该项。"
-                />
-                <LazyEChart option={surfaceChartOption(selected)} style={{ height: 320 }} />
-                <Space className="section-gap" wrap>
+              <Card
+                size="small"
+                title="二维曲面预览"
+                extra={<Segmented size="small" value={surfaceChartMode} onChange={value => setSurfaceChartMode(value as SurfaceChartMode)} options={[{ label: '着色曲面', value: 'surface' }, { label: '三角网格', value: 'mesh' }]} />}
+                className="surface-preview-card"
+              >
+                <details className="inline-help-note">
+                  <summary><span>i</span>如何理解二维插值结果？</summary>
+                  <p>输入 x/y 后返回插值 z、命中的三角形 triangle 和插值权重 lambda。triangle 表示当前点所在的三角面片，lambda 表示该点在三个顶点上的插值权重；后端未返回时显示“当前未返回该项”。</p>
+                </details>
+                <LazyEChart option={surfaceChartOption(selected, preview, previewInput, surfaceChartMode)} style={{ height: 340 }} />
+                <Space className="surface-preview-toolbar" wrap>
                   <InputNumber value={previewInput.x} onChange={value => setPreviewInput(current => ({ ...current, x: Number(value) }))} addonBefore="x" />
                   <InputNumber value={previewInput.y} onChange={value => setPreviewInput(current => ({ ...current, y: Number(value) }))} addonBefore="y" />
                   <Button onClick={() => runPreview.mutate(selected)}>计算 z</Button>
@@ -818,7 +1038,22 @@ export function FunctionAssetsPage() {
                 )}
               </Card>
             )}
-            {selected.validation_status !== 'invalid' && selected.function_type !== 'piecewise_2d' && (selected.points || []).length > 0 && <Card size="small" title="曲线图预览"><LazyEChart option={curveChartOption(selected, preview)} style={{ height: 280 }} /></Card>}
+            {selected.validation_status !== 'invalid' && selected.function_type !== 'piecewise_2d' && (selected.points || []).length > 0 && (
+              <Card
+                size="small"
+                title="一维曲线预览"
+                extra={<Segmented size="small" value={curveChartMode} onChange={value => setCurveChartMode(value as CurveChartMode)} options={[{ label: '曲线视图', value: 'curve' }, { label: '分段结构', value: 'segments' }]} />}
+                className="curve-preview-card"
+              >
+                <LazyEChart option={curveChartOption(selected, preview, curveChartMode)} style={{ height: 320 }} />
+                <div className="curve-preview-meta">
+                  <span><b>{(selected.points || []).length}</b> 个断点</span>
+                  <span><b>{Math.max(0, (selected.points || []).length - 1)}</b> 个线性分段</span>
+                  <span>定义域 <b>{String(selected.domain?.x_min ?? '-')} – {String(selected.domain?.x_max ?? '-')}</b></span>
+                  <span>值域 <b>{String(selected.domain?.y_min ?? '-')} – {String(selected.domain?.y_max ?? '-')}</b></span>
+                </div>
+              </Card>
+            )}
             {selected.validation_status !== 'invalid' && preview?.values && <Table rowKey="x" size="small" pagination={false} dataSource={preview.values} columns={previewColumns} />}
 
             {(selected.referenced_by || []).length > 0 && (

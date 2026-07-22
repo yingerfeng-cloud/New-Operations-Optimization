@@ -12,16 +12,37 @@ async function chooseOption(page: Page, select: Locator, name: string | RegExp) 
   await option.click();
 }
 
-test('real backend smoke creates generic model draft and runs backend testModel', async ({ page }) => {
-  await page.goto('/scenarios');
-  await expect(page.getByTestId('scenario-card-day_ahead_unit_commitment')).toBeVisible();
-  await page.getByTestId('scenario-enter-day_ahead_unit_commitment').click();
-  await expect(page).toHaveURL(/\/models\/create/);
+async function fillFormulaEditor(page: Page, value: string) {
+  const editor = page.getByLabel('公式表达式').locator('.cm-content');
+  await editor.click();
+  await page.keyboard.press('Control+A');
+  await page.keyboard.insertText(value);
+}
 
-  await expect(page.getByTestId('scenario-select')).toContainText('未选择');
-  await chooseOption(page, page.getByTestId('scenario-select'), '日前机组组合优化');
+async function compileAndApplyFormula(page: Page, value: string) {
+  await fillFormulaEditor(page, value);
+  const compileResponsePromise = page.waitForResponse(response => response.url().endsWith('/api/formulas/expand'));
+  await page.getByRole('button', { name: '后端编译与展开' }).click();
+  const compileResponse = await compileResponsePromise;
+  expect(compileResponse.ok(), await compileResponse.text()).toBeTruthy();
+  const applyButton = page.getByRole('button', { name: '应用公式' });
+  await expect(applyButton).toBeEnabled({ timeout: 30_000 });
+  await applyButton.click();
+}
+
+test('@real real backend smoke creates generic model draft and runs backend testModel', async ({ page }) => {
+  await page.goto('/models/create?mode=new');
+  await expect(page.getByText('空白创建模型').first()).toBeVisible();
+
+  const scenarioSelect = page.locator('.ant-form-item').filter({ hasText: '业务场景' }).locator('.ant-select').first();
+  await expect(scenarioSelect).toBeVisible();
+  await chooseOption(page, scenarioSelect, '日前机组组合优化');
+  await page.locator('[data-field-code="name"] input').fill('真实后端 UI Smoke');
+  await page.getByText('高级编辑：模型编码', { exact: true }).click();
+  await page.locator('[data-field-code="model_code"] input').fill(`real_backend_smoke_${Date.now()}`);
 
   await page.getByRole('button', { name: '下一步' }).click();
+  await expect(page.getByRole('heading', { name: '模型语义' })).toBeVisible();
   await page.getByRole('button', { name: '新增集合' }).first().click();
   let dialog = page.getByRole('dialog', { name: '新增集合' });
   await fill(dialog.getByLabel('编码'), 'resource');
@@ -42,14 +63,13 @@ test('real backend smoke creates generic model draft and runs backend testModel'
 
   await page.getByRole('button', { name: '下一步' }).click();
   await page.getByRole('button', { name: '新增目标函数' }).click();
-  await page.getByLabel('公式表达式').fill('p_grid');
-  await page.getByRole('button', { name: '应用公式' }).click();
+  await page.getByRole('radio', { name: '最小化' }).check();
+  await compileAndApplyFormula(page, 'p_grid');
 
   await page.getByRole('button', { name: '新增约束公式' }).click();
-  await page.getByLabel('公式表达式').fill('p_grid >= load');
-  await page.getByRole('button', { name: '应用公式' }).click();
-  await page.getByRole('button', { name: '编译 generic_spec' }).click();
-  await expect(page.getByRole('dialog', { name: 'generic_spec 编译成功' })).toBeVisible();
+  await compileAndApplyFormula(page, 'p_grid >= load');
+  await page.getByRole('button', { name: '编译模型（后端权威）' }).click();
+  await expect(page.getByRole('dialog', { name: 'generic_spec 权威编译成功' })).toBeVisible();
   await page.getByRole('button', { name: '知道了' }).click();
 
   await page.getByRole('button', { name: '下一步' }).click();

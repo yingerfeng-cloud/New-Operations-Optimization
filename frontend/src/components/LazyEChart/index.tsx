@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
 import { init, use } from 'echarts/core';
-import { LineChart, ScatterChart } from 'echarts/charts';
-import { GridComponent, LegendComponent, TooltipComponent } from 'echarts/components';
+import { BarChart, CustomChart, LineChart, PieChart, ScatterChart } from 'echarts/charts';
+import { DataZoomComponent, GridComponent, LegendComponent, TitleComponent, TooltipComponent, VisualMapComponent } from 'echarts/components';
 import { CanvasRenderer } from 'echarts/renderers';
 import type { EChartsCoreOption } from 'echarts/core';
 
-use([LineChart, ScatterChart, GridComponent, LegendComponent, TooltipComponent, CanvasRenderer]);
+use([BarChart, CustomChart, LineChart, PieChart, ScatterChart, DataZoomComponent, GridComponent, LegendComponent, TitleComponent, TooltipComponent, VisualMapComponent, CanvasRenderer]);
 
 export function LazyEChart({ option, style }: { option: EChartsCoreOption; style?: CSSProperties }) {
   const host = useRef<HTMLDivElement>(null);

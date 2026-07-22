@@ -4,7 +4,7 @@ import type { ReactNode } from 'react';
 type Action = { label: string; onClick: () => void };
 
 export function PageLoading({ label = '正在加载页面…' }: { label?: string }) {
-  return <main className="page-state page-state-full" aria-busy="true" aria-live="polite"><Spin size="large" /><strong>{label}</strong><Skeleton active paragraph={{ rows: 4 }} /></main>;
+  return <section role="status" className="page-state page-state-full" aria-busy="true" aria-live="polite"><Spin size="large" /><strong>{label}</strong><Skeleton active paragraph={{ rows: 4 }} /></section>;
 }
 
 export function SectionLoading({ label = '正在加载…' }: { label?: string }) {

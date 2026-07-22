@@ -89,6 +89,17 @@ Object.defineProperty(window, 'ResizeObserver', { writable: true, value: ResizeO
 Object.defineProperty(globalThis, 'IntersectionObserver', { writable: true, value: IntersectionObserverMock });
 Object.defineProperty(window, 'IntersectionObserver', { writable: true, value: IntersectionObserverMock });
 Object.defineProperty(window, 'scrollTo', { writable: true, value: vi.fn() });
+// CodeMirror measures DOM ranges when drawing selections and diagnostics.
+// jsdom intentionally has no layout engine, so provide stable empty geometry.
+if (!Range.prototype.getClientRects) {
+  Object.defineProperty(Range.prototype, 'getClientRects', { writable: true, value: () => [] });
+}
+if (!Range.prototype.getBoundingClientRect) {
+  Object.defineProperty(Range.prototype, 'getBoundingClientRect', {
+    writable: true,
+    value: () => ({ x: 0, y: 0, width: 0, height: 0, top: 0, right: 0, bottom: 0, left: 0, toJSON: () => ({}) }),
+  });
+}
 
 class FileReaderMock {
   result: string | ArrayBuffer | null = null;
@@ -119,15 +130,11 @@ const nativeStderrWrite = testProcess?.stderr?.write.bind(testProcess.stderr);
 vi.spyOn(console, 'error').mockImplementation((...args: unknown[]) => {
   const text = args.map(item => String(item)).join(' ');
   if (text.includes('Could not parse CSS stylesheet')) return;
-  if (text.includes('not wrapped in act') && text.includes('Notification')) return;
-  if (text.includes('Warning: [antd: notification]')) return;
   nativeConsoleError(...args);
 });
 vi.spyOn(console, 'warn').mockImplementation((...args: unknown[]) => {
   const text = args.map(item => String(item)).join(' ');
   if (text.includes('Could not parse CSS stylesheet')) return;
-  if (text.includes('not wrapped in act') && text.includes('Notification')) return;
-  if (text.includes('Warning: [antd: notification]')) return;
   nativeConsoleWarn(...args);
 });
 if (testProcess?.stderr && nativeStderrWrite) {

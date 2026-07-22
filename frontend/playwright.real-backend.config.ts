@@ -9,6 +9,8 @@ process.env.RUNTIME_STORE_PATH = runtimeStorePath;
 
 export default defineConfig({
   testDir: './src/tests/e2e',
+  // The controlled backend gate executes only tests that declare their real dependency.
+  grep: /@real/,
   globalSetup: './src/tests/e2e/real-global-setup.mjs',
   workers: 1,
   timeout: 60_000,

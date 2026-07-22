@@ -1,4 +1,5 @@
 import type { ModelDraft } from '../stores/modelCreationStore';
+import { analyzeDraftNonlinear } from './nonlinearDiagnostics';
 
 function normalizeProblemType(value: unknown) {
   const text = String(value || '').toUpperCase();
@@ -41,7 +42,10 @@ export function inferModelProblemType(draft: ModelDraft): 'LP' | 'MILP' | 'NLP' 
     return type.includes('binary') || type.includes('integer') || type === 'bool';
   });
   const solver = String(draft.basic_info.solver || '').toLowerCase();
-  const hasNlpHint = solver === 'ipopt' || draft.formulas.some(formula => /(\w+\[[^\]]+\]|\w+)\s*(\*|\/|\*\*|\^)\s*(\w+\[[^\]]+\]|\w+)/.test(formula.dsl_formula));
+  const nonlinearReport = analyzeDraftNonlinear(draft);
+  const hasNlpHint = solver === 'ipopt' || nonlinearReport.relationships.some(item =>
+    !item.converted && ['bilinear', 'division', 'high_order_power', 'general_nonlinear_function'].includes(item.nonlinear_type),
+  );
   if (hasNlpHint && hasIntegerVariable) return 'MINLP_RESERVED';
   if (hasNlpHint) return 'NLP';
   if (hasIntegerVariable) return 'MILP';

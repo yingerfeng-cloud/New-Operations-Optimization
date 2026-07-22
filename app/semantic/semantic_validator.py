@@ -109,6 +109,7 @@ class RuntimeParameterValidator:
         var_dims = {str(item.get("math_var") or item.get("key") or item.get("code") or item.get("name")): extract_dimensions(item) for item in variables if item.get("math_var") or item.get("key") or item.get("code") or item.get("name")}
         param_dims = {str(item.get("math_param") or item.get("key") or item.get("code")): extract_dimensions(item) for item in params if item.get("math_param") or item.get("key") or item.get("code")}
         generic_sets = generic_spec.get("sets") or {}
+        authoritative_fragments = generic_spec.get("formula_compiler") == "backend_authoritative_v2"
 
         def check_generic_set(field: str, index: Any, require_non_empty: bool = False) -> None:
             name = str(index)
@@ -117,6 +118,39 @@ class RuntimeParameterValidator:
                 return
             if require_non_empty and not list(generic_sets.get(name) or []):
                 errors.append({"field": f"generic_spec.sets.{name}", "error": "empty generic set", "expected": "non-empty", "actual": []})
+
+        def validate_authoritative_key(field: str, actual_key: list[Any], expected_key: list[str], scope: list[Any]) -> None:
+            if len(actual_key) != len(expected_key):
+                errors.append({"field": field, "error": "variable key arity mismatch", "expected": expected_key, "actual": actual_key})
+                return
+            scope_aliases = {
+                str(item.get("alias")): str(item.get("set"))
+                for item in scope
+                if isinstance(item, dict) and item.get("alias") and item.get("set")
+            }
+            for position, token in enumerate(actual_key):
+                expected_set = expected_key[position]
+                if isinstance(token, dict) and token.get("type") == "index_offset":
+                    source_set = str(token.get("set") or "")
+                    target_set = str(token.get("target_set") or source_set)
+                    if source_set not in set_keys or target_set != expected_set:
+                        errors.append({"field": field, "error": "offset key dimension mismatch", "expected": expected_set, "actual": token})
+                    else:
+                        check_generic_set(field, source_set, True)
+                        check_generic_set(field, target_set, True)
+                    continue
+                if isinstance(token, str) and token in scope_aliases:
+                    check_generic_set(field, scope_aliases[token], True)
+                    continue
+                if isinstance(token, str) and token in set_keys:
+                    check_generic_set(field, token, True)
+                    continue
+                # Literal member keys (for example state[0]) are resolved against
+                # the variable's declared dimension by the Builder.
+                if token in list(generic_sets.get(expected_set) or []):
+                    check_generic_set(field, expected_set, True)
+                    continue
+                errors.append({"field": field, "error": "authoritative variable key is not resolvable", "expected": expected_set, "actual": token})
 
         if generic_spec and not set_keys:
             errors.append({"field": "semantic_spec.sets", "error": "missing semantic sets", "expected": ">=1", "actual": 0})
@@ -167,9 +201,11 @@ class RuntimeParameterValidator:
                 if term.get("var") and str(term["var"]) in var_dims:
                     expected_key = var_dims[str(term["var"])]
                     actual_key = list(term.get("key") or [])
-                    if expected_key and actual_key != expected_key:
+                    if authoritative_fragments and expected_key:
+                        validate_authoritative_key(f"{cname}.terms.key", actual_key, expected_key, list(constraint.get("scope") or constraint.get("foreach") or []))
+                    elif expected_key and actual_key != expected_key:
                         errors.append({"field": f"{cname}.terms.key", "error": "variable key mismatch", "expected": expected_key, "actual": actual_key})
-                for index in list(term.get("key") or []) + list(term.get("foreach") or []):
+                for index in ([] if authoritative_fragments else list(term.get("key") or [])) + list(term.get("foreach") or []):
                     if str(index) not in set_keys:
                         errors.append({"field": f"{cname}.terms.key", "error": "unknown set", "expected": sorted(set_keys), "actual": index})
                     check_generic_set(f"{cname}.terms", index, True)
@@ -204,11 +240,13 @@ class RuntimeParameterValidator:
             if term.get("var") and str(term["var"]) in var_dims:
                 expected_key = var_dims[str(term["var"])]
                 actual_key = list(term.get("key") or [])
-                if expected_key and actual_key != expected_key:
+                if authoritative_fragments and expected_key:
+                    validate_authoritative_key("generic_spec.objective.terms.key", actual_key, expected_key, list(term.get("scope") or term.get("foreach") or []))
+                elif expected_key and actual_key != expected_key:
                     errors.append({"field": "generic_spec.objective.terms.key", "error": "variable key mismatch", "expected": expected_key, "actual": actual_key})
             if term.get("coef_param") and str(term["coef_param"]) not in param_keys:
                 errors.append({"field": "generic_spec.objective.terms.coef_param", "error": "unknown parameter", "expected": sorted(param_keys), "actual": term["coef_param"]})
-            for index in list(term.get("key") or []) + list(term.get("foreach") or []) + list(term.get("param_key") or []):
+            for index in ([] if authoritative_fragments else list(term.get("key") or [])) + list(term.get("foreach") or []) + list(term.get("param_key") or []):
                 if str(index) not in set_keys:
                     errors.append({"field": "generic_spec.objective.terms.key", "error": "unknown set", "expected": sorted(set_keys), "actual": index})
                 check_generic_set("generic_spec.objective.terms", index, True)

@@ -31,7 +31,9 @@ test('scene/model context opens task wizard and semantic time table', async ({ p
   await page.goto('/tasks?create=1&model=P1-MODEL&scene=%E6%97%A5%E5%89%8D%E8%B0%83%E5%BA%A6');
   await expect(page.getByText(/业务调度模型 · v1/).first()).toBeVisible();
   await expect(page.getByRole('button', { name: '下一步' })).toBeEnabled(); await page.getByRole('button', { name: '下一步' }).click();
-  await expect(page.getByText('00:00', { exact: true })).toBeVisible(); await expect(page.getByText('01:00', { exact: true })).toBeVisible(); await expect(page.getByText('初始状态', { exact: true })).toBeVisible();
+  await expect(page.getByText('00:00', { exact: true })).toBeVisible(); await expect(page.getByText('01:00', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: /状态序列/ }).click();
+  await expect(page.getByText('初始状态', { exact: true })).toBeVisible();
 });
 
 test('result tabs are derived from returned data and omit unrelated explanations', async ({ page }) => {

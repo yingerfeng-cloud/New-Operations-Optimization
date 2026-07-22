@@ -163,7 +163,7 @@ export function ModelCenterPage() {
         extra={<><Button onClick={() => setTemplateOpen(true)}>从模板克隆</Button><Button type="primary" onClick={() => nav('/models/create')}>创建模型</Button></>}
       />
       <MetricGrid>
-        <MetricCard title="模型资产数" value={rows.length} description="真实后端资产" tone="blue" onClick={() => nav('/models/create')} />
+        <MetricCard title="模型资产数" value={rows.length} description="真实后端资产" tone="blue" />
         <MetricCard title="可调用模型" value={publishedCount} description="已发布 / 试运行 / 已测试" tone="green" />
         <MetricCard title="开发中" value={developingCount} description="草稿与待发布版本" tone="amber" />
         <MetricCard title="Builder 覆盖" value={componentBasedCount + genericCount + templateCount} description={`组件化 ${componentBasedCount} / 通用线性 ${genericCount} / 模板 ${templateCount}`} tone="purple" />

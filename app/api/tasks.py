@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Response
 
 from app.schemas.solve import SolveRequest, TaskView
 from app.services.job_service import job_service
@@ -31,3 +31,9 @@ def cancel_task(task_id: str) -> TaskView:
 @router.post("/tasks/{task_id}/retry", response_model=TaskView)
 def retry_task(task_id: str) -> TaskView:
     return job_service.retry_task(task_id)
+
+
+@router.delete("/tasks/{task_id}", status_code=204, response_class=Response)
+def delete_task(task_id: str) -> Response:
+    job_service.delete_task(task_id)
+    return Response(status_code=204)

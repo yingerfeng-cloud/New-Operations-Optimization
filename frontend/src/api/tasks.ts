@@ -4,3 +4,4 @@ export const getTask = (id: string) => unwrap<SolveTask>(apiClient.get(`/api/tas
 export const createTask = (payload: Record<string, unknown>) => unwrap<SolveTask>(apiClient.post('/api/tasks', payload));
 export const cancelTask = (id: string) => unwrap<SolveTask>(apiClient.post(`/api/tasks/${id}/cancel`));
 export const retryTask = (id: string) => unwrap<SolveTask>(apiClient.post(`/api/tasks/${id}/retry`));
+export const deleteTask = async (id: string) => { await apiClient.delete(`/api/tasks/${id}`); };

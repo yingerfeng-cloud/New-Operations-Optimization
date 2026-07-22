@@ -2,10 +2,10 @@ import { Button, Card, Drawer, Space, Tabs } from 'antd';
 import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { getResult, getResults } from '../../api/results';
+import { getModel } from '../../api/models';
 import { DataTable } from '../../components/DataTable';
 import { JsonViewer } from '../../components/JsonViewer';
 import { PageHeader } from '../../components/PageHeader';
-import { StatusTag } from '../../components/StatusTag';
 import { EmptyActionState, MetricCard, MetricGrid } from '../../components/WorkspaceUI';
 import {
   ResultChartPanel,
@@ -17,6 +17,7 @@ import {
   ResultNlpPanel,
   ResultVariablesPanel,
 } from '../../features/result-center/ResultPanels';
+import { buildResultLabelMap } from '../../features/result-center/resultLabels';
 import type { SolveResult } from '../../types/result';
 
 const record = (value: unknown) => value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {};
@@ -49,17 +50,24 @@ export function ResultCenterPage() {
   useEffect(() => { const task = new URLSearchParams(window.location.search).get('task'); if (task) setId(task); }, []);
   const list = useQuery({ queryKey: ['results'], queryFn: getResults });
   const detail = useQuery({ queryKey: ['result', id], queryFn: () => getResult(id!), enabled: !!id });
+  const detailModelId = String(detail.data?.model_id || '');
+  const detailModel = useQuery({ queryKey: ['model', detailModelId], queryFn: () => getModel(detailModelId), enabled: !!detailModelId });
+  const labelMap = buildResultLabelMap(detailModel.data);
   const rows = list.data || [];
-  const success = rows.filter(result => String(result.status).toUpperCase() === 'SUCCESS').length;
-  const objectiveValues = rows.map(result => Number(result.objective_value)).filter(Number.isFinite);
-  const bestObjective = objectiveValues.length ? Math.min(...objectiveValues) : undefined;
-  const failed = rows.filter(result => ['FAILED', 'INFEASIBLE', 'TIMEOUT', 'CANCELLED'].includes(String(result.status).toUpperCase())).length;
+  const coveredModels = new Set(rows.map(result => String(result.model || result.model_id || '')).filter(Boolean)).size;
+  const latestFinishedAt = rows
+    .map(result => String(result.finished_at || ''))
+    .filter(Boolean)
+    .sort((a, b) => (Date.parse(b) || 0) - (Date.parse(a) || 0))[0];
+  const latestFinishedText = latestFinishedAt
+    ? new Date(latestFinishedAt).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false })
+    : '-';
   const tabKeys = resultTabKeys(detail.data);
   const tabCandidates = {
-    overview: { key: 'overview', label: '结果概览', children: <div className="panel"><ResultMetricsPanel result={detail.data} /></div> },
-    curves: { key: 'curves', label: '变量曲线', children: <div className="panel"><ResultChartPanel result={detail.data} /></div> },
+    overview: { key: 'overview', label: '结果概览', children: <div className="panel"><ResultMetricsPanel result={detail.data} labelMap={labelMap} /></div> },
+    curves: { key: 'curves', label: '变量曲线', children: <div className="panel"><ResultChartPanel result={detail.data} labelMap={labelMap} /></div> },
     reservoir: { key: 'reservoir', label: '水库过程', children: <div className="panel"><ResultCascadeHydroPanel result={detail.data} /></div> },
-    dispatch: { key: 'dispatch', label: '出力与负荷', children: <div className="panel"><ResultVariablesPanel result={detail.data} /></div> },
+    dispatch: { key: 'dispatch', label: '出力与负荷', children: <div className="panel"><ResultVariablesPanel result={detail.data} labelMap={labelMap} /></div> },
     pwl: { key: 'pwl', label: 'PWL 诊断', children: <div className="panel"><ResultConstraintsPanel result={detail.data} /></div> },
     convergence: { key: 'convergence', label: '收敛诊断', children: <div className="panel"><ResultNlpPanel result={detail.data} /></div> },
     advice: { key: 'advice', label: '业务建议', children: <div className="panel"><ResultExplanationPanel result={detail.data} /></div> },
@@ -69,11 +77,10 @@ export function ResultCenterPage() {
   return (
     <>
       <PageHeader title="结果报告库" description="查看求解结果、关键指标、变量曲线、业务解释和 JSON 结果。导出报告（预留）位于结果详情高级操作，不作为主流程按钮开放。" />
-      <MetricGrid>
-        <MetricCard title="结果总数" value={rows.length} description="任务结果归档" tone="blue" />
-        <MetricCard title="成功结果" value={success} description="可生成报告" tone="green" />
-        <MetricCard title="最优目标值" value={bestObjective ?? '-'} description="归档结果对比" tone="amber" />
-        <MetricCard title="异常结果" value={failed} description={failed ? '需要查看日志' : '暂无异常'} tone={failed ? 'red' : 'neutral'} />
+      <MetricGrid columns={3}>
+        <MetricCard title="归档报告" value={rows.length} description="可查看的求解结果" tone="blue" />
+        <MetricCard title="模型种类" value={coveredModels} description="当前归档涉及的模型" tone="green" />
+        <MetricCard title="最近完成" value={latestFinishedText} description="最新报告归档时间" tone="amber" />
       </MetricGrid>
       <Card className="content-card section-gap" title="结果列表">
         {rows.length ? (
@@ -82,10 +89,9 @@ export function ResultCenterPage() {
             loading={list.isLoading}
             columns={[
               { title: '结果/任务编号', render: (_: unknown, result: SolveResult) => result.task_id || result.job_id || result.id },
-              { title: '状态', dataIndex: 'status', render: (status: string) => <StatusTag status={status} /> },
-              { title: '目标值', dataIndex: 'objective_value' },
-              { title: '总成本', render: (_: unknown, result: SolveResult) => String(result.metrics?.total_cost ?? result.summary?.total_cost ?? '-') },
-              { title: 'Gap', render: (_: unknown, result: SolveResult) => String(result.metrics?.gap ?? result.summary?.gap ?? '-') },
+              { title: '模型', render: (_: unknown, result: SolveResult) => String(result.model || result.model_id || '-') },
+              { title: <span title="各模型目标函数的含义由建模定义决定，不用于跨模型比较">目标函数值</span>, render: (_: unknown, result: SolveResult) => String(result.objective_value ?? result.total_cost ?? result.metrics?.objective_value ?? result.summary?.objective_value ?? '-') },
+              { title: 'Gap', render: (_: unknown, result: SolveResult) => String(result.gap ?? result.metrics?.gap ?? result.summary?.gap ?? '-') },
               { title: '操作', render: (_: unknown, result: SolveResult) => <Button type="link" onClick={() => setId(String(result.task_id || result.job_id || result.id))}>查看报告</Button> },
             ]}
           />
@@ -100,7 +106,7 @@ export function ResultCenterPage() {
         title={`结果报告 ${id || ''}`}
         footer={<Space style={{ width: '100%', justifyContent: 'flex-end' }}><span className="muted">高级操作：导出报告预留，未作为主流程能力开放。</span><Button onClick={() => setId(undefined)}>关闭</Button></Space>}
       >
-        <ResultKpiStrip result={detail.data} />
+        <ResultKpiStrip result={detail.data} labelMap={labelMap} />
         <Tabs className="section-gap" items={tabKeys.map(key => tabCandidates[key as keyof typeof tabCandidates])} />
       </Drawer>
     </>

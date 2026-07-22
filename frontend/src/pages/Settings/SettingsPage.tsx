@@ -100,7 +100,7 @@ function StatusOverview({ endpointStatus, endpointDesc, apiBase, solverStatus, s
           <strong>{apiBase}</strong>
         </div>
       </div>
-      <Card className="content-card" title="服务连通性">
+      <Card className="content-card settings-table-card" title="服务连通性">
         <Table
           className="settings-compact-table"
           pagination={false}
@@ -133,7 +133,7 @@ function DictionaryTable({ name, addLabel, parentOptions }: { name: keyof System
   return (
     <Form.List name={name}>
       {(fields, { add, remove }) => (
-        <Space orientation="vertical" size={12} style={{ width: '100%' }}>
+        <div className="settings-table-stack">
           <Table<DictionaryField>
             className="settings-form-table"
             pagination={false}
@@ -142,8 +142,8 @@ function DictionaryTable({ name, addLabel, parentOptions }: { name: keyof System
             columns={dictionaryColumns(remove, parentOptions)}
             scroll={{ x: parentOptions ? 820 : 660 }}
           />
-          <Button icon={<PlusOutlined />} onClick={() => add({ code: '', label: '', parent_code: parentOptions?.[0]?.value || '', enabled: true, sort_order: (fields.length + 1) * 10 })}>{addLabel}</Button>
-        </Space>
+          <div className="settings-table-actions"><Button icon={<PlusOutlined />} onClick={() => add({ code: '', label: '', parent_code: parentOptions?.[0]?.value || '', enabled: true, sort_order: (fields.length + 1) * 10 })}>{addLabel}</Button></div>
+        </div>
       )}
     </Form.List>
   );
@@ -174,13 +174,13 @@ function DictionaryConfigPanel({ dictionaries, loading }: { dictionaries?: Syste
   });
   return (
     <Form form={form} layout="vertical" onFinish={save.mutate} initialValues={dictionaries}>
-      <Card className="content-card" title="业务场景字典" extra={<Button icon={<ReloadOutlined />} onClick={() => reset.mutate()} loading={reset.isPending}>恢复默认</Button>}>
+      <Card className="content-card settings-table-card" title="业务场景字典" extra={<Button icon={<ReloadOutlined />} onClick={() => reset.mutate()} loading={reset.isPending}>恢复默认</Button>}>
         <DictionaryTable name="business_scenarios" addLabel="新增业务场景" />
       </Card>
-      <Card className="content-card section-gap" title="组件领域字典">
+      <Card className="content-card section-gap settings-table-card" title="组件领域字典">
         <DictionaryTable name="component_domains" addLabel="新增领域" />
       </Card>
-      <Card className="content-card section-gap" title="组件分类字典">
+      <Card className="content-card section-gap settings-table-card" title="组件分类字典">
         <DictionaryTable name="component_categories" addLabel="新增分类" parentOptions={domainOptions} />
       </Card>
       <div className="settings-action-bar">
@@ -215,19 +215,34 @@ function LlmConfigPanel({ config }: { config?: LlmConfig }) {
   const provider = Form.useWatch('provider', form) || config?.provider;
   const providerOptions = (config?.supported_providers || ['disabled', 'openai_compatible', 'volcengine_ark']).map(value => ({ value, label: value }));
   return (
-    <Card className="content-card" title="大模型配置">
+    <Card className="content-card llm-config-card" title="大模型配置">
       <Form form={form} layout="vertical" onFinish={save.mutate}>
-        <Row gutter={16}>
-          <Col xs={24} md={8}><Form.Item name="provider" label="Provider" rules={[{ required: true }]}><Select options={providerOptions} /></Form.Item></Col>
-          <Col xs={24} md={8}><Form.Item name="enabled" label="启用大模型" valuePropName="checked"><Switch disabled={provider === 'disabled'} /></Form.Item></Col>
-          <Col xs={24} md={8}><Form.Item name="model" label="模型 / Endpoint ID"><Input disabled={provider === 'disabled'} /></Form.Item></Col>
-          <Col xs={24}><Form.Item name="base_url" label="Base URL"><Input disabled={provider === 'disabled'} /></Form.Item></Col>
-          <Col xs={24} md={8}><Form.Item name="temperature" label="Temperature"><InputNumber min={0} max={2} step={0.1} /></Form.Item></Col>
-          <Col xs={24} md={8}><Form.Item name="max_tokens" label="Max Tokens"><InputNumber min={128} max={32000} precision={0} /></Form.Item></Col>
-          <Col xs={24} md={8}><Form.Item name="timeout_seconds" label="超时秒数"><InputNumber min={1} max={120} /></Form.Item></Col>
-          <Col xs={24} md={16}><Form.Item name="api_key" label={`API Key${config?.api_key_configured ? '（已配置，留空则保持不变）' : ''}`}><Input.Password autoComplete="new-password" disabled={provider === 'disabled'} /></Form.Item></Col>
-          <Col xs={24} md={8}><Form.Item name="clear_api_key" label="清除已保存 Key" valuePropName="checked"><Switch disabled={!config?.api_key_configured} /></Form.Item></Col>
-        </Row>
+        <div className="llm-config-grid">
+          <section className="settings-field-group">
+            <header><strong>模型接入</strong><span>选择服务商并配置模型入口</span></header>
+            <Row gutter={16}>
+              <Col xs={24} md={8}><Form.Item name="provider" label="Provider" rules={[{ required: true }]}><Select options={providerOptions} /></Form.Item></Col>
+              <Col xs={24} md={8}><Form.Item name="enabled" label="启用大模型" valuePropName="checked"><Switch disabled={provider === 'disabled'} /></Form.Item></Col>
+              <Col xs={24} md={8}><Form.Item name="model" label="模型 / Endpoint ID"><Input disabled={provider === 'disabled'} /></Form.Item></Col>
+              <Col xs={24}><Form.Item name="base_url" label="Base URL"><Input disabled={provider === 'disabled'} /></Form.Item></Col>
+            </Row>
+          </section>
+          <section className="settings-field-group">
+            <header><strong>生成参数</strong><span>控制响应随机性、长度与超时</span></header>
+            <Row gutter={16}>
+              <Col xs={24} md={8}><Form.Item name="temperature" label="Temperature"><InputNumber min={0} max={2} step={0.1} /></Form.Item></Col>
+              <Col xs={24} md={8}><Form.Item name="max_tokens" label="Max Tokens"><InputNumber min={128} max={32000} precision={0} /></Form.Item></Col>
+              <Col xs={24} md={8}><Form.Item name="timeout_seconds" label="超时秒数"><InputNumber min={1} max={120} /></Form.Item></Col>
+            </Row>
+          </section>
+          <section className="settings-field-group settings-field-group-secret">
+            <header><strong>访问凭证</strong><span>密钥仅用于服务端调用，不会回显</span></header>
+            <Row gutter={16}>
+              <Col xs={24} md={16}><Form.Item name="api_key" label={`API Key${config?.api_key_configured ? '（已配置，留空则保持不变）' : ''}`}><Input.Password autoComplete="new-password" disabled={provider === 'disabled'} /></Form.Item></Col>
+              <Col xs={24} md={8}><Form.Item name="clear_api_key" label="清除已保存 Key" valuePropName="checked"><Switch disabled={!config?.api_key_configured} /></Form.Item></Col>
+            </Row>
+          </section>
+        </div>
         <Descriptions className="section-gap" bordered column={2}>
           <Descriptions.Item label="配置来源">{config?.config_source || '-'}</Descriptions.Item>
           <Descriptions.Item label="Key 状态">{config?.api_key_configured ? '已配置' : '未配置'}</Descriptions.Item>
@@ -246,7 +261,7 @@ function LlmConfigPanel({ config }: { config?: LlmConfig }) {
 function RuntimeConfigPanel({ apiBase, solverDesc, solverData }: { apiBase: string; solverDesc: string; solverData: Awaited<ReturnType<typeof getSolverStatus>> | undefined }) {
   return (
     <Space orientation="vertical" size={16} style={{ width: '100%' }}>
-      <Alert type="info" showIcon title="部署信息为只读" description="这里展示的是当前前后端入口、构建目录和求解器状态。实际端口、API Base URL、生产路径由启动脚本、环境变量和部署配置决定，不适合在浏览器页面内直接修改。" />
+      <Alert className="compact-notice" type="info" showIcon title="部署信息为只读" description="端口、API Base URL 和生产路径由启动脚本、环境变量及部署配置决定。" />
       <Card className="content-card" title="部署入口">
         <Descriptions column={2} bordered>
           <Descriptions.Item label="API 地址">{apiBase}</Descriptions.Item>
@@ -325,7 +340,7 @@ export function SettingsPage({ variant = 'settings' }: SettingsPageProps) {
   if (isRuntime) {
     return (
       <>
-        <PageHeader title="求解运行环境" description="查看求解器、后端 API、运行入口和 React 前端托管状态。" status={<Tag color="blue">HiGHS</Tag>} />
+        <PageHeader title="求解运行环境" description="查看求解器、后端 API、运行入口和 React 前端托管状态。" status={<Space size={6}><Tag color="blue">HiGHS</Tag><Tag color={solverData?.ipopt?.available ? 'green' : solverData ? 'orange' : 'blue'}>Ipopt {solverData ? (solverData.ipopt?.available ? '可用' : '不可用') : '检查中'}</Tag>{solverData?.ipopt?.available === false && <span className="ipopt-status-detail" title={solverData.ipopt.message || undefined}>{solverData.ipopt.message || 'NLP 求解不可用，LP/MILP 仍走 HiGHS。'}</span>}</Space>} />
         <MetricGrid>
           <HealthItem title="后端 API" status={endpointStatus('backend')} desc={endpointDesc('backend', apiBase)} />
           <HealthItem title="求解器" status={solverStatus} desc={solverDesc} />
@@ -346,7 +361,6 @@ export function SettingsPage({ variant = 'settings' }: SettingsPageProps) {
             <Descriptions.Item label="Ipopt 版本">{solverData?.ipopt?.version || '-'}</Descriptions.Item>
             <Descriptions.Item label="NLP 文档">docs/nlp-solver.md</Descriptions.Item>
           </Descriptions>
-          {solverData?.ipopt?.available === false && <Alert className="section-gap" type="warning" showIcon title="Ipopt 不可用" description={solverData.ipopt.message || 'NLP 求解不可用，LP/MILP 仍走 HiGHS。'} />}
         </Card>
         <Card className="content-card section-gap" title="运行入口">
           <Descriptions column={2} bordered>

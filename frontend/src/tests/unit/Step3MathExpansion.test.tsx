@@ -7,6 +7,10 @@ import { createInitialDraft, type ModelDraft } from '../../features/model-creati
 import { renderWithQueryClient } from '../testUtils';
 import type { FormulaDef } from '../../types/formula';
 
+const { expandFormulaMock, legacyCompilerMock } = vi.hoisted(() => ({ expandFormulaMock: vi.fn(), legacyCompilerMock: vi.fn() }));
+vi.mock('../../api/formulas', () => ({ analyzeFormula: expandFormulaMock, expandFormula: expandFormulaMock }));
+vi.mock('../../features/model-creation/utils/compileFormulaToGenericSpec', () => ({ compileFormulaToGenericSpec: legacyCompilerMock }));
+
 const formula = (kind: 'constraint' | 'objective', dsl: string, foreach: string[] = []): FormulaDef => ({
   formula_id: dsl,
   name: dsl,
@@ -60,6 +64,21 @@ vi.mock('../../api/functionAssets', () => ({
 }));
 
 beforeEach(() => {
+  expandFormulaMock.mockImplementation(async (payload: Record<string, unknown>) => {
+    const objective = payload.formula_type === 'objective';
+    return {
+      success: true,
+      ast_version: '1.0',
+      compiler_version: '2.0.0',
+      normalized_expression: payload.formula,
+      expression_class: 'linear', diagnostics: [], references: [], scope: payload.scope,
+      participation: 'solve_active', estimated_expansion: { constraint_count: objective ? 0 : 1, term_count: 2, exact: true },
+      status: 'compile_valid', checks: { syntax: 'passed', symbol_dimension_unit: 'passed', classification: 'linear', compile: 'passed' },
+      compiled_fragment: objective
+        ? { type: 'objective', direction: 'minimize', terms: [{ var: 'p', key: ['u', 't'], aggregate_scope: [{ alias: 'u', set: 'unit' }, { alias: 't', set: 'time' }], coefficient: { numeric: 1, factors: [{ parameter: 'cost', indices: ['u'], power: 1 }] } }] }
+        : { type: 'constraint', constraints: [{ source_formula_id: payload.formula_id, split_sequence: 1, sense: '>=', scope: payload.scope, terms: [{ var: 'p', key: ['u', 't'], aggregate_scope: [{ alias: 'u', set: 'unit' }], coefficient: { numeric: 1, factors: [] } }], rhs: 0, rhs_terms: [{ numeric: 1, factors: [{ parameter: 'load', indices: ['t'], power: 1 }] }] }] },
+    };
+  });
   vi.spyOn(Modal, 'success').mockImplementation(() => ({ destroy: vi.fn(), update: vi.fn() }) as ReturnType<typeof Modal.success>);
 });
 
@@ -107,16 +126,33 @@ function componentDraft2d() {
   return draft;
 }
 
-test('Step3 generic builder compiles formulas into generic_spec preview', () => {
+test('Step3 generic builder composes only backend authoritative fragments into generic_spec', async () => {
   renderWithQueryClient(<Harness initial={genericDraft()} />);
   expect(screen.getByText('目标函数')).toBeInTheDocument();
   expect(screen.getByText('约束条件')).toBeInTheDocument();
   fireEvent.click(screen.getByText('高级调试'));
   expect(screen.getByText('待编译')).toBeInTheDocument();
-  fireEvent.click(screen.getByText('编译 generic_spec'));
-  expect(screen.getByText('已生成')).toBeInTheDocument();
+  fireEvent.click(screen.getByText('编译模型（后端权威）'));
+  await waitFor(() => expect(screen.getByText('已生成')).toBeInTheDocument());
   expect(screen.getByText('generic_spec 预览')).toBeInTheDocument();
-  expect(screen.getByText(/"rhs_param": "load"/)).toBeInTheDocument();
+  expect(screen.getByText(/"formula_compiler": "backend_authoritative_v2"/)).toBeInTheDocument();
+  expect(screen.getByText(/"source_formula_id"/)).toBeInTheDocument();
+  expect(expandFormulaMock).toHaveBeenCalledTimes(2);
+  expect(legacyCompilerMock).not.toHaveBeenCalled();
+});
+
+test('Step3 exposes weighted objective mode, global direction and normalized summary', () => {
+  const draft = genericDraft();
+  draft.objective = { mode: 'weighted_sum', global_direction: 'minimize' };
+  draft.formulas = [
+    { ...formula('objective', 'sum(p[u,t] for u in unit for t in time)'), name: '成本', objective_direction: 'minimize', weight: 2 },
+    { ...formula('objective', 'sum(p[u,t] for u in unit for t in time) + 1'), formula_id: 'revenue', name: '收益', objective_direction: 'maximize', weight: 3 },
+  ];
+  renderWithQueryClient(<Harness initial={draft} />);
+  expect(screen.getByText('weighted_sum 加权和')).toBeInTheDocument();
+  expect(screen.getAllByText('minimize').length).toBeGreaterThan(0);
+  expect(screen.getByText(/\+2 × 成本/)).toBeInTheDocument();
+  expect(screen.getByText(/-3 × 收益/)).toBeInTheDocument();
 });
 
 test('Step3 component builder renders generated constraints and dependencies', () => {

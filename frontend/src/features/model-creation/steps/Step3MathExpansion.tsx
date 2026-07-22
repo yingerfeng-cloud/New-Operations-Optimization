@@ -1,4 +1,4 @@
-import { Alert, Button, Card, Descriptions, Empty, Form, Input, Modal, Select, Space, Table, Tag, Tooltip, Typography, message } from 'antd';
+import { Alert, Button, Card, Descriptions, Empty, Form, Input, Modal, Popover, Select, Space, Table, Tag, Tooltip, Typography, message } from 'antd';
 import { useEffect, useState } from 'react';
 import { Collapse } from 'antd';
 import { useQuery } from '@tanstack/react-query';
@@ -7,10 +7,13 @@ import type { ModelDraft } from '../stores/modelCreationStore';
 import type { FunctionAsset } from '../../../types/functionAsset';
 import { getFunctionAssets } from '../../../api/functionAssets';
 import { FormulaBuilderModal } from '../../formula-editor/FormulaBuilderModal';
-import { compileFormulaToGenericSpec } from '../utils/compileFormulaToGenericSpec';
 import { JsonViewer } from '../../../components/JsonViewer';
 import { FormulaDisplay } from '../../formula-editor/FormulaDisplay';
 import { analyzeDraftNonlinear, firstBilinearDiagnostic } from '../utils/nonlinearDiagnostics';
+import { FormulaManagementPanel } from '../../formula-editor/FormulaManagementPanel';
+import { compileFormulaAuthoritatively, isAuthoritativeArtifactCurrent, type AuthoritativeCompileContext } from '../../formula-editor/authoritativeCompilation';
+import { composeAuthoritativeGenericSpec } from '../utils/composeAuthoritativeGenericSpec';
+import { markFormulaApplied, markFormulaCompiled, markFormulaSaved } from '../../formula-editor/formulaVersioning';
 
 const newFormula = (kind: 'constraint' | 'objective'): FormulaDef => ({
   formula_id: crypto.randomUUID(),
@@ -25,6 +28,8 @@ const newFormula = (kind: 'constraint' | 'objective'): FormulaDef => ({
   referenced_variables: [],
   free_indices: [],
   compile_status: 'error',
+  created_at: new Date().toISOString(),
+  updated_at: new Date().toISOString(),
 });
 
 function componentRows(component: Record<string, unknown>, key: string) {
@@ -78,8 +83,9 @@ function invalidAssetReason(asset: FunctionAsset) {
 }
 
 function formulaStatus(formula: FormulaDef) {
-  if (formula.compile_status === 'ready') return { color: 'green', text: '已通过' };
-  if (formula.compile_status === 'error') return { color: 'red', text: '编译失败' };
+  if (formula.compile_status === 'compile_valid') return { color: 'green', text: '权威编译通过' };
+  if (formula.compile_status === 'stale') return { color: 'orange', text: '编译已过期' };
+  if (formula.compile_status === 'error' || formula.compile_status === 'compile_failed') return { color: 'red', text: '编译失败' };
   if (/(\w+\[[^\]]+\]|\w+)\s*\*\s*(\w+\[[^\]]+\]|\w+)/.test(formula.dsl_formula || '')) return { color: 'orange', text: '存在风险' };
   return { color: 'blue', text: '待校验' };
 }
@@ -141,7 +147,28 @@ export function Step3MathExpansion({ draft, onChange }: { draft: ModelDraft; onC
     parameters: Object.fromEntries(draft.semantic.parameters.map(x => [x.code, { label: x.name || x.code, indices: x.indices || x.dimension, unit: x.unit, description: x.description }])),
     variables: Object.fromEntries(draft.semantic.variables.map(x => [x.code, { label: x.name || x.code, indices: x.indices || x.dimension, unit: x.unit, description: x.description }])),
   };
+  const authoritativeContext: AuthoritativeCompileContext = {
+    symbols: {
+      sets: Object.fromEntries(draft.semantic.sets.map(set => [set.code, { values: set.values || [] }])),
+      parameters: draft.semantic.parameters.map(parameter => ({
+        ...parameter,
+        dimension: parameter.indices || parameter.dimension || parameter.dimensions || parameter.index_sets || [],
+      })),
+      variables: draft.semantic.variables.map(variable => ({
+        ...variable,
+        dimension: variable.indices || variable.dimension || variable.dimensions || variable.index_sets || [],
+      })),
+    },
+    model_context: { time_dimension: draft.time_dimension },
+  };
   const nonlinearReport = analyzeDraftNonlinear(draft);
+  const nonlinearMessageGroups = Object.entries(nonlinearReport.relationships.reduce<Record<string, number>>((counts, item) => {
+    const messageText = String(item.message || '检测到非线性关系');
+    counts[messageText] = (counts[messageText] || 0) + 1;
+    return counts;
+  }, {})).map(([messageText, count]) => ({ messageText, count }));
+  const nonlinearSummary = nonlinearMessageGroups.map(item => `${item.messageText}${item.count > 1 ? `（${item.count} 处）` : ''}`).join('；');
+  const nonlinearDetails = <div className="model-diagnostic-details">{nonlinearMessageGroups.map(item => <div key={item.messageText}><span>{item.messageText}</span>{item.count > 1 && <Tag>{item.count} 处</Tag>}</div>)}</div>;
 
   useEffect(() => {
     if (!mappingOpen || !functionAssets.data?.length || mappingForm.getFieldValue('function_asset_id')) return;
@@ -160,12 +187,31 @@ export function Step3MathExpansion({ draft, onChange }: { draft: ModelDraft; onC
     }
   }, [mappingForm, mappingOpen, selectedAsset]);
 
-  const compile = () => {
+  const compile = async () => {
     try {
-      const spec = compileFormulaToGenericSpec(draft.formulas, draft.semantic);
+      let formulas = [...draft.formulas];
+      for (const source of formulas.filter(formula => (formula.solve_participation || 'solve_active') === 'solve_active')) {
+        if (isAuthoritativeArtifactCurrent(source, authoritativeContext)) continue;
+        const { result, artifact } = await compileFormulaAuthoritatively(source, authoritativeContext);
+        const updated = markFormulaCompiled({
+          ...source,
+          scope: result.scope,
+          diagnostics: result.diagnostics,
+          ast_version: result.ast_version,
+          compiler_version: result.compiler_version,
+          compile_status: artifact ? 'compile_valid' : 'compile_failed',
+          compile_error: result.diagnostics.filter(item => item.severity === 'error').map(item => item.message).join('；') || undefined,
+          authoritative_artifact: artifact,
+        }, artifact);
+        formulas = formulas.map(item => item.formula_id === source.formula_id ? updated : item);
+        if (!artifact) throw new Error(`${source.name} 未通过后端权威编译：${updated.compile_error || '未返回可求解片段'}`);
+      }
+      const nextDraft = { ...draft, formulas };
+      const spec = composeAuthoritativeGenericSpec(nextDraft);
+      const appliedFormulas = formulas.map(formula => (formula.solve_participation || 'solve_active') === 'solve_active' ? markFormulaApplied(formula) : formula);
       setCompileError('');
-      onChange({ ...draft, advanced: { ...draft.advanced, generic_spec: spec } });
-      modal.success({ title: 'generic_spec 编译成功', content: '所有公式已编译为后端线性结构。' });
+      onChange({ ...nextDraft, formulas: appliedFormulas, advanced: { ...draft.advanced, generic_spec: spec } });
+      modal.success({ title: 'generic_spec 权威编译成功', content: '最终求解结构仅由后端 compiled fragments 组合生成。' });
     } catch (error) {
       const text = String(error);
       setCompileError(text);
@@ -174,13 +220,28 @@ export function Step3MathExpansion({ draft, onChange }: { draft: ModelDraft; onC
   };
 
   const applyFormula = (formula: FormulaDef) => {
+    const duplicateName = draft.formulas.some(item => item.formula_id !== formula.formula_id && item.name.trim() === formula.name.trim());
+    if (!formula.name.trim()) {
+      message.error('公式名称不能为空');
+      return;
+    }
+    if (duplicateName) {
+      message.error(`公式名称必须唯一：${formula.name}`);
+      return;
+    }
+    if ((formula.solve_participation || 'solve_active') === 'solve_active' && !isAuthoritativeArtifactCurrent(formula, authoritativeContext)) {
+      message.error('solve_active 公式必须先完成当前版本的后端权威编译');
+      return;
+    }
     const exists = draft.formulas.some(x => x.formula_id === formula.formula_id);
-    onChange({ ...draft, formulas: exists ? draft.formulas.map(x => x.formula_id === formula.formula_id ? formula : x) : [...draft.formulas, formula] });
+    const now = new Date().toISOString();
+    const saved = markFormulaSaved({ ...formula, created_at: formula.created_at || now, updated_at: now }, now);
+    onChange({ ...draft, formulas: exists ? draft.formulas.map(x => x.formula_id === formula.formula_id ? saved : x) : [...draft.formulas, saved], advanced: { ...draft.advanced, generic_spec: undefined } });
     setEditing(undefined);
   };
 
   const deleteFormula = (formulaId: string) => {
-    onChange({ ...draft, formulas: draft.formulas.filter(x => x.formula_id !== formulaId) });
+    onChange({ ...draft, formulas: draft.formulas.filter(x => x.formula_id !== formulaId), advanced: { ...draft.advanced, generic_spec: undefined } });
     setEditing(undefined);
   };
 
@@ -360,6 +421,7 @@ export function Step3MathExpansion({ draft, onChange }: { draft: ModelDraft; onC
       open={!!editing}
       value={editing}
       symbols={symbols}
+      compileContext={authoritativeContext}
       onApply={applyFormula}
       onCancel={() => setEditing(undefined)}
       onDelete={deleteFormula}
@@ -383,10 +445,10 @@ export function Step3MathExpansion({ draft, onChange }: { draft: ModelDraft; onC
         ]} />
         {component.solve_strategy === 'binary_segment_milp' && <Alert className="section-gap" type="warning" showIcon title="预留能力，当前不可发布为可求解模型。" />}
         {Boolean(component.metadata) && ['unknown', 'nonconvex'].includes(String((component.metadata as Record<string, unknown>).convexity || '')) && component.solve_strategy === 'convex_combination_lp' && (
-          <Alert className="section-gap" type="warning" showIcon title="凸组合 LP 风险" description="当前曲线凸性未知或非凸，结果可能不严格落在原始折线上。" />
+          <Alert className="section-gap compact-step-note" type="warning" showIcon title="凸组合 LP 风险" description="当前曲线凸性未知或非凸，结果可能不严格落在原始折线上。" />
         )}
         {component.solve_strategy === 'convex_hull_lp_approx' && (
-          <Alert className="section-gap" type="warning" showIcon title="convex_hull_lp_approx 非精确近似" description="该策略不是一般二维曲面的精确表达，只适用于凸包近似或特定凸/凹函数边界。" />
+          <Alert className="section-gap compact-step-note" type="warning" showIcon title="convex_hull_lp_approx 非精确近似" description="该策略不是一般二维曲面的精确表达，只适用于凸包近似或特定凸/凹函数边界。" />
         )}
         <Table className="section-gap" size="small" pagination={false} rowKey={stableRowKey} dataSource={[...componentRows(component, 'generated_constraints'), ...componentRows(component, 'constraints')]} columns={[{ title: '约束', dataIndex: 'name' }, { title: '公式', render: (_, row) => <FormulaDisplay row={row} /> }]} />
         <Table className="section-gap" size="small" pagination={false} rowKey={stableRowKey} dataSource={[...componentRows(component, 'generated_objective_terms'), ...componentRows(component, 'objective_terms')]} columns={[{ title: '目标项', dataIndex: 'name' }, { title: '公式', render: (_, row) => <FormulaDisplay row={row} /> }]} />
@@ -471,14 +533,23 @@ export function Step3MathExpansion({ draft, onChange }: { draft: ModelDraft; onC
       </Space>
       {nonlinearReport.count > 0 && (
         <Alert
-          className="section-gap"
+          className="section-gap compact-step-note model-diagnostic-alert"
           type={nonlinearReport.has_blocking_nonlinearity ? 'error' : 'warning'}
           showIcon
           title="非线性转换建议"
-          description={nonlinearReport.relationships.map(item => item.message).join('；')}
+          description={nonlinearSummary}
+          action={<Popover title="转换建议明细" content={nonlinearDetails} trigger="click"><Button type="link" size="small">查看明细</Button></Popover>}
         />
       )}
       {formulaBusinessCards(draft.formulas, setEditing)}
+      <FormulaManagementPanel
+        formulas={draft.formulas}
+        semantic={draft.semantic}
+        symbols={symbols}
+        compileContext={authoritativeContext}
+        onEdit={setEditing}
+        onChange={formulas => onChange({ ...draft, formulas, advanced: { ...draft.advanced, generic_spec: undefined } })}
+      />
       {draft.basic_info.builder_mode === 'component_based' && renderComponentSummaryList()}
       <Collapse className="section-gap" items={[{ key: 'debug', label: '高级调试', children: renderComponentWorkbench() }]} />
       <Modal width={720} open={mappingOpen} destroyOnHidden onCancel={() => setMappingOpen(false)} title="添加函数映射" footer={null}>
@@ -515,7 +586,7 @@ export function Step3MathExpansion({ draft, onChange }: { draft: ModelDraft; onC
             />
           </Form.Item>
           <Alert
-            className="section-gap"
+            className="section-gap compact-step-note"
             type="info"
             showIcon
             title="求解策略说明"
@@ -529,7 +600,7 @@ export function Step3MathExpansion({ draft, onChange }: { draft: ModelDraft; onC
           />
           {selectedStrategy === 'convex_combination_lp' && ['unknown', 'nonconvex'].includes(String(selectedConvexity || '')) && (
             <Alert
-              className="section-gap"
+              className="section-gap compact-step-note"
               type="warning"
               showIcon
               title="曲线形态存在求解风险"
@@ -538,7 +609,7 @@ export function Step3MathExpansion({ draft, onChange }: { draft: ModelDraft; onC
           )}
           {selectedStrategy === 'convex_hull_lp_approx' && (
             <Alert
-              className="section-gap"
+              className="section-gap compact-step-note"
               type="warning"
               showIcon
               title="convex_hull_lp_approx 非精确近似"
@@ -633,25 +704,70 @@ export function Step3MathExpansion({ draft, onChange }: { draft: ModelDraft; onC
   return (
     <>
       {modalContextHolder}
+      <Card className="section-gap" title="目标编译策略" size="small">
+        <Space wrap align="start">
+          <div>
+            <Typography.Text type="secondary">目标模式</Typography.Text>
+            <Select
+              aria-label="目标模式"
+              value={draft.objective?.mode || (draft.objective?.type === 'weighted_sum' ? 'weighted_sum' : 'single')}
+              style={{ width: 160, display: 'block' }}
+              options={[{ value: 'single', label: 'single 单目标' }, { value: 'weighted_sum', label: 'weighted_sum 加权和' }]}
+              onChange={mode => onChange({ ...draft, objective: { ...(draft.objective || {}), mode, type: mode }, advanced: { ...draft.advanced, generic_spec: undefined } })}
+            />
+          </div>
+          <div>
+            <Typography.Text type="secondary">全局方向</Typography.Text>
+            <Select
+              aria-label="全局目标方向"
+              value={draft.objective?.global_direction || (draft.objective?.sense === 'maximize' ? 'maximize' : 'minimize')}
+              style={{ width: 160, display: 'block' }}
+              options={[{ value: 'minimize', label: 'minimize' }, { value: 'maximize', label: 'maximize' }]}
+              onChange={global_direction => onChange({ ...draft, objective: { ...(draft.objective || {}), global_direction, sense: global_direction }, advanced: { ...draft.advanced, generic_spec: undefined } })}
+            />
+          </div>
+          <Alert
+            type="info"
+            showIcon
+            title="方向归一化"
+            description={draft.formulas.filter(item => item.kind === 'objective' && (item.solve_participation || 'solve_active') === 'solve_active').map(item => {
+              const global = draft.objective?.global_direction || (draft.objective?.sense === 'maximize' ? 'maximize' : 'minimize');
+              const sign = item.objective_direction === global ? 1 : -1;
+              const mode = draft.objective?.mode || (draft.objective?.type === 'weighted_sum' ? 'weighted_sum' : 'single');
+              const weight = mode === 'weighted_sum' ? item.weight : 1;
+              return `${sign < 0 ? '-' : '+'}${String(weight ?? '未填')} × ${item.name}（${item.objective_direction || '方向未填'}）`;
+            }).join('；') || '尚未配置参与求解的目标'}
+          />
+        </Space>
+      </Card>
       <Space wrap>
         <Button type="primary" onClick={() => setEditing(newFormula('constraint'))}>新增约束公式</Button>
         <Button onClick={() => setEditing(newFormula('objective'))}>新增目标函数</Button>
-        <Button onClick={compile}>编译 generic_spec</Button>
+        <Button onClick={() => { void compile(); }}>编译模型（后端权威）</Button>
         {nonlinearReport.relationships.some(item => item.nonlinear_type === 'bilinear' && !item.converted) && (
           <Button onClick={addMccormickFromDiagnostic}>一键生成 McCormick 组件</Button>
         )}
       </Space>
       {nonlinearReport.count > 0 && (
         <Alert
-          className="section-gap"
+          className="section-gap compact-step-note model-diagnostic-alert"
           type={nonlinearReport.has_blocking_nonlinearity ? 'error' : 'warning'}
           showIcon
           title="非线性转换建议"
-          description={nonlinearReport.relationships.map(item => item.message).join('；')}
+          description={nonlinearSummary}
+          action={<Popover title="转换建议明细" content={nonlinearDetails} trigger="click"><Button type="link" size="small">查看明细</Button></Popover>}
         />
       )}
-      {compileError && <Alert className="section-gap" type="error" showIcon title="编译失败" description={compileError} />}
+      {compileError && <Alert className="section-gap compact-step-note" type="error" showIcon title="编译失败" description={compileError} />}
       {formulaBusinessCards(draft.formulas, setEditing)}
+      <FormulaManagementPanel
+        formulas={draft.formulas}
+        semantic={draft.semantic}
+        symbols={symbols}
+        compileContext={authoritativeContext}
+        onEdit={setEditing}
+        onChange={formulas => onChange({ ...draft, formulas, advanced: { ...draft.advanced, generic_spec: undefined } })}
+      />
       <Collapse
         className="section-gap"
         items={[{

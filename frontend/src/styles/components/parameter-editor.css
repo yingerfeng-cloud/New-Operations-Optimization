@@ -1,0 +1,15 @@
+.parameter-toolbar { margin-bottom: 10px; padding: 6px; border: 1px solid var(--proto-line); border-radius: 6px; background: #f8fafc; }
+.parameter-toolbar-label { margin-right: 6px; color: #667085; font-size: 12px; }
+.parameter-editor-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin: 8px 0; color: #667085; font-size: 12px; }
+.parameter-scale-note { color: #175cd3; }
+.parameter-scale-note.warning { color: #b54708; }
+.time-series-preview { border-radius: 8px; background: #f8fafc; }
+.fullscreen-matrix-modal .ant-modal-content,
+.focus-editor-modal .ant-modal-content { height: calc(100vh - 32px); display: flex; flex-direction: column; }
+.fullscreen-matrix-modal .ant-modal-body,
+.focus-editor-modal .ant-modal-body { min-height: 0; flex: 1; overflow: auto; }
+.fullscreen-editor-header { position: sticky; top: 0; z-index: 4; display: flex; justify-content: space-between; gap: 12px; padding: 8px 0; background: #fff; }
+.fullscreen-editor-header > div:first-child { display: flex; flex-direction: column; gap: 3px; }
+.fullscreen-editor-header span { color: #667085; font-size: 12px; }
+.matrix-cell-missing { padding: 2px; border-left: 3px solid #d92d20; background: #fff1f0; }
+

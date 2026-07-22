@@ -2,3 +2,17 @@
 @import './styles/base.css';
 @import './styles/product.css';
 @import './styles/states.css';
+@import './styles/layout.css';
+@import './styles/global.css';
+@import './styles/components/cards.css';
+@import './styles/components/forms.css';
+@import './styles/components/tables.css';
+@import './styles/components/tags.css';
+@import './styles/components/drawers.css';
+@import './styles/components/step-navigation.css';
+@import './styles/components/parameter-editor.css';
+@import './styles/pages/task-create.css';
+@import './styles/pages/model-creation.css';
+@import './styles/ant-overrides.css';
+@import './styles/responsive.css';
+@import './styles/feedback-iteration.css';

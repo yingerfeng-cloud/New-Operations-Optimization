@@ -22,7 +22,7 @@ function semanticItem({
   onEdit?: () => void;
 }) {
   return (
-    <div className="semantic-item-card" key={key}>
+    <div className="semantic-item-card" key={key} data-field-code={code} data-object-id={code}>
       <div className="semantic-item-main">
         <Typography.Text strong>{name || code}</Typography.Text>
         <Typography.Text type="secondary">{code}</Typography.Text>
@@ -125,7 +125,7 @@ export function SemanticOverviewCard({
   ];
 
   return (
-    <section className="semantic-overview-card">
+    <section className="semantic-overview-card" data-section-key="overview">
       <div className="card-title-row">
         <div>
           <Typography.Title level={5}>语义结构概览</Typography.Title>
@@ -134,7 +134,7 @@ export function SemanticOverviewCard({
       </div>
       <div className="semantic-group-grid">
         {groups.map(group => (
-          <div className="semantic-group-card" key={group.key}>
+          <div className="semantic-group-card" key={group.key} data-section-key={group.key}>
             <div className="semantic-group-head">
               <Space>
                 <Tag color={group.color} icon={group.icon}>{group.title}</Tag>

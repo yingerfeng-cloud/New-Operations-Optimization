@@ -41,11 +41,13 @@ function formatList(value?: string[]) {
   return (value || []).join(', ');
 }
 
-function duplicateCodes(rows: Array<{ code: string }>) {
+function duplicateCodes(rows: Array<{ code?: unknown }>) {
   const seen = new Set<string>();
   const duplicated = new Set<string>();
   rows.forEach(row => {
-    const code = row.code.trim();
+    // Historical/backend templates can contain partially populated semantic rows.
+    // Keep the semantic step accessible and let the editor surface that row.
+    const code = typeof row.code === 'string' ? row.code.trim() : '';
     if (!code) return;
     if (seen.has(code)) duplicated.add(code);
     seen.add(code);
@@ -259,7 +261,7 @@ export function Step2SemanticModel({ draft, onChange }: { draft: ModelDraft; onC
 
   return (
     <>
-      {duplicateMessages.length > 0 && <Alert className="section-gap" type="error" showIcon title="编码唯一性校验失败" description={duplicateMessages.join('；')} />}
+      {duplicateMessages.length > 0 && <Alert className="section-gap compact-step-note" type="error" showIcon title="编码唯一性校验失败" description={duplicateMessages.join('；')} />}
       <div className="semantic-workbench section-gap">
         <SemanticOverviewCard
           draft={draft}
@@ -270,9 +272,9 @@ export function Step2SemanticModel({ draft, onChange }: { draft: ModelDraft; onC
           onEditParameter={index => openEdit('parameters', draft.semantic.parameters[index], index)}
           onEditVariable={index => openEdit('variables', draft.semantic.variables[index], index)}
         />
-        <ComponentDependencyCard draft={draft} onEditBinding={setBindingTarget} />
+        <div data-section-key="dependencies"><ComponentDependencyCard draft={draft} onEditBinding={setBindingTarget} /></div>
       </div>
-      <TimeDimensionConfigCard draft={draft} onChange={onChange} />
+      <div data-section-key="time"><TimeDimensionConfigCard draft={draft} onChange={onChange} /></div>
       <Collapse
         className="section-gap"
         items={[{

@@ -174,14 +174,37 @@ class ModelService:
                 STORE.models[model_id] = failed
                 STORE.save_runtime()
             raise
+        published_at = now_text()
+        published_draft = deepcopy(normalized_model.model_draft or {})
+        published_formula_versions: dict[str, dict[str, Any]] = {}
+        for formula in published_draft.get("formulas") or []:
+            if not isinstance(formula, dict):
+                continue
+            state = deepcopy(formula.get("version_state") or {})
+            revision = state.get("applied_revision") or state.get("current_revision") or 1
+            state["published_revision"] = revision
+            formula["version_state"] = state
+            source_snapshot = deepcopy(formula.get("applied_version") or formula.get("last_compiled_version") or formula.get("last_saved_version") or {})
+            source_snapshot.update({"revision": revision, "saved_at": published_at})
+            formula["published_version"] = source_snapshot
+            published_formula_versions[str(formula.get("formula_id") or formula.get("name") or len(published_formula_versions))] = state
+        published_generic_spec = deepcopy(normalized_model.generic_spec or {})
+        for artifact in published_generic_spec.get("formula_artifacts") or []:
+            if not isinstance(artifact, dict):
+                continue
+            version = published_formula_versions.get(str(artifact.get("formula_id")))
+            if version:
+                artifact["version_state"] = deepcopy(version)
         updated = model.model_copy(
             update={
                 **normalized_model.model_dump(exclude={"id", "created_at", "updated_at", "published_at", "status", "validation_warnings", "dry_run_result"}),
+                "model_draft": published_draft,
+                "generic_spec": published_generic_spec,
                 "status": "published",
                 "is_active_version": True,
                 "published_by": normalized_model.published_by or (normalized_model.ui_metadata or {}).get("published_by") or "system",
-                "published_at": now_text(),
-                "updated_at": now_text(),
+                "published_at": published_at,
+                "updated_at": published_at,
                 "solver": diagnosis.get("recommended_solver") or normalized_model.solver,
                 "problem_type": (dry_run_result.get("solver_check") or {}).get("problem_type") or normalized_model.problem_type,
                 "model_problem_type": (dry_run_result.get("solver_check") or {}).get("problem_type") or normalized_model.model_problem_type,
@@ -191,10 +214,11 @@ class ModelService:
                     **(normalized_model.ui_metadata or {}),
                     "publish_info": {
                         "status": "published",
-                        "published_at": now_text(),
+                        "published_at": published_at,
                         "dry_run_status": dry_run_result.get("structure_check", {}).get("status", "passed"),
                     },
                     "version_info": self._model_version_info(normalized_model, dry_run_result),
+                    "formula_versions": published_formula_versions,
                 },
             }
         )
@@ -781,11 +805,14 @@ class ModelService:
         if not generic_spec:
             return errors
         for index, constraint in enumerate(generic_spec.get("constraints") or []):
-            if constraint.get("compile_status") == "unsupported":
+            if constraint.get("compile_status") in {"unsupported", "compile_failed"}:
                 errors.append({"field": f"generic_spec.constraints[{index}].formula", "error": UNSUPPORTED_FORMULA_MESSAGE, "actual": constraint.get("compile_error")})
         for index, term in enumerate((generic_spec.get("objective") or {}).get("terms") or []):
-            if term.get("compile_status") == "unsupported":
+            if term.get("compile_status") in {"unsupported", "compile_failed"}:
                 errors.append({"field": f"generic_spec.objective.terms[{index}].formula", "error": UNSUPPORTED_FORMULA_MESSAGE, "actual": term.get("compile_error")})
+        objective = generic_spec.get("objective") or {}
+        if (objective.get("terms") or []) and str(objective.get("sense") or generic_spec.get("sense") or "") not in {"minimize", "maximize"}:
+            errors.append({"field": "generic_spec.objective.sense", "error": "参与求解的目标方向必须显式配置为 minimize 或 maximize", "actual": objective.get("sense") or generic_spec.get("sense")})
         return errors
 
     def _diagnose_problem_type(self, model: ModelPackage | ModelView) -> dict[str, Any]:

@@ -170,6 +170,23 @@ export function getScenarioById(id: string) {
   return scenarioCatalog.find(item => item.id === id);
 }
 
+export function modelBelongsToScenario(model: Record<string, unknown>, scenario: ScenarioCatalogItem, catalogModel?: ScenarioModelItem) {
+  const values = [
+    model.scene,
+    model.scenario,
+    model.template_id,
+    model.model_code,
+    model.resolved_model_code,
+    model.code,
+  ].map(value => String(value || ''));
+  const modelCodes = scenario.models.map(item => item.code);
+  const templateCodes = scenario.models.map(item => item.templateCode).filter((value): value is string => Boolean(value));
+  const matchesCode = (value: string, code: string) => value === code || value.startsWith(`${code}_`);
+  if (values.includes(scenario.id) || values.includes(scenario.name)) return true;
+  if (catalogModel && values.some(value => [catalogModel.id, catalogModel.code, catalogModel.templateCode || ''].some(code => code && matchesCode(value, code)))) return true;
+  return values.some(value => [...modelCodes, ...templateCodes].some(code => matchesCode(value, code)));
+}
+
 export function scenariosFromDictionary(items?: DictionaryItem[]) {
   if (items === undefined) return scenarioCatalog;
   return items

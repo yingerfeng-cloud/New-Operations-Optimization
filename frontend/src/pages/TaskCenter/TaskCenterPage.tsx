@@ -1,8 +1,8 @@
-import { MoreOutlined } from '@ant-design/icons';
-import { Button, Card, Drawer, Dropdown, Space, Tabs, message } from 'antd';
+import { DeleteOutlined, MoreOutlined } from '@ant-design/icons';
+import { Button, Card, Drawer, Dropdown, Modal, Space, Tabs, message } from 'antd';
 import { useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { cancelTask, createTask, getTask, getTasks, retryTask } from '../../api/tasks';
+import { cancelTask, createTask, deleteTask, getTask, getTasks, retryTask } from '../../api/tasks';
 import { getModels } from '../../api/models';
 import { getResult } from '../../api/results';
 import { DataTable } from '../../components/DataTable';
@@ -11,7 +11,8 @@ import { StatusTag } from '../../components/StatusTag';
 import { MetricCard, MetricGrid } from '../../components/WorkspaceUI';
 import { TaskCreateWizard } from '../../features/task-create/TaskCreateWizard';
 import { TaskExplanationPanel, TaskInputPanel, TaskLogsPanel, TaskOverviewPanel, TaskResultPanel, TaskTimelinePanel, isRetryableStatus, isRunningStatus } from '../../features/task-center/TaskPanels';
-import { isTaskFailed, normalizeTaskStatus, resolveTaskDetailDefaultTab, shouldPollTask } from '../../features/task-center/taskStatus';
+import { buildResultLabelMap } from '../../features/result-center/resultLabels';
+import { isTaskFailed, isTaskTerminal, normalizeTaskStatus, resolveTaskDetailDefaultTab, shouldPollTask } from '../../features/task-center/taskStatus';
 import type { SolveTask } from '../../types/task';
 import { validateRuntimeTimeDimension, type RuntimeField, type TimeDimensionConfig } from '../../features/time-dimension';
 
@@ -49,11 +50,23 @@ export function TaskCenterPage() {
   const create = useMutation({ mutationFn: createTask, onSuccess: task => { message.success('求解任务已提交'); setCreateOpen(false); refresh(task.id); openDetail(task.id); } });
   const cancel = useMutation({ mutationFn: cancelTask, onSuccess: task => { message.success('任务已取消'); refresh(task.id); } });
   const retry = useMutation({ mutationFn: retryTask, onSuccess: task => { message.success('任务已重试'); refresh(task.id); openDetail(task.id); } });
+  const remove = useMutation({
+    mutationFn: deleteTask,
+    onSuccess: (_data, taskId) => {
+      if (viewId === taskId) closeDetail();
+      qc.removeQueries({ queryKey: ['task', taskId] });
+      qc.removeQueries({ queryKey: ['result', taskId] });
+      qc.invalidateQueries({ queryKey: ['tasks'] });
+      message.success('任务记录已删除');
+    },
+  });
   const rows = tasks.data || [];
   const running = rows.filter(task => isRunningStatus(task.status)).length;
   const success = rows.filter(task => normalizeTaskStatus(task.status) === 'SUCCESS').length;
   const failed = rows.filter(task => isTaskFailed(task.status) || normalizeTaskStatus(task.status) === 'CANCELLED').length;
   const current = detail.data;
+  const currentModelId = String(current?.model_id || current?.resolved_model_id || result.data?.model_id || '');
+  const resultLabelMap = buildResultLabelMap((models.data || []).find(model => model.id === currentModelId));
   useEffect(() => {
     if (!viewId) { tabInitializedFor.current = ''; previousStatus.current = ''; setActiveTab('overview'); return; }
     if (!current) return;
@@ -66,17 +79,26 @@ export function TaskCenterPage() {
     previousStatus.current = status;
   }, [current, result.data, viewId]);
   const closeDetail = () => { setViewId(undefined); tabInitializedFor.current = ''; previousStatus.current = ''; };
+  const confirmDelete = (task: SolveTask) => Modal.confirm({
+    title: '删除任务记录？',
+    icon: <DeleteOutlined />,
+    content: `任务 ${task.id} 及其归档结果将被永久删除，此操作无法撤销。`,
+    okText: '删除记录',
+    cancelText: '取消',
+    okButtonProps: { danger: true },
+    onOk: () => remove.mutateAsync(task.id),
+  });
 
   return <>
     <PageHeader title="任务调度中心" description="创建、监控、取消和重试优化任务；成功后直接进入结果分析。" extra={<Button type="primary" onClick={() => setCreateOpen(true)}>创建任务</Button>} />
     <MetricGrid><MetricCard title="任务总数" value={rows.length} description="真实任务队列" tone="blue" /><MetricCard title="运行中" value={running} description="校验 / 建模 / 求解" tone="amber" /><MetricCard title="成功" value={success} description="可查看结果" tone="green" /><MetricCard title="异常" value={failed} description={failed ? '需要处理' : '暂无异常'} tone={failed ? 'red' : 'neutral'} /></MetricGrid>
     <Card className="content-card section-gap" title="求解任务列表"><DataTable<SolveTask> dataSource={rows} loading={tasks.isLoading} columns={[
       { title: '任务编号', dataIndex: 'id' }, { title: '模型', dataIndex: 'model' }, { title: '状态', dataIndex: 'status', render: (status: string) => <StatusTag status={status} /> }, { title: '进度', dataIndex: 'progress', render: (progress: number) => `${progress || 0}%` }, { title: '创建时间', dataIndex: 'created_at' }, { title: '求解器', dataIndex: 'solver' }, { title: '目标值', dataIndex: 'cost' },
-      { title: '操作', fixed: 'right' as const, render: (_: unknown, task: SolveTask) => <Space className="task-actions"><Button type="link" onClick={() => openDetail(task.id)}>查看</Button><Dropdown trigger={['click']} menu={{ items: [{ key: 'cancel', label: '取消任务', danger: true, disabled: !isRunningStatus(task.status) }, { key: 'retry', label: '重试任务', disabled: !isRetryableStatus(task.status) }, { key: 'result', label: '查看结果', disabled: normalizeTaskStatus(task.status) !== 'SUCCESS' }], onClick: ({ key }) => { if (key === 'cancel') cancel.mutate(task.id); if (key === 'retry') retry.mutate(task.id); if (key === 'result') openDetail(task.id); } }}><Button type="link" icon={<MoreOutlined />} aria-label={`任务 ${task.id} 更多操作`}>更多</Button></Dropdown></Space> },
+      { title: '操作', fixed: 'right' as const, render: (_: unknown, task: SolveTask) => <Space className="task-actions"><Button type="link" onClick={() => openDetail(task.id)}>查看</Button><Dropdown trigger={['click']} menu={{ items: [{ key: 'cancel', label: '取消任务', danger: true, disabled: !isRunningStatus(task.status) }, { key: 'retry', label: '重试任务', disabled: !isRetryableStatus(task.status) }, { key: 'result', label: '查看结果', disabled: normalizeTaskStatus(task.status) !== 'SUCCESS' }, { type: 'divider' }, { key: 'delete', label: '删除记录', icon: <DeleteOutlined />, danger: true, disabled: !isTaskTerminal(task.status) }], onClick: ({ key }) => { if (key === 'cancel') cancel.mutate(task.id); if (key === 'retry') retry.mutate(task.id); if (key === 'result') openDetail(task.id); if (key === 'delete') confirmDelete(task); } }}><Button type="link" icon={<MoreOutlined />} aria-label={`任务 ${task.id} 更多操作`}>更多</Button></Dropdown></Space> },
     ]} /></Card>
     <TaskCreateWizard open={createOpen} models={models.data || []} initialModelId={initialModelId} initialScene={initialScene} submitting={create.isPending} onClose={() => setCreateOpen(false)} onSubmit={payload => create.mutateAsync(payload)} />
     <Drawer size="large" open={!!viewId} destroyOnHidden onClose={closeDetail} title={`任务 ${viewId || ''}`} footer={<Space style={{ width: '100%', justifyContent: 'flex-end' }}><Button onClick={closeDetail}>关闭</Button>{current && <Button danger disabled={!isRunningStatus(current.status)} title={!isRunningStatus(current.status) ? '仅运行中的任务可取消' : undefined} onClick={() => cancel.mutate(current.id)}>取消任务</Button>}{current && isRetryableStatus(current.status) && <Button type="primary" onClick={() => retry.mutate(current.id)}>重试任务</Button>}</Space>}>
-      <Tabs activeKey={activeTab} onChange={setActiveTab} items={[{ key: 'overview', label: '任务概览', children: <TaskOverviewPanel task={current} /> }, { key: 'timeline', label: '求解过程', children: <TaskTimelinePanel task={current} /> }, { key: 'input', label: '输入参数', children: <TaskInputPanel task={current} /> }, { key: 'logs', label: '技术日志', children: <TaskLogsPanel task={current} /> }, { key: 'result', label: '优化结果', children: <TaskResultPanel result={result.data} /> }, { key: 'explain', label: '业务解释', children: <TaskExplanationPanel task={current} result={result.data} /> }]} />
+      <Tabs activeKey={activeTab} onChange={setActiveTab} items={[{ key: 'overview', label: '任务概览', children: <TaskOverviewPanel task={current} /> }, { key: 'timeline', label: '求解过程', children: <TaskTimelinePanel task={current} /> }, { key: 'input', label: '输入参数', children: <TaskInputPanel task={current} /> }, { key: 'logs', label: '技术日志', children: <TaskLogsPanel task={current} /> }, { key: 'result', label: '优化结果', children: <TaskResultPanel result={result.data} labelMap={resultLabelMap} /> }, { key: 'explain', label: '业务解释', children: <TaskExplanationPanel task={current} result={result.data} /> }]} />
     </Drawer>
   </>;
 }

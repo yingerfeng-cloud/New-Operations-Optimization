@@ -74,10 +74,11 @@ async function createPolicyModel(api: APIRequestContext, base: ModelAsset, polic
     timeSet.time_granularity = policy.interval_minutes;
   }
   const created = await json<ModelAsset>(await api.post(`/api/models/${base.id}/versions`, { data: source }));
+  await json<ModelAsset>(await api.post(`/api/models/${created.id}/test`, { data: sample }));
   return json<ModelAsset>(await api.post(`/api/models/${created.id}/publish`));
 }
 
-test('controlled environment is healthy and contains callable seed models', async ({ request }) => {
+test('@real controlled environment is healthy and contains callable seed models', async ({ request }) => {
   const health = await json<Record<string, any>>(await request.get('/api/health'));
   expect(health.ok).toBe(true);
   expect(health.highspy_installed).toBe(true);
@@ -85,7 +86,7 @@ test('controlled environment is healthy and contains callable seed models', asyn
   expect(models.some(model => callable.has(String(model.status).toLowerCase()))).toBe(true);
 });
 
-test('published generic model solves with the real backend and emits result metadata', async ({ request }) => {
+test('@real published generic model solves with the real backend and emits result metadata', async ({ request }) => {
   test.setTimeout(180_000);
   const models = await json<ModelAsset[]>(await request.get('/api/models'));
   let selected: ModelAsset | undefined;
@@ -108,7 +109,7 @@ test('published generic model solves with the real backend and emits result meta
   expect(result.objective_value).not.toBeNull();
 });
 
-test('candidate horizon and data-derived horizon use real published contracts', async ({ request }) => {
+test('@real candidate horizon and data-derived horizon use real published contracts', async ({ request }) => {
   test.setTimeout(300_000);
   const models = await json<ModelAsset[]>(await request.get('/api/models'));
   let base: ModelAsset | undefined;
@@ -187,7 +188,7 @@ test('candidate horizon and data-derived horizon use real published contracts', 
   expect(derivedResult.chart?.labels).toHaveLength(4);
 });
 
-test('hydro capability is selected from semantic structure and solved through the generic task API', async ({ request }) => {
+test('@real hydro capability is selected from semantic structure and solved through the generic task API', async ({ request }) => {
   test.setTimeout(240_000);
   const models = await json<ModelAsset[]>(await request.get('/api/models'));
   let selected: ModelAsset | undefined;
@@ -212,7 +213,7 @@ test('hydro capability is selected from semantic structure and solved through th
   expect(result.business_output?.water_balance_check?.length || result.business_output?.storage_curve?.length).toBeGreaterThan(0);
 });
 
-test('real infeasible submission returns actionable diagnosis instead of a generic failure only', async ({ request }) => {
+test('@real real infeasible submission returns actionable diagnosis instead of a generic failure only', async ({ request }) => {
   test.setTimeout(180_000);
   const models = await json<ModelAsset[]>(await request.get('/api/models'));
   let selected: ModelAsset | undefined;
@@ -238,7 +239,7 @@ test('real infeasible submission returns actionable diagnosis instead of a gener
   }
 });
 
-test('agent performs automatic skill matching without a hidden requested skill', async ({ request }) => {
+test('@real agent performs automatic skill matching without a hidden requested skill', async ({ request }) => {
   test.setTimeout(120_000);
   const conversation = await json<Record<string, any>>(await request.post('/api/agent/conversations', { data: { title: 'real gate' } }));
   const response = await request.post('/api/agent/analyze', {

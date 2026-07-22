@@ -1,0 +1,55 @@
+body,
+.main,
+.main-content,
+.main-content.content {
+  background: #f4f6f9 !important;
+}
+
+.sidebar,
+.app-sidebar {
+  background: #10243a !important;
+  box-shadow: none !important;
+}
+
+.brand-mark,
+.sidebar .brand-mark {
+  border-radius: 6px !important;
+  background: #2166c2 !important;
+  box-shadow: none !important;
+}
+
+.app-sidebar .ant-menu-item-selected,
+.nav button.active {
+  background: #173756 !important;
+}
+
+.page-hero {
+  padding: 0 !important;
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.page-hero h3 { font-size: clamp(22px, 2vw, 24px) !important; }
+.page-hero-desc { max-width: 960px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+
+.metric,
+.metric.blue,
+.metric.green,
+.metric.amber,
+.metric.red,
+.metric-card-v2,
+.metric-card-blue,
+.metric-card-green,
+.metric-card-amber,
+.metric-card-red,
+.metric-card-purple,
+.metric-card-neutral {
+  background: #fff !important;
+  box-shadow: none !important;
+}
+
+.metric::before,
+.metric-card-v2::before { opacity: .65; }
+
+code { border-radius: 4px; color: #475467; background: #f2f4f7; }

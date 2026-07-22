@@ -2,7 +2,9 @@ import { Alert, Button, Card, Descriptions, Empty, Progress, Space, Table, Tag, 
 import { JsonViewer } from '../../components/JsonViewer';
 import { StatusTag } from '../../components/StatusTag';
 import type { SolveResult } from '../../types/result';
+import { resultLabel, type ResultLabelMap } from '../result-center/resultLabels';
 import type { SolveTask } from '../../types/task';
+import { formatDurationSeconds } from '../../utils/formatDuration';
 import { isTaskRetryable, isTaskRunning } from './taskStatus';
 import { isTaskFailed } from './taskStatus';
 
@@ -41,6 +43,22 @@ function rowsFromArrayOrObject(value: unknown, prefix: string): Row[] {
   return rowsFromObject(value);
 }
 
+function TaskVariableValue({ value, variable }: { value: unknown; variable: string }) {
+  if (!value || typeof value !== 'object') return <span className="task-variable-scalar">{text(value)}</span>;
+  if (Array.isArray(value)) return <div className="task-variable-json"><JsonViewer value={value} /></div>;
+  const entries = Object.entries(value as Record<string, unknown>);
+  const compact = entries.length > 0 && entries.every(([, item]) => item === null || ['string', 'number', 'boolean'].includes(typeof item));
+  if (!compact) return <div className="task-variable-json"><JsonViewer value={value} /></div>;
+  return (
+    <div className="task-variable-values">
+      {entries.map(([key, item]) => {
+        const shortKey = key.startsWith(`${variable}[`) ? key.slice(variable.length) : key;
+        return <div className="task-variable-value" key={key}><span title={key}>{shortKey}</span><strong>{text(item)}</strong></div>;
+      })}
+    </div>
+  );
+}
+
 function statusColor(status: string, current: string) {
   if (current === 'SUCCESS') return 'green';
   if (['FAILED', 'INFEASIBLE', 'TIMEOUT', 'CANCELLED'].includes(current)) return status === current ? 'red' : 'gray';
@@ -55,11 +73,16 @@ export function TaskOverviewPanel({ task }: { task?: SolveTask }) {
   const trace = task.trace || {};
   const problemType = task.problem_type || trace.problem_type || (String(task.solver || '').toLowerCase().includes('ipopt') ? 'NLP' : '-');
   const isNlp = String(problemType).toUpperCase() === 'NLP' || String(task.solver || '').toLowerCase().includes('ipopt');
+  const progressStatus = status === 'SUCCESS' ? 'success' : ['FAILED', 'TIMEOUT', 'CANCELLED', 'INFEASIBLE'].includes(status) ? 'exception' : 'active';
   return (
     <>
-      {task.resolution_warning && <Alert showIcon type="warning" title="模型解析提示" description={task.resolution_warning} className="section-gap" />}
-      {task.error && <Alert showIcon type="error" title="任务错误" description={task.error} className="section-gap" />}
-      {isNlp && <Alert showIcon type="warning" title="NLP 结果不承诺全局最优" description="Ipopt 用于连续变量 NLP，通常返回局部最优或求解器终止状态；请关注初值、上下界和约束违反摘要。" className="section-gap" />}
+      <div className="task-overview-progress">
+        <span><strong>任务进度</strong><small>{Math.max(0, Math.min(100, Number(task.progress || 0)))}%</small></span>
+        <Progress percent={Math.max(0, Math.min(100, Number(task.progress || 0)))} status={progressStatus} showInfo={false} />
+      </div>
+      {task.resolution_warning && <Alert showIcon type="warning" title="模型解析提示" description={task.resolution_warning} className="compact-notice task-overview-alert" />}
+      {task.error && <Alert showIcon type="error" title="任务错误" description={task.error} className="compact-notice task-overview-alert" />}
+      {isNlp && <Alert showIcon type="warning" title="NLP 结果不承诺全局最优" description="Ipopt 用于连续变量 NLP，通常返回局部最优或求解器终止状态；请关注初值、上下界和约束违反摘要。" className="compact-notice task-overview-alert" />}
       <Descriptions bordered size="small" column={2}>
         <Descriptions.Item label="任务编号">{task.id}</Descriptions.Item>
         <Descriptions.Item label="状态"><StatusTag status={task.status} /></Descriptions.Item>
@@ -75,13 +98,10 @@ export function TaskOverviewPanel({ task }: { task?: SolveTask }) {
         <Descriptions.Item label="风险">{text(task.risk)}</Descriptions.Item>
         <Descriptions.Item label="重试次数">{text(task.retry_count || 0)}</Descriptions.Item>
         <Descriptions.Item label="创建时间">{task.created_at}</Descriptions.Item>
-        <Descriptions.Item label="耗时">{task.duration_seconds === undefined ? '-' : `${task.duration_seconds}s`}</Descriptions.Item>
+        <Descriptions.Item label="耗时">{formatDurationSeconds(task.duration_seconds)}</Descriptions.Item>
         <Descriptions.Item label="约束违反摘要">{text(task.constraint_violation_summary ?? trace.constraint_violation_summary)}</Descriptions.Item>
         <Descriptions.Item label="局部最优提示">{text(task.local_optimum_warning ?? trace.local_optimum_warning)}</Descriptions.Item>
       </Descriptions>
-      <Card size="small" title="任务进度" className="section-gap">
-        <Progress percent={Math.max(0, Math.min(100, Number(task.progress || 0)))} status={status === 'SUCCESS' ? 'success' : ['FAILED', 'TIMEOUT', 'CANCELLED', 'INFEASIBLE'].includes(status) ? 'exception' : 'active'} />
-      </Card>
     </>
   );
 }
@@ -119,17 +139,34 @@ export function TaskLogsPanel({ task }: { task?: SolveTask }) {
   return logs.length ? <Timeline items={logs.map((log, index) => ({ content: log, color: index === logs.length - 1 ? 'blue' : 'gray' }))} /> : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无求解日志" />;
 }
 
-export function TaskResultPanel({ result }: { result?: SolveResult }) {
+function TaskResultName({ code, labelMap }: { code: unknown; labelMap?: ResultLabelMap }) {
+  const technicalCode = String(code || '-');
+  const label = resultLabel(technicalCode, labelMap);
+  return <span className="result-field-name"><span>{label}</span>{label !== technicalCode && <small>{technicalCode}</small>}</span>;
+}
+
+export function TaskResultPanel({ result, labelMap }: { result?: SolveResult; labelMap?: ResultLabelMap }) {
   if (!result) return <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="任务完成后展示结果" />;
   const variables = result.variables || result.variable_values || {};
   const metrics = result.metrics || {};
   return (
     <>
       <Card size="small" title="关键指标">
-        <Table size="small" pagination={false} rowKey="__row_key" dataSource={rowsFromObject(metrics)} columns={[{ title: '指标', dataIndex: 'key' }, { title: '值', dataIndex: 'value', render: text }]} />
+        <Table size="small" pagination={false} rowKey="__row_key" dataSource={rowsFromObject(metrics)} columns={[{ title: '指标', dataIndex: 'key', render: value => <TaskResultName code={value} labelMap={labelMap} /> }, { title: '值', dataIndex: 'value', render: text }]} />
       </Card>
       <Card size="small" title="变量结果" className="section-gap">
-        <Table size="small" pagination={false} rowKey="__row_key" dataSource={rowsFromObject(variables)} columns={[{ title: '变量', dataIndex: 'key' }, { title: '结果', dataIndex: 'value', render: text }]} />
+        <Table
+          className="task-variable-table"
+          size="small"
+          tableLayout="fixed"
+          pagination={false}
+          rowKey="__row_key"
+          dataSource={rowsFromObject(variables)}
+          columns={[
+            { title: '变量', dataIndex: 'key', width: 180, render: value => <TaskResultName code={value} labelMap={labelMap} /> },
+            { title: '结果', dataIndex: 'value', render: (value, row) => <TaskVariableValue value={value} variable={String(row.key || '')} /> },
+          ]}
+        />
       </Card>
     </>
   );
@@ -141,11 +178,11 @@ export function TaskExplanationPanel({ task, result }: { task?: SolveTask; resul
   const supporting = { warnings: task?.warnings, risk_notes: task?.risk_notes, precheck_errors: task?.precheck_errors, infeasibility_diagnosis: task?.infeasibility_diagnosis, solver_diagnostic: task?.solver_diagnostic };
   if (!explanation && !Object.values(supporting).some(value => value !== undefined && value !== null && value !== '')) return <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无业务解释，请查看技术日志" />;
   const actions = task && isTaskFailed(task.status) ? <Space wrap className="section-gap"><Button href={`/tasks?create=1&model=${encodeURIComponent(String(task.model_id || task.resolved_model_id || ''))}`}>修改参数重新提交</Button><Button href={`/models/${encodeURIComponent(String(task.model_id || task.resolved_model_id || ''))}`}>查看模型</Button><Button href="/runtime">检查求解环境</Button></Space> : null;
-  if (typeof explanation === 'string') return <><Alert showIcon type="info" title="主要原因" description={explanation} />{actions}</>;
+  if (typeof explanation === 'string') return <><Alert className="compact-notice" showIcon type="info" title="主要原因" description={explanation} />{actions}</>;
   const obj = explanation && typeof explanation === 'object' ? explanation as Record<string, unknown> : {};
   return (
     <>
-      <Alert showIcon type="info" title="结果解释" description={text(obj.summary || result?.suggestion || '已生成任务诊断，请结合参数、约束和技术日志复核。')} />
+      <Alert className="compact-notice" showIcon type="info" title="结果解释" description={text(obj.summary || result?.suggestion || '已生成任务诊断，请结合参数、约束和技术日志复核。')} />
       <Card size="small" title="诊断详情" className="section-gap">
         <JsonViewer value={result?.business_output || (Object.keys(obj).length ? obj : supporting)} />
       </Card>

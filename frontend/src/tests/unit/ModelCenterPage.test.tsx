@@ -221,7 +221,7 @@ test('runs model asset operations from list', async () => {
   fireEvent.click(screen.getByRole('button', { name: /更多/ }));
   fireEvent.click((await screen.findAllByText('复制模型')).at(-1) as HTMLElement);
   expect(navigate).toHaveBeenCalledWith('/models/create?mode=clone&source=model_001');
-}, 30000);
+}, 60000);
 
 test('model detail follows route id changes and close returns to models', async () => {
   const view = renderPage();

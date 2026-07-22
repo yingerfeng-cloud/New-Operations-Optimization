@@ -18,6 +18,7 @@ function nlpDraft(problemType = 'NLP'): ModelDraft {
     formula_id: 'obj',
     name: '目标',
     kind: 'objective',
+    objective_direction: 'minimize',
     display_formula: 'p[t]',
     dsl_formula: 'p[t]',
     tokens: [],
@@ -29,6 +30,7 @@ function nlpDraft(problemType = 'NLP'): ModelDraft {
     compile_status: 'ready',
   }];
   draft.advanced.generic_spec = {
+    formula_compiler: 'backend_authoritative_v2',
     sets: { time: [0] },
     parameters: { load: [100] },
     variables: [{ name: 'p', indices: ['time'], domain: 'NonNegativeReals' }],

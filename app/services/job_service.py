@@ -75,6 +75,15 @@ class JobService:
             job_runner.start(task_id)
         return task.view()
 
+    def delete_task(self, task_id: str) -> None:
+        task = self.get_task(task_id)
+        if task.status in {"PENDING", "QUEUED", "RUNNING", "VALIDATING", "BUILDING_MODEL", "SOLVING", "FORMATTING_RESULT"}:
+            raise HTTPException(status_code=409, detail="Running tasks must be cancelled before their records can be deleted")
+        with STORE.lock:
+            STORE.tasks.pop(task_id, None)
+            STORE.results.pop(task_id, None)
+            STORE.save_runtime()
+
     def _prepare_request(self, req: SolveRequest) -> None:
         req.solver = "HiGHS"
         user_parameter_keys = set(req.parameters or {})

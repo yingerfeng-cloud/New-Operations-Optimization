@@ -38,6 +38,28 @@ function variableRefs(text: string, variableCodes: string[]) {
   return [...text.matchAll(pattern)].map(match => match[0]);
 }
 
+function topLevelAdditiveTerms(expression: string) {
+  const terms: string[] = [];
+  let start = 0;
+  let roundDepth = 0;
+  let squareDepth = 0;
+  for (let index = 0; index < expression.length; index += 1) {
+    const character = expression[index];
+    if (character === '(') roundDepth += 1;
+    else if (character === ')') roundDepth = Math.max(0, roundDepth - 1);
+    else if (character === '[') squareDepth += 1;
+    else if (character === ']') squareDepth = Math.max(0, squareDepth - 1);
+    else if ((character === '+' || character === '-') && roundDepth === 0 && squareDepth === 0 && index > start) {
+      const term = expression.slice(start, index).trim();
+      if (term) terms.push(term);
+      start = index + 1;
+    }
+  }
+  const tail = expression.slice(start).trim();
+  if (tail) terms.push(tail);
+  return terms;
+}
+
 function baseName(expression: string) {
   return expression.trim().match(/^([A-Za-z_]\w*)/)?.[1] || '';
 }
@@ -58,8 +80,10 @@ export function analyzeFormulaText(expression: string, variableCodes: string[], 
   const rows: NonlinearDiagnostic[] = [];
   const refs = variableRefs(text, variableCodes);
   const relationSides = text.split(/==|<=|>=/).map(side => side.trim()).filter(Boolean);
-  const productSide = relationSides.find(side => side.includes('*') && side.split('*').filter(part => variableRefs(part, variableCodes).length > 0).length >= 2) || text;
-  const factors = productSide.split('*').map(item => item.trim());
+  const productTerm = relationSides
+    .flatMap(topLevelAdditiveTerms)
+    .find(term => term.includes('*') && term.split('*').filter(part => variableRefs(part, variableCodes).length > 0).length >= 2);
+  const factors = productTerm?.split('*').map(item => item.trim()) || [];
   const factorVars = factors.map(item => variableRefs(item, variableCodes)[0]).filter(Boolean);
   if (factorVars.length >= 2) {
     const pair = factorVars.slice(0, 2);

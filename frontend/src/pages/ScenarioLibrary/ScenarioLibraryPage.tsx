@@ -8,29 +8,12 @@ import { PageHeader } from '../../components/PageHeader';
 import { ConfigurationMissingState } from '../../components/PageStates';
 import { StatusTag } from '../../components/StatusTag';
 import { FilterBar, MetricCard } from '../../components/WorkspaceUI';
-import { scenarioCatalog, scenariosFromDictionary } from '../../features/model-creation/data/scenarioCatalog';
-import type { ScenarioCatalogItem, ScenarioModelItem } from '../../types/scenario';
+import { modelBelongsToScenario, scenarioCatalog, scenariosFromDictionary } from '../../features/model-creation/data/scenarioCatalog';
 
 const statusOptions = ['全部', '已发布', '试运行'];
 
 function statusLabel(status: string) {
   return status === 'trial' ? '试运行' : status === 'published' ? '已发布' : status;
-}
-
-function modelBelongsToScenario(model: Record<string, unknown>, scenario: ScenarioCatalogItem, catalogModel?: ScenarioModelItem) {
-  const values = [
-    model.scene,
-    model.scenario,
-    model.template_id,
-    model.model_code,
-    model.resolved_model_code,
-    model.code,
-  ].map(value => String(value || ''));
-  const modelCodes = scenario.models.map(item => item.code);
-  const templateCodes = scenario.models.map(item => item.templateCode).filter(Boolean);
-  if (values.includes(scenario.id) || values.includes(scenario.name)) return true;
-  if (catalogModel && (values.includes(catalogModel.id) || values.includes(catalogModel.code) || values.includes(catalogModel.templateCode || ''))) return true;
-  return values.some(value => modelCodes.includes(value) || templateCodes.includes(value));
 }
 
 function publishedStatus(status: unknown) {
@@ -107,25 +90,24 @@ export function ScenarioLibraryPage() {
               <MetricCard title="模型资产" value={scenario.ownedModelCount} tone="blue" />
               <MetricCard title="已发布模型" value={scenario.publishedModelCount} tone="green" />
             </div>
-            <Space wrap className="section-gap">
-              <Button data-testid={`scenario-enter-${scenario.id}`} type="primary" disabled={!scenario.models[0]} onClick={() => scenario.models[0] && openModelCreation(scenario.id, scenario.models[0].id)}>进入建模</Button>
-              <Button disabled={!scenario.recommendedModelId} title={!scenario.recommendedModelId ? '暂无已发布模型' : undefined} onClick={() => nav(`/tasks?create=1&scene=${encodeURIComponent(scenario.name)}&model=${encodeURIComponent(scenario.recommendedModelId || '')}`)}>使用推荐模型发起任务</Button>
+            <div className="scenario-primary-actions section-gap">
+              <Button type="primary" disabled={!scenario.recommendedModelId} title={!scenario.recommendedModelId ? '暂无已发布模型' : undefined} onClick={() => nav(`/tasks?create=1&scene=${encodeURIComponent(scenario.name)}&model=${encodeURIComponent(scenario.recommendedModelId || '')}`)}>使用推荐模型发起任务</Button>
               <Button onClick={() => nav('/models/create?mode=new')}>创建空白模型</Button>
-            </Space>
+            </div>
             <div className="scenario-model-list">
               {scenario.models.map(model => (
                 <div className="scenario-model-item" key={model.id}>
                   <div className="scenario-model-main">
                     <strong>{model.name}</strong>
                     <span className="scenario-model-code">{model.code}</span>
-                    <div className="scenario-model-meta">
-                      <StatusTag status={scenario.status} />
-                      <Tag color="geekblue">{builderText(model.builderMode)}</Tag>
-                      <Tag color="purple">{model.problemType}</Tag>
+                    <div className="scenario-model-action">
+                      <Button size="small" onClick={() => openModelCreation(scenario.id, model.id)}>进入建模</Button>
                     </div>
                   </div>
-                  <div className="scenario-model-action">
-                    <Button onClick={() => openModelCreation(scenario.id, model.id)}>进入建模</Button>
+                  <div className="scenario-model-meta">
+                    <StatusTag status={scenario.status} />
+                    <Tag color="geekblue">{builderText(model.builderMode)}</Tag>
+                    <Tag color="purple">{model.problemType}</Tag>
                   </div>
                 </div>
               ))}

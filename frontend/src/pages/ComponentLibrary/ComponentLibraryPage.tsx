@@ -90,14 +90,14 @@ export function ComponentLibraryPage() {
         <MetricCard title="依赖缺失" value={missingDeps} description="阻止发布风险" tone={missingDeps ? 'red' : 'neutral'} />
       </MetricGrid>
       <Card className="content-card section-gap" title={`组件清单 · 已发布 ${publishedCount}`}>
-        <Space wrap className="full-width">
+        <Space wrap className="full-width component-filter-bar">
           <Select allowClear placeholder="分类" style={{ width: 140 }} value={filters.category} onChange={category => setFilters({ ...filters, category })} options={optionsFromDictionary(dictionaries?.component_categories, allRows, 'category')} />
           <Select allowClear placeholder="领域" style={{ width: 140 }} value={filters.domain} onChange={domain => setFilters({ ...filters, domain })} options={optionsFromDictionary(dictionaries?.component_domains, allRows, 'domain')} />
           <Select allowClear placeholder="状态" style={{ width: 140 }} value={filters.status} onChange={status => setFilters({ ...filters, status })} options={[...new Set(allRows.map(item => String(item.status || '')).filter(Boolean))].map(value => ({ value, label: value }))} />
           <Select allowClear placeholder="实现状态" style={{ width: 140 }} value={filters.implemented} onChange={implemented => setFilters({ ...filters, implemented })} options={[{ value: 'true', label: '已实现' }, { value: 'false', label: '未实现' }]} />
         </Space>
         <DataTable<ComponentDef>
-          className="section-gap"
+          className="component-list-table"
           loading={list.isLoading}
           dataSource={rows}
           columns={[

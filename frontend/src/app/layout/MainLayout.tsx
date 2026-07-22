@@ -21,7 +21,7 @@ export function MainLayout() {
   const { mobile, medium } = useViewport();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [manualCollapsed, setManualCollapsed] = useState(() => localStorage.getItem(COLLAPSE_KEY) === 'true');
-  const collapsed = medium ? manualCollapsed || localStorage.getItem(COLLAPSE_KEY) === null : false;
+  const collapsed = manualCollapsed || (medium && localStorage.getItem(COLLAPSE_KEY) === null);
 
   useEffect(() => setDrawerOpen(false), [pathname]);
   const toggleCollapsed = () => {

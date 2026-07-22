@@ -1,1 +1,43 @@
-{"ok":true,"api_skill_name":"run_economic_dispatch"}
+{
+  "ok": true,
+  "api_skill_name": "run_economic_dispatch",
+  "request": {
+    "parameters": {
+      "load_forecast": [
+        160,
+        190,
+        175,
+        150
+      ],
+      "unit_min_output": {
+        "U1": 30,
+        "U2": 20,
+        "U3": 10
+      },
+      "unit_max_output": {
+        "U1": 120,
+        "U2": 90,
+        "U3": 70
+      },
+      "fuel_cost": {
+        "U1": 220,
+        "U2": 260,
+        "U3": 360
+      },
+      "ramp_up_limit": {
+        "U1": 80,
+        "U2": 60,
+        "U3": 50
+      },
+      "ramp_down_limit": {
+        "U1": 80,
+        "U2": 60,
+        "U3": 50
+      }
+    },
+    "options": {
+      "mode": "sync",
+      "explain": true
+    }
+  }
+}

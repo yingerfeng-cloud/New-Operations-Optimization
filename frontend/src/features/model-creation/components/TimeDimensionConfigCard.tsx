@@ -95,7 +95,7 @@ export function TimeDimensionConfigCard({ draft, onChange }: { draft: ModelDraft
   return (
     <Card className="section-gap" title="时间维度配置" extra={<Space><Typography.Text type="secondary">是否启用时间维度</Typography.Text><Switch aria-label="是否启用时间维度" checked={config.enabled} onChange={toggleEnabled} /></Space>}>
       {blockedMessage && <Alert className="section-gap-tight" showIcon type="error" title={blockedMessage} />}
-      {!config.enabled ? <Alert showIcon type="info" title="非时序模型" description="模型不会生成时间集合，也不会在任务中心展示 horizon。" /> : (
+      {!config.enabled ? <Alert className="compact-step-note" showIcon type="info" title="非时序模型" description="模型不会生成时间集合，也不会在任务中心展示 horizon。" /> : (
         <Space orientation="vertical" size={16} style={{ width: '100%' }}>
           <Form layout="vertical">
             <Space wrap align="start" size={16}>
@@ -119,7 +119,7 @@ export function TimeDimensionConfigCard({ draft, onChange }: { draft: ModelDraft
             {mode === 'free' && <Space wrap align="start"><Form.Item label="默认 horizon" required><InputNumber min={1} value={config.default_horizon} onChange={value => update({ default_horizon: value || undefined })} /></Form.Item><Form.Item label="最小 horizon"><InputNumber min={1} value={config.min_horizon} onChange={value => update({ min_horizon: value || undefined })} /></Form.Item><Form.Item label="最大 horizon"><InputNumber min={1} value={config.max_horizon} onChange={value => update({ max_horizon: value || undefined })} /></Form.Item><Form.Item label="步长"><InputNumber min={1} value={config.horizon_step} onChange={value => update({ horizon_step: value || undefined })} /></Form.Item><Form.Item label="默认时间粒度"><InputNumber min={0.0001} value={config.interval_minutes} onChange={value => update({ interval_minutes: value || undefined, delta_t: value ? value / 60 : undefined })} /></Form.Item><Form.Item label="delta_t"><InputNumber min={0.0001} value={config.delta_t} onChange={value => update({ delta_t: value || undefined })} /></Form.Item></Space>}
             {mode === 'choice' && <>
               <Form.Item label="默认 horizon" required><Select style={{ width: 220 }} value={config.default_horizon} options={allowed.map(item => ({ value: item, label: `${item} 点` }))} onChange={value => update({ default_horizon: value })} /></Form.Item>
-              {errors.length > 0 && <Alert className="section-gap-tight" showIcon type="error" title="候选时段配置不完整" description={errors.join('；')} />}
+              {errors.length > 0 && <Alert className="section-gap-tight compact-step-note" showIcon type="error" title="候选时段配置不完整" description={errors.join('；')} />}
               <Table size="small" pagination={false} rowKey="horizon" dataSource={allowed.map(horizon => ({ horizon, interval: config.interval_minutes_by_horizon?.[String(horizon)], delta: config.delta_t_by_horizon?.[String(horizon)] }))} columns={[
                 { title: 'horizon', dataIndex: 'horizon', render: (value: number) => <InputNumber min={1} value={value} onChange={next => updateCandidate(value, 'horizon', next)} /> },
                 { title: '时间粒度（分钟）', dataIndex: 'interval', render: (value: number, row) => <InputNumber min={0.0001} value={value} onChange={next => updateCandidate(row.horizon, 'interval', next)} /> },

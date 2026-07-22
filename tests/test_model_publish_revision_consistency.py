@@ -70,3 +70,33 @@ def test_versions_use_family_maximum_and_reject_duplicate_family_version() -> No
     with pytest.raises(HTTPException) as conflict:
         model_service.create_model(duplicate)
     assert conflict.value.detail["code"] == "MODEL_VERSION_CONFLICT"
+
+
+def test_publish_persists_formula_published_revision_without_losing_applied_baseline() -> None:
+    payload = minimal_dispatch_payload()
+    payload["model_draft"] = {
+        "formulas": [{
+            "formula_id": "versioned-objective",
+            "name": "versioned-objective",
+            "kind": "objective",
+            "dsl_formula": "dispatch",
+            "version_state": {
+                "current_revision": 2,
+                "last_saved_revision": 2,
+                "last_compiled_revision": 2,
+                "applied_revision": 2,
+                "expression_hash": "fnv1a-current",
+                "compiled_expression_hash": "fnv1a-current",
+                "compiler_version": "2.0.0",
+            },
+            "applied_version": {"revision": 2, "expression_hash": "fnv1a-current", "expression": "dispatch"},
+        }]
+    }
+    model = model_service.create_model(ModelPackage.model_validate(payload))
+    tested = model_service.run_model_test_case(model.id, {"parameters": model.parameters})
+    published = model_service.publish_model(tested.id)
+    formula = published.model_draft["formulas"][0]
+    assert formula["version_state"]["applied_revision"] == 2
+    assert formula["version_state"]["published_revision"] == 2
+    assert formula["published_version"]["revision"] == 2
+    assert published.ui_metadata["formula_versions"]["versioned-objective"]["published_revision"] == 2

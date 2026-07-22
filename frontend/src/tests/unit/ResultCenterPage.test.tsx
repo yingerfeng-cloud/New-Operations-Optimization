@@ -31,7 +31,7 @@ test('renders result center and structured report detail', async () => {
   renderPage();
   expect(screen.getByText('结果报告库')).toBeInTheDocument();
   expect(await screen.findByText('OPT-SUCCESS')).toBeInTheDocument();
-  expect(screen.getByText('最优目标值')).toBeInTheDocument();
+  expect(screen.getByText('模型种类')).toBeInTheDocument();
 
   fireEvent.click(screen.getByRole('button', { name: '查看报告' }));
 

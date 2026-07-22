@@ -1,0 +1,5 @@
+.ant-table-wrapper { max-width: 100%; }
+.ant-table-thead > tr > th { padding: 9px 12px !important; background: #f2f4f7 !important; color: #344054 !important; font-weight: 600 !important; border-bottom: 1px solid #d0d5dd !important; }
+.ant-table-tbody > tr > td { padding: 8px 12px !important; border-bottom: 1px solid #eaecf0 !important; }
+.ant-table-tbody > tr:hover > td { background: #f8fafc !important; }
+.ant-table-cell[align="right"] { font-variant-numeric: tabular-nums; }

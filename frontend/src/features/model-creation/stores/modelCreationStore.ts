@@ -72,6 +72,14 @@ export interface ModelDraft {
       defaultValue?: unknown;
       default_value?: unknown;
       default?: unknown;
+      fixed_value?: number;
+      min_value?: number;
+      max_value?: number;
+      allowed_values?: number[];
+      nonzero?: boolean;
+      positive?: boolean;
+      negative?: boolean;
+      validation?: Record<string, unknown>;
       exampleValue?: unknown;
       required?: boolean;
       description?: string;
@@ -92,7 +100,7 @@ export interface ModelDraft {
     }>;
   };
   components: Array<Record<string, unknown>>;
-  objective?: Record<string, unknown>;
+  objective?: { mode?: 'single' | 'weighted_sum'; global_direction?: 'minimize' | 'maximize'; [key: string]: unknown };
   formulas: FormulaDef[];
   time_dimension: TimeDimensionConfig;
   runtime_parameters: Record<string, unknown>;
@@ -141,6 +149,7 @@ export function createBlankDraft(options: { generateCode?: boolean } = {}): Mode
     },
     semantic: createBaseSemantic(),
     components: [],
+    objective: { mode: 'single', global_direction: 'minimize' },
     formulas: [],
     time_dimension: { schema_version: 1, enabled: false, policy: 'not_applicable', editable: false },
     runtime_parameters: {},

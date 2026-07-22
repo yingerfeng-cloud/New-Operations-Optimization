@@ -1,0 +1,11 @@
+.step-section-nav {
+  position: sticky; top: 0; z-index: 7; display: flex; align-items: center; gap: 8px; margin: -4px 0 16px; padding: 8px;
+  border-bottom: 1px solid var(--proto-line); background: rgba(255,255,255,.97);
+}
+.step-section-nav-links { display: flex; align-items: center; gap: 2px; min-width: 0; overflow-x: auto; }
+.step-section-nav button { flex: 0 0 auto; padding: 6px 10px; border: 0; border-radius: 5px; color: #667085; background: transparent; cursor: pointer; }
+.step-section-nav button:hover,
+.step-section-nav button.active { color: #174ea6; background: #eaf2ff; }
+.step-section-nav-select { display: none; width: 100%; }
+.step-focus-trigger { margin-left: auto; border: 1px solid #b7c9df; background: #fff; color: #344054; }
+

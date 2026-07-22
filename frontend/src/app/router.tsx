@@ -2,11 +2,11 @@ import { lazy, Suspense } from 'react';
 import { PageLoading } from '../components/PageStates';
 import { createBrowserRouter } from 'react-router-dom';
 import { MainLayout } from './layout/MainLayout';
-import { DashboardPage } from '../pages/Dashboard/DashboardPage';
-import { SettingsPage } from '../pages/Settings/SettingsPage';
-import { AgentWorkbenchPage } from '../pages/AgentWorkbench/AgentWorkbenchPage';
 import { AudienceProvider } from './audience';
 
+const Dashboard = lazy(() => import('../pages/Dashboard/DashboardPage').then(m => ({ default: m.DashboardPage })));
+const Settings = lazy(() => import('../pages/Settings/SettingsPage').then(m => ({ default: m.SettingsPage })));
+const AgentWorkbench = lazy(() => import('../pages/AgentWorkbench/AgentWorkbenchPage').then(m => ({ default: m.AgentWorkbenchPage })));
 const ScenarioLibrary = lazy(() => import('../pages/ScenarioLibrary/ScenarioLibraryPage').then(m => ({ default: m.ScenarioLibraryPage })));
 const ModelCenter = lazy(() => import('../pages/ModelCenter/ModelCenterPage').then(m => ({ default: m.ModelCenterPage })));
 const ComponentLibrary = lazy(() => import('../pages/ComponentLibrary/ComponentLibraryPage').then(m => ({ default: m.ComponentLibraryPage })));
@@ -23,7 +23,7 @@ export const router = createBrowserRouter([
     path: '/',
     element: <AudienceProvider><MainLayout /></AudienceProvider>,
     children: [
-      { index: true, element: <DashboardPage /> },
+      { index: true, element: load(<Dashboard />) },
       { path: 'scenarios', element: load(<ScenarioLibrary />) },
       { path: 'models', element: load(<ModelCenter />) },
       { path: 'models/create', element: load(<ModelCreation />) },
@@ -32,14 +32,14 @@ export const router = createBrowserRouter([
       { path: 'components', element: load(<ComponentLibrary />) },
       { path: 'components/:id', element: load(<ComponentLibrary />) },
       { path: 'functions', element: load(<FunctionAssets />) },
-      { path: 'runtime', element: <SettingsPage variant="runtime" /> },
+      { path: 'runtime', element: load(<Settings variant="runtime" />) },
       { path: 'tasks', element: load(<TaskCenter />) },
       { path: 'results', element: load(<ResultCenter />) },
       { path: 'services', element: load(<ModelServices />) },
       { path: 'model-services', element: load(<ModelServices />) },
       { path: 'skills', element: load(<SkillCenter />) },
-      { path: 'agents', element: <AgentWorkbenchPage /> },
-      { path: 'settings', element: <SettingsPage variant="settings" /> },
+      { path: 'agents', element: load(<AgentWorkbench />) },
+      { path: 'settings', element: load(<Settings variant="settings" />) },
     ],
   },
 ]);
