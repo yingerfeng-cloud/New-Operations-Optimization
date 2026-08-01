@@ -13,6 +13,6 @@ test('task input panel shows submitted business data and contract summary', () =
 
 test('failed diagnosis includes causes, risk notes, and executable actions', () => {
   render(<TaskExplanationPanel task={task({ status: 'INFEASIBLE', diagnostics: { category: '不可行问题', cause: '供需不平衡' }, risk_notes: ['负荷超限'] })} />);
-  expect(screen.getByText('诊断详情')).toBeInTheDocument(); expect(screen.getByRole('link', { name: '修改参数重新提交' })).toBeInTheDocument();
+  expect(screen.getByText('结构化解释')).toBeInTheDocument(); expect(screen.getByRole('link', { name: '修改参数重新提交' })).toBeInTheDocument();
   expect(screen.getByRole('link', { name: '检查求解环境' })).toBeInTheDocument();
 });

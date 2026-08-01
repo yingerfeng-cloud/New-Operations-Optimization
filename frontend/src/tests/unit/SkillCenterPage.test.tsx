@@ -98,7 +98,9 @@ vi.mock('antd', async () => {
     Title: ({ children }: any) => h('h3', null, children),
   };
   const message = { success: noop, error: noop, warning: noop, info: noop, destroy: noop, loading: vi.fn(() => noop) };
-  return { Alert, Button, Card, Checkbox, Descriptions, Drawer, Input, Modal, Space, Statistic, Table, Tabs, Tag, Typography, message };
+  const ConfigProvider = ({ children }: any) => children;
+  const notification = { ...message };
+  return { Alert, Button, Card, Checkbox, ConfigProvider, Descriptions, Drawer, Input, Modal, Space, Statistic, Table, Tabs, Tag, Typography, message, notification };
 });
 
 const baseSkill: PlatformSkill = {

@@ -1,9 +1,6 @@
 import '@testing-library/jest-dom/vitest';
 import { afterEach, vi } from 'vitest';
 import { message, notification } from 'antd';
-import { cleanupTestEnv } from './test-utils';
-import { queryClient } from '../app/providers';
-import { useModelCreationStore } from '../features/model-creation/stores/modelCreationStore';
 
 vi.mock('echarts-for-react', async () => {
   const React = await import('react');
@@ -32,29 +29,27 @@ vi.mock('echarts/core', () => ({
   use: vi.fn(),
 }));
 
-vi.mock('antd', async importOriginal => {
-  const actual = await importOriginal<typeof import('antd')>();
-  const messageApi = {
-    ...actual.message,
-    success: vi.fn(),
-    error: vi.fn(),
-    warning: vi.fn(),
-    info: vi.fn(),
-    loading: vi.fn(),
-    open: vi.fn(),
-    destroy: vi.fn(),
-  };
-  const notificationApi = {
-    ...actual.notification,
-    success: vi.fn(),
-    error: vi.fn(),
-    warning: vi.fn(),
-    info: vi.fn(),
-    open: vi.fn(),
-    destroy: vi.fn(),
-  };
-  return { ...actual, message: messageApi, notification: notificationApi };
+// Keep Ant Design components real, but make its process-wide static feedback
+// APIs synchronous and side-effect free. Real message portals can mount after
+// Testing Library cleanup and race with jsdom node removal.
+Object.assign(message, {
+  success: vi.fn(),
+  error: vi.fn(),
+  warning: vi.fn(),
+  info: vi.fn(),
+  loading: vi.fn(),
+  open: vi.fn(),
+  destroy: vi.fn(),
 });
+Object.assign(notification, {
+  success: vi.fn(),
+  error: vi.fn(),
+  warning: vi.fn(),
+  info: vi.fn(),
+  open: vi.fn(),
+  destroy: vi.fn(),
+});
+
 Object.defineProperty(globalThis, 'IS_REACT_ACT_ENVIRONMENT', { writable: true, value: true });
 
 const matchMediaMock = vi.fn().mockImplementation((query: string) => ({
@@ -144,12 +139,17 @@ if (testProcess?.stderr && nativeStderrWrite) {
   });
 }
 afterEach(async () => {
-  message.destroy();
-  notification.destroy();
-  await queryClient.cancelQueries();
-  queryClient.clear();
-  useModelCreationStore.getState().reset();
-  await cleanupTestEnv();
+  try {
+    vi.clearAllTimers();
+  } catch {
+    // Some tests already restored real timers.
+  }
+  vi.useRealTimers();
+  vi.clearAllMocks();
   localStorage.clear();
   sessionStorage.clear();
+  document.body.innerHTML = '';
+  document.body.removeAttribute('style');
+  document.body.className = '';
+  document.documentElement.removeAttribute('style');
 });

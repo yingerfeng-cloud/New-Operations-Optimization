@@ -1,9 +1,9 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { cleanup, render, type RenderOptions } from '@testing-library/react';
 import type { ReactElement, PropsWithChildren } from 'react';
-import { vi } from 'vitest';
+import { afterEach, vi } from 'vitest';
 import axios from 'axios';
-import { ConfigProvider } from 'antd';
+import { ConfigProvider, message, notification } from 'antd';
 
 const testQueryClients = new Set<QueryClient>();
 const originalFetch = globalThis.fetch;
@@ -83,6 +83,8 @@ function removeAntdPortals() {
 }
 
 export async function cleanupTestEnv() {
+  message.destroy();
+  notification.destroy();
   cleanup();
   await clearTestQueryClients();
   removeAntdPortals();
@@ -101,6 +103,10 @@ export async function cleanupTestEnv() {
   document.body.className = '';
   document.documentElement.removeAttribute('style');
 }
+
+// Keep the expensive React Query/Ant Design cleanup colocated with the render
+// helper. Pure unit-test files should not pay to import those dependency graphs.
+afterEach(cleanupTestEnv);
 
 export function renderWithProviders(ui: ReactElement, options?: RenderOptions) {
   const queryClient = createTestQueryClient();

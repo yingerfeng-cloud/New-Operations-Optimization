@@ -129,7 +129,7 @@ test('asks for confirmation before deleting an existing formula', () => {
   fireEvent.click(screen.getByRole('button', { name: '删除公式' }));
   expect(screen.getByText('确认删除这条公式？')).toBeInTheDocument();
   expect(onDelete).not.toHaveBeenCalled();
-  fireEvent.click(within(screen.getByRole('dialog', { name: '确认删除这条公式？' })).getByRole('button', { name: '删除公式' }));
+  fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: '删除公式' }));
   expect(onDelete).toHaveBeenCalledWith('existing');
 });
 

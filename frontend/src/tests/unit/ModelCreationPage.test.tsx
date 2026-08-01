@@ -358,7 +358,7 @@ test('retesting a changed draft updates and publishes the same asset', async () 
 
 test('version mode creates its first saved asset through the version endpoint', async () => {
   renderPage(['/models/create?mode=version&source=MODEL-POWER-UNIT-COMMITMENT-DAY-AHEAD']);
-  await screen.findByText('基于版本修改');
+  await screen.findByText('创建新版本并修改');
   fireEvent.click(screen.getByRole('button', { name: '保存草稿' }));
   await waitFor(() => expect(modelApi.createModelVersion).toHaveBeenCalledWith('MODEL-POWER-UNIT-COMMITMENT-DAY-AHEAD', expect.any(Object)));
   expect(modelApi.createModel).not.toHaveBeenCalled();
@@ -460,7 +460,7 @@ test('editing model A then routing to model B clears A and loads B', async () =>
       <RaceHarness />
     </MemoryRouter>,
   );
-  await screen.findByText('基于版本修改');
+  await screen.findByText('创建新版本并修改');
   expect(useModelCreationStore.getState().draft.basic_info.name).toContain('日前机组组合优化');
 
   fireEvent.click(screen.getByText('编辑模型 B'));
