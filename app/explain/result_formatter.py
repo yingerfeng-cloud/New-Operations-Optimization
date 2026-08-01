@@ -44,7 +44,13 @@ class SolveResultFormatter:
         metrics_config = model_spec.get("metrics_config") or {}
         explanation_config = model_spec.get("explanation_config") or {}
         constraint_check_config = model_spec.get("constraint_check_config") or {}
-        if not output_contract and not metrics_config and not explanation_config:
+        executable_metrics = (
+            any(str(item.get("expression") or "").strip() for item in metrics_config.get("metrics") or [])
+            or bool(metrics_config.get("lists"))
+            or bool(metrics_config.get("objects"))
+            or bool(metrics_config.get("business_metrics"))
+        )
+        if not output_contract and not executable_metrics and not explanation_config:
             return None
 
         sets = (context or {}).get("sets") or {}
@@ -61,6 +67,8 @@ class SolveResultFormatter:
             key = str(item.get("key") or "")
             expression = str(item.get("expression") or "").strip()
             if not key:
+                continue
+            if not expression:
                 continue
             value = metrics["objective_value"] if expression == "objective_value" else self._eval_output_expression(expression, sets, params, values, metrics, {})
             metrics[key] = self._round_value(value, int(item.get("precision", 6)))

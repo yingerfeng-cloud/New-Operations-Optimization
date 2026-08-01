@@ -16,6 +16,18 @@ def load_jsonl(path: str | Path) -> list[dict[str, Any]]:
 
 
 def evaluate_intent_cases(cases: list[dict[str, Any]], skills: list[dict[str, Any]]) -> dict[str, Any]:
+    # This benchmark measures configured Agent Skill semantics. Runtime model
+    # publication and API Skill callability are covered by registry/governance
+    # tests and must not remove local definitions from the routing benchmark.
+    routing_skills = [
+        {
+            **skill,
+            "enabled": skill.get("configured_enabled", skill.get("enabled", True)),
+            "platform_skill_status": "enabled",
+        }
+        for skill in skills
+        if skill.get("configured_enabled", skill.get("enabled", True)) is not False
+    ]
     total = len(cases)
     intent_correct = 0
     skill_correct = 0
@@ -30,7 +42,7 @@ def evaluate_intent_cases(cases: list[dict[str, Any]], skills: list[dict[str, An
     safety_correct = 0
     failures: list[dict[str, Any]] = []
     for case in cases:
-        result = intent_router_v2.route(str(case.get("utterance") or ""), {}, skills)
+        result = intent_router_v2.route(str(case.get("utterance") or ""), {}, routing_skills)
         expected_intent = case.get("expected_intent_type")
         actual_intent = result.get("intent_type")
         if expected_intent == "knowledge_question":

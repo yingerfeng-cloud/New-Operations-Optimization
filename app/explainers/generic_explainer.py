@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 from app.explainers.base import ADVISORY_DISCLAIMER, BaseExplainer
+from app.solvers.status import ipopt_unavailable_explanation
 
 
 FAILURE_MESSAGES = {
@@ -113,7 +114,7 @@ class GenericExplainer(BaseExplainer):
 
     def _failure_message(self, code: str, error: str) -> str:
         if code == "SOLVER_UNAVAILABLE" and "IPOPT" in error.upper():
-            return "本次非线性模型未完成求解，原因是 NLP 求解器 Ipopt 不可用，平台未启用替代求解器。当前结果不是有效优化方案。请安装 Ipopt，或切换为线性化/分段线性近似模型后重试。"
+            return ipopt_unavailable_explanation()
         return FAILURE_MESSAGES[code]
 
 

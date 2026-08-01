@@ -1802,6 +1802,21 @@ class ModelService:
                 model = STORE.models.get(model_id)
                 template = templates[code]
                 if model:
+                    lifecycle_status = str(template.get("status") or "published")
+                    if (
+                        self._is_managed_default(model)
+                        and lifecycle_status == "published"
+                        and model.status != "published"
+                    ):
+                        STORE.models[model_id] = model.model_copy(
+                            update={
+                                "status": "published",
+                                "is_active_version": True,
+                                "published_at": model.published_at or timestamp,
+                                "updated_at": timestamp,
+                            }
+                        )
+                        changed = True
                     continue
                 else:
                     lifecycle_status = str(template.get("status") or "published")

@@ -1258,12 +1258,6 @@ class AgentOrchestrator:
                     unit_keys = list(value.keys())
                     break
         if not unit_keys:
-            for key, value in extracted.items():
-                sample = (schema.get(key) or {}).get("sample_value") or (schema.get(key) or {}).get("default_value")
-                if isinstance(value, (int, float)) and isinstance(sample, dict) and sample:
-                    unit_keys = list(sample.keys())
-                    break
-        if not unit_keys:
             return extracted
         result: dict[str, Any] = {}
         for key, value in extracted.items():

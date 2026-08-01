@@ -13,7 +13,7 @@ parameter_policy: {"allow_defaults": true, "require_default_confirmation": true,
 intent_policy: {"router_mode": "llm_plus_rules", "confidence_threshold": 0.75, "clarify_threshold": 0.6, "clarify_when_top_scores_close": true, "top_score_margin_threshold": 0.15}
 safety_policy: {"disallow_auto_control": true, "disclaimer_required": true}
 name: economic_dispatch
-display_name: 经济调度优化 Agent Skill
+display_name: 经济调度
 description: 根据负荷预测、机组出力上限和燃料成本，调用经济调度 API Skill 计算低成本出力方案。
 canonical_api_skill_name: run_economic_dispatch
 version: 1.0.0

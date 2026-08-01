@@ -27,6 +27,13 @@ TEMPLATE_DISPLAY_NAMES = {
     "retail_da_spot_bidding_v1": ("售电公司日前现货申报优化模型", "面向售电公司日前现货场景，生成可解释、可审批、可复盘的申报策略建议。"),
 }
 
+# These built-in models have enabled Agent Skill packages and are part of the
+# production Agent routing/evaluation contract.  Trial templates remain
+# explicit-model-id only and must not be exposed as formal API Skills.
+PUBLISHED_AGENT_TEMPLATE_CODES = {
+    "cascade_hydro_dispatch",
+}
+
 
 def power_template_library() -> dict[str, dict[str, Any]]:
     templates = {
@@ -70,6 +77,8 @@ def power_template_library() -> dict[str, dict[str, Any]]:
         apply_time_dimension_metadata(template)
         template.setdefault("version", "v1.0")
         template.setdefault("status", "published")
+        if code in PUBLISHED_AGENT_TEMPLATE_CODES:
+            template["status"] = "published"
         template.setdefault("tags", ["power", "HiGHS", "Pyomo"])
         draft = create_model_draft_from_template(template)
         template["model_draft"] = draft

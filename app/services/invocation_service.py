@@ -13,6 +13,7 @@ from app.services.model_service import DIRECT_CALLABLE_STATUSES, model_service
 from app.services.result_interpreter import result_interpreter
 from app.services.result_post_processor import result_post_processor
 from app.services.result_service import result_service
+from app.solvers.status import ipopt_unavailable_explanation
 from app.storage.memory_store import STORE
 from app.utils import now_text
 from app.explainers.base import ADVISORY_DISCLAIMER
@@ -437,7 +438,16 @@ class InvocationService:
         skill_name: str | None = None,
     ) -> dict[str, Any]:
         error_message = str(error.get("message") or "Skill invocation failed")
-        explanation = self._failure_explanation(error)
+        resolved_model = model
+        if resolved_model is None and model_id:
+            try:
+                resolved_model = model_service.get_model(model_id)
+            except HTTPException:
+                resolved_model = None
+        explanation = self._failure_explanation(
+            error,
+            domain_label=self._failure_domain_label(resolved_model, model_id),
+        )
         processed: dict[str, Any] | None = None
         if task_id:
             try:
@@ -447,12 +457,6 @@ class InvocationService:
             except HTTPException:
                 processed = None
         if processed is None:
-            resolved_model = model
-            if resolved_model is None and model_id:
-                try:
-                    resolved_model = model_service.get_model(model_id)
-                except HTTPException:
-                    resolved_model = None
             processed = result_post_processor.process(
                 result={"status": status, "error": error, "message": error_message},
                 model=resolved_model or {"model_id": model_id},
@@ -499,7 +503,7 @@ class InvocationService:
             "requires_human_review": bool(processed.get("requires_human_review", True)),
         }
 
-    def _failure_explanation(self, error: dict[str, Any]) -> str:
+    def _failure_explanation(self, error: dict[str, Any], domain_label: str | None = None) -> str:
         text = " ".join([str(error.get("message") or ""), str(error.get("details") or ""), str(error)])
         lowered = text.lower()
         unavailable_terms = (
@@ -507,8 +511,23 @@ class InvocationService:
             "not found", "missing", "no executable", "not in path",
         )
         if "ipopt" in lowered and any(term in lowered for term in unavailable_terms):
-            return "本次非线性模型未完成求解，原因是 NLP 求解器 Ipopt 不可用，平台未启用替代求解器。当前结果不是有效优化方案。请安装 Ipopt，或切换为受支持的建模与求解路径后重试。"
+            return ipopt_unavailable_explanation(domain_label)
         return "Skill 调用失败，需要先修正错误后重新求解。当前结果不是有效优化方案。"
+
+    def _failure_domain_label(self, model: Any | None, model_id: str | None) -> str | None:
+        semantic = (
+            dict(model.get("semantic_spec") or model)
+            if isinstance(model, dict)
+            else dict(getattr(model, "semantic_spec", {}) or {})
+        )
+        terms = [
+            str(model_id or ""),
+            str(semantic.get("model_code") or semantic.get("code") or ""),
+            str(semantic.get("name") or ""),
+            *[str(item) for item in semantic.get("tags") or []],
+        ]
+        normalized = " ".join(terms).lower()
+        return "水电" if "hydro" in normalized or "水电" in normalized else None
 
     def _agent_skill_metadata(self, skill_name: str | None) -> dict[str, Any]:
         if not skill_name:
