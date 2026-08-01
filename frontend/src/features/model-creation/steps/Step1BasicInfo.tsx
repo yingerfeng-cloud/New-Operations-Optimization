@@ -1,10 +1,11 @@
-import { Alert, Card, Col, Collapse, Descriptions, Form, Input, Radio, Row, Select, Space, Tag, Typography } from 'antd';
+import { Alert, Card, Col, Collapse, Descriptions, Form, Input, Modal, Radio, Row, Select, Space, Tag, Typography } from 'antd';
 import { CheckCircleFilled, InfoCircleFilled } from '@ant-design/icons';
 import type { ModelTemplate } from '../../../types/template';
 import type { ModelAsset } from '../../../types/model';
 import type { ModelDraft, ModelWorkspaceContext } from '../stores/modelCreationStore';
 import type { ScenarioCatalogItem } from '../../../types/scenario';
 import { inferModelProblemType } from '../utils/inferModelProblemType';
+import { transitionBuilderMode } from '../utils/builderModeTransition';
 
 export function Step1BasicInfo({
   draft,
@@ -29,6 +30,7 @@ export function Step1BasicInfo({
   onModeChange: (mode: 'new' | 'template') => void;
   disabledScenarios?: Array<{ code: string; label: string }>;
 }) {
+  const [modal, modalContextHolder] = Modal.useModal();
   const b = draft.basic_info;
   const scenarioOptions = scenarios ?? [];
   const disabledScenario = disabledScenarios.find(item => item.code === b.scenario_id || item.label === b.scenario);
@@ -38,6 +40,26 @@ export function Step1BasicInfo({
     ...(assetScenarioMissing ? [{ value: b.scenario_id || b.scenario, label: `${b.scenario}${disabledScenario ? '（已停用）' : '（历史/自定义场景）'}` }] : []),
   ];
   const set = (p: Partial<typeof b>) => onChange({ ...draft, basic_info: { ...b, ...p } });
+  const changeBuilderMode = (nextMode: typeof b.builder_mode, extraBasicInfo: Partial<typeof b> = {}) => {
+    const apply = () => {
+      const transitioned = transitionBuilderMode(draft, nextMode);
+      onChange({
+        ...transitioned,
+        basic_info: { ...transitioned.basic_info, ...extraBasicInfo },
+      });
+    };
+    if (b.builder_mode === 'component_based' && nextMode === 'generic_linear' && draft.components.length) {
+      modal.confirm({
+        title: '切换为通用线性 Builder？',
+        content: `当前已选择 ${draft.components.length} 个组件。切换后这些组件将不再参与当前模型，配置会暂存，切回组件化 Builder 时可恢复。`,
+        okText: '确认切换',
+        cancelText: '取消',
+        onOk: apply,
+      });
+      return;
+    }
+    apply();
+  };
   const objectiveCount = draft.formulas.filter(formula => formula.kind === 'objective').length;
   const hasConstraintDefinition = draft.formulas.some(formula => formula.kind === 'constraint') || draft.components.length > 0;
   const problemTypeReady = objectiveCount > 0 && draft.semantic.variables.length > 0 && hasConstraintDefinition;
@@ -46,6 +68,7 @@ export function Step1BasicInfo({
 
   return (
     <>
+      {modalContextHolder}
       <Form layout="vertical">
         <Row gutter={[16, 16]}>
           <Col xs={24} lg={8}>
@@ -84,7 +107,7 @@ export function Step1BasicInfo({
                     { label: '排程', value: 'scheduling' },
                     { label: '资源分配', value: 'resource_allocation' },
                   ]}
-                  onChange={value => set({ modeling_skeleton: value, builder_mode: 'component_based' })}
+                  onChange={value => changeBuilderMode('component_based', { modeling_skeleton: value })}
                 />
               </Form.Item>
               <Form.Item label="建模模式" data-section-key="mode">
@@ -93,7 +116,7 @@ export function Step1BasicInfo({
                   aria-label="建模模式"
                   value={b.builder_mode}
                   options={[{ label: '通用线性 Builder', value: 'generic_linear' }, { label: '组件化 Builder', value: 'component_based' }, { label: '模板 Builder', value: 'template_based' }]}
-                  onChange={value => set({ builder_mode: value })}
+                  onChange={value => changeBuilderMode(value)}
                 />
               </Form.Item>
             </Card>
@@ -113,8 +136,8 @@ export function Step1BasicInfo({
               <Form.Item label="模型说明">
                 <Input.TextArea
                   rows={3}
-                  value={String((draft.advanced as Record<string, unknown>).description || '')}
-                  onChange={e => onChange({ ...draft, advanced: { ...draft.advanced, description: e.target.value } as typeof draft.advanced })}
+                  value={draft.advanced.description || ''}
+                  onChange={e => onChange({ ...draft, advanced: { ...draft.advanced, description: e.target.value } })}
                 />
               </Form.Item>
               <Collapse

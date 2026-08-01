@@ -105,7 +105,18 @@ export interface ModelDraft {
   time_dimension: TimeDimensionConfig;
   runtime_parameters: Record<string, unknown>;
   parameter_groups: Record<string, Record<string, unknown>>;
-  advanced: { generic_spec?: Record<string, unknown>; component_spec?: Record<string, unknown>; ui_metadata?: Record<string, unknown> };
+  advanced: {
+    description?: string;
+    generic_spec?: Record<string, unknown>;
+    component_spec?: Record<string, unknown>;
+    ui_metadata?: Record<string, unknown>;
+    builder_mode_drafts?: {
+      component_based?: {
+        components: Array<Record<string, unknown>>;
+        component_spec?: Record<string, unknown>;
+      };
+    };
+  };
 }
 
 export interface ModelDraftValidationResult {

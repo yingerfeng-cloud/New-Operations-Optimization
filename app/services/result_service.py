@@ -19,7 +19,20 @@ class ResultService:
 
     def list_results(self) -> list[dict[str, Any]]:
         with STORE.lock:
-            return [{"job_id": job_id, **result.get("summary", {})} for job_id, result in sorted(STORE.results.items(), key=lambda item: item[0], reverse=True)]
+            rows: list[dict[str, Any]] = []
+            for job_id, stored in sorted(STORE.results.items(), key=lambda item: item[0], reverse=True):
+                summary = stored.get("summary") if isinstance(stored, dict) else None
+                payload = stored.get("result") if isinstance(stored, dict) else None
+                if not isinstance(payload, dict):
+                    payload = stored if isinstance(stored, dict) else {}
+
+                row = dict(summary) if isinstance(summary, dict) else {}
+                for key in ("objective_value", "model_id", "model_code", "status", "finished_at"):
+                    value = payload.get(key)
+                    if value is not None:
+                        row[key] = value
+                rows.append({"job_id": job_id, **row})
+            return rows
 
     def trace(self, task_id: str) -> dict[str, Any]:
         task = self._task(task_id)

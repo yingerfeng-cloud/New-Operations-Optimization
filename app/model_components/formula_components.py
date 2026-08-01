@@ -8,6 +8,18 @@ from typing import Any
 
 import pyomo.environ as pyo
 
+from app.model_components.dependency_graph import (
+    build_dependency_graph,
+    component_dependency_ids,
+    component_is_available,
+    find_dependency_cycles,
+)
+from app.model_components.formula_contracts import (
+    formula_expression,
+    participates_in_solve,
+    participation_fields,
+    synchronize_formula_fields,
+)
 from app.storage.memory_store import STORE
 from app.problem_type_diagnosis import component_problem_type_fields
 from app.model_components.solver_capabilities import normalize_capabilities
@@ -20,8 +32,12 @@ ALLOWED_FUNCTIONS = {"sum", "min", "max", "abs", "log", "exp", "sqrt", "piecewis
 SCIENTIFIC_FUNCTIONS = {"log", "exp", "sqrt"}
 PIECEWISE_STRICT_VALIDATION = False
 DEFAULT_INDEX_ALIASES = {"time": "t", "time_volume": "tv", "unit": "u", "station": "s", "edge": "e", "scenario": "sc"}
-BOUNDARY_STRATEGIES = {"normal", "skip_first", "skip_last", "use_initial_value", "use_terminal_value", "skip_out_of_range"}
-DISPLAY_ONLY_MODES = {"display_only", "remark_only", "none"}
+BOUNDARY_STRATEGIES = {"strict", "skip_first", "skip_last", "skip_out_of_range", "explicit_subset"}
+BOUNDARY_STRATEGY_ALIASES = {
+    "normal": "strict",
+    "use_initial_value": "skip_first",
+    "use_terminal_value": "skip_last",
+}
 
 
 def validate_component_definition(component: dict[str, Any]) -> dict[str, Any]:
@@ -34,6 +50,9 @@ def validate_component_definition(component: dict[str, Any]) -> dict[str, Any]:
 
     if errors:
         return {"valid": False, "errors": errors}
+    dependency_errors = _validate_dependencies(component)
+    if dependency_errors:
+        return {"valid": False, "errors": dependency_errors}
     status = str(component.get("status") or "").lower()
     if component.get("metadata_only") is True or status in {"reserved", "planned"}:
         return {
@@ -50,8 +69,15 @@ def validate_component_definition(component: dict[str, Any]) -> dict[str, Any]:
         for index, item in enumerate(rows):
             if _is_programmatic_generated(item):
                 continue
-            expression = str(item.get("expression") or item.get("formula") or "").strip()
+            expression = formula_expression(item)
             if not expression:
+                errors.append(
+                    _error(
+                        f"{section}[{index}].dsl_formula",
+                        "公式不能为空",
+                        "请填写 dsl_formula、formula 或 expression；保存后服务端会同步三字段。",
+                    )
+                )
                 continue
             if section == "constraints":
                 errors.extend(_validate_boundary_strategy(expression, item, f"{section}[{index}].boundary_strategy"))
@@ -68,8 +94,6 @@ def validate_component_definition(component: dict[str, Any]) -> dict[str, Any]:
             errors.extend(validate_formula_expression(expression, symbols, f"{section}[{index}].expression"))
 
     errors.extend(_validate_piecewise_component(component))
-    dependency_errors = _validate_dependencies(component)
-    errors.extend(dependency_errors)
     if not errors and not _component_uses_only_programmatic_constraints(component):
         errors.extend(validate_component_compiles(component))
     return {"valid": not errors, "errors": errors}
@@ -154,6 +178,7 @@ def load_library_component(component_type: str) -> dict[str, Any] | None:
 
 def normalize_component_payload(payload: dict[str, Any]) -> dict[str, Any]:
     component_id = str(payload.get("component_id") or payload.get("type") or "").strip()
+    dependencies = component_dependency_ids(payload)
     constraints = deepcopy(payload.get("constraints") or payload.get("generated_constraints") or [])
     objective_terms = deepcopy(payload.get("objective_terms") or payload.get("generated_objective_terms") or [])
     variables = deepcopy(payload.get("variables") or [])
@@ -162,22 +187,14 @@ def normalize_component_payload(payload: dict[str, Any]) -> dict[str, Any]:
     generated_constraints = []
     for index, item in enumerate(constraints):
         constraint_id = item.get("constraint_id") or item.get("code") or f"{component_id}_constraint_{index + 1}"
-        expression = item.get("expression") or item.get("formula") or ""
-        boundary_strategy = item.get("boundary_strategy") or _default_boundary_strategy(str(expression))
-        solve_participation = item.get("solve_participation")
-        participates = item.get("participates_in_solve", True)
-        if solve_participation in {"display_only", "remark_only", "none"}:
-            participates = False
+        expression = formula_expression(item)
+        boundary_strategy = _normalize_boundary_strategy(item.get("boundary_strategy") or _default_boundary_strategy(expression))
         generated_constraints.append(
             {
-                **item,
+                **synchronize_formula_fields(item, expression),
                 "constraint_id": constraint_id,
                 "name": item.get("name") or constraint_id,
-                "formula": expression,
-                "expression": expression,
-                "enabled": item.get("enabled", True),
-                "participates_in_solve": participates,
-                "solve_participation": solve_participation or ("solve_active" if participates else "display_only"),
+                **participation_fields(item),
                 "boundary_strategy": boundary_strategy,
                 "source_component": component_id,
             }
@@ -185,18 +202,17 @@ def normalize_component_payload(payload: dict[str, Any]) -> dict[str, Any]:
     generated_terms = []
     for index, item in enumerate(objective_terms):
         term_id = item.get("term_id") or item.get("code") or f"{component_id}_objective_{index + 1}"
+        expression = formula_expression(item)
         generated_terms.append(
             {
-                **item,
+                **synchronize_formula_fields(item, expression),
                 "term_id": term_id,
                 "name": item.get("name") or term_id,
                 "source": "component",
                 "source_component": component_id,
-                "enabled": item.get("enabled", True),
+                **participation_fields(item, default="preview_only"),
                 "editable": True,
                 "supported_by_backend": item.get("supported_by_backend", False),
-                "solve_participation": item.get("solve_participation", "display_only"),
-                "expression": item.get("expression") or item.get("formula") or "",
             }
         )
     problem_fields = component_problem_type_fields({**payload, "variables": variables, "constraints": generated_constraints, "objective_terms": generated_terms})
@@ -221,8 +237,8 @@ def normalize_component_payload(payload: dict[str, Any]) -> dict[str, Any]:
         "problem_types": problem_types,
         "solver_capabilities": solver_capabilities,
         "problem_type_effect": problem_fields["problem_type_effect"],
-        "depends_on": list(payload.get("depends_on") or payload.get("dependencies") or []),
-        "dependencies": list(payload.get("dependencies") or payload.get("depends_on") or []),
+        "depends_on": dependencies,
+        "dependencies": dependencies,
     }
 
 
@@ -238,9 +254,9 @@ class DynamicFormulaComponent:
 
     def build(self, model: Any, spec: dict[str, Any], context: dict[str, Any]) -> None:
         for index, constraint in enumerate(self.definition.get("generated_constraints") or []):
-            if constraint.get("enabled", True) is False or constraint.get("participates_in_solve", True) is False:
+            if not participates_in_solve(constraint):
                 continue
-            expression = str(constraint.get("expression") or constraint.get("formula") or "").strip()
+            expression = formula_expression(constraint)
             if not expression:
                 continue
             indices = list(constraint.get("indices") or [])
@@ -248,15 +264,16 @@ class DynamicFormulaComponent:
             if _is_piecewise_constraint(constraint):
                 self._build_piecewise_constraint(model, context, constraint, name, indices)
                 continue
-            pyomo_constraint = self._build_constraint(model, context, expression, indices)
+            pyomo_constraint = self._build_constraint(model, context, constraint, expression, indices)
             setattr(model, name, pyomo_constraint)
             context["constraints"][name] = pyomo_constraint
 
-    def _build_constraint(self, model: Any, context: dict[str, Any], expression: str, indices: list[str]) -> Any:
+    def _build_constraint(self, model: Any, context: dict[str, Any], constraint: dict[str, Any], expression: str, indices: list[str]) -> Any:
         tree = ast.parse(expression, mode="eval").body
         index_specs = _normalize_index_specs(indices)
         index_sets = [getattr(model, item["set"]) for item in index_specs]
         aggregate_bound = _aggregate_bound_compare(tree)
+        boundary_strategy = _normalize_boundary_strategy(constraint.get("boundary_strategy") or _default_boundary_strategy(expression))
 
         if aggregate_bound:
             call_node, other_node, relation_op = aggregate_bound
@@ -296,10 +313,18 @@ class DynamicFormulaComponent:
             for item, value in zip(index_specs, values, strict=False):
                 local_indices[item["set"]] = value
                 local_indices[item["alias"]] = value
+            if _boundary_excludes_scope(boundary_strategy, expression, index_specs, local_indices, context):
+                return pyo.Constraint.Skip
             try:
                 return _eval_formula_node(tree, m, context, local_indices)
-            except IndexError:
-                return pyo.Constraint.Skip
+            except IndexError as exc:
+                if boundary_strategy == "skip_out_of_range":
+                    return pyo.Constraint.Skip
+                raise RuntimeError(
+                    "组件公式索引越界："
+                    f"constraint={constraint.get('constraint_id') or constraint.get('name') or '<unknown>'}, "
+                    f"boundary_strategy={boundary_strategy}, indices={local_indices}, expression={expression}"
+                ) from exc
             except KeyError as exc:
                 raise RuntimeError(f"公式引用缺少索引或参数：{exc}") from exc
 
@@ -308,7 +333,7 @@ class DynamicFormulaComponent:
         return pyo.Constraint(rule=lambda m: rule(m))
 
     def _build_piecewise_constraint(self, model: Any, context: dict[str, Any], constraint: dict[str, Any], name: str, indices: list[str]) -> None:
-        parsed = _parse_piecewise_constraint(constraint, str(constraint.get("expression") or constraint.get("formula") or ""))
+        parsed = _parse_piecewise_constraint(constraint, formula_expression(constraint))
         if not parsed:
             raise RuntimeError("piecewise constraint must use y == piecewise(x, curve), or provide x/y/curve fields")
         y_node, x_node, curve_name = parsed
@@ -570,41 +595,80 @@ def _refresh_formula_function_suggestions(errors: list[dict[str, Any]]) -> None:
 
 
 def _validate_dependencies(component: dict[str, Any]) -> list[dict[str, Any]]:
-    errors = []
-    for dependency in list(component.get("depends_on") or component.get("dependencies") or []):
-        with STORE.lock:
-            exists = dependency in STORE.custom_components
-        if not exists:
-            try:
-                from app.model_components.registry import component_definition
+    from app.model_components.registry import list_component_catalog
 
-                component_definition(str(dependency))
-                exists = True
-            except RuntimeError:
-                exists = False
-        if not exists:
-            errors.append(_error("dependencies", f"依赖组件 {dependency} 不存在", "请先发布依赖组件，或删除该依赖。"))
+    errors: list[dict[str, Any]] = []
+    identifier = str(component.get("component_id") or component.get("type") or "").strip()
+    dependencies = component_dependency_ids(component)
+    with STORE.lock:
+        custom_components = [deepcopy(item) for item in STORE.custom_components.values()]
+    catalog = {
+        str(item.get("component_id") or item.get("type") or ""): item
+        for item in [*list_component_catalog(), *custom_components]
+    }
+    catalog[identifier] = {**component, "component_id": identifier, "depends_on": dependencies, "dependencies": dependencies}
+
+    for dependency in dependencies:
+        if dependency == identifier:
+            errors.append(_error("dependencies", "组件不能依赖自身", "请删除自依赖。"))
+            continue
+        definition = catalog.get(dependency)
+        if not definition:
+            errors.append(_error("dependencies", f"依赖组件 {dependency} 不存在", "请先创建并发布依赖组件，或删除该依赖。"))
+            continue
+        if not component_is_available(definition):
+            errors.append(_error("dependencies", f"依赖组件 {dependency} 尚未发布或已停用", "请先发布并启用依赖组件，或删除该依赖。"))
+
+    graph = build_dependency_graph(catalog.values())
+    for cycle in find_dependency_cycles(graph):
+        if identifier in cycle and len(cycle) > 2:
+            errors.append(
+                _error(
+                    "dependencies",
+                    f"组件依赖存在循环：{' → '.join(cycle)}",
+                    "请移除循环中的至少一条依赖关系。",
+                )
+            )
     return errors
 
 
 def _validate_boundary_strategy(expression: str, item: dict[str, Any], field: str) -> list[dict[str, Any]]:
-    strategy = str(item.get("boundary_strategy") or _default_boundary_strategy(expression) or "normal")
+    strategy = _normalize_boundary_strategy(item.get("boundary_strategy") or _default_boundary_strategy(expression))
     if strategy not in BOUNDARY_STRATEGIES:
-        return [_error(field, f"边界策略 {strategy} 不合法", "请使用 normal、skip_first、skip_last、use_initial_value 或 use_terminal_value。")]
-    errors: list[dict[str, Any]] = []
-    if _contains_forward_time(expression) and strategy not in {"skip_last", "use_terminal_value", "skip_out_of_range"}:
-        errors.append(_error(field, "公式包含 t+1，必须明确末时段边界策略", "请设置 boundary_strategy=skip_last 或 use_terminal_value。"))
-    if _contains_backward_time(expression) and strategy not in {"skip_first", "use_initial_value", "skip_out_of_range"}:
-        errors.append(_error(field, "公式包含 t-1，必须明确首时段边界策略", "请设置 boundary_strategy=skip_first 或 use_initial_value。"))
-    return errors
+        return [_error(field, f"边界策略 {strategy} 不合法", "请使用 strict、skip_first、skip_last、skip_out_of_range 或 explicit_subset。")]
+    return []
 
 
 def _default_boundary_strategy(expression: str) -> str:
-    if _contains_forward_time(expression):
-        return "skip_last"
-    if _contains_backward_time(expression):
-        return "skip_first"
-    return "normal"
+    return "strict"
+
+
+def _normalize_boundary_strategy(value: Any) -> str:
+    strategy = str(value or "strict").strip().lower()
+    return BOUNDARY_STRATEGY_ALIASES.get(strategy, strategy)
+
+
+def _boundary_excludes_scope(
+    strategy: str,
+    expression: str,
+    index_specs: list[dict[str, str]],
+    local_indices: dict[str, Any],
+    context: dict[str, Any],
+) -> bool:
+    if strategy not in {"skip_first", "skip_last"}:
+        return False
+    for item in index_specs:
+        if item["alias"] not in {"t", "time"} and item["set"] not in {"time", "time_volume", "state_time", "soc_time"}:
+            continue
+        values = list((context.get("sets") or {}).get(item["set"]) or [])
+        if not values:
+            continue
+        current = local_indices.get(item["alias"], local_indices.get(item["set"]))
+        if strategy == "skip_first" and _contains_backward_time(expression) and current == values[0]:
+            return True
+        if strategy == "skip_last" and _contains_forward_time(expression) and current == values[-1]:
+            return True
+    return False
 
 
 def _contains_forward_time(expression: str) -> bool:
@@ -620,15 +684,11 @@ def _contains_piecewise(expression: str) -> bool:
 
 
 def _is_solve_active(item: dict[str, Any]) -> bool:
-    if item.get("enabled", True) is False:
-        return False
-    if item.get("participates_in_solve") is False:
-        return False
-    return item.get("solve_participation", "solve_active") not in DISPLAY_ONLY_MODES
+    return participates_in_solve(item)
 
 
 def _is_piecewise_constraint(item: dict[str, Any]) -> bool:
-    return str(item.get("type") or "").lower() == "piecewise" or _contains_piecewise(str(item.get("expression") or item.get("formula") or ""))
+    return str(item.get("type") or "").lower() == "piecewise" or _contains_piecewise(formula_expression(item))
 
 
 def _validate_piecewise_component(component: dict[str, Any]) -> list[dict[str, Any]]:
@@ -655,7 +715,7 @@ def _validate_piecewise_component(component: dict[str, Any]) -> list[dict[str, A
 
 
 def _validate_piecewise_constraint(component: dict[str, Any], item: dict[str, Any], index: int) -> list[dict[str, Any]]:
-    parsed = _parse_piecewise_constraint(item, str(item.get("expression") or item.get("formula") or ""))
+    parsed = _parse_piecewise_constraint(item, formula_expression(item))
     if not parsed:
         return [_error(f"constraints[{index}].expression", "piecewise constraint must use y == piecewise(x, curve)", "Use structured x/y/curve fields or the piecewise DSL.")]
     y_node, x_node, curve_name = parsed
@@ -901,7 +961,54 @@ def _compile_test_runtime_parameters(component: dict[str, Any], model_spec: dict
         if default is None:
             default = param.get("sample", 1)
         params[code] = _default_value_for_dimensions(list(param.get("dimension") or []), params, default)
+    _align_compile_index_parameters(component, params)
     return params
+
+
+def _align_compile_index_parameters(component: dict[str, Any], params: dict[str, Any]) -> None:
+    """Keep synthetic compile checks representative when a scalar selects a set member.
+
+    A component may use a runtime scalar such as ``terminal_time`` as an array
+    index.  Its production default can legitimately be outside the deliberately
+    small deterministic compile fixture.  Infer the referenced variable
+    dimension from the DSL and choose the fixture's final member instead of
+    treating that unrelated production default as an index-boundary defect.
+    """
+    scalar_parameters = {
+        str(item.get("code") or item.get("name") or item.get("key") or "")
+        for item in component.get("parameters") or []
+        if not (item.get("dimension") or item.get("indices"))
+    }
+    variable_dimensions = {
+        str(item.get("code") or item.get("name") or item.get("key") or ""): list(item.get("dimension") or item.get("indices") or [])
+        for item in component.get("variables") or []
+    }
+    formula_rows = [
+        *(component.get("constraints") or component.get("generated_constraints") or []),
+        *(component.get("objective_terms") or component.get("objectives") or []),
+    ]
+    for row in formula_rows:
+        expression = formula_expression(row)
+        if not expression:
+            continue
+        try:
+            tree = ast.parse(expression, mode="eval")
+        except SyntaxError:
+            continue
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Subscript):
+                continue
+            dimensions = variable_dimensions.get(_subscript_base(node)) or []
+            index_nodes = list(node.slice.elts) if isinstance(node.slice, ast.Tuple) else [node.slice]
+            for position, index_node in enumerate(index_nodes):
+                if position >= len(dimensions) or not isinstance(index_node, ast.Name) or index_node.id not in scalar_parameters:
+                    continue
+                set_values = params.get(str(dimensions[position]))
+                if not isinstance(set_values, list) or not set_values:
+                    continue
+                current = params.get(index_node.id)
+                if current not in set_values:
+                    params[index_node.id] = set_values[-1]
 
 
 def _default_value_for_dimensions(dimensions: list[str], params: dict[str, Any], value: Any) -> Any:
@@ -921,7 +1028,7 @@ def _default_value_for_dimensions(dimensions: list[str], params: dict[str, Any],
                 return result[: len(values)]
         if isinstance(value, dict):
             return value
-        if dimensions[0] in {"time", "time_volume"}:
+        if dimensions[0] in {"time", "time_volume", "state_time", "soc_time"}:
             return [value for _ in values]
         return {str(item): value for item in values}
     first = dimensions[0]
@@ -934,9 +1041,9 @@ def _default_value_for_dimensions(dimensions: list[str], params: dict[str, Any],
 
 def _default_set_values(code: str) -> list[Any]:
     if code == "time":
+        return [0, 1]
+    if code in {"time_volume", "state_time", "soc_time"}:
         return [0, 1, 2]
-    if code == "time_volume":
-        return [0, 1, 2, 3]
     if code == "unit":
         return ["U1", "U2"]
     if code == "station":

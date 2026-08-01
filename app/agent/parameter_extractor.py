@@ -60,7 +60,7 @@ class ParameterExtractor:
         params.update(self._extract_json_object(message, input_schema))
         units = self._units(message)
         load = self._extract_load_values(message)
-        if load and self._schema_item(input_schema, "load_forecast"):
+        if load and "load_forecast" not in params and self._schema_item(input_schema, "load_forecast"):
             params["load_forecast"] = self._time_value(input_schema, "load_forecast", load)
 
         storage_params = self._extract_storage_dispatch(message, input_schema)

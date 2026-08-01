@@ -10,6 +10,7 @@ from app.builders.pyomo_builder import PyomoModelBuilder
 from app.diagnosis.infeasible_diagnosis import diagnose_infeasible
 from app.explain.result_formatter import SolveResultFormatter
 from app.schemas.solve import TaskRecord, TaskStatus
+from app.services.result_post_processor import result_post_processor
 from app.solvers.solver_router import SolverRouteError, solver_router
 from app.storage.memory_store import STORE
 from app.utils import now_text
@@ -130,6 +131,15 @@ class JobRunner:
                     "finished_at": now_text(),
                     **formatted,
                 }
+                explanation_request = runtime.get("_explanation_request") if isinstance(runtime.get("_explanation_request"), dict) else {}
+                result = result_post_processor.process(
+                    result=result,
+                    model=runtime.get("_result_context") or {"semantic_spec": semantic_spec, "id": task.request.model_id, "name": task.request.model, "scene": task.request.scene},
+                    skill_name=explanation_request.get("skill_name"),
+                    parameters=runtime.get("_explanation_parameters") or task.request.parameters,
+                    parameter_sources=explanation_request.get("parameter_sources"),
+                    use_llm=bool(explanation_request.get("use_llm", False)),
+                )
                 result["result_capabilities"] = self._result_capabilities(result)
                 result["result_metadata"] = {
                     "capabilities": result["result_capabilities"],
@@ -198,7 +208,37 @@ class JobRunner:
             task.progress = progress
 
     def _finish(self, task: TaskRecord, *, status: TaskStatus, error: str | None = None) -> None:
+        processed_failure: dict[str, Any] | None = None
+        if status in {"FAILED", "INFEASIBLE", "TIMEOUT", "CANCELLED", "INTERRUPTED"}:
+            runtime = dict(task.request.payload or {})
+            explanation_request = runtime.get("_explanation_request") if isinstance(runtime.get("_explanation_request"), dict) else {}
+            failure_result = dict(task.result or {})
+            failure_result.update({
+                "job_id": task.id,
+                "model_id": task.request.model_id,
+                "model_code": self._model_code(task),
+                "status": status,
+                "error": error or failure_result.get("error"),
+                "trace": task.trace,
+                "logs": task.logs,
+                "run_metrics": task.run_metrics,
+            })
+            try:
+                processed_failure = result_post_processor.process(
+                    result=failure_result,
+                    model=runtime.get("_result_context") or {"semantic_spec": runtime.get("semantic_spec") or {}, "id": task.request.model_id, "name": task.request.model, "scene": task.request.scene},
+                    skill_name=explanation_request.get("skill_name"),
+                    parameters=runtime.get("_explanation_parameters") or task.request.parameters,
+                    parameter_sources=explanation_request.get("parameter_sources"),
+                    use_llm=bool(explanation_request.get("use_llm", False)),
+                )
+                processed_failure["result_capabilities"] = self._result_capabilities(processed_failure)
+            except Exception:
+                # Explanation must never mask the original solve failure.
+                processed_failure = failure_result
         with STORE.lock:
+            if processed_failure is not None:
+                task.result = processed_failure
             task.status = status
             task.progress = 100
             task.finished_at = now_text()

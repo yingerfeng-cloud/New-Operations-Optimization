@@ -14,8 +14,19 @@ from app.schemas.solve import TaskRecord, TaskRecordState
 
 
 LOGGER = logging.getLogger(__name__)
-RUNTIME_SCHEMA_VERSION = 2
+RUNTIME_SCHEMA_VERSION = 3
 INTERRUPTED_TASK_STATUSES = {"PENDING", "QUEUED", "VALIDATING", "BUILDING_MODEL", "SOLVING", "FORMATTING_RESULT", "RUNNING"}
+LEGACY_MODEL_STATUS_MIGRATIONS = {
+    "draft": "developing",
+    "tested": "trial",
+    "草稿": "developing",
+    "开发中": "developing",
+    "已测试": "trial",
+    "试运行": "trial",
+    "已发布": "published",
+    "已下线": "offline",
+    "发布失败": "publish_failed",
+}
 
 
 class MemoryStore:
@@ -104,6 +115,7 @@ class MemoryStore:
             return
         try:
             payload = json.loads(self._persistence_path.read_text(encoding="utf-8"))
+            loaded_schema_version = int(payload.get("schema_version") or 1) if isinstance(payload, dict) else 1
             payload = self._migrate_payload(payload)
             section_names = (
                 "models", "model_versions", "active_model_versions", "assets", "tasks", "results",
@@ -135,7 +147,7 @@ class MemoryStore:
             self.system_config.update(sections["system_config"])
             self.custom_components.update(sections["custom_components"])
             self.function_assets.update(sections["function_assets"])
-            if self._interrupt_recovered_tasks():
+            if loaded_schema_version < RUNTIME_SCHEMA_VERSION or self._interrupt_recovered_tasks():
                 self.save_runtime()
         except Exception:
             timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
@@ -156,8 +168,24 @@ class MemoryStore:
         if version == 1:
             for key in ("models", "model_versions", "active_model_versions", "assets", "tasks", "results"):
                 migrated.setdefault(key, {})
-            migrated["schema_version"] = RUNTIME_SCHEMA_VERSION
             LOGGER.info("Migrated runtime store schema from v1 to v2")
+            version = 2
+        if version == 2:
+            models = migrated.get("models") or {}
+            if isinstance(models, dict):
+                for model in models.values():
+                    if isinstance(model, dict):
+                        model["status"] = LEGACY_MODEL_STATUS_MIGRATIONS.get(str(model.get("status")), model.get("status"))
+            model_versions = migrated.get("model_versions") or {}
+            if isinstance(model_versions, dict):
+                for rows in model_versions.values():
+                    if not isinstance(rows, list):
+                        continue
+                    for row in rows:
+                        if isinstance(row, dict) and "status" in row:
+                            row["status"] = LEGACY_MODEL_STATUS_MIGRATIONS.get(str(row.get("status")), row.get("status"))
+            LOGGER.info("Migrated runtime store model lifecycle from v2 to v3")
+        migrated["schema_version"] = RUNTIME_SCHEMA_VERSION
         return migrated
 
     def _interrupt_recovered_tasks(self) -> bool:

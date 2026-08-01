@@ -1,6 +1,6 @@
-negative_examples: ["仅咨询模型原理"]
-do_not_invoke_examples: ["只咨询业务知识，不运行优化"]
-positive_examples: ["合约敞口压到20%以下", "合约现货敞口控制在20%以内"]
+positive_examples: ["把合约现货敞口控制在百分之二十以内", "按负荷预测分解中长期合约电量", "生成各时段合约分解和剩余敞口", "在敞口限额下优化合约持仓", "根据现货价格预测调整合约覆盖", "计算明日最大现货暴露时段", "降低高价时段未覆盖电量", "给定合约总量求最稳妥的时段分解", "检查负荷与合约后运行敞口优化", "把现货暴露集中度降下来并求解", "按风险限额生成合约分解建议", "形成需要交易员复核的敞口方案"]
+negative_examples: ["生成独立储能充放电计划", "安排光储日前联合调度", "做光储日内滚动修正", "生成售电日前申报曲线", "安排火电机组组合", "求梯级水电计划", "做光伏容量规划", "分析用户侧柔性负荷"]
+do_not_invoke_examples: ["现货敞口是什么", "介绍中长期合约交易", "合约分解一般怎么做", "解释敞口比例含义", "只查询市场规则", "为什么会有基差风险", "有哪些风险管理方法", "不要优化只讲业务原理"]
 schema_version: "2.0"
 state: enabled
 business_domain:
@@ -8,7 +8,8 @@ business_domain:
   secondary: ["optimization"]
 model_family: optimization
 supported_intents: ["optimization_run", "parameter_check", "result_explanation"]
-business_goals: ["optimize"]
+business_goals: ["控制现货暴露", "分解中长期合约", "识别高风险时段", "提供人工交易复核依据"]
+required_data: [{"name": "load_forecast", "label": "负荷预测", "ask_when_missing": "请提供覆盖目标周期的负荷预测。", "required": true}, {"name": "contract_total", "label": "合约总电量", "ask_when_missing": "请提供待分解的中长期合约总电量。", "required": true}, {"name": "spot_price_forecast", "label": "现货价格预测", "ask_when_missing": "请提供各时段现货价格预测。", "required": true}, {"name": "max_exposure_ratio", "label": "最大敞口比例", "ask_when_missing": "请明确可接受的最大现货敞口比例。", "required": true}]
 explanation_profile: contract_spot_exposure
 parameter_policy: {"allow_defaults": true, "require_default_confirmation": true, "allow_sample_data": true, "sample_data_must_be_confirmed": true}
 intent_policy: {"router_mode": "llm_plus_rules", "confidence_threshold": 0.75, "clarify_threshold": 0.6, "clarify_when_top_scores_close": true, "top_score_margin_threshold": 0.15}
@@ -18,8 +19,7 @@ display_name: 中长期合约分解与现货暴露控制模型
 canonical_api_skill_name: run_contract_spot_exposure_v1
 enabled: true
 confirmation_required: true
-execution_policy:
-  mode: advisory_only
+execution_policy: {"advisory_only": true, "requires_human_review": true, "requires_invoke_confirmation": true}
 required_parameters:
   - horizon
   - time

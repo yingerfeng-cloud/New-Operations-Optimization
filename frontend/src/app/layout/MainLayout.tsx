@@ -50,7 +50,7 @@ export function MainLayout() {
         className="mobile-nav-drawer"
         title="平台导航"
         placement="left"
-        width="min(88vw, 340px)"
+        size="min(88vw, 340px)"
         open={mobile && drawerOpen}
         onClose={() => setDrawerOpen(false)}
         destroyOnHidden

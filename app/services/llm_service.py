@@ -197,6 +197,42 @@ class LLMService:
             ]
         )
 
+    def summarize_evidence(self, payload: dict[str, Any]) -> dict[str, Any]:
+        """Rewrite grounded evidence without changing calculations or facts."""
+        if not self.enabled():
+            return {}
+        prompt = {
+            "task": "Rewrite the supplied deterministic optimization explanation in clear Chinese.",
+            "rules": [
+                "Return JSON only, without markdown.",
+                "Use only facts and numbers present in evidence_package.",
+                "Do not introduce thresholds, causal claims, guarantees, benefits, or external actions.",
+                "Keep facts, inferences, recommendations, and limitations separate.",
+                "Every operational recommendation must require human review.",
+                "Preserve evidence_refs from the deterministic explanation when emitting item arrays.",
+            ],
+            "input": payload,
+            "output_format": {
+                "summary": "",
+                "facts": [],
+                "fact_items": [],
+                "inferences": [],
+                "inference_items": [],
+                "recommendations": [],
+                "recommendation_items": [],
+                "risk_notes": [],
+                "manual_review_points": [],
+                "limitations": [],
+                "disclaimer": "",
+            },
+        }
+        return self.chat_json(
+            [
+                {"role": "system", "content": "You are a grounded result explanation editor. Return JSON only."},
+                {"role": "user", "content": json.dumps(prompt, ensure_ascii=False)},
+            ]
+        )
+
     def chat_json(self, messages: list[dict[str, str]]) -> dict[str, Any]:
         config = self.config()
         return self._adapter(config).chat_json(messages, self._parse_json)

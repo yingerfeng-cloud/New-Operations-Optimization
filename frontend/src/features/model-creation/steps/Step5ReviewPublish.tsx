@@ -323,7 +323,7 @@ export function Step5ReviewPublish({
       {testResult && (
         <Card title="测试运行结果" className="section-gap">
           <Descriptions size="small" column={3} items={[
-            { key: 'status', label: '模型状态', children: (testResult as ModelAsset).status || '-' },
+            { key: 'status', label: '模型状态', children: (testResult as ModelAsset).status === 'trial' ? '试运行' : (testResult as ModelAsset).status || '-' },
             { key: 'structure', label: '结构校验', children: statusOf((dryRun as Record<string, unknown> | undefined)?.structure_check) },
             { key: 'solver', label: '求解器 dry-run', children: statusOf((dryRun as Record<string, unknown> | undefined)?.solver_check) },
           ]} />

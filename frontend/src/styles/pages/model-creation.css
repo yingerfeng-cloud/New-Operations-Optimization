@@ -297,6 +297,17 @@
   box-shadow: 0 8px 22px rgba(16, 36, 58, .05);
 }
 
+.component-dependency-card .card-title-row {
+  align-items: stretch;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.component-dependency-card .card-title-row > .ant-space {
+  width: 100%;
+  justify-content: space-between;
+}
+
 .card-title-row .ant-typography {
   margin: 0;
 }
@@ -384,9 +395,13 @@
 .component-dependency-row {
   width: 100%;
   display: grid;
-  grid-template-columns: minmax(140px, .75fr) minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 12px;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas:
+    "main"
+    "tags"
+    "actions";
+  align-items: start;
+  gap: 10px 12px;
   padding: 12px;
   border: 1px solid #e3ebf6;
   border-radius: 12px;
@@ -401,14 +416,27 @@
   box-shadow: 0 8px 18px rgba(22, 119, 255, .08);
 }
 
+.component-dependency-row.is-static {
+  cursor: default;
+}
+
 .component-dependency-row.has-warning {
-  background: #fffaf1;
-  border-color: #f1d4a4;
+  background: #fff8f5;
+  border-color: #efc4b8;
 }
 
 .component-dependency-main strong,
 .component-dependency-main small {
   display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.component-dependency-main {
+  grid-area: main;
+  min-width: 0;
+  align-self: center;
 }
 
 .component-dependency-main small {
@@ -417,15 +445,55 @@
 }
 
 .component-dependency-tags {
+  grid-area: tags;
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
+  min-width: 0;
 }
 
 .component-dependency-actions {
+  grid-area: actions;
   display: flex;
   align-items: center;
+  justify-content: flex-start;
+  flex-wrap: wrap;
   gap: 8px;
+}
+
+.component-dependency-actions .ant-tag {
+  margin: 0;
+}
+
+.component-picker-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.component-picker-name strong,
+.component-picker-name small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.component-picker-name small {
+  margin-top: 3px;
+  color: var(--proto-muted, #667085);
+}
+
+.component-picker-cell-text {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.component-picker-table .ant-table-cell {
+  word-break: normal;
 }
 
 .parameter-binding-drawer .ant-drawer-header {
@@ -618,5 +686,18 @@
 
   .component-dependency-row {
     grid-template-columns: 1fr;
+    grid-template-areas:
+      "main"
+      "tags"
+      "actions";
+  }
+
+  .component-dependency-actions {
+    justify-content: flex-start;
+  }
+
+  .component-picker-footer {
+    align-items: flex-start;
+    flex-direction: column;
   }
 }

@@ -10,7 +10,7 @@ import { PageHeader } from '../../components/PageHeader';
 import { StatusTag } from '../../components/StatusTag';
 import { EmptyActionState, FilterBar } from '../../components/WorkspaceUI';
 import type { ModelAsset } from '../../types/model';
-import { capabilityOrFallback, demoCapabilityFor } from '../../features/demo/demoCapabilities';
+import { capabilityOrFallback } from '../../features/demo/demoCapabilities';
 
 function asRecords(value: unknown): Record<string, unknown>[] {
   return Array.isArray(value) ? value.filter((item): item is Record<string, unknown> => !!item && typeof item === 'object' && !Array.isArray(item)) : [];
@@ -92,13 +92,8 @@ function statusText(value?: unknown) {
   const map: Record<string, string> = {
     published: '已发布',
     trial: '试运行',
-    tested: '已测试',
-    draft: '草稿',
-    developing: '开发中',
+    developing: '草稿',
     offline: '已下线',
-    已发布: '已发布',
-    试运行: '试运行',
-    已测试: '已测试',
   };
   return map[text] || text;
 }
@@ -106,7 +101,7 @@ function statusText(value?: unknown) {
 export function ModelServicesPage() {
   const nav = useNavigate();
   const models = useQuery({ queryKey: ['models'], queryFn: getModels });
-  const services = useMemo(() => (models.data || []).filter(model => ['published', 'trial', 'tested', '已发布', '试运行', '已测试'].includes(String(model.status))), [models.data]);
+  const services = useMemo(() => (models.data || []).filter(model => model.status === 'published'), [models.data]);
   const [keyword, setKeyword] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>();
   const [problemFilter, setProblemFilter] = useState<string>();
@@ -233,7 +228,6 @@ export function ModelServicesPage() {
                         { key: 'solver', label: '推荐求解器', children: selectedCapability.solver },
                         { key: 'nonlinear', label: '非线性处理方式', children: selectedCapability.nonlinearHandling },
                       ]} />
-                      {demoCapabilityFor(selected) && <Alert className="section-gap" showIcon type="info" title={demoCapabilityFor(selected)?.displayName} description={`演示标签：${selectedCapability.tags.join(' / ') || '-'}`} />}
                       <Table
                         className="section-gap"
                         loading={detail.isFetching}

@@ -17,7 +17,28 @@ def _create_model(*, version: str = "v1.0"):
     return model_service.create_model(ModelPackage.model_validate(payload))
 
 
-def test_publish_requires_same_asset_and_current_tested_revision() -> None:
+def test_new_model_status_is_system_managed_and_always_starts_developing() -> None:
+    payload = minimal_dispatch_payload()
+    payload.update({
+        "status": "published",
+        "is_active_version": True,
+        "published_at": "2026-07-30 10:00:00",
+        "tested_at": "2026-07-30 09:00:00",
+        "tested_content_hash": "forged",
+        "tested_model_id": payload["id"],
+    })
+
+    created = model_service.create_model(ModelPackage.model_validate(payload))
+
+    assert created.status == "developing"
+    assert created.is_active_version is False
+    assert created.published_at is None
+    assert created.tested_at is None
+    assert created.tested_content_hash is None
+    assert created.tested_model_id is None
+
+
+def test_publish_requires_current_trial_revision_and_trial_is_immutable() -> None:
     model = _create_model()
 
     with pytest.raises(HTTPException) as not_tested:
@@ -25,21 +46,17 @@ def test_publish_requires_same_asset_and_current_tested_revision() -> None:
     assert not_tested.value.detail["code"] == "MODEL_NOT_TESTED"
 
     tested = model_service.run_model_test_case(model.id, {"parameters": model.parameters})
+    assert tested.status == "trial"
     assert tested.tested_model_id == model.id
     assert tested.tested_content_hash == tested.content_hash
 
     changed_payload = ModelPackage.model_validate(tested.model_dump())
     changed_payload.name = f"{tested.name}-changed"
-    changed = model_service.update_model(model.id, changed_payload)
-    assert changed.id == model.id
-    assert changed.status == "developing"
+    with pytest.raises(HTTPException) as immutable:
+        model_service.update_model(model.id, changed_payload)
+    assert immutable.value.status_code == 409
 
-    with pytest.raises(HTTPException) as outdated:
-        model_service.publish_model(model.id)
-    assert outdated.value.detail["code"] == "MODEL_TEST_OUTDATED"
-
-    retested = model_service.run_model_test_case(model.id, {"parameters": changed.parameters})
-    published = model_service.publish_model(retested.id)
+    published = model_service.publish_model(tested.id)
     assert published.id == model.id
     assert published.status == "published"
 
@@ -54,6 +71,86 @@ def test_publish_rejects_test_record_from_different_asset() -> None:
     with pytest.raises(HTTPException) as mismatch:
         model_service.publish_model(model.id)
     assert mismatch.value.detail["code"] == "MODEL_TEST_MISMATCH"
+
+
+def test_published_validation_preserves_status_and_offline_version_can_be_republished() -> None:
+    model = _create_model()
+    tested = model_service.run_model_test_case(model.id, {"parameters": model.parameters})
+    published = model_service.publish_model(tested.id)
+
+    validated = model_service.run_model_test_case(published.id, {"parameters": published.parameters})
+    assert validated.status == "published"
+    assert validated.tested_content_hash == validated.content_hash
+
+    offline = model_service.offline_model(validated.id)
+    assert offline.status == "offline"
+
+    republished = model_service.publish_model(offline.id)
+    assert republished.status == "published"
+
+
+def test_trial_model_can_be_tested_and_promoted_to_formal_publication() -> None:
+    model = _create_model()
+    with STORE.lock:
+        STORE.models[model.id] = model.model_copy(update={"status": "trial"})
+
+    tested = model_service.run_model_test_case(model.id, {"parameters": model.parameters})
+    assert tested.status == "trial"
+
+    published = model_service.publish_model(tested.id)
+    assert published.status == "published"
+
+
+def test_unpublished_trial_can_return_to_draft_and_clears_test_evidence() -> None:
+    model = _create_model()
+    tested = model_service.run_model_test_case(model.id, {"parameters": model.parameters})
+
+    draft = model_service.return_model_to_draft(tested.id)
+
+    assert draft.status == "developing"
+    assert draft.published_at is None
+    assert draft.tested_at is None
+    assert draft.tested_model_id is None
+    assert draft.tested_content_hash is None
+
+    changed_payload = ModelPackage.model_validate(draft.model_dump())
+    changed_payload.name = f"{draft.name}-changed"
+    changed = model_service.update_model(draft.id, changed_payload)
+    assert changed.name.endswith("-changed")
+
+
+def test_previously_published_trial_cannot_return_to_draft() -> None:
+    model = _create_model()
+    tested = model_service.run_model_test_case(model.id, {"parameters": model.parameters})
+    published = model_service.publish_model(tested.id)
+    offline = model_service.offline_model(published.id)
+    retrial = model_service.run_model_test_case(offline.id, {"parameters": offline.parameters})
+
+    with pytest.raises(HTTPException) as immutable:
+        model_service.return_model_to_draft(retrial.id)
+
+    assert immutable.value.detail["code"] == "PUBLISHED_HISTORY_IMMUTABLE"
+
+
+def test_offline_is_restricted_to_online_models_and_published_history_is_immutable() -> None:
+    developing = _create_model()
+    with pytest.raises(HTTPException) as invalid_transition:
+        model_service.offline_model(developing.id)
+    assert invalid_transition.value.detail["code"] == "INVALID_MODEL_STATUS_TRANSITION"
+
+    tested = model_service.run_model_test_case(developing.id, {"parameters": developing.parameters})
+    with pytest.raises(HTTPException) as trial_transition:
+        model_service.offline_model(tested.id)
+    assert trial_transition.value.detail["code"] == "INVALID_MODEL_STATUS_TRANSITION"
+
+    published = model_service.publish_model(tested.id)
+    offline = model_service.offline_model(published.id)
+    changed_payload = ModelPackage.model_validate(offline.model_dump())
+    changed_payload.name = f"{offline.name}-changed"
+
+    with pytest.raises(HTTPException) as immutable:
+        model_service.update_model(offline.id, changed_payload)
+    assert immutable.value.status_code == 409
 
 
 def test_versions_use_family_maximum_and_reject_duplicate_family_version() -> None:

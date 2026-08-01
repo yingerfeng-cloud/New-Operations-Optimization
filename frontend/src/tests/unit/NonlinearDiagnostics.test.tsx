@@ -25,6 +25,14 @@ test('state recursion with parameter-scaled flows is not misclassified as biline
   expect(diagnostics.some(item => item.nonlinear_type === 'bilinear')).toBe(false);
 });
 
+test('variable names do not match longer parameter prefixes', () => {
+  const diagnostics = analyzeFormulaText(
+    'sum(deviation_penalty[t] * deviation_penalty_price * delta_t for t in time)',
+    ['deviation_penalty'],
+  );
+  expect(diagnostics.some(item => item.nonlinear_type === 'bilinear')).toBe(false);
+});
+
 function nonlinearDraft(): ModelDraft {
   const draft = createInitialDraft();
   draft.basic_info.name = '非线性诊断测试模型';

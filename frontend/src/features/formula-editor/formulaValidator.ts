@@ -8,6 +8,14 @@ export interface FormulaValidation {
   warnings: string[];
 }
 
+function escapeRegExp(text: string) {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function symbolRefPattern(code: string) {
+  return `\\b${escapeRegExp(code)}(?![A-Za-z0-9_])(?:\\[[^\\]]+\\])?`;
+}
+
 export function validateFormula(
   dsl: string,
   kind: 'constraint' | 'objective',
@@ -22,10 +30,11 @@ export function validateFormula(
   if (!text) errors.push('表达式不能为空');
   const relation = splitRelation(text);
   if (kind === 'constraint' && !relation) errors.push('约束表达式必须包含 >=、<=、== 或 !=');
+  if (relation && (!relation.lhs || !relation.rhs)) errors.push('关系符左右两侧都必须填写表达式');
   if (kind === 'objective' && relation) errors.push('目标函数不能包含关系符');
   if (relation?.sense === '!=') errors.push('!= 需要离散化，当前线性编译器不支持');
-  if (/\b(abs|max|min|piecewise)\s*\(/.test(text) && !/^\s*(max|min)\([^)]*\sfor\s/.test(text)) {
-    errors.push('科学函数或分段函数需要先线性化');
+  if (/\b(abs|max|min|piecewise|log|exp|sqrt)\s*\(/.test(text) && !/^\s*(max|min)\([^)]*\sfor\s/.test(text)) {
+    warnings.push('已识别非线性或分段函数；可进行语法与类型分析，但不能直接进入 LP/MILP，需先完成受支持的线性化转换');
   }
 
   const vars = new Set<string>();
@@ -36,8 +45,8 @@ export function validateFormula(
   visit(tokens);
   for (const a of vars) {
     for (const b of vars) {
-      const ref = `${a}(?:\\[[^\\]]+\\])?`;
-      const ref2 = `${b}(?:\\[[^\\]]+\\])?`;
+      const ref = symbolRefPattern(a);
+      const ref2 = symbolRefPattern(b);
       if (new RegExp(`${ref}\\s*[*/]\\s*${ref2}`).test(text)) {
         errors.push('变量乘除变量属于非线性表达');
         break;

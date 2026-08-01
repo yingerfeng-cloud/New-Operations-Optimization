@@ -106,7 +106,7 @@ function numericSeries(result?: SolveResult, labelMap?: ResultLabelMap): Numeric
 function ResultFieldName({ code, labels }: { code: unknown; labels?: ResultLabelMap }) {
   const technicalCode = String(code || '-');
   const label = resultLabel(technicalCode, labels);
-  return <span className="result-field-name"><span>{label}</span>{label !== technicalCode && <small>{technicalCode}</small>}</span>;
+  return <span className="result-field-name" title={label !== technicalCode ? technicalCode : undefined}><span>{label}</span></span>;
 }
 
 export function ResultKpiStrip({ result, labelMap }: { result?: SolveResult; labelMap?: ResultLabelMap }) {
@@ -210,7 +210,7 @@ export function ResultConstraintsPanel({ result }: { result?: SolveResult }) {
 }
 
 export function ResultExplanationPanel({ result }: { result?: SolveResult }) {
-  const explanation = result?.business_explanation || result?.explanation;
+  const explanation = result?.explanation_structured || result?.business_explanation || result?.explanation;
   if (!result) return <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="请选择结果" />;
   if (typeof explanation === 'string') return <details className="inline-help-note result-explanation-note"><summary><span>i</span><b>业务解释</b><small>{previewText(explanation)}</small></summary><p>{explanation}</p></details>;
   const obj = objectValue(explanation);
@@ -218,9 +218,10 @@ export function ResultExplanationPanel({ result }: { result?: SolveResult }) {
   return (
     <>
       <details className="inline-help-note result-explanation-note"><summary><span>i</span><b>业务解释</b><small>{previewText(summary)}</small></summary><p>{summary}</p></details>
-      <Card size="small" title="风险提示 / 下一步" className="section-gap">
-        <JsonViewer value={{ risk_notes: obj.risk_notes || obj.risks || [], next_actions: obj.next_actions || obj.actions || [] }} />
+      <Card size="small" title="事实 / 推断 / 建议 / 风险" className="section-gap">
+        <JsonViewer value={{ facts: obj.facts || [], inferences: obj.inferences || [], recommendations: obj.recommendations || [], risk_notes: obj.risk_notes || obj.risks || [], manual_review_points: obj.manual_review_points || [], limitations: obj.limitations || [] }} />
       </Card>
+      {Boolean(result.evidence_package) && <Card size="small" title="EvidencePackage" className="section-gap"><JsonViewer value={result.evidence_package} /></Card>}
     </>
   );
 }

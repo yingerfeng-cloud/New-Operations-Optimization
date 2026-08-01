@@ -5,10 +5,10 @@ from typing import Any
 
 from app.services.time_dimension_service import resolve_state_time_set
 from app.model_dimensions import extract_dimensions
+from app.model_components.formula_contracts import formula_expression, participates_in_solve
 
 FORMULA_NOT_GENERATED = "公式未生成，请检查左端变量、右端参数和索引配置"
 TRIVIAL_ZERO_CONSTRAINT_RE = re.compile(r"^\s*(?:∀\s*[^：:]+[：:]\s*)?0\s*(?:>=|<=|==)\s*0\s*$")
-DISPLAY_ONLY_MODES = {"display_only", "remark_only", "none"}
 
 
 def _first_non_blank(*values: Any) -> str:
@@ -22,7 +22,7 @@ def _first_non_blank(*values: Any) -> str:
 
 
 def _is_display_only(item: dict[str, Any]) -> bool:
-    return str(item.get("solve_participation") or item.get("participation") or "solve_active") in DISPLAY_ONLY_MODES
+    return not participates_in_solve(item)
 
 
 def _is_trivial_zero_constraint(formula: str) -> bool:
@@ -54,6 +54,7 @@ def _constraint_rhs_text(constraint: dict[str, Any]) -> str:
 
 def constraint_display_formula(constraint: dict[str, Any]) -> str:
     formula = _first_non_blank(
+        constraint.get("dsl_formula"),
         constraint.get("formula"),
         constraint.get("expression"),
         constraint.get("dsl"),
@@ -80,7 +81,7 @@ def constraint_display_formula(constraint: dict[str, Any]) -> str:
 
 
 def objective_term_formula(term: dict[str, Any]) -> str:
-    formula = _first_non_blank(term.get("formula"), term.get("expression"), term.get("dsl"), term.get("math_expression"), term.get("generated_formula"), term.get("display_formula"), term.get("expr"))
+    formula = _first_non_blank(term.get("dsl_formula"), term.get("formula"), term.get("expression"), term.get("dsl"), term.get("math_expression"), term.get("generated_formula"), term.get("display_formula"), term.get("expr"))
     if formula and formula != "0":
         return formula
     var = str(term.get("var") or "").strip()
@@ -121,7 +122,7 @@ class RuntimeParameterValidator:
 
         def validate_authoritative_key(field: str, actual_key: list[Any], expected_key: list[str], scope: list[Any]) -> None:
             if len(actual_key) != len(expected_key):
-                errors.append({"field": field, "error": "variable key arity mismatch", "expected": expected_key, "actual": actual_key})
+                errors.append({"field": field, "error": "variable key mismatch", "expected": expected_key, "actual": actual_key})
                 return
             scope_aliases = {
                 str(item.get("alias")): str(item.get("set"))
@@ -180,7 +181,7 @@ class RuntimeParameterValidator:
 
         for constraint in generic_spec.get("constraints", []) or []:
             cname = str(constraint.get("name", "constraint"))
-            raw_formula = _first_non_blank(constraint.get("formula"), constraint.get("expression"), constraint.get("display_formula"), constraint.get("math_expression"), constraint.get("math_constraint"))
+            raw_formula = formula_expression(constraint) or _first_non_blank(constraint.get("display_formula"), constraint.get("math_expression"), constraint.get("math_constraint"))
             if _is_display_only(constraint) and _is_trivial_zero_constraint(raw_formula):
                 continue
             formula = constraint_display_formula(constraint)

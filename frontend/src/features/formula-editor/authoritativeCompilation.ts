@@ -15,6 +15,7 @@ export function formulaCompileSignature(formula: FormulaDef, context: Authoritat
     formula: formula.dsl_formula,
     formula_type: formula.kind,
     participation: formula.solve_participation || 'solve_active',
+    boundary_strategy: formula.boundary_strategy || 'strict',
     objective_direction: formula.objective_direction,
     weight: formula.weight,
     scope: scopeOf(formula),
@@ -42,7 +43,10 @@ export function formulaAnalyzePayload(formula: FormulaDef, context: Authoritativ
     objective_direction: formula.kind === 'objective' ? formula.objective_direction : undefined,
     scope: scopeOf(formula),
     symbols: context.symbols,
-    model_context: context.model_context,
+    model_context: {
+      ...(context.model_context || {}),
+      boundary_strategy: formula.boundary_strategy || 'strict',
+    },
   };
 }
 

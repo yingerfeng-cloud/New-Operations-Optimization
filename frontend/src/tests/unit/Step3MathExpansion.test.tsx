@@ -224,6 +224,29 @@ test('Step3 saves 2D function mapping component with triangulated MILP strategy'
   expect(json).toContain('"solve_strategy":"triangulated_milp_exact"');
 });
 
+test('Step3 binds a 2D asset to the selected catalog component without adding a duplicate', async () => {
+  const draft = componentDraft2d();
+  draft.components = [{
+    component_id: 'function_mapping_2d_component',
+    type: 'function_mapping_2d_component',
+    name: '二维函数映射组件',
+    dependencies: ['balance_equation_component'],
+  }];
+  renderWithQueryClient(<Harness initial={draft} />);
+
+  fireEvent.click(screen.getByRole('button', { name: '绑定函数资产' }));
+  expect((await screen.findAllByRole('dialog')).at(-1)).toBeInTheDocument();
+  expect(await screen.findByTitle(/hydro_power_surface_001/)).toBeInTheDocument();
+  expect(screen.queryByText(/curve_storage_level/)).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: '保存绑定' }));
+
+  await waitFor(() => expect(screen.getByTestId('component-count')).toHaveTextContent('1'));
+  const json = screen.getByTestId('draft-json').textContent || '';
+  expect(json).toContain('"function_asset_id":"hydro_power_surface_001"');
+  expect(json).toContain('"type":"function_mapping_2d_component"');
+  expect(json).toContain('"dependencies":["balance_equation_component"]');
+});
+
 test('Step3 rejects 2D mapping when z variable is missing', async () => {
   const draft = componentDraft2d();
   draft.semantic.variables = draft.semantic.variables.filter(variable => variable.code !== 'power');

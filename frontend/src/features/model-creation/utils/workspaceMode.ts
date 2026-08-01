@@ -4,7 +4,7 @@ import { createBlankDraft, type ModelDraft, type ModelWorkspaceMode } from '../s
 import { modelAssetToDraft } from './modelAssetToDraft';
 
 const modes = new Set<ModelWorkspaceMode>(['new', 'template', 'edit', 'clone', 'version']);
-const publishedStatuses = new Set(['published', '已发布']);
+const immutableStatuses = new Set(['trial', 'published', 'offline']);
 
 export interface WorkspaceRequest {
   mode: ModelWorkspaceMode;
@@ -43,7 +43,7 @@ export function parseWorkspaceRequest(searchParams: URLSearchParams, routeModelI
 }
 
 export function effectiveAssetMode(mode: ModelWorkspaceMode, asset: ModelAsset): ModelWorkspaceMode {
-  return mode === 'edit' && publishedStatuses.has(String(asset.status)) ? 'version' : mode;
+  return mode === 'edit' && immutableStatuses.has(String(asset.status)) ? 'version' : mode;
 }
 
 export function assetToWorkspaceDraft(asset: ModelAsset, mode: ModelWorkspaceMode): ModelDraft {
@@ -93,5 +93,5 @@ export const workspaceTitles: Record<ModelWorkspaceMode, string> = {
   template: '从模板创建模型',
   edit: '编辑模型草稿',
   clone: '复制模型',
-  version: '创建模型新版本',
+  version: '创建新版本并修改',
 };

@@ -10,7 +10,7 @@ from app.jobs.job_runner import job_runner
 from app.schemas.solve import SolveRequest, TaskRecord, TaskView
 from app.semantic.semantic_mapper import map_business_parameters
 from app.semantic.semantic_validator import RuntimeParameterValidator
-from app.services.model_service import CALLABLE_STATUSES, model_service
+from app.services.model_service import DIRECT_CALLABLE_STATUSES, model_service
 from app.services.model_set_reference_validator import validate_set_references
 from app.services.template_service import template_library
 from app.services.time_dimension_service import normalize_runtime_time_dimension, resolve_time_dimension_config
@@ -117,6 +117,15 @@ class JobService:
             except HTTPException as exc:
                 if exc.status_code != 404:
                     raise
+                if model_service.find_models_by_code(req.model_code):
+                    raise HTTPException(
+                        status_code=409,
+                        detail={
+                            "code": "MODEL_NOT_PUBLISHED",
+                            "message": "该 model_code 当前没有已发布版本；试运行仅允许显式传入 model_id 调试。",
+                            "model_code": req.model_code,
+                        },
+                    )
                 template = deepcopy(template_library.get_template(req.model_code))
                 component_spec = deepcopy(template.get("component_spec") or {})
                 generic_spec = deepcopy(template.get("generic_spec") or {})
@@ -163,8 +172,8 @@ class JobService:
                 return
             raise HTTPException(status_code=422, detail="model_id or model_code is required for semantic optimization")
 
-        model = model_service.resolve_model(model_id=req.model_id)
-        if model.status not in CALLABLE_STATUSES:
+        model = model_service.get_model(req.model_id)
+        if model.status not in DIRECT_CALLABLE_STATUSES:
             raise HTTPException(status_code=409, detail=f"Model is not callable in status: {model.status}")
         req.scene = model.scene
         req.model = model.name
@@ -222,6 +231,32 @@ class JobService:
         errors = RuntimeParameterValidator().validate(semantic_spec, merged)
         if errors:
             raise HTTPException(status_code=422, detail=errors)
+        declared_parameter_keys = [
+            str(item.get("math_param") or item.get("code") or item.get("key"))
+            for item in semantic_spec.get("parameters") or []
+            if item.get("math_param") or item.get("code") or item.get("key")
+        ]
+        merged["_explanation_parameters"] = {
+            key: deepcopy(merged[key])
+            for key in declared_parameter_keys
+            if key in merged
+        }
+        merged["_result_context"] = {
+            "id": model.id,
+            "name": model.name,
+            "scene": model.scene,
+            "version": model.version,
+            "content_hash": model.content_hash,
+            "objective": model.objective,
+            "tags": list(model.tags or []),
+            "semantic_spec": deepcopy(semantic_spec),
+            "component_spec": deepcopy(component_spec),
+            "generic_spec": deepcopy(generic_spec),
+            "objective_config": deepcopy(model.objective_config or {}),
+            "input_contract": deepcopy(model.input_contract or {}),
+            "output_contract": deepcopy(model.output_contract or {}),
+            "ui_metadata": deepcopy(model.ui_metadata or {}),
+        }
         req.payload = merged
 
     @staticmethod

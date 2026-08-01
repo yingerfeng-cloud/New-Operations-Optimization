@@ -4,25 +4,10 @@ from copy import deepcopy
 from typing import Any
 
 from app.problem_type_diagnosis import component_problem_type_fields
+from app.model_components.formula_contracts import formula_expression, participation_fields, synchronize_formula_fields
 
 
 COMPONENT_REGISTRY: dict[str, Any] = {}
-
-COMPONENT_DEPENDENCIES: dict[str, list[str]] = {
-    "hydro_volume_bounds": ["hydro_initial_volume"],
-    "hydro_outflow_balance": ["hydro_power_flow_conversion"],
-    "hydro_outflow_bounds": ["hydro_outflow_balance"],
-    "hydro_spill_bounds": ["hydro_outflow_balance"],
-    "hydro_cascade_inflow_delay": ["hydro_outflow_balance"],
-    "hydro_reservoir_balance": ["hydro_cascade_inflow_delay"],
-    "hydro_load_tracking": ["hydro_power_flow_conversion"],
-    "hydro_terminal_volume": ["hydro_reservoir_balance"],
-    "hydro_ramp_smoothing": ["hydro_power_flow_conversion"],
-    "storage_soc_bounds": ["storage_soc_balance"],
-    "storage_terminal_soc_tracking": ["storage_soc_balance"],
-    "storage_charge_discharge_exclusive": ["storage_soc_balance"],
-    "grid_power_limit": ["pv_storage_power_balance"],
-}
 
 COMPONENT_OUTPUTS: dict[str, list[str]] = {
     "hydro_initial_volume": ["volume"],
@@ -255,15 +240,14 @@ def component_definition(component_type: str, builder: Any | None = None) -> dic
     constraint_rows = HYDRO_CONSTRAINT_OVERRIDES.get(component_type) or [{"expression": formula}]
     generated_constraints = []
     for index, row in enumerate(constraint_rows):
-        expression = str(row.get("expression") or row.get("formula") or formula)
+        expression = formula_expression(row) or str(formula)
         generated_constraints.append(
             {
-                **deepcopy(row),
+                **synchronize_formula_fields(deepcopy(row), expression),
                 "constraint_id": row.get("constraint_id") or f"{component_type}_generated_{index + 1}",
                 "name": row.get("name") or display_name,
                 "type": row.get("type") or COMPONENT_CONSTRAINT_TYPES.get(component_type, "business_rule"),
-                "formula": expression,
-                "expression": expression,
+                **participation_fields(row),
                 "business_meaning": row.get("business_meaning") or description,
                 "indices": row.get("indices") or COMPONENT_INDICES.get(component_type, []),
             }
@@ -275,6 +259,7 @@ def component_definition(component_type: str, builder: Any | None = None) -> dic
                 "name": display_name,
                 "type": "mccormick",
                 "formula": "w ~= x * y",
+                "dsl_formula": "w ~= x * y",
                 "expression": "w ~= x * y",
                 "business_meaning": description,
                 "indices": [],
@@ -282,8 +267,7 @@ def component_definition(component_type: str, builder: Any | None = None) -> dic
                 "programmatic": True,
                 "generated_by": "validate_mccormick_spec",
                 "expression_class": "linear",
-                "participates_in_solve": True,
-                "solve_participation": "generated",
+                **participation_fields("solve_active"),
             }
         ]
     required_sets = []
@@ -299,7 +283,7 @@ def component_definition(component_type: str, builder: Any | None = None) -> dic
                 **deepcopy(term),
                 "source": "component",
                 "source_component": component_type,
-                "enabled": True,
+                **participation_fields(term),
                 "editable": True,
             }
         )
@@ -314,7 +298,7 @@ def component_definition(component_type: str, builder: Any | None = None) -> dic
         "implemented": True,
         "status": "published",
         "required": component_type in {"hydro_power_flow_conversion", "hydro_outflow_balance"},
-        "depends_on": COMPONENT_DEPENDENCIES.get(component_type, []),
+        "depends_on": list(getattr(builder, "depends_on", [])),
         "inputs": list(getattr(builder, "required_parameters", [])),
         "parameters": deepcopy(HYDRO_PARAMETERS) if component_type.startswith("hydro_") else [],
         "variables": deepcopy(HYDRO_VARIABLES) if component_type.startswith("hydro_") else [],
@@ -338,7 +322,6 @@ def component_definition(component_type: str, builder: Any | None = None) -> dic
     item["problem_type"] = problem_type
     item["problem_types"] = list(item.get("problem_types") or item.get("solver_capabilities") or [problem_type])
     item["solver_capabilities"] = list(item.get("solver_capabilities") or item.get("problem_types") or [problem_type])
-    item.setdefault("depends_on", COMPONENT_DEPENDENCIES.get(component_type, []))
     item.setdefault("generated_constraints", generated_constraints)
     item.setdefault("generated_objective_terms", terms)
     return item

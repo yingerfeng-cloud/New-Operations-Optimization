@@ -1,0 +1,70 @@
+[
+  {
+    "component_id": "audit_legacy_expression",
+    "sets": [{"code": "time"}],
+    "parameters": [{"code": "limit", "dimension": ["time"]}],
+    "variables": [{"code": "x", "dimension": ["time"]}],
+    "constraints": [{"constraint_id": "legacy_expression", "indices": [{"set": "time", "alias": "t"}], "expression": "x[t] >= limit[t]", "solve_participation": "solve_active"}]
+  },
+  {
+    "component_id": "audit_legacy_formula",
+    "sets": [{"code": "time"}],
+    "parameters": [{"code": "limit", "dimension": ["time"]}],
+    "variables": [{"code": "x", "dimension": ["time"]}],
+    "constraints": [{"constraint_id": "legacy_formula", "indices": [{"set": "time", "alias": "t"}], "formula": "x[t] <= limit[t]", "solve_participation": "display_only"}]
+  },
+  {
+    "component_id": "audit_dsl_formula",
+    "sets": [{"code": "time"}],
+    "parameters": [{"code": "limit", "dimension": ["time"]}],
+    "variables": [{"code": "x", "dimension": ["time"]}],
+    "constraints": [{"constraint_id": "dsl_formula", "indices": [{"set": "time", "alias": "t"}], "dsl_formula": "x[t] <= limit[t]", "solve_participation": "solve_active"}]
+  },
+  {
+    "component_id": "audit_preview_only",
+    "variables": [{"code": "x", "dimension": []}],
+    "constraints": [{"constraint_id": "preview", "dsl_formula": "x >= 20", "solve_participation": "preview_only"}]
+  },
+  {
+    "component_id": "audit_disabled",
+    "variables": [{"code": "x", "dimension": []}],
+    "constraints": [{"constraint_id": "disabled", "dsl_formula": "x >= 30", "solve_participation": "disabled"}]
+  },
+  {
+    "component_id": "audit_state_transition",
+    "sets": [{"code": "time", "type": "time_period"}, {"code": "state_time", "type": "state_time", "base_set": "time"}],
+    "parameters": [{"code": "input", "dimension": ["time"]}, {"code": "output", "dimension": ["time"]}],
+    "variables": [{"code": "state", "dimension": ["state_time"]}],
+    "constraints": [{"constraint_id": "transition", "indices": [{"set": "time", "alias": "t"}], "dsl_formula": "state[t+1] == state[t] + input[t] - output[t]", "boundary_strategy": "strict", "solve_participation": "solve_active"}]
+  },
+  {
+    "component_id": "audit_objective",
+    "variables": [{"code": "x", "dimension": []}],
+    "constraints": [{"constraint_id": "lower", "dsl_formula": "x >= 1", "solve_participation": "solve_active"}],
+    "objective_terms": [{"term_id": "min_x", "dsl_formula": "x", "solve_participation": "solve_active", "supported_by_backend": true}]
+  },
+  {
+    "component_id": "audit_multiple_constraints",
+    "parameters": [{"code": "lower", "dimension": []}, {"code": "upper", "dimension": []}],
+    "variables": [{"code": "x", "dimension": []}],
+    "constraints": [
+      {"constraint_id": "lower", "expression": "x >= lower", "solve_participation": "solve_active"},
+      {"constraint_id": "upper", "formula": "x <= upper", "solve_participation": "solve_active"}
+    ]
+  },
+  {
+    "component_id": "audit_backward_transition",
+    "sets": [{"code": "time", "type": "time_period"}],
+    "variables": [{"code": "x", "dimension": ["time"]}],
+    "constraints": [{"constraint_id": "backward", "indices": [{"set": "time", "alias": "t"}], "dsl_formula": "x[t] >= x[t-1]", "boundary_strategy": "skip_first", "solve_participation": "solve_active"}]
+  },
+  {
+    "component_id": "audit_multiple_objectives",
+    "variables": [{"code": "x", "dimension": []}],
+    "constraints": [{"constraint_id": "bounds", "dsl_formula": "x >= 0", "solve_participation": "solve_active"}],
+    "objective_terms": [
+      {"term_id": "active", "dsl_formula": "x", "solve_participation": "solve_active", "supported_by_backend": true},
+      {"term_id": "preview", "dsl_formula": "-x", "solve_participation": "remark_only", "supported_by_backend": true}
+    ]
+  }
+]

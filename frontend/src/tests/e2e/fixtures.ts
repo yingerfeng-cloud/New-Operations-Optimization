@@ -127,7 +127,7 @@ export async function mockApi(page: Page) {
     } else if (url.endsWith('/api/models/MODEL-DRAFT-1/test')) {
       savedModel = {
         ...savedModel,
-        status: 'tested',
+        status: 'trial',
         dry_run_result: { structure_check: { status: 'passed' }, solver_check: { status: 'passed' } },
       };
       body = savedModel;

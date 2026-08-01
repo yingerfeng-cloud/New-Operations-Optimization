@@ -1,4 +1,5 @@
 import type { ModelAsset } from '../../types/model';
+import type { SolveResult } from '../../types/result';
 
 export type ResultLabelMap = Record<string, string>;
 
@@ -33,29 +34,28 @@ function objectValue(value: unknown): Record<string, unknown> {
   return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {};
 }
 
-function rows(value: unknown): Array<Record<string, unknown>> {
-  return Array.isArray(value) ? value.filter(item => item && typeof item === 'object') as Array<Record<string, unknown>> : [];
+function collectDefinitions(target: ResultLabelMap, source: unknown, visited = new WeakSet<object>()) {
+  if (!source || typeof source !== 'object') return;
+  if (visited.has(source)) return;
+  visited.add(source);
+  if (Array.isArray(source)) {
+    source.forEach(item => collectDefinitions(target, item, visited));
+    return;
+  }
+
+  const item = source as Record<string, unknown>;
+  const code = String(item.code || item.key || item.variable || item.metric || item.id || '').trim();
+  const label = String(item.display_name || item.label || item.business_name || item.name || item.title || '').trim();
+  if (code && label && label !== code && /[\u3400-\u9fff]/u.test(label)) target[code] = label;
+  Object.values(item).forEach(value => collectDefinitions(target, value, visited));
 }
 
-function addDefinitions(target: ResultLabelMap, definitions: unknown) {
-  rows(definitions).forEach(item => {
-    const code = String(item.code || item.key || item.variable || item.id || '').trim();
-    const label = String(item.display_name || item.label || item.business_name || item.name || '').trim();
-    if (code && label && label !== code) target[code] = label;
-  });
-}
-
-export function buildResultLabelMap(model?: ModelAsset): ResultLabelMap {
+export function buildResultLabelMap(model?: ModelAsset, result?: SolveResult): ResultLabelMap {
   const labels: ResultLabelMap = {};
-  if (!model) return labels;
-  const semantic = objectValue(model.semantic_spec);
-  const generic = objectValue(model.generic_spec);
-  const component = objectValue(model.component_spec);
-  const draft = objectValue(model.model_draft);
-  const draftSemantic = objectValue(draft.semantic);
-  const contract = objectValue(model.output_contract);
-  [semantic.variables, generic.variables, component.variables, draft.variables, draftSemantic.variables, contract.variables]
-    .forEach(definitions => addDefinitions(labels, definitions));
+  collectDefinitions(labels, model);
+  collectDefinitions(labels, objectValue(result?.result_metadata));
+  collectDefinitions(labels, result?.metric_definitions);
+  collectDefinitions(labels, result?.output_schema);
   return labels;
 }
 

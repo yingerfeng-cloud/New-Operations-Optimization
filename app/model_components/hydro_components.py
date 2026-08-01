@@ -15,6 +15,7 @@ class HydroComponentBase:
     example = ""
     required_parameters: list[str] = []
     common_errors: list[str] = []
+    depends_on: list[str] = []
 
     def validate(self, spec: dict[str, Any], context: dict[str, Any]) -> None:
         if not context["metadata"].get("hydro_runtime_validated"):
@@ -55,6 +56,7 @@ class HydroInitialVolumeComponent(HydroComponentBase):
 
 @register_component("hydro_volume_bounds")
 class HydroVolumeBoundsComponent(HydroComponentBase):
+    depends_on = ["hydro_initial_volume"]
     display_name = "库容上下限组件"
     description = "用于保证水库运行不突破安全库容边界。"
     formula = "volume_min[s] <= volume[s,t] <= volume_max[s]"
@@ -151,6 +153,7 @@ class HydroGenerationFlowBoundsComponent(HydroComponentBase):
 
 @register_component("hydro_outflow_balance")
 class HydroOutflowBalanceComponent(HydroComponentBase):
+    depends_on = ["hydro_power_flow_conversion"]
     display_name = "下泄流量平衡组件"
     description = "电站下泄流量由发电过机流量和弃水流量组成。"
     formula = "q_out[s,t] = q_gen[s,t] + q_spill[s,t]"
@@ -170,6 +173,7 @@ class HydroOutflowBalanceComponent(HydroComponentBase):
 
 @register_component("hydro_outflow_bounds")
 class HydroOutflowBoundsComponent(HydroComponentBase):
+    depends_on = ["hydro_outflow_balance"]
     display_name = "下泄流量上下限组件"
     description = "限制生态、防洪或调度要求的下泄边界。"
     formula = "outflow_min[s] <= q_out[s,t] <= outflow_max[s]"
@@ -210,6 +214,7 @@ class HydroEcologicalFlowComponent(HydroComponentBase):
 
 @register_component("hydro_spill_bounds")
 class HydroSpillBoundsComponent(HydroComponentBase):
+    depends_on = ["hydro_outflow_balance"]
     display_name = "弃水上限组件"
     description = "限制弃水流量上限。"
     formula = "0 <= q_spill[s,t] <= spill_max[s]"
@@ -231,6 +236,7 @@ class HydroSpillBoundsComponent(HydroComponentBase):
 
 @register_component("hydro_cascade_inflow_delay")
 class HydroCascadeInflowDelayComponent(HydroComponentBase):
+    depends_on = ["hydro_outflow_balance"]
     display_name = "梯级传播时滞入库组件"
     description = "根据上游下泄、传播时滞和区间来水生成下游入库表达式。"
     formula = "inflow[down,t] = local_inflow[down,t] + sum(q_out[up,t-delay])"
@@ -271,6 +277,7 @@ class HydroCascadeInflowDelayComponent(HydroComponentBase):
 
 @register_component("hydro_reservoir_balance")
 class HydroReservoirBalanceComponent(HydroComponentBase):
+    depends_on = ["hydro_cascade_inflow_delay"]
     display_name = "水库水量平衡组件"
     description = "描述库容随入库、下泄变化的时序递推。"
     formula = "volume[s,t+1] = volume[s,t] + (inflow[s,t] - q_out[s,t]) * delta_v"
@@ -305,6 +312,7 @@ class HydroReservoirBalanceComponent(HydroComponentBase):
 
 @register_component("hydro_load_tracking")
 class HydroLoadTrackingComponent(HydroComponentBase):
+    depends_on = ["hydro_power_flow_conversion"]
     display_name = "负荷跟踪组件"
     description = "用正负偏差变量表达无法完全跟踪负荷的情况。"
     formula = "sum(station_power[s,t]) - load_forecast[t] = load_dev_pos[t] - load_dev_neg[t]"
@@ -347,6 +355,7 @@ class HydroLoadTrackingComponent(HydroComponentBase):
 
 @register_component("hydro_terminal_volume")
 class HydroTerminalVolumeComponent(HydroComponentBase):
+    depends_on = ["hydro_reservoir_balance"]
     display_name = "期末库容控制组件"
     description = "控制调度结束时库容接近目标值，避免过度消耗水库。"
     formula = "volume[s,H] - target_terminal_volume[s] = terminal_dev_pos[s] - terminal_dev_neg[s]"
@@ -379,6 +388,7 @@ class HydroTerminalVolumeComponent(HydroComponentBase):
 
 @register_component("hydro_ramp_smoothing")
 class HydroRampSmoothingComponent(HydroComponentBase):
+    depends_on = ["hydro_power_flow_conversion"]
     display_name = "出力平滑组件"
     description = "减少相邻时段出力剧烈变化。"
     formula = "ramp_abs[s,t] >= |station_power[s,t] - station_power[s,t-1]|"

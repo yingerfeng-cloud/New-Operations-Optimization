@@ -29,7 +29,7 @@ function escapeRegExp(text: string) {
 
 function variableRefPattern(variableCodes: string[]) {
   const codes = variableCodes.map(escapeRegExp).join('|');
-  return codes ? new RegExp(`\\b(${codes})(?:\\[[^\\]]+\\])?`, 'g') : undefined;
+  return codes ? new RegExp(`\\b(${codes})(?![A-Za-z0-9_])(?:\\[[^\\]]+\\])?`, 'g') : undefined;
 }
 
 function variableRefs(text: string, variableCodes: string[]) {

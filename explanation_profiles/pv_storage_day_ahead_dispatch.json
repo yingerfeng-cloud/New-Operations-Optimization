@@ -1,13 +1,20 @@
 {
   "profile_name": "pv_storage_day_ahead_dispatch",
-  "applies_to": {"tags": ["pv_storage_day_ahead", "光储日前"]},
+  "profile_version": "1.0",
+  "applies_to": {"tags": ["pv_storage_day_ahead", "光储日前"], "business_domains": ["pv_storage"], "model_families": ["pv_storage_day_ahead_dispatch"]},
   "key_metrics": [
-    {"name": "total_curtailment", "label": "弃电量", "expression": "sum(pv_curtailment)", "unit": "MWh"},
-    {"name": "storage_contribution", "label": "储能放电贡献", "expression": "sum(storage_discharge)", "unit": "MWh"}
+    {"name": "total_pv_generation", "label": "光伏预测电量", "function": "total_energy", "args": ["pv_generation"], "unit": "MWh"},
+    {"name": "total_curtailment", "label": "弃电量", "function": "total_energy", "args": ["pv_curtailment"], "unit": "MWh"},
+    {"name": "curtailment_rate", "label": "弃电率", "function": "curtailment_rate", "args": ["pv_curtailment", "pv_generation"], "unit": "p.u."},
+    {"name": "storage_contribution", "label": "储能放电贡献", "function": "total_energy", "args": ["storage_discharge"], "unit": "MWh"},
+    {"name": "grid_peak_period", "label": "最大并网出力时段", "function": "max_period", "args": ["grid_export"], "unit": ""},
+    {"name": "grid_binding_count", "label": "并网边界触及时段数", "function": "binding_count", "args": ["grid_export", "grid_export_limit"], "unit": "时段"}
   ],
   "risk_rules": [
-    {"name": "grid_limit_binding", "condition": "grid_export_max > 0", "level": "medium", "message": "请复核并网边界及可能触边时段。"}
+    {"name": "curtailment_warning", "condition": "curtailment_rate > 0.05", "level": "medium", "message": "弃电率偏高，需复核并网限制和储能空间。"},
+    {"name": "grid_limit_binding", "condition": "grid_binding_count > 0", "level": "medium", "message": "存在并网边界触及时段。"},
+    {"name": "terminal_soc_review", "condition": "soc_min <= 0", "level": "high", "message": "SOC 触及下边界，需复核次日衔接。"}
   ],
-  "manual_review_points": ["复核光伏预测、负荷和电价曲线。", "复核并网约束与末端 SOC。"],
+  "manual_review_points": ["复核光伏预测、负荷和电价曲线。", "复核并网约束与末端 SOC。", "复核设备可用率和日前计划提交边界。"],
   "explanation_limits": ["日前结果基于当前预测输入，不代表实际运行时必然最优。"]
 }

@@ -40,7 +40,7 @@ def test_and_publish_model(client, model_id: str, runtime_parameters: dict | Non
     test_payload = {"parameters": runtime_parameters} if runtime_parameters is not None else {}
     tested = client.post(f"/api/models/{model_id}/test", json=test_payload)
     assert tested.status_code == 200, tested.text
-    assert tested.json()["status"] == "tested", tested.text
+    assert tested.json()["status"] == "trial", tested.text
     published = client.post(f"/api/models/{model_id}/publish")
     assert published.status_code == 200, published.text
     return published

@@ -12,7 +12,9 @@ from fastapi import HTTPException
 
 from app.builders.generic_linear_builder import GenericLinearBuilder
 from app.generic_formula_compiler import UNSUPPORTED_FORMULA_MESSAGE, compile_generic_formula_spec
+from app.model_components.dependency_graph import component_dependency_ids, component_id as dependency_component_id, selected_dependency_errors
 from app.model_components.formula_components import load_library_component, validate_component_definition
+from app.model_components.formula_contracts import formula_expression, participates_in_solve
 from app.model_draft import finalize_model_draft, normalize_component_model_package, normalize_generic_model_package
 from app.problem_type_diagnosis import (
     infer_problem_type_from_component_spec,
@@ -31,13 +33,29 @@ from app.templates.power_templates import power_template_library
 from app.utils import has_pyomo, now_text, require_pyomo_for_publish
 
 
-CALLABLE_STATUSES = {"published", "trial", "tested", "已发布", "试运行", "已测试"}
-PUBLISHED_STATUSES = {"published", "已发布"}
+# A concrete version may be invoked directly during acceptance testing.
+# Legacy model-code aliases resolve the active published version; newly
+# generated versioned Skills use an immutable model id/version/content hash.
+DIRECT_CALLABLE_STATUSES = {"published", "trial"}
+PRODUCTION_CALLABLE_STATUSES = {"published"}
+# Backward-compatible alias for direct, explicit-model invocation paths.
+CALLABLE_STATUSES = DIRECT_CALLABLE_STATUSES
+PUBLISHED_STATUSES = PRODUCTION_CALLABLE_STATUSES
+IMMUTABLE_MODEL_STATUSES = {"published", "trial", "offline"}
 LOGGER = logging.getLogger(__name__)
 
 
 class ModelService:
     def create_model(self, model: ModelPackage) -> ModelView:
+        model = model.model_copy(update={
+            "status": "developing",
+            "is_active_version": False,
+            "published_by": None,
+            "published_at": None,
+            "tested_at": None,
+            "tested_content_hash": None,
+            "tested_model_id": None,
+        })
         model = self._normalize_component_model(model)
         model = self._normalize_generic_formula_model(model)
         model = self._apply_generalized_top_level_fields(model)
@@ -80,8 +98,8 @@ class ModelService:
 
     def update_model(self, model_id: str, model: ModelPackage) -> ModelView:
         existing = self.get_model(model_id)
-        if existing.status in PUBLISHED_STATUSES:
-            raise HTTPException(status_code=409, detail="Published model must be copied or taken offline before editing")
+        if existing.status in IMMUTABLE_MODEL_STATUSES or existing.published_at:
+            raise HTTPException(status_code=409, detail="Online and historical model versions are immutable; create a new version before editing")
         model = self._normalize_component_model(model)
         model = self._normalize_generic_formula_model(model)
         model = self._apply_generalized_top_level_fields(model)
@@ -108,10 +126,6 @@ class ModelService:
         diagnosis = self._diagnose_problem_type(normalized_model)
         if not diagnosis.get("publish_valid", True):
             problem_errors, _ = validate_problem_type_override(diagnosis)
-            failed = model.model_copy(update={"status": "publish_failed", "updated_at": now_text()})
-            with STORE.lock:
-                STORE.models[model_id] = failed
-                STORE.save_runtime()
             raise HTTPException(
                 status_code=422,
                 detail={
@@ -154,26 +168,29 @@ class ModelService:
                 # "not tested".  This pass deliberately avoids the solver.
                 self._validate_model_package(normalized_model, require_publish_ready=True, run_solver=False)
             except HTTPException:
-                failed = model.model_copy(update={"status": "publish_failed", "updated_at": now_text()})
-                with STORE.lock:
-                    STORE.models[model_id] = failed
-                    STORE.save_runtime()
                 raise
         if model.tested_model_id and model.tested_model_id != model.id:
             raise HTTPException(status_code=409, detail={"code": "MODEL_TEST_MISMATCH", "message": "测试资产与发布资产不一致，请重新测试当前模型。"})
         if not model.tested_model_id or not model.tested_content_hash:
             raise HTTPException(status_code=409, detail={"code": "MODEL_NOT_TESTED", "message": "模型尚未通过测试，请先测试后再发布。"})
-        if model.tested_content_hash != current_hash or model.status != "tested":
+        if model.tested_content_hash != current_hash or model.status not in {"trial", "offline"}:
             raise HTTPException(status_code=409, detail={"code": "MODEL_TEST_OUTDATED", "message": "模型在测试通过后发生了修改，请重新测试后再发布。"})
-        require_publish_ready = True
-        try:
-            warnings, dry_run_result = self._validate_model_package(normalized_model, require_publish_ready=require_publish_ready)
-        except HTTPException as exc:
-            failed = model.model_copy(update={"status": "publish_failed", "updated_at": now_text()})
-            with STORE.lock:
-                STORE.models[model_id] = failed
-                STORE.save_runtime()
-            raise
+        # The immutable trial revision already contains solver-backed acceptance
+        # evidence for this exact content hash. Publishing reuses that evidence
+        # after the structural checks above instead of running the solver twice.
+        dry_run_result = deepcopy(model.dry_run_result or {})
+        if (
+            (dry_run_result.get("structure_check") or {}).get("status") != "passed"
+            or (dry_run_result.get("solver_check") or {}).get("status") != "passed"
+        ):
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "code": "MODEL_TEST_EVIDENCE_INVALID",
+                    "message": "试运行测试凭据不完整，请重新测试当前模型。",
+                },
+            )
+        warnings = list(model.validation_warnings or [])
         published_at = now_text()
         published_draft = deepcopy(normalized_model.model_draft or {})
         published_formula_versions: dict[str, dict[str, Any]] = {}
@@ -227,7 +244,13 @@ class ModelService:
                 if candidate_id == model_id or self._model_code(candidate) != self._model_code(updated):
                     continue
                 if candidate.is_active_version:
-                    inactive = candidate.model_copy(update={"is_active_version": False, "updated_at": now_text()})
+                    inactive = candidate.model_copy(
+                        update={
+                            "status": "offline" if candidate.status == "published" else candidate.status,
+                            "is_active_version": False,
+                            "updated_at": now_text(),
+                        }
+                    )
                     STORE.models[candidate_id] = inactive
                     if candidate.model_family_id and STORE.active_model_versions.get(candidate.model_family_id) == candidate_id:
                         STORE.active_model_versions.pop(candidate.model_family_id, None)
@@ -240,11 +263,58 @@ class ModelService:
 
     def offline_model(self, model_id: str) -> ModelView:
         model = self.get_model(model_id)
+        if model.status == "offline":
+            return model
+        if model.status != "published":
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "code": "INVALID_MODEL_STATUS_TRANSITION",
+                    "message": "只有已发布模型可以下线；试运行模型应正式发布或退回草稿。",
+                    "status": model.status,
+                },
+            )
         updated = model.model_copy(update={"status": "offline", "is_active_version": False, "updated_at": now_text()})
         with STORE.lock:
             STORE.models[model_id] = updated
             if updated.model_family_id and STORE.active_model_versions.get(updated.model_family_id) == model_id:
                 STORE.active_model_versions.pop(updated.model_family_id, None)
+            self._record_model_version_locked(updated)
+            STORE.save_runtime()
+        return updated
+
+    def return_model_to_draft(self, model_id: str) -> ModelView:
+        model = self.get_model(model_id)
+        if model.status != "trial":
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "code": "INVALID_MODEL_STATUS_TRANSITION",
+                    "message": "只有未发布的试运行模型可以退回草稿。",
+                    "status": model.status,
+                },
+            )
+        if model.published_at:
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "code": "PUBLISHED_HISTORY_IMMUTABLE",
+                    "message": "该版本曾经正式发布，不能退回草稿；请创建新版本后修改。",
+                    "status": model.status,
+                },
+            )
+        updated = model.model_copy(
+            update={
+                "status": "developing",
+                "is_active_version": False,
+                "tested_at": None,
+                "tested_content_hash": None,
+                "tested_model_id": None,
+                "updated_at": now_text(),
+            }
+        )
+        with STORE.lock:
+            STORE.models[model_id] = updated
             self._record_model_version_locked(updated)
             STORE.save_runtime()
         return updated
@@ -311,14 +381,14 @@ class ModelService:
     def resolve_model(self, model_id: str | None = None, model_code: str | None = None, require_published: bool = True) -> ModelView:
         if model_id:
             model = self.get_model(model_id)
-            if require_published and model.status not in CALLABLE_STATUSES:
-                raise HTTPException(status_code=409, detail=f"Model is not callable in status: {model.status}")
+            if require_published and model.status not in PRODUCTION_CALLABLE_STATUSES:
+                raise HTTPException(status_code=409, detail=f"Model is not published: {model.status}")
             return model
         if not model_code:
             raise HTTPException(status_code=422, detail="model_id or model_code is required")
         candidates = self.find_models_by_code(model_code)
         if require_published:
-            candidates = [model for model in candidates if model.status in CALLABLE_STATUSES]
+            candidates = [model for model in candidates if model.status in PRODUCTION_CALLABLE_STATUSES]
         if not candidates:
             raise HTTPException(status_code=404, detail=f"Model code not found: {model_code}")
         return self._choose_model_for_code(model_code, candidates)
@@ -335,12 +405,16 @@ class ModelService:
         ]
 
     def model_code_resolution_warning(self, model_code: str, resolved_model: ModelView) -> str | None:
-        candidates = self.find_models_by_code(model_code)
+        candidates = [
+            model
+            for model in self.find_models_by_code(model_code)
+            if model.status in PRODUCTION_CALLABLE_STATUSES
+        ]
         if len(candidates) <= 1:
             return None
         return (
             f"存在多个 model_code={model_code} 的模型，当前优先调用 {resolved_model.id}。"
-            "建议生产调用显式传入 model_id。"
+            "生产调用仍按活动已发布版本路由；如需复现历史版本，请显式传入 model_id。"
         )
 
     def _is_template_backed_model(self, model: ModelPackage | ModelView) -> bool:
@@ -445,7 +519,7 @@ class ModelService:
         def score(model: ModelView) -> tuple[int, int, int, str, str]:
             active_score = 1 if model.is_active_version or STORE.active_model_versions.get(str(model.model_family_id)) == model.id else 0
             user_score = 0 if self._is_managed_default(model) else 1
-            status_score = {"published": 4, "tested": 3, "trial": 2, "developing": 1}.get(str(model.status), 0)
+            status_score = {"published": 3, "trial": 2, "developing": 1}.get(str(model.status), 0)
             return (active_score, user_score, status_score, str(model.published_at or model.updated_at or model.created_at or ""), model.id)
 
         return sorted(candidates, key=score, reverse=True)[0]
@@ -561,7 +635,13 @@ class ModelService:
             for task in tasks
             if task.request.model_id == model_id
         ]
-        skill_name = f"run_{str(model.template_id or model.id).lower().replace('-', '_').replace(' ', '_')}"
+        model_code = self._model_code(model)
+        skill_available = model.status in PRODUCTION_CALLABLE_STATUSES
+        skill_name = (
+            f"run_{str(model_code).lower().replace('-', '_').replace(' ', '_')}"
+            if skill_available
+            else None
+        )
         return {
             "basic_info": {
                 "id": model.id,
@@ -592,9 +672,20 @@ class ModelService:
                 **((model.ui_metadata or {}).get("publish_info") or {}),
             },
             "skill_info": {
+                "available": skill_available,
                 "skill_name": skill_name,
                 "model_id": model.id,
+                "model_code": model_code,
                 "model_version": model.version,
+                "endpoint": f"/api/skills/{skill_name}/run" if skill_name else None,
+                "debug_endpoint": f"/api/models/{model.id}/invoke" if model.status == "trial" else None,
+                "access_policy": (
+                    "production_skill"
+                    if skill_available
+                    else "explicit_model_id_only"
+                    if model.status == "trial"
+                    else "unavailable"
+                ),
                 "mathematical_expansion": model.mathematical_expansion,
             },
             "test_result": model.dry_run_result,
@@ -626,7 +717,8 @@ class ModelService:
         if dry_run_result["structure_check"]["status"] != "passed" or dry_run_result["solver_check"]["status"] != "passed":
             raise HTTPException(status_code=422, detail={"message": "模型测试用例执行失败", **dry_run_result})
         content_hash = self._content_hash(ModelPackage.model_validate(model.model_dump()))
-        updated = model.model_copy(update={"status": "tested", "content_hash": content_hash, "tested_content_hash": content_hash, "tested_model_id": model.id, "updated_at": now_text(), "tested_at": now_text(), "dry_run_result": dry_run_result, "validation_warnings": dry_run_result["solver_check"].get("warnings", [])})
+        next_status = model.status if model.status == "published" else "trial"
+        updated = model.model_copy(update={"status": next_status, "content_hash": content_hash, "tested_content_hash": content_hash, "tested_model_id": model.id, "updated_at": now_text(), "tested_at": now_text(), "dry_run_result": dry_run_result, "validation_warnings": dry_run_result["solver_check"].get("warnings", [])})
         with STORE.lock:
             STORE.models[model_id] = updated
             self._record_model_version_locked(updated)
@@ -942,12 +1034,12 @@ class ModelService:
         constraints.extend(draft.get("constraints") or [])
         state_sets = [item for item in sets.values() if item.get("type") == "state_time"]
         for index, constraint in enumerate(constraints):
-            expression = str(constraint.get("expression") or constraint.get("formula") or "")
+            if not participates_in_solve(constraint):
+                continue
+            expression = formula_expression(constraint)
             field = f"constraints[{index}]"
             if "t+1" in expression.replace(" ", "") and not state_sets:
                 errors.append({"field": field, "error": "t+1 requires a state_time set", "expected": "state_time with generation_rule=horizon_plus_1", "actual": expression})
-            if "t-1" in expression.replace(" ", "") and str(constraint.get("boundary_strategy") or "") not in {"skip_first", "use_initial_value"}:
-                errors.append({"field": f"{field}.boundary_strategy", "error": "t-1 requires boundary_strategy", "expected": ["skip_first", "use_initial_value"], "actual": constraint.get("boundary_strategy")})
         return errors
 
     def _structured_publish_errors(self, errors: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -1003,31 +1095,36 @@ class ModelService:
         return errors
 
     def _validate_component_dependency_integrity(self, component_spec: dict[str, Any]) -> list[dict[str, Any]]:
-        from app.model_components.registry import COMPONENT_DEPENDENCIES
+        from app.model_components.registry import list_component_catalog
 
         enabled = {
-            str(item.get("type") or item.get("component_id") or item.get("code") or "")
+            dependency_component_id(item)
             for item in component_spec.get("components") or []
             if item.get("enabled", True) is not False
         }
-        errors: list[dict[str, Any]] = []
-        for component_id in sorted(enabled):
-            dependencies = set(COMPONENT_DEPENDENCIES.get(component_id, []))
-            definition = load_library_component(component_id)
-            if definition:
-                dependencies.update(definition.get("depends_on") or [])
-            for dependency in sorted(dependencies):
-                if dependency and dependency not in enabled:
-                    errors.append(
-                        {
-                            "field": "component_spec.components",
-                            "error": "missing component dependency",
-                            "component_id": component_id,
-                            "missing_dependency": dependency,
-                            "suggestion": f"add required component {dependency} before publishing",
-                        }
-                    )
-        return errors
+        with STORE.lock:
+            custom_components = [deepcopy(item) for item in STORE.custom_components.values()]
+        catalog = {
+            str(item.get("component_id") or item.get("type") or ""): item
+            for item in [*list_component_catalog(), *custom_components]
+        }
+        catalog_dependency_graph = {
+            component_id: component_dependency_ids(definition)
+            for component_id, definition in catalog.items()
+        }
+        raw_errors = selected_dependency_errors(
+            enabled,
+            catalog_dependency_graph,
+            # Unknown selected components are reported by _validate_component_assets.
+            known_ids={*catalog, *enabled},
+        )
+        return [
+            {
+                **item,
+                "field": "component_spec.components",
+            }
+            for item in raw_errors
+        ]
 
     def _suggestion_for_field(self, field: str) -> str:
         if "additional_custom_constraints" in field:
@@ -1356,16 +1453,12 @@ class ModelService:
         supported = {"load_deviation", "spill", "ramp", "terminal_volume", "investment", "curtailment", "deviation", "deviation_penalty_cost", "storage_cycle", "battery_degradation", "energy_revenue", "terminal_soc", "piecewise_cost"}
         errors: list[dict[str, Any]] = []
         for term in ((component_spec.get("objective") or {}).get("terms") or []):
-            if term.get("enabled", True) is False:
-                continue
-            if term.get("supported_by_backend") is False:
-                continue
-            if term.get("solve_participation", "solve") in {"display_only", "remark_only", "none"}:
+            if not participates_in_solve(term) or term.get("supported_by_backend") is False:
                 continue
             weight_key = str(term.get("weight_key") or "")
             if weight_key not in supported:
                 if term.get("supported_by_backend") is True:
-                    expression = str(term.get("expression") or "").strip()
+                    expression = formula_expression(term)
                     if not expression:
                         errors.append(
                             {
@@ -1389,10 +1482,10 @@ class ModelService:
         return errors
 
     def _validate_component_objective_publish_mode(self, component_spec: dict[str, Any], model: ModelPackage | ModelView) -> dict[str, Any] | None:
-        terms = [term for term in ((component_spec.get("objective") or {}).get("terms") or []) if term.get("enabled", True) is not False]
+        terms = list((component_spec.get("objective") or {}).get("terms") or [])
         if not terms:
             return None
-        active_terms = [term for term in terms if term.get("solve_participation", "solve") not in {"display_only", "remark_only", "none"}]
+        active_terms = [term for term in terms if participates_in_solve(term)]
         if active_terms:
             return None
         supported = {"load_deviation", "spill", "ramp", "terminal_volume", "investment", "curtailment", "deviation", "deviation_penalty_cost", "storage_cycle", "battery_degradation", "energy_revenue", "terminal_soc", "piecewise_cost"}
@@ -1575,18 +1668,20 @@ class ModelService:
         }
         models: list[ModelView] = []
         for code, template in power_template_library().items():
+            lifecycle_status = str(template.get("status") or "published")
+            is_published = lifecycle_status == "published"
             sample = template.get("sample_runtime_parameters", {})
             params = {**base_uc_params, **sample} if code == "unit_commitment_day_ahead" else dict(sample)
             models.append(
                 ModelView(
                     id=f"MODEL-POWER-{code.upper().replace('_', '-')}",
                     model_family_id=f"builtin:{code}",
-                    is_active_version=True,
+                    is_active_version=is_published,
                     template_id=code,
                     name=template["name"],
                     scene=template.get("scenario", template["name"]),
                     version=template.get("version", "v1.0"),
-                    status=template.get("status", "published"),
+                    status=lifecycle_status,
                     solver="HiGHS",
                     problem_type=template.get("problem_type", template.get("model_problem_type", "MILP")),
                     objective=((template.get("model_draft") or {}).get("objective_strategy") or {}).get("summary") or (template.get("objectives") or [{"code": "objective"}])[0]["code"],
@@ -1612,7 +1707,7 @@ class ModelService:
                     output_contract={"variables": [v["code"] for v in template.get("variables", [])]},
                     created_at=timestamp,
                     updated_at=timestamp,
-                    published_at=timestamp,
+                    published_at=timestamp if is_published else None,
                 )
             )
         with STORE.lock:
@@ -1630,8 +1725,15 @@ class ModelService:
                 code = self._model_code(model)
                 family_id = model.model_family_id or (f"builtin:{code}" if self._is_managed_default(model) else f"legacy:{model.id}")
                 current = model if model.model_family_id else model.model_copy(update={"model_family_id": family_id})
+                lifecycle_updates: dict[str, Any] = {}
+                if current.status != "published" and current.is_active_version:
+                    lifecycle_updates["is_active_version"] = False
+                if self._is_managed_default(current) and current.status == "trial" and current.published_at:
+                    lifecycle_updates["published_at"] = None
+                if lifecycle_updates:
+                    current = current.model_copy(update=lifecycle_updates)
                 normalized[model_id] = current
-                if current.status in CALLABLE_STATUSES:
+                if current.status in PRODUCTION_CALLABLE_STATUSES:
                     by_code.setdefault(code, []).append(current)
 
             STORE.active_model_versions.clear()
@@ -1639,14 +1741,19 @@ class ModelService:
                 def score(item: ModelView) -> tuple[int, int, int, int, str, str]:
                     explicit_active = 1 if item.is_active_version else 0
                     user_model = 0 if self._is_managed_default(item) else 1
-                    status_score = {"published": 3, "tested": 2, "trial": 1}.get(str(item.status), 0)
+                    status_score = 1 if item.status == "published" else 0
                     return (explicit_active * user_model, user_model, explicit_active, status_score, str(item.published_at or item.updated_at or item.created_at or ""), item.id)
 
                 winner = sorted(candidates, key=score, reverse=True)[0]
                 if len(candidates) > 1:
                     LOGGER.info("Resolved legacy duplicate model_code=%s to active model_id=%s", code, winner.id)
                 for candidate in candidates:
-                    normalized[candidate.id] = normalized[candidate.id].model_copy(update={"is_active_version": candidate.id == winner.id})
+                    normalized[candidate.id] = normalized[candidate.id].model_copy(
+                        update={
+                            "status": "published" if candidate.id == winner.id else "offline",
+                            "is_active_version": candidate.id == winner.id,
+                        }
+                    )
                 STORE.active_model_versions[str(winner.model_family_id)] = winner.id
 
             STORE.models.clear()
@@ -1661,10 +1768,16 @@ class ModelService:
         template_codes = list(power_template_library().keys())
         with STORE.lock:
             changed = False
+            templates = power_template_library()
             for code in template_codes:
                 skill_name = f"run_{str(code).lower().replace('-', '_').replace(' ', '_')}"
                 default_model_id = f"MODEL-POWER-{code.upper().replace('_', '-')}"
                 existing = STORE.skills.get(skill_name, {})
+                if str((templates.get(code) or {}).get("status") or "published") != "published":
+                    if existing.get("model_id") == default_model_id:
+                        STORE.skills.pop(skill_name, None)
+                        changed = True
+                    continue
                 next_record = {
                     **existing,
                     "skill_name": skill_name,
@@ -1691,15 +1804,17 @@ class ModelService:
                 if model:
                     continue
                 else:
+                    lifecycle_status = str(template.get("status") or "published")
+                    is_published = lifecycle_status == "published"
                     STORE.models[model_id] = ModelView(
                         id=model_id,
                         model_family_id=f"builtin:{code}",
-                        is_active_version=True,
+                        is_active_version=is_published,
                         template_id=code,
                         name=template["name"],
                         scene=template.get("scenario", template["name"]),
                         version=template.get("version", "v1.0"),
-                        status=template.get("status", "published"),
+                        status=lifecycle_status,
                         solver=template.get("solver", "HiGHS"),
                         problem_type=template.get("problem_type", template.get("model_problem_type", "MILP")),
                         objective=((template.get("model_draft") or {}).get("objective_strategy") or {}).get("summary") or (template.get("objectives") or [{"code": "objective"}])[0]["code"],
@@ -1725,7 +1840,7 @@ class ModelService:
                         output_contract={"variables": [v["code"] for v in template.get("variables", [])]},
                         created_at=timestamp,
                         updated_at=timestamp,
-                        published_at=timestamp,
+                        published_at=timestamp if is_published else None,
                     )
                     changed = True
             if changed:
@@ -1802,32 +1917,13 @@ def _normalize_default_component(component: dict[str, Any]) -> dict[str, Any]:
     if normalized_sets:
         row["sets"] = normalized_sets
         row["required_sets"] = deepcopy(normalized_sets)
-    dependency_map = {
-        "storage_soc_bounds": ["storage_soc_balance"],
-        "storage_terminal_soc_tracking": ["storage_soc_balance"],
-        "storage_charge_discharge_exclusive": ["storage_soc_balance"],
-        "grid_power_limit": ["pv_storage_power_balance"],
-    }
-    component_id = str(row.get("component_id") or row.get("type") or "")
-    if component_id in dependency_map:
-        row["depends_on"] = sorted(set(row.get("depends_on") or []) | set(dependency_map[component_id]))
     return row
 
 
 def _default_library_components() -> list[dict[str, Any]]:
-    common_sets = [{"code": "time", "name": "调度时段"}, {"code": "time_volume", "name": "SOC时点"}]
-    storage_vars = [
-        {"code": "p_ch", "name": "充电功率", "dimension": ["time"], "unit": "MW", "type": "continuous", "lower_bound": 0},
-        {"code": "p_dis", "name": "放电功率", "dimension": ["time"], "unit": "MW", "type": "continuous", "lower_bound": 0},
-        {"code": "soc", "name": "储能SOC", "dimension": ["time_volume"], "unit": "MWh", "type": "continuous", "lower_bound": 0},
-    ]
-
-
-def _default_library_components() -> list[dict[str, Any]]:
-    marker = {"managed_default_version": "pv-storage-v2-components-zh-v3"}
+    marker = {"managed_default_version": "pv-storage-v2-components-zh-v4"}
     time = [{"code": "time", "name": "调度时段"}]
     time_volume = [{"code": "time_volume", "name": "SOC时点"}]
-    marker["managed_default_version"] = "pv-storage-v2-components-zh-v4"
     for item in time:
         item.update({"type": "time_period", "required": True})
     for item in time_volume:
@@ -1924,6 +2020,7 @@ def _default_library_components() -> list[dict[str, Any]]:
             "version": "1.1.0",
             "problem_types": ["LP"],
             "solver_capabilities": ["LP"],
+            "depends_on": ["pv_storage_power_balance"],
             "description": "限制各时段并网功率不超过电网接入上限。",
             "sets": time,
             "parameters": [{"code": "grid_limit", "name": "并网限制", "dimension": ["time"], "unit": "MW", "required": True, "default": 200}],
@@ -2020,6 +2117,7 @@ def _default_library_components() -> list[dict[str, Any]]:
             "version": "1.1.0",
             "problem_types": ["MILP"],
             "solver_capabilities": ["MILP"],
+            "depends_on": ["storage_soc_balance"],
             "description": "用二进制状态变量避免储能在同一时段同时充电和放电。",
             "sets": time,
             "parameters": [{"code": "storage_power_capacity", "name": "储能功率容量", "dimension": [], "unit": "MW", "required": True, "default": 50}],
@@ -2046,6 +2144,7 @@ def _default_library_components() -> list[dict[str, Any]]:
             "version": "1.1.0",
             "problem_types": ["LP"],
             "solver_capabilities": ["LP"],
+            "depends_on": ["storage_soc_balance"],
             "description": "按能量容量和SOC上下限比例约束储能SOC安全范围。",
             "sets": time_volume,
             "parameters": [
@@ -2069,6 +2168,7 @@ def _default_library_components() -> list[dict[str, Any]]:
             "version": "1.1.0",
             "problem_types": ["LP"],
             "solver_capabilities": ["LP"],
+            "depends_on": ["storage_soc_balance"],
             "description": "通过正负偏差变量跟踪期末SOC目标。",
             "sets": time_volume,
             "parameters": [{"code": "terminal_time", "name": "期末时点", "dimension": [], "default": 4}, {"code": "terminal_soc_target", "name": "期末SOC目标", "dimension": [], "unit": "MWh", "default": 0}],
@@ -2080,118 +2180,5 @@ def _default_library_components() -> list[dict[str, Any]]:
             "constraints": [{"constraint_id": "terminal_soc_tracking_eq", "name": "期末SOC目标跟踪", "indices": [], "expression": "soc[terminal_time] + terminal_soc_dev_pos - terminal_soc_dev_neg == terminal_soc_target"}],
             "objective_terms": [{"term_id": "terminal_soc_penalty", "name": "期末SOC偏差惩罚", "expression": "terminal_soc_dev_pos + terminal_soc_dev_neg", "weight_key": "terminal_soc", "solve_participation": "solve_active", "supported_by_backend": True, "enabled": True}],
             "math_template": {"formula": "SOC[T] + Dev+ - Dev- = SOC_target"},
-        },
-    ]
-    return [
-        {
-            "component_id": "storage_soc_balance",
-            "name": "储能SOC平衡组件",
-            "domain": "光储一体化",
-            "category": "储能组件",
-            "version": "1.0.0",
-            "problem_types": ["LP", "MILP"],
-            "solver_capabilities": ["LP", "MILP"],
-            "description": "描述储能SOC在相邻时段之间的递推关系。",
-            "sets": common_sets,
-            "parameters": [
-                {"code": "eta_ch", "name": "充电效率", "dimension": [], "unit": "p.u.", "required": True, "default": 0.95},
-                {"code": "eta_dis", "name": "放电效率", "dimension": [], "unit": "p.u.", "required": True, "default": 0.95},
-                {"code": "delta_t", "name": "时间步长", "dimension": [], "unit": "h", "required": True, "default": 1},
-            ],
-            "variables": storage_vars,
-            "constraints": [
-                {
-                    "constraint_id": "storage_soc_balance_eq",
-                    "name": "储能SOC平衡",
-                    "type": "state_transition",
-                    "indices": ["time"],
-                    "expression": "soc[t+1] == soc[t] + eta_ch * p_ch[t] * delta_t - p_dis[t] / eta_dis * delta_t",
-                    "business_meaning": "下一时段SOC等于当前SOC加充电电量并扣减放电电量。",
-                }
-            ],
-            "math_template": {"formula": "SOC[t+1] = SOC[t] + eta_ch * P_ch[t] * Δt - P_dis[t] / eta_dis * Δt"},
-        },
-        {
-            "component_id": "pv_available_output",
-            "name": "光伏可用出力组件",
-            "domain": "光储一体化",
-            "category": "光伏组件",
-            "version": "1.0.0",
-            "sets": [{"code": "time", "name": "调度时段"}],
-            "parameters": [{"code": "pv_forecast", "name": "光伏预测出力", "dimension": ["time"], "unit": "MW", "required": True, "default": 100}],
-            "variables": [
-                {"code": "p_pv_used", "name": "光伏利用功率", "dimension": ["time"], "unit": "MW", "type": "continuous", "lower_bound": 0},
-                {"code": "p_pv_curtail", "name": "弃光功率", "dimension": ["time"], "unit": "MW", "type": "continuous", "lower_bound": 0},
-            ],
-            "constraints": [{"constraint_id": "pv_available_balance", "name": "光伏出力分解", "indices": ["time"], "expression": "p_pv_used[t] + p_pv_curtail[t] == pv_forecast[t]"}],
-            "math_template": {"formula": "P_pv_used[t] + P_pv_curtail[t] = PV_forecast[t]"},
-        },
-        {
-            "component_id": "pv_storage_power_balance",
-            "name": "光储功率平衡组件",
-            "domain": "光储一体化",
-            "category": "并网/计划组件",
-            "version": "1.0.0",
-            "sets": [{"code": "time", "name": "调度时段"}],
-            "variables": [
-                {"code": "p_grid", "name": "并网功率", "dimension": ["time"], "unit": "MW", "type": "continuous", "lower_bound": 0},
-                {"code": "p_pv_used", "name": "光伏利用功率", "dimension": ["time"], "unit": "MW", "type": "continuous", "lower_bound": 0},
-                {"code": "p_ch", "name": "充电功率", "dimension": ["time"], "unit": "MW", "type": "continuous", "lower_bound": 0},
-                {"code": "p_dis", "name": "放电功率", "dimension": ["time"], "unit": "MW", "type": "continuous", "lower_bound": 0},
-            ],
-            "constraints": [{"constraint_id": "pv_storage_power_balance_eq", "name": "光储功率平衡", "indices": ["time"], "expression": "p_grid[t] == p_pv_used[t] + p_dis[t] - p_ch[t]"}],
-            "depends_on": ["pv_available_output", "storage_soc_balance"],
-            "math_template": {"formula": "P_grid[t] = P_pv_used[t] + P_dis[t] - P_ch[t]"},
-        },
-        {
-            "component_id": "grid_power_limit",
-            "name": "并网功率限制组件",
-            "domain": "光储一体化",
-            "category": "并网/计划组件",
-            "version": "1.0.0",
-            "sets": [{"code": "time", "name": "调度时段"}],
-            "parameters": [{"code": "grid_limit", "name": "并网限制", "dimension": ["time"], "unit": "MW", "required": True, "default": 200}],
-            "variables": [{"code": "p_grid", "name": "并网功率", "dimension": ["time"], "unit": "MW", "type": "continuous", "lower_bound": 0}],
-            "constraints": [{"constraint_id": "grid_power_upper", "name": "并网功率上限", "indices": ["time"], "expression": "p_grid[t] <= grid_limit[t]"}],
-            "math_template": {"formula": "0 <= P_grid[t] <= GridLimit[t]"},
-        },
-        {
-            "component_id": "storage_capacity_decision",
-            "name": "储能功率容量决策组件",
-            "domain": "光储一体化",
-            "category": "容量配置组件",
-            "version": "1.0.0",
-            "sets": [{"code": "time", "name": "调度时段"}],
-            "variables": [
-                {"code": "storage_power_capacity", "name": "储能功率容量", "dimension": [], "unit": "MW", "type": "continuous", "lower_bound": 0},
-                {"code": "storage_energy_capacity", "name": "储能能量容量", "dimension": [], "unit": "MWh", "type": "continuous", "lower_bound": 0},
-                *storage_vars,
-            ],
-            "parameters": [{"code": "soc_min", "name": "SOC下限比例", "dimension": [], "unit": "p.u.", "required": True, "default": 0.1}],
-            "constraints": [
-                {"constraint_id": "charge_capacity_limit", "name": "充电容量上限", "indices": ["time"], "expression": "p_ch[t] <= storage_power_capacity"},
-                {"constraint_id": "discharge_capacity_limit", "name": "放电容量上限", "indices": ["time"], "expression": "p_dis[t] <= storage_power_capacity"},
-                {"constraint_id": "soc_energy_upper", "name": "SOC容量上限", "indices": ["time_volume"], "expression": "soc[time_volume] <= storage_energy_capacity"},
-                {"constraint_id": "soc_energy_lower", "name": "SOC容量下限", "indices": ["time_volume"], "expression": "soc[time_volume] >= soc_min * storage_energy_capacity"},
-            ],
-            "objective_terms": [{"term_id": "investment_cost_display", "name": "投资成本", "expression": "storage_power_capacity + storage_energy_capacity", "weight_key": "investment", "solve_participation": "display_only"}],
-            "math_template": {"formula": "P_ch/P_dis <= P_cap, SOC <= E_cap"},
-        },
-        {
-            "component_id": "schedule_tracking",
-            "name": "计划曲线跟踪组件",
-            "domain": "光储一体化",
-            "category": "并网/计划组件",
-            "version": "1.0.0",
-            "sets": [{"code": "time", "name": "调度时段"}],
-            "parameters": [{"code": "schedule", "name": "计划曲线", "dimension": ["time"], "unit": "MW", "required": True, "default": 100}],
-            "variables": [
-                {"code": "p_grid", "name": "并网功率", "dimension": ["time"], "unit": "MW", "type": "continuous", "lower_bound": 0},
-                {"code": "deviation_pos", "name": "正偏差", "dimension": ["time"], "unit": "MW", "type": "continuous", "lower_bound": 0},
-                {"code": "deviation_neg", "name": "负偏差", "dimension": ["time"], "unit": "MW", "type": "continuous", "lower_bound": 0},
-            ],
-            "constraints": [{"constraint_id": "schedule_tracking_eq", "name": "计划曲线跟踪", "indices": ["time"], "expression": "p_grid[t] + deviation_pos[t] - deviation_neg[t] == schedule[t]"}],
-            "objective_terms": [{"term_id": "deviation_penalty_display", "name": "偏差惩罚", "expression": "sum(deviation_pos[t] + deviation_neg[t] for t in time)", "weight_key": "deviation", "solve_participation": "display_only"}],
-            "math_template": {"formula": "P_grid[t] + Dev+[t] - Dev-[t] = Schedule[t]"},
         },
     ]

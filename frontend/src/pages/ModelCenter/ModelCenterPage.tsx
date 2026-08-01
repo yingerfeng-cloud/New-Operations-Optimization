@@ -1,9 +1,10 @@
 import { MoreOutlined } from '@ant-design/icons';
 import { Button, Card, Drawer, Dropdown, Input, Modal, Select, Space, Tabs, Tag, Tooltip, message } from 'antd';
+import type { MenuProps } from 'antd';
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate, useParams } from 'react-router-dom';
-import { getModel, getModelAssetDetail, getModels, offlineModel, publishModel, testModel } from '../../api/models';
+import { getModel, getModelAssetDetail, getModels, offlineModel, publishModel, returnModelToDraft, testModel } from '../../api/models';
 import { cloneTemplate, getTemplates } from '../../api/templates';
 import { DataTable } from '../../components/DataTable';
 import { PageHeader } from '../../components/PageHeader';
@@ -21,17 +22,23 @@ import {
 } from '../../features/model-center/ModelAssetPanels';
 import { capabilityOrFallback } from '../../features/demo/demoCapabilities';
 import type { ModelAsset } from '../../types/model';
-
-const callableStatuses = new Set(['published', 'trial', 'tested', '已发布', '试运行', '已测试']);
+import {
+  isImmutableVersion,
+  lifecycleActionLabel,
+  lifecycleActions,
+  lifecycleHint,
+  lifecycleStatus,
+  lifecycleStatusText,
+  testActionLabel,
+  type ModelLifecycleAction,
+} from '../../features/model-center/modelLifecycle';
 
 function buildModeText(value: unknown) {
   return value === 'component_based' ? '组件化 Builder' : value === 'generic_linear' ? '通用线性 Builder' : value === 'template_based' ? '模板 Builder' : String(value || '-');
 }
 
 function statusText(value: unknown) {
-  const text = String(value || '-');
-  const map: Record<string, string> = { published: '已发布', trial: '试运行', tested: '已测试', draft: '草稿', developing: '开发中', offline: '已下线' };
-  return map[text] || text;
+  return lifecycleStatusText(value);
 }
 
 function problemType(model: ModelAsset) {
@@ -55,19 +62,28 @@ function renderDate(value: unknown) {
   );
 }
 
-function isCallable(model: ModelAsset) {
-  return callableStatuses.has(String(model.status));
-}
-
 function editAction(model: ModelAsset) {
-  const status = String(model.status || '');
-  if (status === 'published' || status === '已发布') {
-    return { label: '创建新版本', url: `/models/create?mode=version&source=${encodeURIComponent(model.id)}` };
+  if (lifecycleStatus(model.status) === 'trial' && !model.published_at) {
+    return { label: '退回草稿并修改', url: `/models/${encodeURIComponent(model.id)}/edit`, returnToDraft: true };
+  }
+  if (isImmutableVersion(model)) {
+    return { label: '创建新版本并修改', url: `/models/create?mode=version&source=${encodeURIComponent(model.id)}` };
   }
   return {
-    label: status === 'tested' || status === '已测试' ? '继续编辑' : '编辑草稿',
+    label: '编辑草稿',
     url: `/models/${encodeURIComponent(model.id)}/edit`,
   };
+}
+
+function errorMessage(error: unknown) {
+  const response = (error as { response?: { data?: { detail?: unknown } } })?.response;
+  const detail = response?.data?.detail;
+  if (typeof detail === 'string') return detail;
+  if (detail && typeof detail === 'object') {
+    const record = detail as Record<string, unknown>;
+    return String(record.message || record.code || '操作失败');
+  }
+  return error instanceof Error ? error.message : '操作失败';
 }
 
 function objectValue(value: unknown): Record<string, unknown> {
@@ -98,6 +114,7 @@ function templateCapability(template: { code?: string; problem_type?: string; ta
 }
 
 export function ModelCenterPage() {
+  const [modalApi, modalContextHolder] = Modal.useModal();
   const qc = useQueryClient();
   const nav = useNavigate();
   const { id } = useParams();
@@ -122,12 +139,33 @@ export function ModelCenterPage() {
       qc.invalidateQueries({ queryKey: ['model-asset-detail', modelId] });
     }
   };
-  const publish = useMutation({ mutationFn: publishModel, onSuccess: model => { message.success('模型发布成功'); refresh(model.id); } });
+  const publish = useMutation({
+    mutationFn: publishModel,
+    onSuccess: model => { message.success('模型状态已更新为已发布'); refresh(model.id); },
+    onError: error => message.error(`发布失败：${errorMessage(error)}`),
+  });
   const test = useMutation({
     mutationFn: ({ model, detail: testDetail = {} }: { model: ModelAsset; detail?: Record<string, unknown> }) => testModel(model.id, { parameters: defaultTestParameters(model, testDetail) }),
-    onSuccess: model => { message.success('模型测试完成'); refresh(model.id); },
+    onSuccess: model => {
+      message.success(lifecycleStatus(model.status) === 'published' ? '验证运行通过，模型保持已发布' : '模型测试通过，状态已更新为试运行');
+      refresh(model.id);
+    },
+    onError: error => message.error(`测试失败：${errorMessage(error)}`),
   });
-  const offline = useMutation({ mutationFn: offlineModel, onSuccess: model => { message.success('模型已下线'); refresh(model.id); } });
+  const offline = useMutation({
+    mutationFn: offlineModel,
+    onSuccess: model => { message.success('模型已下线'); refresh(model.id); },
+    onError: error => message.error(`下线失败：${errorMessage(error)}`),
+  });
+  const returnDraft = useMutation({
+    mutationFn: returnModelToDraft,
+    onSuccess: model => {
+      message.success('模型已退回草稿，原测试基线已清除');
+      refresh(model.id);
+      nav(`/models/${encodeURIComponent(model.id)}/edit`);
+    },
+    onError: error => message.error(`退回草稿失败：${errorMessage(error)}`),
+  });
   const clone = useMutation({
     mutationFn: cloneTemplate,
     onSuccess: model => {
@@ -147,16 +185,50 @@ export function ModelCenterPage() {
       && (!filters.status || String(model.status) === filters.status)
       && (!filters.scene || String(model.scene || '') === filters.scene);
   });
-  const publishedCount = rows.filter(isCallable).length;
-  const developingCount = rows.filter(model => ['developing', 'draft', '开发中', '草稿'].includes(String(model.status))).length;
-  const componentBasedCount = rows.filter(model => model.build_mode === 'component_based').length;
-  const genericCount = rows.filter(model => model.build_mode === 'generic_linear').length;
-  const templateCount = rows.filter(model => model.build_mode === 'template_based').length;
+  const publishedCount = rows.filter(model => model.status === 'published').length;
+  const trialCount = rows.filter(model => model.status === 'trial').length;
+  const developingCount = rows.filter(model => model.status === 'developing').length;
   const current = detail.data;
   const currentAssetDetail = assetDetail.data || {};
 
+  const executeEditAction = (model: ModelAsset) => {
+    const action = editAction(model);
+    if (!action.returnToDraft) {
+      nav(action.url);
+      return;
+    }
+    modalApi.confirm({
+      title: '退回草稿并修改？',
+      content: '退回后将清除当前试运行的测试凭据；修改完成后需要重新测试，才能再次进入试运行。',
+      okText: '退回草稿',
+      cancelText: '取消',
+      onOk: () => returnDraft.mutateAsync(model.id),
+    });
+  };
+
+  const executeLifecycleAction = (model: ModelAsset, action: ModelLifecycleAction) => {
+    const label = lifecycleActionLabel(action);
+    modalApi.confirm({
+      title: `${label}？`,
+      content: action === 'offline'
+        ? '下线后新的任务和服务调用将不再使用该模型版本，历史记录会保留。'
+        : action === 'republish'
+          ? '将恢复这个已测试通过的历史版本；同一 model_code 当前正在正式服务的版本会自动下线。'
+          : action === 'promote'
+            ? '系统将校验当前内容与试运行测试基线一致，然后正式发布；不会重复执行求解测试。'
+          : '发布后当前版本将成为正式可用版本；后续修改会基于该版本生成新草稿。',
+      okText: label,
+      cancelText: '取消',
+      okButtonProps: { danger: action === 'offline' },
+      onOk: () => action === 'offline'
+        ? offline.mutateAsync(model.id)
+        : publish.mutateAsync(model.id),
+    });
+  };
+
   return (
     <>
+      {modalContextHolder}
       <PageHeader
         title="模型资产中心"
         description="模型版本管理、发布治理、模板克隆、测试运行与资产沉淀。"
@@ -164,9 +236,9 @@ export function ModelCenterPage() {
       />
       <MetricGrid>
         <MetricCard title="模型资产数" value={rows.length} description="真实后端资产" tone="blue" />
-        <MetricCard title="可调用模型" value={publishedCount} description="已发布 / 试运行 / 已测试" tone="green" />
-        <MetricCard title="开发中" value={developingCount} description="草稿与待发布版本" tone="amber" />
-        <MetricCard title="Builder 覆盖" value={componentBasedCount + genericCount + templateCount} description={`组件化 ${componentBasedCount} / 通用线性 ${genericCount} / 模板 ${templateCount}`} tone="purple" />
+        <MetricCard title="正式服务" value={publishedCount} description="已发布，可被 API / Skill 调用" tone="green" />
+        <MetricCard title="试运行验收" value={trialCount} description="仅按 model_id 调试" tone="purple" />
+        <MetricCard title="草稿" value={developingCount} description="可直接编辑的未发布版本" tone="amber" />
       </MetricGrid>
       <Card className="content-card section-gap" title="模型资产列表">
         <FilterBar onReset={() => setFilters({})}>
@@ -233,44 +305,66 @@ export function ModelCenterPage() {
             {
               title: '状态',
               width: 150,
-              render: (_: unknown, model: ModelAsset) => {
-                const capability = capabilityOrFallback(model);
-                return (
+              render: (_: unknown, model: ModelAsset) => (
                   <div className="model-asset-status-cell">
-                    <StatusTag status={statusText(model.status)} />
-                    {capability.onlineDebug ? <Tag color="green">可调试</Tag> : <Tag>未开放调试</Tag>}
+                    <Tooltip title={lifecycleHint(model)}>
+                      <span><StatusTag status={statusText(model.status)} /></span>
+                    </Tooltip>
+                    {model.status === 'published'
+                      ? <Tag color="green">正式服务</Tag>
+                      : model.status === 'trial'
+                        ? <Tag color="purple">仅限验收调试</Tag>
+                        : <Tag>未开放调用</Tag>}
                   </div>
-                );
-              },
+                ),
             },
             { title: '更新时间', width: 130, dataIndex: 'updated_at', render: renderDate },
             {
               title: '操作',
               width: 140,
-              render: (_: unknown, model: ModelAsset) => (
-                <Space className="asset-actions">
-                  <Button aria-label="查看" size="small" onClick={() => nav(`/models/${encodeURIComponent(model.id)}`)}>查看</Button>
-                  <Dropdown
-                    trigger={['click']}
-                    menu={{
-                      items: [
-                        { key: 'edit', label: editAction(model).label },
-                        { key: 'test', label: '测试运行' },
-                        { key: 'publish', label: isCallable(model) ? '下线模型' : '发布模型' },
-                        { key: 'copy', label: '复制模型' },
-                      ],
-                      onClick: ({ key }) => {
-                        if (key === 'edit') nav(editAction(model).url);
-                        if (key === 'test') test.mutate({ model });
-                        if (key === 'publish') (isCallable(model) ? offline : publish).mutate(model.id);
-                        if (key === 'copy') nav(`/models/create?mode=clone&source=${encodeURIComponent(model.id)}`);
-                      },
-                    }}
-                  >
-                    <Button size="small" icon={<MoreOutlined />}>更多</Button>
-                  </Dropdown>
-                </Space>
-              ),
+              render: (_: unknown, model: ModelAsset) => {
+                const actions = lifecycleActions(model);
+                const status = lifecycleStatus(model.status);
+                const unavailableActionLabel = status === 'developing' || status === 'publish_failed'
+                  ? '正式发布（需先测试进入试运行）'
+                  : status === 'offline'
+                    ? '恢复为正式版本（需先测试）'
+                    : '暂无可用状态操作';
+                return (
+                  <Space className="asset-actions">
+                    <Button aria-label="查看" size="small" onClick={() => nav(`/models/${encodeURIComponent(model.id)}`)}>查看</Button>
+                    <Dropdown
+                      trigger={['click']}
+                      menu={{
+                        items: ([
+                          { key: 'status', label: `当前状态：${statusText(model.status)}`, disabled: true },
+                          { type: 'divider' },
+                          { key: 'edit', label: editAction(model).label },
+                          { key: 'test', label: testActionLabel(model) },
+                          ...actions.map(action => ({
+                            key: `lifecycle-${action}`,
+                            label: lifecycleActionLabel(action),
+                            danger: action === 'offline',
+                          })),
+                          ...(actions.length
+                            ? []
+                            : [{ key: 'lifecycle-unavailable', label: unavailableActionLabel, disabled: true }]),
+                          { key: 'copy', label: '复制为独立模型' },
+                        ] satisfies MenuProps['items']),
+                        onClick: ({ key }) => {
+                          if (key === 'edit') executeEditAction(model);
+                          if (key === 'test') test.mutate({ model });
+                          const action = actions.find(item => key === `lifecycle-${item}`);
+                          if (action) executeLifecycleAction(model, action);
+                          if (key === 'copy') nav(`/models/create?mode=clone&source=${encodeURIComponent(model.id)}`);
+                        },
+                      }}
+                    >
+                      <Button size="small" icon={<MoreOutlined />}>更多</Button>
+                    </Dropdown>
+                  </Space>
+                );
+              },
             },
           ]}
         />
@@ -279,13 +373,33 @@ export function ModelCenterPage() {
         size="large"
         open={!!viewId}
         onClose={() => nav('/models')}
-        title={<Space>{current?.name || '模型详情'}<Button type="link" onClick={() => setExpertView(value => !value)}>{expertView ? '业务视图' : '专家视图'}</Button></Space>}
+        title={(
+          <Space>
+            {current?.name || '模型详情'}
+            {current && (
+              <Tooltip title={lifecycleHint(current)}>
+                <span><StatusTag status={statusText(current.status)} /></span>
+              </Tooltip>
+            )}
+            <Button type="link" onClick={() => setExpertView(value => !value)}>{expertView ? '业务视图' : '专家视图'}</Button>
+          </Space>
+        )}
         footer={(
           <Space style={{ width: '100%', justifyContent: 'flex-end' }}>
             <Button onClick={() => nav('/models')}>关闭</Button>
-            {current && <Button onClick={() => test.mutate({ model: current, detail: currentAssetDetail })}>测试运行</Button>}
-            {current && <Button onClick={() => nav(`/models/create?mode=clone&source=${encodeURIComponent(current.id)}`)}>复制模型</Button>}
-            {current && <Button type="primary" onClick={() => isCallable(current) ? offline.mutate(current.id) : publish.mutate(current.id)}>{isCallable(current) ? '下线模型' : '发布模型'}</Button>}
+            {current && <Button onClick={() => executeEditAction(current)}>{editAction(current).label}</Button>}
+            {current && <Button onClick={() => test.mutate({ model: current, detail: currentAssetDetail })}>{testActionLabel(current)}</Button>}
+            {current && <Button onClick={() => nav(`/models/create?mode=clone&source=${encodeURIComponent(current.id)}`)}>复制为独立模型</Button>}
+            {current && lifecycleActions(current).map(action => (
+              <Button
+                key={action}
+                type={action === 'offline' ? 'default' : 'primary'}
+                danger={action === 'offline'}
+                onClick={() => executeLifecycleAction(current, action)}
+              >
+                {lifecycleActionLabel(action)}
+              </Button>
+            ))}
           </Space>
         )}
       >
@@ -300,7 +414,7 @@ export function ModelCenterPage() {
                 { key: 'component', label: '组件装配', children: <ModelComponentPanel model={current} detail={currentAssetDetail} /> },
               ] : []),
               { key: 'runtime', label: '运行参数', children: <ModelRuntimePanel model={current} detail={currentAssetDetail} /> },
-              { key: 'demo', label: '演示说明', children: <ModelDemoPanel model={current} /> },
+              { key: 'documentation', label: '模型说明', children: <ModelDemoPanel model={current} detail={currentAssetDetail} /> },
               { key: 'governance', label: '发布治理', children: <ModelGovernancePanel model={current} detail={currentAssetDetail} /> },
               { key: 'history', label: '调用记录', children: <ModelHistoryPanel detail={currentAssetDetail} /> },
             ]}

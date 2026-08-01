@@ -1,5 +1,5 @@
 import { MoreOutlined } from '@ant-design/icons';
-import { Button, Card, Descriptions, Drawer, Dropdown, Select, Space, Tabs, Tag, message } from 'antd';
+import { Button, Card, Descriptions, Drawer, Dropdown, Select, Space, Spin, Tabs, Tag, message } from 'antd';
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useParams } from 'react-router-dom';
@@ -16,6 +16,13 @@ import { ComponentValidationPanel } from '../../features/component-library/Compo
 import { ComponentEditor } from '../../features/component-library/ComponentEditor';
 import type { ComponentDef } from '../../types/component';
 import type { DictionaryItem } from '../../types/systemConfig';
+import {
+  analyzeComponentDependencies,
+  COMPONENT_PUBLISHED_STATUS,
+  getComponentDependencyIds,
+  getComponentId,
+  isPublishedComponent,
+} from '../../utils/componentDependencies';
 
 type ValidationResult = { valid: boolean; errors?: unknown[] };
 
@@ -69,9 +76,24 @@ export function ComponentLibraryPage() {
     && (!filters.implemented || String(item.implemented !== false) === filters.implemented));
   const enabledCount = rows.filter(item => item.enabled !== false).length;
   const implementedCount = rows.filter(item => item.implemented !== false).length;
-  const publishedCount = rows.filter(item => ['published', '已发布'].includes(String(item.status))).length;
-  const availableIds = rows.map(item => item.component_id);
-  const missingDeps = rows.filter(item => (item.depends_on || item.dependencies || []).some(dep => !availableIds.includes(dep))).length;
+  const publishedCount = rows.filter(item => String(item.status).toLowerCase() === COMPONENT_PUBLISHED_STATUS).length;
+  const dependencyAnalysis = analyzeComponentDependencies(allRows);
+  const componentById = new Map(allRows.map(item => [getComponentId(item), item]));
+  const unavailableDependencyOwners = allRows.flatMap(item => (
+    getComponentDependencyIds(item).some(dependencyId => {
+      const dependency = componentById.get(dependencyId);
+      return dependency && !isPublishedComponent(dependency);
+    })
+      ? [getComponentId(item)]
+      : []
+  ));
+  const dependencyIssueIds = new Set([
+    ...dependencyAnalysis.missing.map(item => item.componentId),
+    ...dependencyAnalysis.selfDependencies,
+    ...dependencyAnalysis.cycles.flatMap(cycle => cycle),
+    ...unavailableDependencyOwners,
+  ]);
+  const dependencyIssueCount = rows.filter(item => dependencyIssueIds.has(getComponentId(item))).length;
   const c = detail.data;
   const dictionaries = config.data?.dictionaries;
   const validationResult = validation || asValidationResult(c?.validation_result);
@@ -87,7 +109,7 @@ export function ComponentLibraryPage() {
         <MetricCard title="组件总数" value={rows.length} description="组件注册表" tone="blue" />
         <MetricCard title="启用组件" value={enabledCount} description="参与模型装配" tone="green" />
         <MetricCard title="已实现" value={implementedCount} description="已有后端实现" tone="amber" />
-        <MetricCard title="依赖缺失" value={missingDeps} description="阻止发布风险" tone={missingDeps ? 'red' : 'neutral'} />
+        <MetricCard title="依赖异常" value={dependencyIssueCount} description="缺失、自依赖或循环" tone={dependencyIssueCount ? 'red' : 'neutral'} />
       </MetricGrid>
       <Card className="content-card section-gap" title={`组件清单 · 已发布 ${publishedCount}`}>
         <Space wrap className="full-width component-filter-bar">
@@ -162,7 +184,19 @@ export function ComponentLibraryPage() {
           </Space>
         )}
       >
-        {editing ? <ComponentEditor component={c} availableIds={availableIds} dictionaries={dictionaries} onSave={value => save.mutate(value)} /> : c && (
+        {editing ? (
+          viewId && !c
+            ? <div className="component-editor-loading"><Spin description="正在加载完整组件定义…" /></div>
+            : (
+              <ComponentEditor
+                key={c?.component_id || 'new-component'}
+                component={c}
+                availableComponents={allRows}
+                dictionaries={dictionaries}
+                onSave={value => save.mutate(value)}
+              />
+            )
+        ) : c && (
           <Tabs
             items={[
               {
@@ -179,7 +213,7 @@ export function ComponentLibraryPage() {
                     <Descriptions.Item label="启用">{booleanPill(c.enabled)}</Descriptions.Item>
                     <Descriptions.Item label="后端实现">{booleanPill(c.implemented)}</Descriptions.Item>
                     <Descriptions.Item label="依赖组件" span={2}>
-                      {(c.depends_on || c.dependencies || []).length ? (c.depends_on || c.dependencies || []).map(dep => <Tag key={dep}>{dep}</Tag>) : '无'}
+                      {getComponentDependencyIds(c).length ? getComponentDependencyIds(c).map(dep => <Tag key={dep}>{dep}</Tag>) : '无'}
                     </Descriptions.Item>
                     <Descriptions.Item label="组件说明" span={2}>{String(c.description || '-')}</Descriptions.Item>
                   </Descriptions>
@@ -188,7 +222,7 @@ export function ComponentLibraryPage() {
               { key: 'business', label: '业务口径', children: <ComponentBusinessView component={c} /> },
               { key: 'math', label: '数学定义', children: <ComponentMathDefinition component={c} /> },
               { key: 'params', label: '参数绑定', children: <ParameterBindingPanel component={c} /> },
-              { key: 'deps', label: '依赖关系', children: <ComponentDependencyPanel component={c} available={availableIds} /> },
+              { key: 'deps', label: '依赖关系', children: <ComponentDependencyPanel component={c} available={allRows} /> },
               { key: 'validation', label: '校验结果', children: <ComponentValidationPanel result={validationResult} /> },
             ]}
           />

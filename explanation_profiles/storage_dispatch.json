@@ -1,14 +1,20 @@
 {
   "profile_name": "storage_dispatch",
-  "applies_to": {"tags": ["storage", "储能调度"], "business_domains": ["energy_storage"]},
+  "profile_version": "1.0",
+  "applies_to": {"tags": ["storage", "储能调度", "storage_dispatch"], "business_domains": ["energy_storage"], "model_families": ["storage_dispatch"]},
   "key_metrics": [
-    {"name": "total_charge_energy", "label": "总充电量", "expression": "sum(charge_power)", "unit": "MWh"},
-    {"name": "total_discharge_energy", "label": "总放电量", "expression": "sum(discharge_power)", "unit": "MWh"},
-    {"name": "max_soc", "label": "最高 SOC", "expression": "max(soc)", "unit": "MWh"}
+    {"name": "total_charge_energy", "label": "总充电量", "function": "total_energy", "args": ["charge_power"], "unit": "MWh"},
+    {"name": "total_discharge_energy", "label": "总放电量", "function": "total_energy", "args": ["discharge_power"], "unit": "MWh"},
+    {"name": "max_soc", "label": "最高 SOC", "function": "max_value", "args": ["soc"], "unit": "MWh"},
+    {"name": "min_soc", "label": "最低 SOC", "function": "min_value", "args": ["soc"], "unit": "MWh"},
+    {"name": "storage_switch_count", "label": "充放电状态切换次数", "function": "switch_count", "args": ["storage_power"], "unit": "次"},
+    {"name": "peak_discharge_periods", "label": "放电高峰时段", "function": "top_periods", "args": ["discharge_power"], "count": 3, "unit": ""}
   ],
   "risk_rules": [
-    {"name": "soc_upper_warning", "condition": "soc_max >= storage_capacity", "level": "medium", "message": "SOC 达到容量边界，请复核安全裕度。"}
+    {"name": "soc_upper_warning", "condition": "soc_max >= storage_capacity", "level": "medium", "message": "SOC 达到容量边界，请复核安全裕度。"},
+    {"name": "soc_lower_warning", "condition": "soc_min <= 0", "level": "high", "message": "SOC 接近下边界，需复核可执行性和备用裕度。"},
+    {"name": "frequent_switching", "condition": "storage_switch_count > 8", "level": "medium", "message": "充放电切换较频繁，需评估寿命与执行成本。"}
   ],
-  "manual_review_points": ["复核末端 SOC 是否满足次日运行要求。", "复核高价时段电价预测和电池循环寿命约束。"],
+  "manual_review_points": ["复核末端 SOC 是否满足后续运行要求。", "复核高价时段电价预测和电池循环寿命约束。", "复核充放电功率、SOC 安全边界和现场可用状态。"],
   "llm_summary_policy": {"allow_inference": "limited", "require_evidence_reference": true}
 }

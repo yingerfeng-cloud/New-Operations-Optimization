@@ -1,13 +1,20 @@
 {
   "profile_name": "retail_da_spot_bidding",
-  "applies_to": {"tags": ["retail_bidding", "售电日前申报"]},
+  "profile_version": "1.0",
+  "applies_to": {"tags": ["retail_bidding", "售电日前申报"], "business_domains": ["retail_bidding"], "model_families": ["retail_da_spot_bidding"]},
   "key_metrics": [
-    {"name": "total_bid_energy", "label": "申报电量", "expression": "sum(day_ahead_bid)", "unit": "MWh"},
-    {"name": "max_deviation", "label": "最大偏差", "expression": "max(deviation)", "unit": "MWh"}
+    {"name": "total_bid_energy", "label": "申报电量", "function": "total_energy", "args": ["day_ahead_bid"], "unit": "MWh"},
+    {"name": "max_deviation", "label": "最大偏差", "function": "max_value", "args": ["deviation"], "unit": "MWh"},
+    {"name": "avg_deviation", "label": "平均偏差", "function": "avg_value", "args": ["deviation"], "unit": "MWh"},
+    {"name": "deviation_period_count", "label": "非零偏差时段数", "function": "non_zero_count", "args": ["deviation"], "unit": "时段"},
+    {"name": "peak_bid_period", "label": "最大申报时段", "function": "max_period", "args": ["day_ahead_bid"], "unit": ""},
+    {"name": "top_deviation_periods", "label": "高偏差时段", "function": "top_periods", "args": ["deviation"], "count": 3, "unit": ""}
   ],
   "risk_rules": [
-    {"name": "deviation_warning", "condition": "deviation_max > 0", "level": "medium", "message": "存在申报偏差风险，请人工复核。"}
+    {"name": "deviation_warning", "condition": "max_deviation > 0", "level": "medium", "message": "存在申报偏差风险，请人工复核。"},
+    {"name": "broad_deviation", "condition": "deviation_period_count > 4", "level": "high", "message": "偏差覆盖多个时段，需复核负荷预测。"},
+    {"name": "bid_concentration", "condition": "total_bid_energy > 0", "level": "low", "message": "需复核申报量在峰谷时段的集中程度。"}
   ],
-  "manual_review_points": ["复核价格预测、用户负荷和合约边界。", "提交申报前必须完成人工审批。"],
+  "manual_review_points": ["复核价格预测、用户负荷和合约边界。", "提交申报前必须完成人工审批。", "复核市场限价、偏差考核与数据时效性。"],
   "explanation_limits": ["收益或成本变化只有在 evidence 包含基准方案时才能比较。"]
 }

@@ -30,6 +30,42 @@ export interface PlatformSkill {
   tags?: string[];
   execution_policy?: string;
   requires_human_review?: boolean;
+  generated?: boolean;
+  binding_policy?: string;
+  definition_revision?: number;
+  definition_hash?: string;
+  definition?: SkillDefinition | null;
+  explanation_spec?: Record<string, unknown> | null;
+  definition_validation?: SkillValidation;
+  [key: string]: unknown;
+}
+
+export interface SkillValidation {
+  status?: 'valid' | 'invalid' | 'not_generated' | string;
+  score?: number | null;
+  errors?: Array<Record<string, unknown>>;
+  warnings?: Array<Record<string, unknown>>;
+  validated_at?: string;
+}
+
+export interface SkillDefinition {
+  schema_version?: string;
+  revision?: number;
+  skill_name?: string;
+  display_name?: string;
+  description?: string;
+  model_binding?: Record<string, unknown>;
+  input_schema?: SkillInputField[];
+  output_schema?: Record<string, unknown>;
+  instructions?: string[];
+  trigger_examples?: string[];
+  non_trigger_examples?: string[];
+  parameter_questions?: Array<Record<string, unknown>>;
+  explanation_spec?: Record<string, unknown>;
+  execution_policy?: Record<string, unknown>;
+  generation?: Record<string, unknown>;
+  validation?: SkillValidation;
+  definition_hash?: string;
   [key: string]: unknown;
 }
 
@@ -54,5 +90,15 @@ export const runSkill = (name: string, parameters: Record<string, unknown>, opti
 export const enableSkill = (name: string) => unwrap<PlatformSkill>(apiClient.post(`/api/skills/${encodeURIComponent(name)}/enable`));
 export const disableSkill = (name: string) => unwrap<PlatformSkill>(apiClient.post(`/api/skills/${encodeURIComponent(name)}/disable`));
 export const syncSkillSchema = (name: string) => unwrap<PlatformSkill>(apiClient.post(`/api/skills/${encodeURIComponent(name)}/sync-schema`));
+export const previewModelSkill = (modelId: string, options: { use_llm?: boolean } = {}) =>
+  unwrap<{ model_id: string; skill_name: string; definition: SkillDefinition; validation: SkillValidation; persisted: false }>(apiClient.post(`/api/models/${encodeURIComponent(modelId)}/skills/preview`, options));
+export const generateModelSkill = (modelId: string, options: { use_llm?: boolean; status?: string } = {}) =>
+  unwrap<PlatformSkill>(apiClient.post(`/api/models/${encodeURIComponent(modelId)}/skills/generate`, options));
+export const updateSkill = (name: string, body: { definition?: SkillDefinition; description?: string; status?: string; save_invalid_draft?: boolean }) =>
+  unwrap<PlatformSkill>(apiClient.put(`/api/skills/${encodeURIComponent(name)}`, body));
+export const validateSkill = (name: string, definition?: SkillDefinition) =>
+  unwrap<SkillValidation>(apiClient.post(`/api/skills/${encodeURIComponent(name)}/validate`, definition ? { definition } : {}));
+export const getSkillVersions = (name: string) =>
+  unwrap<Array<Record<string, unknown>>>(apiClient.get(`/api/skills/${encodeURIComponent(name)}/versions`));
 export const createAgentSkill = (name: string) => unwrap<Record<string, unknown>>(apiClient.post(`/api/skills/${encodeURIComponent(name)}/create-agent-skill`, {}));
 export const getSkillInvocations = (name: string) => unwrap<Record<string, unknown>[]>(apiClient.get(`/api/skills/${encodeURIComponent(name)}/invocations`));

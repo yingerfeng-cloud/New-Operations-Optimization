@@ -52,7 +52,7 @@ test('runs test callback and renders dry-run result summary', async () => {
   const draft = validDraft();
   const onTest = vi.fn().mockResolvedValue({
     id: 'MODEL-1',
-    status: 'tested',
+    status: 'trial',
     dry_run_result: {
       structure_check: { status: 'passed' },
       solver_check: { status: 'passed', objective_value: 12 },
@@ -64,7 +64,7 @@ test('runs test callback and renders dry-run result summary', async () => {
 
   await waitFor(() => expect(onTest).toHaveBeenCalledTimes(1));
   expect(await screen.findByText('测试运行结果')).toBeInTheDocument();
-  expect(screen.getByText('tested')).toBeInTheDocument();
+  expect(screen.getByText('试运行')).toBeInTheDocument();
   expect(screen.getAllByText('passed').length).toBeGreaterThan(0);
 });
 

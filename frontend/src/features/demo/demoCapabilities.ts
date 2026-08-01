@@ -14,127 +14,158 @@ export interface DemoCapability {
   keyCapabilities: string[];
   risk: string;
   demoNotes: Array<{ label: string; value: string }>;
+  description: string;
+  source: 'model_definition';
 }
 
-export const DEMO_TEMPLATE_CODES = ['cascade_hydro_dispatch', 'cascade_hydro_dispatch_v1', 'nonlinear_hydro_power_demo', 'contract_spot_exposure_v1', 'retail_da_spot_bidding_v1'];
+function objectValue(value: unknown): Record<string, unknown> {
+  return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {};
+}
 
-const DEMO_CAPABILITIES: Record<string, DemoCapability> = {
-  contract_spot_exposure_v1: {
-    code: 'contract_spot_exposure_v1',
-    displayName: '中长期合约分解与现货暴露控制模型',
-    problemType: 'LP',
-    solver: 'HiGHS',
-    buildMode: '通用组件公式模板',
-    functionAssets: '不依赖函数资产',
-    nonlinearHandling: '线性模型，无非线性项',
-    onlineDebug: true,
-    tags: ['LP', 'HiGHS', 'market_trading', 'advisory_only'],
-    useCase: '中长期合约分解与现货暴露控制',
-    keyCapabilities: ['96 点 15 分钟交易优化', '合约电量分解', '现货暴露控制', '暴露比例校核', '成本与风险拆解'],
-    risk: '结果依赖负荷预测、现货价格预测、合约电量和暴露比例边界，平台只生成策略建议，不执行申报或下单。',
-    demoNotes: [
-      { label: '业务目标', value: '在满足合约总量和现货暴露上限的前提下，生成合约使用曲线和现货暴露建议。' },
-      { label: '时间粒度', value: '支持日前 24 小时 96 点、15 分钟粒度交易优化。' },
-      { label: '模型类型', value: 'LP / HiGHS。' },
-      { label: '关键输入', value: '负荷预测、合约总电量、合约价格、现货价格预测、最大暴露比例和偏差惩罚。' },
-      { label: '输出指标', value: 'contract_use_curve、spot_exposure_curve、暴露比例、成本拆解和高风险时段。' },
-      { label: '执行边界', value: '仅提供可解释、可审批、可复盘的交易策略建议。' },
-    ],
-  },
-  retail_da_spot_bidding_v1: {
-    code: 'retail_da_spot_bidding_v1',
-    displayName: '售电公司日前现货申报优化模型',
-    problemType: 'MILP',
-    solver: 'HiGHS',
-    buildMode: '通用组件公式模板',
-    functionAssets: '不依赖函数资产',
-    nonlinearHandling: '线性约束 + 二进制充放电互斥，无非线性项',
-    onlineDebug: true,
-    tags: ['MILP', 'HiGHS', 'spot_bidding', 'storage', 'flex_load'],
-    useCase: '售电公司日前现货申报策略建议',
-    keyCapabilities: ['96 点 15 分钟交易优化', '日前现货申报建议', '储能协同', '可调负荷调整', '偏差风险成本拆解'],
-    risk: '结果依赖日前价格预测、合约分时电量、储能边界和可调负荷边界，需人工审批后在外部交易系统处理。',
-    demoNotes: [
-      { label: '业务目标', value: '协同合约电量、现货购电、储能和可调负荷，生成日前申报策略建议。' },
-      { label: '时间粒度', value: '支持日前 24 小时 96 点、15 分钟粒度交易优化。' },
-      { label: '模型类型', value: 'MILP / HiGHS，使用二进制变量表达储能充放电互斥。' },
-      { label: '关键约束', value: '电量平衡、申报上下限、SOC 递推、充放电互斥、可调负荷边界和负荷转移守恒。' },
-      { label: '输出指标', value: 'spot_buy_curve、adjusted_load_curve、soc_curve、偏差曲线、成本拆解和风险摘要。' },
-      { label: '执行边界', value: '平台不连接交易平台、不自动申报、不自动下单。' },
-    ],
-  },
-  cascade_hydro_dispatch: {
-    code: 'cascade_hydro_dispatch',
-    displayName: '梯级水电调度',
-    problemType: 'LP / MILP（以后端诊断为准）',
-    solver: 'HiGHS',
-    buildMode: 'component_based',
-    functionAssets: '一维严格 PWL + 二维三角片 PWL',
-    nonlinearHandling: '通过分段线性近似水电非线性特性，由 HiGHS 按 LP/MILP 求解',
-    onlineDebug: true,
-    tags: ['LP', 'MILP', 'HiGHS', 'PWL'],
-    useCase: '梯级水电日前调度',
-    keyCapabilities: ['水量平衡', '检修可用容量', '负荷跟踪', '弃水分析'],
-    risk: '结果依赖来水、库容边界和负荷预测质量。',
-    demoNotes: [
-      { label: '业务目标', value: '在满足水量平衡和电站边界的前提下优化梯级水电出力。' },
-      { label: '核心约束', value: '水量平衡、库容上下限、出库流量边界、检修可用容量和负荷跟踪。' },
-      { label: '求解技术', value: 'MILP / HiGHS。' },
-      { label: '输出指标', value: '总发电量、弃水、期末库容偏差、负荷跟踪偏差。' },
-    ],
-  },
-  cascade_hydro_dispatch_v1: {
-    code: 'cascade_hydro_dispatch_v1',
-    displayName: '梯级水电调度 v1（兼容入口）',
-    problemType: 'MILP',
-    solver: 'HiGHS',
-    buildMode: 'component_based（统一模型兼容入口）',
-    functionAssets: '一维严格 PWL + 二维三角片 PWL',
-    nonlinearHandling: '兼容参数迁移后调用 cascade_hydro_dispatch 的 pwl_2d 组件链路',
-    onlineDebug: true,
-    tags: ['deprecated', 'MILP', 'HiGHS', 'PWL'],
-    useCase: '日前/日内水电优化调度',
-    keyCapabilities: ['水位库容曲线', '尾水位流量曲线', '二维出力曲面', '三角剖分 MILP'],
-    risk: '已弃用；新建模型应选择 cascade_hydro_dispatch。',
-    demoNotes: [
-      { label: '业务目标', value: '基于水位库容、尾水位流量和出力曲面完成水电日前调度。' },
-      { label: '函数资产', value: 'cascade_hydro_level_storage_v1、cascade_hydro_tailwater_outflow_v1、cascade_hydro_power_surface_v1。' },
-      { label: '非线性处理方式', value: '使用 1D/2D PWL 将物理曲线转化为 MILP。' },
-      { label: '输入参数说明', value: 'horizon、time、time_volume、station/reservoir、local_inflow、load_forecast 和水库/出力边界。' },
-      { label: '输出指标说明', value: '库容、出库流量、出力、弃水、水量平衡校验和函数资产插值解释。' },
-    ],
-  },
-  nonlinear_hydro_power_demo: {
-    code: 'nonlinear_hydro_power_demo',
-    displayName: '非线性水电出力 NLP 演示模型',
-    problemType: 'NLP',
-    solver: 'Ipopt',
-    buildMode: '原生非线性 Builder',
-    functionAssets: '不依赖 PWL 函数资产',
-    nonlinearHandling: '原生非线性：power = k * flow * head',
-    onlineDebug: true,
-    tags: ['NLP', 'Ipopt', 'nlp_demo'],
-    useCase: '非线性水电出力原生求解',
-    keyCapabilities: ['连续变量 NLP', 'Ipopt 真实求解', 'power = k * flow * head'],
-    risk: 'Ipopt 通常返回局部最优或求解器终止状态，不承诺全局最优；不支持整数变量。',
-    demoNotes: [
-      { label: '非线性关系', value: 'power = k * flow * head。' },
-      { label: '问题类型', value: 'NLP，变量为连续变量。' },
-      { label: '求解器', value: 'Ipopt。' },
-      { label: '初值要求', value: '建议提供合理初值，并确保变量上下界完整。' },
-      { label: '局部最优风险', value: 'NLP 结果不承诺全局最优，受初值、上下界和模型尺度影响。' },
-      { label: '整数变量说明', value: '含整数变量的非线性模型属于 MINLP_RESERVED，当前不作为生产级能力开放。' },
-    ],
-  },
-};
+function stringArray(value: unknown) {
+  return Array.isArray(value) ? value.map(String).filter(Boolean) : [];
+}
+
+function rows(value: unknown) {
+  return Array.isArray(value)
+    ? value.filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === 'object' && !Array.isArray(item))
+    : [];
+}
+
+function firstText(...values: unknown[]) {
+  const value = values.find(item => item !== undefined && item !== null && String(item).trim());
+  return value === undefined ? '' : String(value);
+}
+
+function modelSources(model: Partial<ModelAsset> | Record<string, unknown>) {
+  const semantic = objectValue(model.semantic_spec);
+  const componentSpec = objectValue(model.component_spec || semantic.component_spec);
+  const draft = objectValue(model.model_draft);
+  const advanced = objectValue(draft.advanced);
+  const ui = {
+    ...objectValue(semantic.ui_metadata),
+    ...objectValue(model.ui_metadata),
+    ...objectValue(advanced.ui_metadata),
+  };
+  const documentation = objectValue(ui.model_documentation || ui.documentation);
+  const parameters = {
+    ...objectValue(semantic.sample_runtime_parameters),
+    ...objectValue(model.parameters),
+  };
+  return { semantic, componentSpec, draft, advanced, ui, documentation, parameters };
+}
+
+function functionAssetSummary(model: Partial<ModelAsset> | Record<string, unknown>) {
+  const { componentSpec, documentation, parameters } = modelSources(model);
+  const explicit = firstText(documentation.function_assets, documentation.functionAssets);
+  if (explicit) return explicit;
+
+  const bindings = objectValue(parameters.function_asset_bindings);
+  const assetIds = [...new Set(Object.values(bindings).map(String).filter(Boolean))];
+  if (assetIds.length) return assetIds.join('、');
+
+  const componentTypes = rows(componentSpec.components).map(item => String(item.type || item.component_id || ''));
+  const has1d = componentTypes.some(type => ['function_mapping_component', 'piecewise_linear_curve'].includes(type));
+  const has2d = componentTypes.some(type => type === 'function_mapping_2d_component');
+  if (has1d && has2d) return '1D PWL + 2D PWL（来自组件装配）';
+  if (has2d) return '2D PWL（来自组件装配）';
+  if (has1d) return '1D PWL（来自组件装配）';
+  return '未配置';
+}
+
+function nonlinearSummary(model: Partial<ModelAsset> | Record<string, unknown>, problemType: string) {
+  const { componentSpec, documentation, ui } = modelSources(model);
+  const explicit = firstText(documentation.nonlinear_handling, documentation.nonlinearHandling, ui.nonlinear_handling);
+  if (explicit) return explicit;
+
+  if (problemType.toUpperCase().includes('NLP')) return '原生非线性模型（来自模型问题类型诊断）';
+  const componentTypes = rows(componentSpec.components).map(item => String(item.type || item.component_id || ''));
+  const has1d = componentTypes.some(type => ['function_mapping_component', 'piecewise_linear_curve'].includes(type));
+  const has2d = componentTypes.some(type => type === 'function_mapping_2d_component');
+  if (has1d && has2d) return '由模型组件定义：1D PWL + 2D 三角剖分线性化';
+  if (has2d) return '由模型组件定义：2D PWL 线性化';
+  if (has1d) return '由模型组件定义：1D PWL 线性化';
+  return '模型定义未声明非线性处理';
+}
 
 export function modelCodeOf(model?: Partial<ModelAsset> | Record<string, unknown>) {
-  return String(model?.template_id || model?.model_code || model?.id || model?.code || '');
+  const semantic = objectValue(model?.semantic_spec);
+  return String(model?.template_id || model?.model_code || semantic.model_code || semantic.code || model?.id || model?.code || '');
 }
 
-export function demoCapabilityFor(model?: Partial<ModelAsset> | Record<string, unknown>) {
+export function demoCapabilityFor(model?: Partial<ModelAsset> | Record<string, unknown>): DemoCapability | undefined {
+  if (!model) return undefined;
+  const { semantic, componentSpec, draft, advanced, ui, documentation } = modelSources(model);
+  const basicInfo = objectValue(draft.basic_info);
   const code = modelCodeOf(model);
-  return DEMO_CAPABILITIES[code];
+  const displayName = firstText(model.name, semantic.name, basicInfo.name, code);
+  const problemType = firstText(
+    model.model_problem_type,
+    model.problem_type,
+    semantic.model_problem_type,
+    semantic.problem_type,
+    documentation.problem_type,
+    '-',
+  );
+  const solver = firstText(model.solver, semantic.solver, ui.solver, documentation.solver, '-');
+  const buildMode = firstText(
+    model.build_mode,
+    semantic.build_mode,
+    basicInfo.builder_mode,
+    documentation.build_mode,
+    '-',
+  );
+  const description = firstText(
+    model.description,
+    ui.description,
+    advanced.description,
+    semantic.description,
+    model.scene,
+  );
+  const tags = stringArray(model.tags).length ? stringArray(model.tags) : stringArray(semantic.tags);
+  const componentNames = rows(componentSpec.components)
+    .map(item => firstText(item.name, item.display_name, item.component_id, item.type))
+    .filter(Boolean);
+  const keyCapabilities = stringArray(documentation.key_capabilities).length
+    ? stringArray(documentation.key_capabilities)
+    : [...new Set(componentNames)].slice(0, 8);
+  const deprecated = Boolean(ui.deprecated || semantic.deprecated);
+  const replacement = firstText(ui.replacement_model_code, semantic.replacement_model_code);
+  const risk = firstText(
+    documentation.risk,
+    ui.capability_boundary,
+    deprecated && replacement ? `该模型为兼容入口；新建模型建议使用 ${replacement}。` : '',
+    deprecated ? '该模型为兼容入口，不建议用于新建模型。' : '',
+    '能力边界未在模型定义中配置。',
+  );
+  const functionAssets = functionAssetSummary(model);
+  const configuredNotes = rows(documentation.notes || documentation.demo_notes)
+    .map(item => ({ label: firstText(item.label, item.name), value: firstText(item.value, item.description) }))
+    .filter(item => item.label && item.value);
+  const demoNotes = configuredNotes.length ? configuredNotes : [
+    ...(description ? [{ label: '模型说明', value: description }] : []),
+    { label: '模型编码', value: code || '-' },
+    ...(functionAssets !== '未配置' ? [{ label: '函数资产', value: functionAssets }] : []),
+    ...(deprecated && replacement ? [{ label: '版本迁移', value: `兼容入口；新建模型建议使用 ${replacement}` }] : []),
+  ];
+
+  return {
+    code,
+    displayName,
+    problemType,
+    solver,
+    buildMode,
+    functionAssets,
+    nonlinearHandling: nonlinearSummary(model, problemType),
+    onlineDebug: ['published', 'trial'].includes(String(model.status || semantic.status || '')),
+    tags,
+    useCase: firstText(documentation.use_case, model.scene, semantic.scenario, description, '-'),
+    keyCapabilities,
+    risk,
+    demoNotes,
+    description,
+    source: 'model_definition',
+  };
 }
 
 export function capabilityOrFallback(model: Partial<ModelAsset> | Record<string, unknown>, fallbackProblemType = '-') {
@@ -143,9 +174,9 @@ export function capabilityOrFallback(model: Partial<ModelAsset> | Record<string,
     problemType: capability?.problemType || String(model.model_problem_type || model.problem_type || fallbackProblemType),
     solver: capability?.solver || String(model.solver || '-'),
     buildMode: capability?.buildMode || String(model.build_mode || '-'),
-    functionAssets: capability?.functionAssets || '-',
-    nonlinearHandling: capability?.nonlinearHandling || '-',
-    onlineDebug: capability?.onlineDebug ?? ['published', 'trial', 'tested', '已发布', '试运行', '已测试'].includes(String(model.status || '')),
+    functionAssets: capability?.functionAssets || '未配置',
+    nonlinearHandling: capability?.nonlinearHandling || '模型定义未声明非线性处理',
+    onlineDebug: capability?.onlineDebug ?? ['published', 'trial'].includes(String(model.status || '')),
     tags: capability?.tags || [],
     useCase: capability?.useCase || String(model.scene || model.description || '-'),
   };

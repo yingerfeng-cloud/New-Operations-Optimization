@@ -45,3 +45,26 @@ test('blocks missing component dependencies', () => {
   const result = validateModelDraft(draft);
   expect(result.sections.component_dependencies.errors).toContain('storage_soc 缺少依赖 storage_power_limit');
 });
+
+test('blocks self and cyclic component dependencies without duplicate messages', () => {
+  const draft = baseDraft();
+  draft.basic_info.builder_mode = 'component_based';
+  draft.components = [
+    { component_id: 'self_component', depends_on: ['self_component'] },
+    { component_id: 'cycle_a', depends_on: ['cycle_b'], dependencies: ['cycle_b'] },
+    { component_id: 'cycle_b', depends_on: ['cycle_a'] },
+  ];
+
+  const errors = validateModelDraft(draft).sections.component_dependencies.errors;
+  expect(errors).toContain('self_component 不能依赖自身');
+  expect(errors).toContain('组件依赖存在循环：cycle_a → cycle_b → cycle_a');
+  expect(errors.filter(error => error.includes('cycle_a 缺少依赖'))).toHaveLength(0);
+});
+
+test('disabled components do not introduce dependency blockers', () => {
+  const draft = baseDraft();
+  draft.basic_info.builder_mode = 'component_based';
+  draft.components = [{ component_id: 'disabled_component', enabled: false, depends_on: ['not_selected'] }];
+
+  expect(validateModelDraft(draft).sections.component_dependencies.errors).toEqual([]);
+});

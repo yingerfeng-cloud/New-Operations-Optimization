@@ -23,32 +23,71 @@ class GenericExplainer(BaseExplainer):
         status = str(solver.get("status") or "unknown").upper()
         error_text = str(solver.get("error") or "")
         error_code = self._error_code(status, error_text)
-        facts: list[str] = []
+        fact_items: list[dict[str, Any]] = []
         if error_code:
-            facts.append(self._failure_message(error_code, error_text))
+            fact_items.append({"text": self._failure_message(error_code, error_text), "evidence_refs": ["solver.status", "solver.error"]})
         else:
-            facts.append(f"求解状态为 {solver.get('status') or 'unknown'}。")
+            fact_items.append({"text": f"求解状态为 {solver.get('status') or 'unknown'}。", "evidence_refs": ["solver.status", "solver.termination_condition"]})
             if solver.get("objective_value") is not None:
-                facts.append(f"目标函数值为 {solver['objective_value']}。")
-            if evidence_package.get("variables_summary"):
-                facts.append(f"结果返回 {len(evidence_package['variables_summary'])} 个变量摘要。")
-            binding = [item for item in evidence_package.get("constraint_checks") or [] if item.get("status") == "binding"]
+                objective = (evidence_package.get("model") or {}).get("objective") or {}
+                objective_name = objective.get("name") or objective.get("key") or "目标函数"
+                unit = objective.get("unit") or ""
+                fact_items.append({
+                    "text": f"{objective_name}的求解值为 {solver['objective_value']}{unit}。",
+                    "evidence_refs": ["solver.objective_value", "model.objective"],
+                })
+            for key, metric in (evidence_package.get("derived_metrics") or {}).items():
+                value = metric.get("value")
+                unit = metric.get("unit") or ""
+                fact_items.append({
+                    "text": f"{metric.get('label') or key}为 {value}{unit}。",
+                    "evidence_refs": [metric.get("evidence_ref") or f"derived_metrics.{key}"],
+                })
+            for variable in evidence_package.get("variables_summary") or []:
+                pieces = []
+                for label in ("min", "max", "sum", "non_zero_count"):
+                    if variable.get(label) is not None:
+                        pieces.append(f"{label}={variable[label]}")
+                fact_items.append({
+                    "text": f"变量“{variable.get('business_name') or variable.get('name')}”摘要：{', '.join(pieces) or '无可用数值'}。",
+                    "evidence_refs": [variable.get("evidence_ref") or f"variables_summary.{variable.get('name')}"],
+                })
+            checks = evidence_package.get("constraint_checks") or []
+            binding = [item for item in checks if str(item.get("status") or "").lower() == "binding"]
+            violated = [item for item in checks if str(item.get("status") or "").lower() in {"violated", "failed", "infeasible"}]
             if binding:
-                facts.append(f"检测到 {len(binding)} 个触边约束。")
+                fact_items.append({"text": f"检测到 {len(binding)} 个触边约束。", "evidence_refs": [item.get("evidence_ref") for item in binding]})
+            if violated:
+                fact_items.append({"text": f"检测到 {len(violated)} 个未满足约束。", "evidence_refs": [item.get("evidence_ref") for item in violated]})
 
-        inferences: list[str] = []
+        inference_items: list[dict[str, Any]] = []
         if not error_code and evidence_package.get("risk_notes"):
-            inferences.append("配置的风险规则命中，需重点复核相应时段或边界。")
-        recommendations = [] if error_code else ["在采用方案前复核关键输入、约束边界与现场业务条件。"]
+            for risk in evidence_package.get("risk_notes") or []:
+                inference_items.append({
+                    "text": str(risk.get("message") or risk.get("name") or "声明的风险规则已命中。"),
+                    "evidence_refs": [risk.get("evidence_ref") or "risk_notes"],
+                    "level": risk.get("level") or "medium",
+                })
         manual = [str(item) for item in evidence_package.get("manual_review_points") or []]
+        recommendation_items = [] if error_code else [
+            {"text": item, "evidence_refs": ["manual_review_points"]}
+            for item in (manual or ["在采用方案前复核关键输入、约束边界与现场业务条件。"])
+        ]
         limitations = [str(item) for item in evidence_package.get("explanation_limits") or []]
         if ADVISORY_DISCLAIMER not in limitations:
             limitations.append(ADVISORY_DISCLAIMER)
+        facts = [str(item["text"]) for item in fact_items]
+        inferences = [str(item["text"]) for item in inference_items]
+        recommendations = [str(item["text"]) for item in recommendation_items]
         summary = facts[0] if facts else "未获得可解释的求解事实。"
         return {
+            "explanation_schema_version": "2.0",
             "facts": facts,
+            "fact_items": fact_items,
             "inferences": inferences,
+            "inference_items": inference_items,
             "recommendations": recommendations,
+            "recommendation_items": recommendation_items,
             "risk_notes": evidence_package.get("risk_notes") or [],
             "manual_review_points": manual,
             "limitations": limitations,
@@ -59,7 +98,11 @@ class GenericExplainer(BaseExplainer):
 
     def _error_code(self, status: str, error: str) -> str | None:
         combined = f"{status} {error}".upper()
-        if "IPOPT" in combined and any(term in combined for term in ("UNAVAILABLE", "NOT FOUND", "MISSING")):
+        unavailable_terms = (
+            "UNAVAILABLE", "NOT AVAILABLE", "NOT INSTALLED", "NOT FOUND",
+            "MISSING", "NO EXECUTABLE", "NOT IN PATH", "SOLVER_UNAVAILABLE",
+        )
+        if "IPOPT" in combined and any(term in combined for term in unavailable_terms):
             return "SOLVER_UNAVAILABLE"
         for code in FAILURE_MESSAGES:
             if code in combined:

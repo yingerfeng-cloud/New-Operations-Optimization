@@ -12,6 +12,7 @@ BusinessScenario = Literal[
     "chp_dispatch",
     "cascade_hydro_dispatch",
 ]
+ModelLifecycleStatus = Literal["developing", "trial", "published", "offline", "publish_failed"]
 
 VariableDomain = Literal["NonNegativeReals", "Reals", "Binary", "Integers", "NonNegativeIntegers"]
 ObjectiveSense = Literal["minimize", "maximize"]
@@ -117,7 +118,7 @@ class ModelPackage(BaseModel):
     supersedes_model_id: str | None = None
     is_active_version: bool = False
     published_by: str | None = None
-    status: str = "developing"
+    status: ModelLifecycleStatus = "developing"
     solver: str = "HiGHS"
     problem_type: str = "MILP"
     objective: str | None = None

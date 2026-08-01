@@ -8,6 +8,7 @@ class ModelComponentBuilder(Protocol):
     display_name: str
     category: str
     description: str
+    depends_on: list[str]
 
     def validate(self, spec: dict[str, Any], context: dict[str, Any]) -> None:
         ...

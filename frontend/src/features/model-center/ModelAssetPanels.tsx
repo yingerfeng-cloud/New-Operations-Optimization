@@ -101,6 +101,8 @@ function timePolicyText(config: Record<string, unknown>) {
 export function ModelBasicPanel({ model, detail = {} }: { model: ModelAsset; detail?: Detail }) {
   const basic = { ...model, ...objectValue(detail.basic_info) };
   const skill = objectValue(detail.skill_info);
+  const status = String(basic.status || model.status || '');
+  const modelCode = skill.model_code || model.template_id || model.id;
   const timeDimension = timeDimensionFrom(model, detail);
   const defaultHorizon = String(timeDimension.default_horizon || '');
   const defaultInterval = objectValue(timeDimension.interval_minutes_by_horizon)[defaultHorizon] || timeDimension.interval_minutes;
@@ -109,6 +111,7 @@ export function ModelBasicPanel({ model, detail = {} }: { model: ModelAsset; det
     <Space orientation="vertical" size={14} style={{ width: '100%' }}>
       <Descriptions bordered size="small" column={2}>
         <Descriptions.Item label="模型ID">{text(basic.id)}</Descriptions.Item>
+        <Descriptions.Item label="模型编码">{text(modelCode)}</Descriptions.Item>
         <Descriptions.Item label="模型名称">{text(basic.name)}</Descriptions.Item>
         <Descriptions.Item label="场景">{text(basic.scene)}</Descriptions.Item>
         <Descriptions.Item label="版本">{text(basic.version)}</Descriptions.Item>
@@ -117,7 +120,7 @@ export function ModelBasicPanel({ model, detail = {} }: { model: ModelAsset; det
         <Descriptions.Item label="建模模式">{text(basic.build_mode)}</Descriptions.Item>
         <Descriptions.Item label="问题类型">{text(basic.model_problem_type || basic.problem_type)}</Descriptions.Item>
         <Descriptions.Item label="更新时间">{text(basic.updated_at || model.updated_at)}</Descriptions.Item>
-        <Descriptions.Item label="发布时间">{text(basic.published_at || model.published_at)}</Descriptions.Item>
+        <Descriptions.Item label="最近正式发布时间">{text(basic.published_at || model.published_at)}</Descriptions.Item>
       </Descriptions>
       <Card size="small" title="时间维度契约">
         <Descriptions size="small" column={2}>
@@ -136,13 +139,45 @@ export function ModelBasicPanel({ model, detail = {} }: { model: ModelAsset; det
           </> : null}
         </Descriptions>
       </Card>
-      <Card size="small" title="模型服务接口">
-        <Descriptions size="small" column={2}>
-          <Descriptions.Item label="接口编码">{text(skill.skill_name || `run_${String(model.template_id || model.id).toLowerCase().replaceAll('-', '_')}`)}</Descriptions.Item>
-          <Descriptions.Item label="模型版本">{text(skill.model_version || model.version)}</Descriptions.Item>
-          <Descriptions.Item label="Endpoint" span={2}>/api/skills/{text(skill.skill_name || `run_${String(model.template_id || model.id).toLowerCase().replaceAll('-', '_')}`)}/run</Descriptions.Item>
-        </Descriptions>
-      </Card>
+      {status === 'published' ? (
+        <Card size="small" title="正式模型服务">
+          <Alert
+            showIcon
+            type="success"
+            title="已开放生产调用"
+            description="model_code 解析到当前活动已发布版本；API Skill 和 Agent Skill 只绑定已发布版本。"
+            style={{ marginBottom: 12 }}
+          />
+          <Descriptions size="small" column={2}>
+            <Descriptions.Item label="稳定模型编码">{text(modelCode)}</Descriptions.Item>
+            <Descriptions.Item label="当前 model_id">{text(basic.id)}</Descriptions.Item>
+            <Descriptions.Item label="Skill 编码">{text(skill.skill_name)}</Descriptions.Item>
+            <Descriptions.Item label="模型版本">{text(skill.model_version || model.version)}</Descriptions.Item>
+            <Descriptions.Item label="Endpoint" span={2}>{text(skill.endpoint)}</Descriptions.Item>
+          </Descriptions>
+        </Card>
+      ) : status === 'trial' ? (
+        <Card size="small" title="试运行验收接口">
+          <Alert
+            showIcon
+            type="warning"
+            title="仅允许显式 model_id 调试"
+            description="试运行不会生成或暴露正式 API Skill / Agent Skill，也不会被仅传 model_code 的生产调用选中。"
+            style={{ marginBottom: 12 }}
+          />
+          <Descriptions size="small" column={1}>
+            <Descriptions.Item label="具体版本 model_id">{text(basic.id)}</Descriptions.Item>
+            <Descriptions.Item label="调试 Endpoint">{text(skill.debug_endpoint || `/api/models/${model.id}/invoke`)}</Descriptions.Item>
+          </Descriptions>
+        </Card>
+      ) : (
+        <Alert
+          showIcon
+          type="info"
+          title="当前版本未开放调用"
+          description={status === 'offline' ? '已下线版本仅作为历史基线保留。' : '草稿测试通过后进入试运行验收，正式发布后才开放 API Skill / Agent Skill。'}
+        />
+      )}
     </Space>
   );
 }
@@ -289,8 +324,8 @@ export function ModelGovernancePanel({ model, detail = {} }: { model: ModelAsset
       </Card>
       <Card size="small" title="版本治理">
         <Descriptions size="small" column={2}>
-          <Descriptions.Item label="published_at">{text(publishInfo.published_at || model.published_at)}</Descriptions.Item>
-          <Descriptions.Item label="tested_at">{text(publishInfo.tested_at || model.tested_at)}</Descriptions.Item>
+          <Descriptions.Item label="最近正式发布时间">{text(publishInfo.published_at || model.published_at)}</Descriptions.Item>
+          <Descriptions.Item label="最近测试时间">{text(publishInfo.tested_at || model.tested_at)}</Descriptions.Item>
           <Descriptions.Item label="dry-run">{text(publishInfo.dry_run_status)}</Descriptions.Item>
           <Descriptions.Item label="参数 Schema">{text(version.parameter_schema_version)}</Descriptions.Item>
           <Descriptions.Item label="目标函数版本">{text(version.objective_version)}</Descriptions.Item>
@@ -331,37 +366,56 @@ export function ModelHistoryPanel({ detail = {} }: { detail?: Detail }) {
   );
 }
 
-export function ModelDemoPanel({ model }: { model: ModelAsset }) {
-  const capability = demoCapabilityFor(model);
+export function ModelDemoPanel({ model, detail = {} }: { model: ModelAsset; detail?: Detail }) {
+  const capability = demoCapabilityFor({
+    ...model,
+    ...objectValue(detail.basic_info),
+    semantic_spec: detail.semantic_spec || model.semantic_spec,
+    component_spec: detail.component_spec || model.component_spec,
+    model_draft: detail.model_draft || model.model_draft,
+    parameters: detail.parameters || model.parameters,
+    ui_metadata: {
+      ...objectValue(model.ui_metadata),
+      ...objectValue(detail.ui_metadata),
+    },
+  });
   if (!capability) {
-    return <Alert showIcon type="info" title="暂无专属演示说明" description="该模型暂未配置 P4 标杆演示说明，可查看基本信息、语义和运行参数。"/>;
+    return <Alert showIcon type="info" title="暂无模型说明" description="请在建模流程的“基础信息 > 模型说明”中补充并保存。"/>;
   }
   return (
     <Space orientation="vertical" size={14} style={{ width: '100%' }}>
+      <Alert
+        showIcon
+        type="info"
+        title="内容来自已保存的模型定义"
+        description="模型说明在建模流程“基础信息 > 模型说明”中维护；问题类型、求解器、组件和函数资产均从当前模型资产读取，不使用前端演示硬编码。"
+      />
       <Card size="small" title={capability.displayName}>
-        <Descriptions bordered size="small" column={2}>
+        <Descriptions bordered size="small" column={1}>
           <Descriptions.Item label="问题类型">{capability.problemType}</Descriptions.Item>
           <Descriptions.Item label="求解器">{capability.solver}</Descriptions.Item>
           <Descriptions.Item label="建模方式">{capability.buildMode}</Descriptions.Item>
-          <Descriptions.Item label="函数资产类型">{capability.functionAssets}</Descriptions.Item>
-          <Descriptions.Item label="非线性处理方式" span={2}>{capability.nonlinearHandling}</Descriptions.Item>
+          <Descriptions.Item label="函数资产">{capability.functionAssets}</Descriptions.Item>
+          <Descriptions.Item label="非线性处理方式">{capability.nonlinearHandling}</Descriptions.Item>
           <Descriptions.Item label="是否可在线调试">{capability.onlineDebug ? '是' : '否'}</Descriptions.Item>
-          <Descriptions.Item label="演示标签">{capability.tags.map(tag => <Tag key={tag}>{tag}</Tag>)}</Descriptions.Item>
+          <Descriptions.Item label="模型标签">{capability.tags.length ? capability.tags.map(tag => <Tag key={tag}>{tag}</Tag>) : '-'}</Descriptions.Item>
         </Descriptions>
       </Card>
-      <Card size="small" title="演示说明">
+      <Card size="small" title="模型说明">
         <SmallTable
           rows={capability.demoNotes.map(item => ({ ...item }))}
           columns={[
             { title: '项目', dataIndex: 'label' },
             { title: '说明', dataIndex: 'value' },
           ]}
-          empty="暂无演示说明"
+          empty="暂无模型说明"
         />
       </Card>
-      <Card size="small" title="关键能力">
-        <Space wrap>{capability.keyCapabilities.map(item => <Tag color="blue" key={item}>{item}</Tag>)}</Space>
-      </Card>
+      {capability.keyCapabilities.length > 0 && (
+        <Card size="small" title="已装配能力">
+          <Space wrap>{capability.keyCapabilities.map(item => <Tag color="blue" key={item}>{item}</Tag>)}</Space>
+        </Card>
+      )}
       <Alert showIcon type={capability.problemType === 'NLP' ? 'warning' : 'info'} title="能力边界" description={capability.risk} />
     </Space>
   );

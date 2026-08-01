@@ -1,6 +1,6 @@
-negative_examples: ["仅咨询模型原理"]
-do_not_invoke_examples: ["只咨询业务知识，不运行优化"]
-positive_examples: ["明天储能怎么充放电最划算", "按这个分时电价帮我算储能策略", "储能容量100MWh功率50MW帮我调度"]
+positive_examples: ["请生成明天储能充放电计划", "按分时电价运行储能套利优化", "给定容量和功率上限制定储能调度方案", "在末端SOC约束下优化今日电池运行", "用这组电价曲线求储能最优策略", "安排储能在低谷充电高峰放电", "计算未来二十四小时储能计划", "在需量限制下生成储能削峰方案", "考虑充放电效率执行储能调度", "根据负荷预测和电价生成电池运行建议", "把储能放电集中在晚高峰并求解", "检查这些参数后运行储能优化"]
+negative_examples: ["生成光储日前联合计划", "根据最新预测做光储日内滚动", "控制中长期合约现货敞口", "生成售电公司日前申报曲线", "只优化火电机组组合", "安排梯级水电站调度", "计算光伏容量规划", "分析综合能源冷热电调度"]
+do_not_invoke_examples: ["储能调度是什么", "介绍峰谷套利原理", "储能一般怎么赚钱", "解释SOC的含义", "比较锂电池和液流电池", "给我储能业务知识不要运行模型", "为什么要设置末端SOC", "有哪些储能安全规范"]
 schema_version: "2.0"
 state: enabled
 business_domain:
@@ -8,7 +8,8 @@ business_domain:
   secondary: ["optimization"]
 model_family: optimization
 supported_intents: ["optimization_run", "parameter_check", "result_explanation"]
-business_goals: ["optimize"]
+business_goals: ["降低购电成本", "削峰填谷", "保持SOC安全边界", "形成可人工复核的充放电计划"]
+required_data: [{"name": "electricity_price", "label": "分时电价", "ask_when_missing": "请提供覆盖调度周期的分时电价序列。", "required": true}, {"name": "storage_capacity", "label": "储能容量", "ask_when_missing": "请提供储能额定容量及设备标识。", "required": true}, {"name": "charge_power_max", "label": "最大充电功率", "ask_when_missing": "请提供最大充电功率。", "required": true}, {"name": "discharge_power_max", "label": "最大放电功率", "ask_when_missing": "请提供最大放电功率。", "required": true}]
 explanation_profile: storage_dispatch
 parameter_policy: {"allow_defaults": true, "require_default_confirmation": true, "allow_sample_data": true, "sample_data_must_be_confirmed": true}
 intent_policy: {"router_mode": "llm_plus_rules", "confidence_threshold": 0.75, "clarify_threshold": 0.6, "clarify_when_top_scores_close": true, "top_score_margin_threshold": 0.15}
@@ -40,6 +41,6 @@ optional_parameters:
   - discharge_efficiency
   - initial_soc
 confirmation_required: {"default_values": true, "before_invoke": true}
-execution_policy: {"mode": "advisory_only", "allow_auto_invoke": false}
+execution_policy: {"advisory_only": true, "requires_human_review": true, "requires_invoke_confirmation": true}
 result_explanation: {"template": "prompts/result_explanation.md"}
 error_handling: {"template": "prompts/error_handling.md"}

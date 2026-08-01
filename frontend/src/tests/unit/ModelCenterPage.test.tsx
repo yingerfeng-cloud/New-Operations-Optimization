@@ -28,6 +28,8 @@ const testState = vi.hoisted(() => {
     updated_at: '2026-06-23 12:00:00',
     published_at: '2026-06-23 12:10:00',
     tested_at: '2026-06-23 12:20:00',
+    content_hash: 'content-v1',
+    tested_content_hash: 'content-v1',
     semantic_spec: {
       sets: [{ code: 'time', name: '时段' }],
       parameters: [{ code: 'load', name: '负荷', dimension: ['time'], unit: 'MW' }],
@@ -81,9 +83,10 @@ const testState = vi.hoisted(() => {
       recent_tasks: [{ task_id: 'task_001', status: 'completed', duration_seconds: 2 }],
     },
     publishModel: vi.fn(async (id: string) => ({ ...modelSample, id, status: 'published' })),
-    testModel: vi.fn(async (id: string) => ({ ...modelSample, id, status: 'tested' })),
+    testModel: vi.fn(async (id: string) => ({ ...modelSample, id, status: 'trial' })),
     copyModel: vi.fn(async (id: string) => ({ ...modelSample, id: `${id}_copy`, name: '日前调度模型 副本' })),
     offlineModel: vi.fn(async (id: string) => ({ ...modelSample, id, status: 'offline' })),
+    returnModelToDraft: vi.fn(async (id: string) => ({ ...modelSample, id, status: 'developing', tested_at: undefined, tested_content_hash: undefined })),
     getModel: vi.fn(async (id: string) => ({ ...modelSample, id, name: id === 'model_002' ? '模型 B' : modelSample.name })),
     getModelAssetDetail: vi.fn(async (id: string): Promise<any> => ({ ...modelSample, id })),
   };
@@ -97,6 +100,7 @@ vi.mock('../../api/models', () => ({
   testModel: testState.testModel,
   copyModel: testState.copyModel,
   offlineModel: testState.offlineModel,
+  returnModelToDraft: testState.returnModelToDraft,
 }));
 
 vi.mock('../../api/templates', () => ({
@@ -121,6 +125,14 @@ function renderPage() {
 beforeEach(() => {
   navigate.mockReset();
   testState.routeId = 'model_001';
+  testState.modelSample.status = 'published';
+  testState.modelSample.published_at = '2026-06-23 12:10:00';
+  testState.modelSample.content_hash = 'content-v1';
+  testState.modelSample.tested_content_hash = 'content-v1';
+  testState.publishModel.mockClear();
+  testState.testModel.mockClear();
+  testState.offlineModel.mockClear();
+  testState.returnModelToDraft.mockClear();
   testState.getModel.mockClear();
   testState.getModelAssetDetail.mockClear();
   testState.getModelAssetDetail.mockImplementation(async (id: string) => ({
@@ -133,12 +145,13 @@ test('renders model center metrics and basic asset detail', async () => {
   renderPage();
   expect(screen.getByText('模型资产中心')).toBeInTheDocument();
   expect((await screen.findAllByText('日前调度模型')).length).toBeGreaterThan(0);
-  expect(screen.getByText('可调用模型')).toBeInTheDocument();
-  expect(screen.getByText(/组件化\s*0\s*\/\s*通用线性\s*1/)).toBeInTheDocument();
+  expect(screen.getAllByText('正式服务').length).toBeGreaterThan(0);
+  expect(screen.getByText('试运行验收')).toBeInTheDocument();
+  expect(screen.getByText('已发布，可被 API / Skill 调用')).toBeInTheDocument();
 
   fireEvent.click(screen.getByRole('button', { name: '查看' }));
 
-  await waitFor(() => expect(screen.getByText('模型服务接口')).toBeInTheDocument());
+  await waitFor(() => expect(screen.getByText('正式模型服务')).toBeInTheDocument());
   expect(screen.getByText('run_day_ahead_dispatch')).toBeInTheDocument();
 }, 30000);
 
@@ -211,17 +224,53 @@ test('runs model asset operations from list', async () => {
   expect((await screen.findAllByText('日前调度模型')).length).toBeGreaterThan(0);
 
   fireEvent.click(screen.getByRole('button', { name: /更多/ }));
-  fireEvent.click((await screen.findAllByText('测试运行')).at(-1) as HTMLElement);
+  expect(screen.getByText('创建新版本并修改')).toBeInTheDocument();
+  expect(screen.getByText('复制为独立模型')).toBeInTheDocument();
+  fireEvent.click((await screen.findAllByText('验证运行（状态不变）')).at(-1) as HTMLElement);
   await waitFor(() => expect(testState.testModel).toHaveBeenCalledWith('model_001', { parameters: { load: [10, 12] } }));
 
   fireEvent.click(screen.getByRole('button', { name: /更多/ }));
   fireEvent.click((await screen.findAllByText('下线模型')).at(-1) as HTMLElement);
+  fireEvent.click(await screen.findByRole('button', { name: '下线模型' }));
   await waitFor(() => expect(testState.offlineModel.mock.calls[0]?.[0]).toBe('model_001'));
 
   fireEvent.click(screen.getByRole('button', { name: /更多/ }));
-  fireEvent.click((await screen.findAllByText('复制模型')).at(-1) as HTMLElement);
+  fireEvent.click((await screen.findAllByText('复制为独立模型')).at(-1) as HTMLElement);
   expect(navigate).toHaveBeenCalledWith('/models/create?mode=clone&source=model_001');
 }, 60000);
+
+test('promotes an unchanged trial baseline without repeating the solver test', async () => {
+  testState.routeId = undefined;
+  testState.modelSample.status = 'trial';
+  testState.modelSample.published_at = undefined;
+  renderPage();
+  expect((await screen.findAllByText('日前调度模型')).length).toBeGreaterThan(0);
+
+  fireEvent.click(screen.getByRole('button', { name: /更多/ }));
+  expect(await screen.findByText('当前状态：试运行')).toBeInTheDocument();
+  expect(screen.getByText('退回草稿并修改')).toBeInTheDocument();
+  expect(screen.queryByText('下线模型')).not.toBeInTheDocument();
+  fireEvent.click(screen.getByText('正式发布'));
+  fireEvent.click(await screen.findByRole('button', { name: '正式发布' }));
+
+  await waitFor(() => expect(testState.publishModel.mock.calls[0]?.[0]).toBe('model_001'));
+  expect(testState.testModel).not.toHaveBeenCalled();
+}, 30000);
+
+test('returns an unpublished trial to draft before opening the editor', async () => {
+  testState.routeId = undefined;
+  testState.modelSample.status = 'trial';
+  testState.modelSample.published_at = undefined;
+  renderPage();
+  expect((await screen.findAllByText('日前调度模型')).length).toBeGreaterThan(0);
+
+  fireEvent.click(screen.getByRole('button', { name: /更多/ }));
+  fireEvent.click(screen.getByText('退回草稿并修改'));
+  fireEvent.click(await screen.findByRole('button', { name: '退回草稿' }));
+
+  await waitFor(() => expect(testState.returnModelToDraft.mock.calls[0]?.[0]).toBe('model_001'));
+  expect(navigate).toHaveBeenCalledWith('/models/model_001/edit');
+}, 30000);
 
 test('model detail follows route id changes and close returns to models', async () => {
   const view = renderPage();

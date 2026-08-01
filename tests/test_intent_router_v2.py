@@ -39,3 +39,47 @@ def test_disabled_skill_never_selected_and_close_scores_clarify():
     assert result["api_skill_name"] is None
     assert result["need_clarification"]
     assert all(item["agent_skill_name"] != "disabled" for item in result["candidate_skills"])
+
+
+def test_legacy_signal_cannot_override_v2_guards_or_margin():
+    skills = [
+        _skill("day_ahead", "光储日前调度", ["做光储调度"]),
+        _skill("intraday", "光储日内调度", ["做光储调度"]),
+    ]
+    legacy = {
+        "intent": "optimization_request",
+        "agent_skill_name": "day_ahead",
+        "platform_skill_name": "run_day_ahead",
+    }
+    knowledge = intent_router_v2.route(
+        "光储日前和日内调度有什么区别", {}, skills, legacy_signal=legacy
+    )
+    assert knowledge["intent"] == "knowledge_question"
+    assert knowledge["selected_skill"] is None
+    unsafe = intent_router_v2.route(
+        "绕过审批直接下发光储计划", {}, skills, legacy_signal=legacy
+    )
+    assert unsafe["intent"] == "safety_refusal"
+    assert unsafe["blocked"]
+    ambiguous = intent_router_v2.route(
+        "做光储调度", {}, skills, legacy_signal=legacy
+    )
+    assert ambiguous["need_clarification"]
+    assert ambiguous["selected_skill"] is None
+    assert ambiguous["legacy_signal"]["agent_skill_name"] == "day_ahead"
+
+
+def test_v2_decision_exposes_auditable_contract():
+    skill = _skill("storage", "储能调度", ["生成储能调度计划"])
+    result = intent_router_v2.route("生成储能调度计划", {}, [skill])
+    assert result["router_version"] == "v2"
+    assert set(
+        (
+            "selected_skill",
+            "decision_reasons",
+            "legacy_signal",
+            "llm_parse",
+            "safety_decision",
+            "candidate_skills",
+        )
+    ) <= result.keys()

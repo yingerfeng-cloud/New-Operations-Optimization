@@ -15,6 +15,7 @@ export interface FormulaSymbols {
 }
 
 const aggregateNames = new Set(['sum', 'min', 'max']);
+const functionNames = new Set(['abs', 'piecewise', 'log', 'exp', 'sqrt']);
 const keywords = new Set(['for', 'in']);
 
 function findTopLevelRelation(dsl: string) {
@@ -43,6 +44,18 @@ function parseAggregate(text: string, symbols: FormulaSymbols): FormulaToken[] |
   }];
 }
 
+function findClosingParenthesis(text: string, openIndex: number) {
+  let depth = 0;
+  for (let index = openIndex; index < text.length; index += 1) {
+    if (text[index] === '(') depth += 1;
+    else if (text[index] === ')') {
+      depth -= 1;
+      if (depth === 0) return index;
+    }
+  }
+  return -1;
+}
+
 export function parseFormulaDsl(input: string, symbols: FormulaSymbols = {}): FormulaToken[] {
   const text = input.trim();
   if (!text) return [];
@@ -59,24 +72,55 @@ export function parseFormulaDsl(input: string, symbols: FormulaSymbols = {}): Fo
   const aggregate = parseAggregate(text, symbols);
   if (aggregate) return aggregate;
 
-  const pattern = /(>=|<=|==|!=|[+\-*/=()])|([A-Za-z_]\w*)(?:\[([^\]]+)\])?|(\d+(?:\.\d+)?)/g;
   const out: FormulaToken[] = [];
-  let match: RegExpExecArray | null;
-  while ((match = pattern.exec(text))) {
-    if (match[1]) {
-      if (!['(', ')'].includes(match[1])) out.push({ type: 'operator', code: match[1], label: match[1] });
+  let cursor = 0;
+  while (cursor < text.length) {
+    const rest = text.slice(cursor);
+    const operator = /^(>=|<=|==|!=|[+\-*/=,])/.exec(rest)?.[1];
+    if (operator) {
+      out.push({ type: 'operator', code: operator, label: operator });
+      cursor += operator.length;
       continue;
     }
-    if (match[4]) {
-      out.push({ type: 'number', value: Number(match[4]) });
+    const number = /^\d+(?:\.\d+)?/.exec(rest)?.[0];
+    if (number) {
+      out.push({ type: 'number', value: Number(number) });
+      cursor += number.length;
       continue;
     }
 
-    const code = match[2];
-    const nextChar = text[pattern.lastIndex];
-    if (keywords.has(code) || (aggregateNames.has(code) && nextChar === '(')) continue;
+    const identifier = /^([A-Za-z_]\w*)(?:\[([^\]]+)\])?/.exec(rest);
+    if (!identifier) {
+      cursor += 1;
+      continue;
+    }
+    const code = identifier[1];
+    const indicesText = identifier[2];
+    const afterIdentifier = cursor + identifier[0].length;
+    if (!indicesText && text[afterIdentifier] === '(' && (aggregateNames.has(code) || functionNames.has(code))) {
+      const closeIndex = findClosingParenthesis(text, afterIdentifier);
+      if (closeIndex !== -1) {
+        const callText = text.slice(cursor, closeIndex + 1);
+        const nestedAggregate = aggregateNames.has(code) ? parseAggregate(callText, symbols) : undefined;
+        if (nestedAggregate) {
+          out.push(...nestedAggregate);
+        } else if (functionNames.has(code)) {
+          out.push({
+            type: 'function',
+            fn: code as 'abs' | 'piecewise' | 'log' | 'exp' | 'sqrt',
+            bodyTokens: parseFormulaDsl(text.slice(afterIdentifier + 1, closeIndex), symbols),
+          });
+        } else {
+          out.push(...parseFormulaDsl(text.slice(afterIdentifier + 1, closeIndex), symbols));
+        }
+        cursor = closeIndex + 1;
+        continue;
+      }
+    }
+    cursor = afterIdentifier;
+    if (keywords.has(code)) continue;
 
-    const aliases = match[3]?.split(',').map(item => item.trim()).filter(Boolean);
+    const aliases = indicesText?.split(',').map(item => item.trim()).filter(Boolean);
     let kind: SymbolKind = aliases?.length ? 'variable' : 'parameter';
     let def = symbols.parameters?.[code];
     if (symbols.variables?.[code]) {

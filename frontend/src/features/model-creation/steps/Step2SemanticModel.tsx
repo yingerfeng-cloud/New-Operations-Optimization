@@ -4,6 +4,7 @@ import { useState } from 'react';
 import type { ModelDraft } from '../stores/modelCreationStore';
 import { SemanticOverviewCard } from '../components/SemanticOverviewCard';
 import { ComponentDependencyCard, type BindingTarget } from '../components/ComponentDependencyCard';
+import { ComponentPickerDrawer } from '../components/ComponentPickerDrawer';
 import { ParameterBindingDrawer } from '../components/ParameterBindingDrawer';
 import { TimeDimensionConfigCard } from '../components/TimeDimensionConfigCard';
 
@@ -74,6 +75,7 @@ function stableRowKey(row: { code?: string; name?: string }) {
 export function Step2SemanticModel({ draft, onChange }: { draft: ModelDraft; onChange: (d: ModelDraft) => void }) {
   const [editing, setEditing] = useState<{ kind: SemanticKind; index?: number; row: SemanticRow }>();
   const [bindingTarget, setBindingTarget] = useState<BindingTarget>();
+  const [componentPickerOpen, setComponentPickerOpen] = useState(false);
   const [form] = Form.useForm<Record<string, unknown>>();
 
   const setRows = <K extends SemanticKind>(kind: K, rows: ModelDraft['semantic'][K]) => {
@@ -272,7 +274,19 @@ export function Step2SemanticModel({ draft, onChange }: { draft: ModelDraft; onC
           onEditParameter={index => openEdit('parameters', draft.semantic.parameters[index], index)}
           onEditVariable={index => openEdit('variables', draft.semantic.variables[index], index)}
         />
-        <div data-section-key="dependencies"><ComponentDependencyCard draft={draft} onEditBinding={setBindingTarget} /></div>
+        <div data-section-key="dependencies">
+          <ComponentDependencyCard
+            draft={draft}
+            onEditBinding={setBindingTarget}
+            onSelectComponents={draft.basic_info.builder_mode === 'component_based' ? () => setComponentPickerOpen(true) : undefined}
+            onRemoveComponent={draft.basic_info.builder_mode === 'component_based'
+              ? (index, dependentIndices) => {
+                const removed = new Set([index, ...dependentIndices]);
+                onChange({ ...draft, components: draft.components.filter((_, componentIndex) => !removed.has(componentIndex)) });
+              }
+              : undefined}
+          />
+        </div>
       </div>
       <div data-section-key="time"><TimeDimensionConfigCard draft={draft} onChange={onChange} /></div>
       <Collapse
@@ -293,6 +307,17 @@ export function Step2SemanticModel({ draft, onChange }: { draft: ModelDraft; onC
         }]}
       />
       {renderComponentPanel()}
+      {componentPickerOpen && (
+        <ComponentPickerDrawer
+          open
+          selectedComponents={draft.components}
+          onClose={() => setComponentPickerOpen(false)}
+          onConfirm={components => {
+            onChange({ ...draft, components });
+            setComponentPickerOpen(false);
+          }}
+        />
+      )}
       <ParameterBindingDrawer
         draft={draft}
         target={bindingTarget}

@@ -1,7 +1,9 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { vi } from 'vitest';
 import { ComponentLibraryPage } from '../../pages/ComponentLibrary/ComponentLibraryPage';
+import { ComponentEditor, formulaFromRow, normalizeComponentForEditor } from '../../features/component-library/ComponentEditor';
 import { ComponentBusinessView, ComponentMathDefinition } from '../../features/component-library/ComponentSchemaTables';
 import { ComponentDependencyPanel } from '../../features/component-library/ComponentDependencyPanel';
 import { ParameterBindingPanel } from '../../features/component-library/ParameterBindingPanel';
@@ -60,6 +62,90 @@ test('renders component library list and structured detail drawer', async () => 
   expect(screen.getByText('储能状态递推与边界约束')).toBeInTheDocument();
 }, 30000);
 
+test('direct edit waits for detail and hydrates every formula section', async () => {
+  renderPage();
+  await screen.findByText('储能 SOC 约束');
+
+  fireEvent.click(screen.getByRole('button', { name: '编辑' }));
+  await screen.findByText('组件编辑器');
+  fireEvent.click(await screen.findByRole('button', { name: '约束公式' }));
+  expect(await screen.findByText('SOC 递推')).toBeInTheDocument();
+
+  fireEvent.click(screen.getByRole('button', { name: '目标项' }));
+  expect(await screen.findByText('储能成本')).toBeInTheDocument();
+}, 60000);
+
+test('legacy formula fields are normalized for editing and synchronized on save', async () => {
+  const onSave = vi.fn();
+  const legacyComponent: ComponentDef = {
+    ...componentSample,
+    component_id: 'legacy_component',
+    depends_on: [],
+    generated_constraints: [],
+    generated_objective_terms: [],
+    constraints: [{ constraint_id: 'legacy_limit', name: '旧版出力上限', expression: 'soc[t] <= soc_max[t]' }],
+    objective_terms: [{ term_id: 'legacy_cost', name: '旧版成本', expression: 'sum(cost[t] for t in time)' }],
+  };
+  const normalized = normalizeComponentForEditor(legacyComponent);
+  expect(normalized?.generated_constraints).toHaveLength(1);
+  expect(normalized?.generated_objective_terms).toHaveLength(1);
+
+  const { container } = render(<ComponentEditor component={legacyComponent} availableComponents={[legacyComponent]} onSave={onSave} />);
+  fireEvent.click(screen.getByRole('button', { name: '约束公式' }));
+  expect(await screen.findByText('旧版出力上限')).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: '目标项' }));
+  expect(await screen.findByText('旧版成本')).toBeInTheDocument();
+  expect(screen.getByText('sum(cost[t] for t in time)')).toBeInTheDocument();
+
+  fireEvent.submit(container.querySelector('#component-editor-form')!);
+  await waitFor(() => expect(onSave).toHaveBeenCalled());
+  const payload = onSave.mock.calls[0][0];
+  expect(payload.constraints).toEqual(payload.generated_constraints);
+  expect(payload.objective_terms).toEqual(payload.generated_objective_terms);
+});
+
+test('objective rows retain direction, weight, priority and participation metadata', () => {
+  const formula = formulaFromRow({
+    term_id: 'revenue',
+    name: '收益',
+    expression: 'sum(revenue[t] for t in time)',
+    objective_direction: 'maximize',
+    weight: 2,
+    priority: 3,
+    solve_participation: 'preview_only',
+  }, 'objective');
+
+  expect(formula).toMatchObject({
+    formula_id: 'revenue',
+    dsl_formula: 'sum(revenue[t] for t in time)',
+    objective_direction: 'maximize',
+    weight: 2,
+    priority: 3,
+    solve_participation: 'preview_only',
+  });
+});
+
+test('confirming deletion removes the selected formula from the component draft', async () => {
+  const user = userEvent.setup();
+  render(<ComponentEditor component={componentSample} availableComponents={[componentSample]} onSave={vi.fn()} />);
+  await user.click(screen.getByRole('button', { name: '约束公式' }));
+  const formulaRow = (await screen.findByText('SOC 递推')).closest('tr');
+  expect(formulaRow).not.toBeNull();
+  await user.click(within(formulaRow!).getByRole('button', { name: '编辑' }));
+
+  const formulaDialog = await screen.findByRole('dialog', { name: '公式编辑器' });
+  const deleteButton = within(formulaDialog).getByRole('button', { name: '删除公式' });
+  expect(deleteButton).toBeEnabled();
+  await user.click(deleteButton);
+  const confirmTitle = await screen.findByText('确认删除这条公式？');
+  const confirmDialog = confirmTitle.closest<HTMLDivElement>('.ant-modal');
+  expect(confirmDialog).not.toBeNull();
+  await user.click(within(confirmDialog!).getByRole('button', { name: '删除公式' }));
+
+  await waitFor(() => expect(screen.queryByRole('dialog', { name: '公式编辑器' })).not.toBeInTheDocument());
+  expect(screen.queryByText('SOC 递推', { exact: true })).not.toBeInTheDocument();
+});
+
 test('renders component schema, math, binding and dependency panels', () => {
   render(<ComponentBusinessView component={componentSample} />);
   expect(screen.getByText('required_sets')).toBeInTheDocument();
@@ -74,7 +160,13 @@ test('renders component schema, math, binding and dependency panels', () => {
   expect(screen.getByText('soc0')).toBeInTheDocument();
   expect(screen.getByText('bound')).toBeInTheDocument();
 
-  render(<ComponentDependencyPanel component={componentSample} available={['storage_soc', 'power_balance']} />);
+  render(<ComponentDependencyPanel
+    component={componentSample}
+    available={[
+      componentSample,
+      { component_id: 'power_balance', name: '功率平衡', status: 'published', enabled: true, implemented: true, version: '1' },
+    ]}
+  />);
   expect(screen.getAllByText('missing_component').length).toBeGreaterThan(0);
-  expect(screen.getByText('缺失')).toBeInTheDocument();
+  expect(screen.getByText('异常')).toBeInTheDocument();
 }, 30000);

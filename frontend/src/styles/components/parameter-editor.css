@@ -3,7 +3,75 @@
 .parameter-editor-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin: 8px 0; color: #667085; font-size: 12px; }
 .parameter-scale-note { color: #175cd3; }
 .parameter-scale-note.warning { color: #b54708; }
-.time-series-preview { border-radius: 8px; background: #f8fafc; }
+.time-series-preview {
+  overflow: hidden;
+  padding: 10px 12px 8px;
+  border: 1px solid #e3eaf3;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+.time-series-preview-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #e8eef5;
+}
+.time-series-preview-header > strong {
+  min-width: 0;
+  color: #17233d;
+  font-size: 14px;
+  line-height: 20px;
+}
+.time-series-preview-metrics {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.time-series-preview-metric {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 5px;
+  padding: 3px 8px;
+  border: 1px solid #e1e8f0;
+  border-radius: 6px;
+  background: #fff;
+  white-space: nowrap;
+}
+.time-series-preview-metric > span {
+  color: #7a8699;
+  font-size: 11px;
+  line-height: 18px;
+}
+.time-series-preview-metric > b {
+  color: #24324a;
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+  line-height: 18px;
+}
+.time-series-preview-notice.ant-alert {
+  margin-top: 8px;
+  padding: 5px 8px;
+}
+.time-series-preview-notice .ant-alert-message {
+  font-size: 12px;
+  line-height: 18px;
+}
+.time-series-preview > small {
+  display: block;
+  padding: 0 4px 2px;
+  color: #7a8699;
+  font-size: 11px;
+  line-height: 17px;
+}
+@media (max-width: 720px) {
+  .time-series-preview-header { align-items: flex-start; flex-direction: column; gap: 6px; }
+  .time-series-preview-metrics { justify-content: flex-start; }
+}
 .fullscreen-matrix-modal .ant-modal-content,
 .focus-editor-modal .ant-modal-content { height: calc(100vh - 32px); display: flex; flex-direction: column; }
 .fullscreen-matrix-modal .ant-modal-body,
@@ -12,4 +80,3 @@
 .fullscreen-editor-header > div:first-child { display: flex; flex-direction: column; gap: 3px; }
 .fullscreen-editor-header span { color: #667085; font-size: 12px; }
 .matrix-cell-missing { padding: 2px; border-left: 3px solid #d92d20; background: #fff1f0; }
-

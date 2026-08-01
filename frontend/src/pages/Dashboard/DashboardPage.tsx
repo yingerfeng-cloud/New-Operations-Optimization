@@ -17,7 +17,7 @@ import type { ScenarioCatalogItem } from '../../types/scenario';
 import type { SolveTask } from '../../types/task';
 import { formatDurationSeconds } from '../../utils/formatDuration';
 
-const callable = new Set(['PUBLISHED', 'TRIAL', 'TESTED', 'ACTIVE', 'ONLINE', 'READY']);
+const callable = new Set(['PUBLISHED', 'ACTIVE', 'ONLINE', 'READY']);
 const timestamp = (task: SolveTask) => Date.parse(String(task.created_at || '')) || 0;
 const failureReason = (task: SolveTask) => typeof task.error === 'string' ? task.error : String((task.error as Record<string, unknown> | undefined)?.message || task.risk || '-');
 

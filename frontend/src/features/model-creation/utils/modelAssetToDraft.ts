@@ -265,6 +265,7 @@ export function modelAssetToDraft(asset: ModelAsset): ModelDraft {
     advanced: {
       ...base.advanced,
       ...savedAdvanced,
+      description: String(savedAdvanced.description || objectValue(asset.ui_metadata).description || semanticSpec.description || ''),
       ui_metadata: { ...objectValue(asset.ui_metadata), ...objectValue(savedAdvanced.ui_metadata) },
       generic_spec: hasKeys(genericSpec) ? genericSpec : hasKeys(savedGenericSpec) ? savedGenericSpec : undefined,
       component_spec: hasKeys(componentSpec) ? componentSpec : hasKeys(savedComponentSpec) ? savedComponentSpec : undefined,

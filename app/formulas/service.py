@@ -15,6 +15,8 @@ MAX_AGGREGATE_DEPTH = 4
 MAX_EXPANDED_CONSTRAINTS = 100_000
 MAX_EXPANDED_TERMS = 1_000_000
 ALLOWED_FUNCTIONS = {"sum", "min", "max", "abs", "piecewise", "log", "exp", "sqrt"}
+BOUNDARY_STRATEGIES = {"strict", "skip_first", "skip_last", "skip_out_of_range", "explicit_subset"}
+BOUNDARY_STRATEGY_ALIASES = {"normal": "strict", "use_initial_value": "skip_first", "use_terminal_value": "skip_last"}
 RELATION_NAMES = {ast.LtE: "<=", ast.GtE: ">=", ast.Eq: "==", ast.Lt: "<", ast.Gt: ">"}
 ARITHMETIC_NAMES = {ast.Add: "+", ast.Sub: "-", ast.Mult: "*", ast.Div: "/", ast.Pow: "**"}
 
@@ -98,6 +100,9 @@ class FormulaAnalyzer:
         self.scope = [{"alias": row.alias, "set": row.set} for row in request.scope]
         self.aliases = {row["alias"]: row["set"] for row in self.scope}
         self.references: list[dict[str, Any]] = []
+        raw_boundary = str(request.model_context.get("boundary_strategy") or "strict").strip().lower()
+        self.boundary_strategy = BOUNDARY_STRATEGY_ALIASES.get(raw_boundary, raw_boundary)
+        self.boundary_records: list[dict[str, Any]] = []
 
     def run(self, *, compile_requested: bool, expand_requested: bool = False) -> dict[str, Any]:
         if self.request.ast_version != AST_VERSION:
@@ -111,6 +116,15 @@ class FormulaAnalyzer:
                 fix_hint="将 ast_version 更新为服务端声明的版本。",
             )
             return self._result(None, None, "unsupported", compile_requested)
+        if self.boundary_strategy not in BOUNDARY_STRATEGIES:
+            self._diagnostic(
+                "FORMULA_BOUNDARY_STRATEGY_UNSUPPORTED",
+                "error",
+                "dimension",
+                f"不支持边界策略 {self.boundary_strategy}。",
+                expected=sorted(BOUNDARY_STRATEGIES),
+                actual=self.boundary_strategy,
+            )
         self._validate_scope_contract()
         try:
             tree = ast.parse(self.source, mode="eval")
@@ -369,28 +383,46 @@ class FormulaAnalyzer:
                         fix_hint="在模型语义中提供 time_set 与 state_time_set 的完整成员后重新编译。",
                     )
                 else:
-                    first_invalid: Any | None = None
                     legal: list[Any] = []
+                    invalid: list[Any] = []
                     for value in source_values:
                         try:
                             position = target_values.index(value) + offset
                         except ValueError:
-                            first_invalid = value
-                            break
+                            invalid.append(value)
+                            continue
                         if position < 0 or position >= len(target_values):
-                            first_invalid = value
-                            break
-                        legal.append(value)
-                    if first_invalid is not None:
+                            invalid.append(value)
+                        else:
+                            legal.append(value)
+                    record = {
+                        "boundary_strategy": self.boundary_strategy,
+                        "source_set": set_code,
+                        "target_set": resolved_target,
+                        "offset": offset,
+                        "effective_scope": legal,
+                        "excluded_boundary_count": len(invalid),
+                    }
+                    self.boundary_records.append(record)
+                    invalid_is_prefix = invalid == source_values[: len(invalid)]
+                    invalid_is_suffix = invalid == source_values[len(source_values) - len(invalid) :] if invalid else True
+                    boundary_allowed = (
+                        not invalid
+                        or self.boundary_strategy == "skip_out_of_range"
+                        or (self.boundary_strategy == "skip_first" and offset < 0 and invalid_is_prefix)
+                        or (self.boundary_strategy == "skip_last" and offset > 0 and invalid_is_suffix)
+                    )
+                    if not boundary_allowed:
+                        first_invalid = invalid[0]
                         self._diagnostic(
                             "FORMULA_INDEX_OFFSET_OUT_OF_RANGE",
                             "error",
                             "dimension",
                             f"偏移 {offset:+d} 在作用域 {set_code} 中越界，首个无效索引为 {first_invalid}。",
                             node=node,
-                            actual={"offset": offset, "source_set": set_code, "target_set": resolved_target, "first_out_of_range": first_invalid},
+                            actual={"offset": offset, "source_set": set_code, "target_set": resolved_target, "first_out_of_range": first_invalid, "boundary_strategy": self.boundary_strategy},
                             expected={"legal_scope_values": legal},
-                            fix_hint="显式定义只包含合法时点的子集，或修正偏移和状态时间集合。",
+                            fix_hint="修正偏移/时间集合，或显式选择与越界方向一致的边界策略。",
                         )
             return
         self._diagnostic("FORMULA_INDEX_EXPRESSION_UNSUPPORTED", "error", "dimension", "索引只允许别名、常量或时间偏移 t±n。", node=node)
@@ -480,6 +512,7 @@ class FormulaAnalyzer:
         return "linear" if max_degree == 1 else "constant"
 
     def _compile(self, node: ast.AST) -> dict[str, Any]:
+        boundary = self._boundary_payload()
         if self.request.formula_type == "constraint":
             if not isinstance(node, ast.Compare):
                 raise FormulaFailure("FORMULA_RELATION_REQUIRED", "约束缺少关系运算符。", node)
@@ -503,9 +536,10 @@ class FormulaAnalyzer:
                         "rhs": 0.0,
                         "rhs_terms": [self._scalar_payload(term) for term in rhs_scalars if term.numeric or term.factors],
                         "compile_status": "compile_valid",
+                        **boundary,
                     }
                 )
-            return {"ast_version": AST_VERSION, "type": "constraint", "constraints": rows}
+            return {"ast_version": AST_VERSION, "type": "constraint", "constraints": rows, **boundary}
         expression = self._linear(node, dict(self.aliases))
         if expression.scalars:
             raise FormulaFailure("FORMULA_OBJECTIVE_SCALAR_TERM_UNSUPPORTED", "目标函数包含纯参数或常数项；请显式确认其结果解释语义。", node)
@@ -519,7 +553,23 @@ class FormulaAnalyzer:
             "scope": list(self.scope),
             "terms": [self._term_payload(term) for term in expression.terms],
             "compile_status": "compile_valid",
+            **boundary,
         }
+
+    def _boundary_payload(self) -> dict[str, Any]:
+        records = _dedupe_dicts(self.boundary_records)
+        payload: dict[str, Any] = {
+            "boundary_strategy": self.boundary_strategy,
+            "index_offsets": records,
+            "excluded_boundary_count": sum(int(item.get("excluded_boundary_count") or 0) for item in records),
+        }
+        if len(records) == 1:
+            payload.update(records[0])
+        elif records:
+            payload["effective_scope"] = [item.get("effective_scope") for item in records]
+        else:
+            payload["effective_scope"] = [dict(item) for item in self.scope]
+        return payload
 
     def _linear(self, node: ast.AST, aliases: dict[str, str]) -> LinearExpression:
         if isinstance(node, ast.Constant) and isinstance(node.value, (int, float)) and not isinstance(node.value, bool):

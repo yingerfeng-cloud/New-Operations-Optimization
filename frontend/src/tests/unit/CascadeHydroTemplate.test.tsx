@@ -204,6 +204,8 @@ test('结果中心展示水电结果解释视图', () => {
   expect(screen.getByText('弃水曲线')).toBeInTheDocument();
   expect(screen.getByText('水量平衡校验表')).toBeInTheDocument();
   expect(screen.getByText('函数资产插值解释')).toBeInTheDocument();
-  expect(screen.getByText('发电流量 q_gen')).toBeInTheDocument();
+  // Ant Design renders a hidden measurement header when horizontal scrolling
+  // is enabled, so assert presence without assuming a single DOM copy.
+  expect(screen.getAllByText('发电流量 q_gen').length).toBeGreaterThan(0);
   expect(screen.getAllByText(/cascade_hydro_power_surface_v1/).length).toBeGreaterThan(0);
 });

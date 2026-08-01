@@ -199,7 +199,6 @@ def reset_runtime_store(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     )
     registry_keys = (
         "COMPONENT_REGISTRY",
-        "COMPONENT_DEPENDENCIES",
         "COMPONENT_OUTPUTS",
         "COMPONENT_CONSTRAINT_TYPES",
         "COMPONENT_INDICES",

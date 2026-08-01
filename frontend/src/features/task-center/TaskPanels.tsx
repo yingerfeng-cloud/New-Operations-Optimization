@@ -174,7 +174,7 @@ export function TaskResultPanel({ result, labelMap }: { result?: SolveResult; la
 
 export function TaskExplanationPanel({ task, result }: { task?: SolveTask; result?: SolveResult }) {
   const taskError = task?.error && typeof task.error === 'object' ? (task.error as Record<string, unknown>).message : undefined;
-  const explanation = result?.business_explanation || result?.explanation || task?.business_explanation || task?.explanation || task?.structured_diagnostic || task?.diagnostics || taskError;
+  const explanation = result?.explanation_structured || result?.business_explanation || result?.explanation || task?.explanation_structured || task?.business_explanation || task?.explanation || task?.structured_diagnostic || task?.diagnostics || taskError;
   const supporting = { warnings: task?.warnings, risk_notes: task?.risk_notes, precheck_errors: task?.precheck_errors, infeasibility_diagnosis: task?.infeasibility_diagnosis, solver_diagnostic: task?.solver_diagnostic };
   if (!explanation && !Object.values(supporting).some(value => value !== undefined && value !== null && value !== '')) return <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无业务解释，请查看技术日志" />;
   const actions = task && isTaskFailed(task.status) ? <Space wrap className="section-gap"><Button href={`/tasks?create=1&model=${encodeURIComponent(String(task.model_id || task.resolved_model_id || ''))}`}>修改参数重新提交</Button><Button href={`/models/${encodeURIComponent(String(task.model_id || task.resolved_model_id || ''))}`}>查看模型</Button><Button href="/runtime">检查求解环境</Button></Space> : null;
@@ -183,9 +183,10 @@ export function TaskExplanationPanel({ task, result }: { task?: SolveTask; resul
   return (
     <>
       <Alert className="compact-notice" showIcon type="info" title="结果解释" description={text(obj.summary || result?.suggestion || '已生成任务诊断，请结合参数、约束和技术日志复核。')} />
-      <Card size="small" title="诊断详情" className="section-gap">
-        <JsonViewer value={result?.business_output || (Object.keys(obj).length ? obj : supporting)} />
+      <Card size="small" title="结构化解释" className="section-gap">
+        <JsonViewer value={Object.keys(obj).length ? obj : supporting} />
       </Card>
+      {Boolean(result?.evidence_package) && <Card size="small" title="EvidencePackage" className="section-gap"><JsonViewer value={result?.evidence_package} /></Card>}
       {actions}
     </>
   );

@@ -1,6 +1,6 @@
-import { Badge, Button, Dropdown, Popover, Segmented, Space, Tag, Tooltip } from 'antd';
+import { Badge, Button, Dropdown, Popover, Segmented, Space, Tooltip } from 'antd';
 import { useQuery } from '@tanstack/react-query';
-import { BellOutlined, MenuFoldOutlined, MenuOutlined, MenuUnfoldOutlined, PlusOutlined, SearchOutlined } from '@ant-design/icons';
+import { BellOutlined, CloseOutlined, MenuFoldOutlined, MenuOutlined, MenuUnfoldOutlined, PlusOutlined, SearchOutlined } from '@ant-design/icons';
 import { lazy, Suspense, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { apiClient, unwrap } from '../../api/client';
@@ -16,21 +16,34 @@ interface HealthResponse { ok: boolean; service?: string; solver?: string; pyomo
 interface HeaderProps { pathname: string; mobile?: boolean; medium?: boolean; sidebarCollapsed?: boolean; onOpenMenu?: () => void; onToggleSidebar?: () => void }
 
 const taskTimestamp = (task: SolveTask) => Date.parse(String(task.created_at || '')) || 0;
+const TASK_INBOX_HANDLED_STORAGE_KEY = 'copt.task-inbox.handled.v1';
+const MAX_HANDLED_TASKS = 500;
 const taskFailureReason = (task: SolveTask) => typeof task.error === 'string'
   ? task.error
   : String((task.error as Record<string, unknown> | undefined)?.message || task.risk || '请查看任务诊断详情');
+
+function readHandledTaskIds() {
+  try {
+    const value = JSON.parse(window.localStorage.getItem(TASK_INBOX_HANDLED_STORAGE_KEY) || '[]');
+    return new Set(Array.isArray(value) ? value.map(String).slice(-MAX_HANDLED_TASKS) : []);
+  } catch {
+    return new Set<string>();
+  }
+}
 
 export function Header({ pathname, mobile = false, medium = false, sidebarCollapsed = false, onOpenMenu = () => undefined, onToggleSidebar = () => undefined }: HeaderProps) {
   const nav = useNavigate();
   const { audience, setAudience } = useAudience();
   const [searchOpen, setSearchOpen] = useState(false);
   const [taskInboxOpen, setTaskInboxOpen] = useState(false);
+  const [handledTaskIds, setHandledTaskIds] = useState<Set<string>>(readHandledTaskIds);
   const refetchInterval = import.meta.env.MODE === 'test' ? false : 30000;
   const { data, isError, isFetching } = useQuery({ queryKey: ['health'], queryFn: () => unwrap<HealthResponse>(apiClient.get('/api/health')), refetchInterval });
   const tasks = useQuery({ queryKey: ['tasks'], queryFn: getTasks, refetchInterval: import.meta.env.MODE === 'test' ? false : 15000 });
   const backendOnline = Boolean(data?.ok);
   const current = titleForPath(pathname);
   const failedTasks = [...(tasks.data || [])].filter(task => isTaskFailed(task.status)).sort((a, b) => taskTimestamp(b) - taskTimestamp(a));
+  const pendingFailedTasks = failedTasks.filter(task => !handledTaskIds.has(task.id));
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -39,6 +52,23 @@ export function Header({ pathname, mobile = false, medium = false, sidebarCollap
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
   }, []);
+
+  useEffect(() => {
+    if (!tasks.isSuccess) return;
+    const failedIds = new Set(failedTasks.map(task => task.id));
+    setHandledTaskIds(current => {
+      const retained = new Set([...current].filter(id => failedIds.has(id)));
+      return retained.size === current.size ? current : retained;
+    });
+  }, [tasks.data, tasks.isSuccess]);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(TASK_INBOX_HANDLED_STORAGE_KEY, JSON.stringify([...handledTaskIds].slice(-MAX_HANDLED_TASKS)));
+    } catch {
+      // The inbox remains usable when storage is unavailable; only cross-session persistence is skipped.
+    }
+  }, [handledTaskIds]);
 
   const statusText = backendOnline ? `平台在线 · ${data?.solver || 'HiGHS'}` : isError ? '平台连接异常' : isFetching ? '正在检查平台状态' : '状态待检查';
   const statusItems = [
@@ -50,22 +80,40 @@ export function Header({ pathname, mobile = false, medium = false, sidebarCollap
     setTaskInboxOpen(false);
     nav(task ? `/tasks?task=${encodeURIComponent(task.id)}` : '/tasks');
   };
+  const markTaskHandled = (taskId: string) => {
+    setHandledTaskIds(current => new Set([...current, taskId]));
+  };
+  const markAllHandled = () => {
+    setHandledTaskIds(current => new Set([...current, ...pendingFailedTasks.map(task => task.id)]));
+  };
   const taskInbox = (
     <div className="task-inbox-panel">
       <header>
-        <div><strong>任务消息</strong><span>{failedTasks.length ? `${failedTasks.length} 条待处理` : '暂无待处理任务'}</span></div>
-        {failedTasks.length > 0 && <Tag color="red">异常</Tag>}
+        <div><strong>任务消息</strong><span>{pendingFailedTasks.length ? `${pendingFailedTasks.length} 条待处理` : '暂无待处理任务'}</span></div>
+        {pendingFailedTasks.length > 0 && <Button type="link" size="small" onClick={markAllHandled}>全部处理</Button>}
       </header>
-      {failedTasks.length > 0 ? (
+      {pendingFailedTasks.length > 0 ? (
         <div className="task-inbox-list">
-          {failedTasks.slice(0, 5).map(task => (
-            <button type="button" key={task.id} onClick={() => openTask(task)}>
-              <span><strong>{task.model || task.scene || '优化任务'}</strong><small>{taskFailureReason(task)}</small></span>
-              <time>{task.created_at ? new Date(task.created_at).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }) : '-'}</time>
-            </button>
+          {pendingFailedTasks.slice(0, 5).map(task => (
+            <div className="task-inbox-item" key={task.id}>
+              <button className="task-inbox-open" type="button" onClick={() => openTask(task)}>
+                <span><strong>{task.model || task.scene || '优化任务'}</strong><small>{taskFailureReason(task)}</small></span>
+                <time>{task.created_at ? new Date(task.created_at).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }) : '-'}</time>
+              </button>
+              <Tooltip title="标记为已处理">
+                <Button
+                  className="task-inbox-dismiss"
+                  type="text"
+                  size="small"
+                  icon={<CloseOutlined />}
+                  aria-label={`将${task.model || task.scene || '优化任务'}标记为已处理`}
+                  onClick={() => markTaskHandled(task.id)}
+                />
+              </Tooltip>
+            </div>
           ))}
         </div>
-      ) : <div className="task-inbox-empty">当前没有失败、无解或超时任务</div>}
+      ) : <div className="task-inbox-empty">{failedTasks.length ? '异常消息均已处理，任务记录仍保留在任务中心' : '当前没有失败、无解或超时任务'}</div>}
       <Button type="text" block onClick={() => openTask()}>查看全部任务</Button>
     </div>
   );
@@ -84,9 +132,9 @@ export function Header({ pathname, mobile = false, medium = false, sidebarCollap
         <div className="top-actions">
           <Space size={8}>
             <Popover content={taskInbox} trigger="click" placement="bottomRight" open={taskInboxOpen} onOpenChange={setTaskInboxOpen}>
-              <Tooltip title={failedTasks.length ? `${failedTasks.length} 个异常任务待处理` : '任务消息'}>
-                <Badge count={failedTasks.length} size="small" overflowCount={99}>
-                  <button className={`task-inbox-trigger${failedTasks.length ? ' has-alert' : ''}`} type="button" aria-label={failedTasks.length ? `异常任务提醒，${failedTasks.length} 条` : '任务消息'}>
+              <Tooltip title={pendingFailedTasks.length ? `${pendingFailedTasks.length} 个异常任务待处理` : '任务消息'}>
+                <Badge count={pendingFailedTasks.length} size="small" overflowCount={99}>
+                  <button className={`task-inbox-trigger${pendingFailedTasks.length ? ' has-alert' : ''}`} type="button" aria-label={pendingFailedTasks.length ? `异常任务提醒，${pendingFailedTasks.length} 条` : '任务消息'}>
                     <BellOutlined />
                   </button>
                 </Badge>

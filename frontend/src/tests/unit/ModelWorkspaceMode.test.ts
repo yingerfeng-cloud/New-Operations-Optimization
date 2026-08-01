@@ -40,7 +40,8 @@ describe('model workspace route contract', () => {
   test('legacy source is normalized and a published edit becomes version mode', () => {
     expect(parseWorkspaceRequest(new URLSearchParams('source=MODEL-A'))).toEqual(expect.objectContaining({ mode: 'edit', legacySource: true }));
     expect(effectiveAssetMode('edit', asset({ status: 'published' }))).toBe('version');
-    expect(effectiveAssetMode('edit', asset({ status: 'tested' }))).toBe('edit');
+    expect(effectiveAssetMode('edit', asset({ status: 'trial' }))).toBe('version');
+    expect(effectiveAssetMode('edit', asset({ status: 'offline' }))).toBe('version');
   });
 
   test('old scenario links only resolve a recommended backend template', () => {

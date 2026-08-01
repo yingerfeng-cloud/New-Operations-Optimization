@@ -71,7 +71,7 @@ const modelApi = vi.hoisted(() => ({
   createModelVersion: vi.fn(async () => ({ id: 'MODEL-VERSION-1', status: 'draft' })),
   updateModel: vi.fn(async (id: string) => ({ id, status: 'draft' })),
   publishModel: vi.fn(async (id: string) => ({ id, status: 'published' })),
-  testModel: vi.fn(async (id: string) => ({ id, status: 'tested' })),
+  testModel: vi.fn(async (id: string) => ({ id, status: 'trial' })),
 }));
 
 vi.mock('../../api/models', () => ({
@@ -247,7 +247,7 @@ test('editing while a test is running keeps the returned snapshot outdated', asy
       runtime_parameters: { limit: 48 },
     });
   });
-  await act(async () => pendingTest.resolve({ id: 'MODEL-1', status: 'tested' }));
+  await act(async () => pendingTest.resolve({ id: 'MODEL-1', status: 'trial' }));
 
   expect(await screen.findByText('测试状态：已失效')).toBeInTheDocument();
   expect(screen.getByRole('button', { name: /发布模型/ })).toBeDisabled();
@@ -286,9 +286,9 @@ test('the latest test request wins when responses arrive out of order', async ()
   fireEvent.click(getTestRunButton());
   await waitFor(() => expect(modelApi.testModel).toHaveBeenCalledTimes(2));
 
-  await act(async () => testB.resolve({ id: 'MODEL-1', status: 'tested', marker: 'B' }));
+  await act(async () => testB.resolve({ id: 'MODEL-1', status: 'trial', marker: 'B' }));
   await waitFor(() => expect(screen.getByRole('button', { name: /发布模型/ })).not.toBeDisabled());
-  await act(async () => testA.resolve({ id: 'MODEL-1', status: 'tested', marker: 'A' }));
+  await act(async () => testA.resolve({ id: 'MODEL-1', status: 'trial', marker: 'A' }));
 
   expect(screen.getByRole('button', { name: /发布模型/ })).not.toBeDisabled();
   expect(screen.getByText(/"marker": "B"/)).toBeInTheDocument();
@@ -358,7 +358,7 @@ test('retesting a changed draft updates and publishes the same asset', async () 
 
 test('version mode creates its first saved asset through the version endpoint', async () => {
   renderPage(['/models/create?mode=version&source=MODEL-POWER-UNIT-COMMITMENT-DAY-AHEAD']);
-  await screen.findByText('创建模型新版本');
+  await screen.findByText('基于版本修改');
   fireEvent.click(screen.getByRole('button', { name: '保存草稿' }));
   await waitFor(() => expect(modelApi.createModelVersion).toHaveBeenCalledWith('MODEL-POWER-UNIT-COMMITMENT-DAY-AHEAD', expect.any(Object)));
   expect(modelApi.createModel).not.toHaveBeenCalled();
@@ -460,7 +460,7 @@ test('editing model A then routing to model B clears A and loads B', async () =>
       <RaceHarness />
     </MemoryRouter>,
   );
-  await screen.findByText('创建模型新版本');
+  await screen.findByText('基于版本修改');
   expect(useModelCreationStore.getState().draft.basic_info.name).toContain('日前机组组合优化');
 
   fireEvent.click(screen.getByText('编辑模型 B'));

@@ -1,12 +1,20 @@
 {
   "profile_name": "contract_spot_exposure",
-  "applies_to": {"tags": ["contract_spot", "合约现货"]},
+  "profile_version": "1.0",
+  "applies_to": {"tags": ["contract_spot", "合约现货"], "business_domains": ["contract_spot"], "model_families": ["contract_spot_exposure"]},
   "key_metrics": [
-    {"name": "total_exposure", "label": "现货敞口规模", "expression": "sum(spot_exposure)", "unit": "MWh"},
-    {"name": "max_exposure", "label": "最大时段敞口", "expression": "max(spot_exposure)", "unit": "MWh"}
+    {"name": "total_exposure", "label": "现货敞口规模", "function": "sum_value", "args": ["spot_exposure"], "unit": "MWh"},
+    {"name": "max_exposure", "label": "最大时段敞口", "function": "max_value", "args": ["spot_exposure"], "unit": "MWh"},
+    {"name": "min_exposure", "label": "最小时段敞口", "function": "min_value", "args": ["spot_exposure"], "unit": "MWh"},
+    {"name": "exposure_ratio", "label": "现货敞口占比", "function": "exposure_ratio", "args": ["spot_exposure", "load_forecast"], "unit": "p.u."},
+    {"name": "max_exposure_period", "label": "最大敞口时段", "function": "max_period", "args": ["spot_exposure"], "unit": ""},
+    {"name": "top_exposure_periods", "label": "高敞口时段", "function": "top_periods", "args": ["spot_exposure"], "count": 3, "unit": ""}
   ],
   "risk_rules": [
-    {"name": "exposure_limit_warning", "condition": "spot_exposure_max > 0", "level": "high", "message": "存在现货敞口，请复核高风险时段和限额。"}
+    {"name": "exposure_limit_warning", "condition": "exposure_ratio > 0.2", "level": "high", "message": "现货敞口占比较高，请复核限额。"},
+    {"name": "negative_exposure", "condition": "min_exposure < 0", "level": "medium", "message": "存在反向敞口，需复核合约与负荷口径。"},
+    {"name": "concentration_warning", "condition": "max_exposure > 0", "level": "medium", "message": "敞口集中于部分时段，需关注价格波动。"}
   ],
-  "manual_review_points": ["复核合约电量、负荷预测与现货价格预测。", "复核敞口限额和高风险时段。"]
+  "manual_review_points": ["复核合约电量、负荷预测与现货价格预测。", "复核敞口限额和高风险时段。", "复核交易规则、持仓口径和人工审批记录。"],
+  "explanation_limits": ["敞口风险说明不构成自动交易或收益承诺。"]
 }

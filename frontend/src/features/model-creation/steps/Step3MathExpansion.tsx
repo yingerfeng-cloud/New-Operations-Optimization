@@ -72,6 +72,13 @@ function hasSemanticVariable(draft: ModelDraft, expression?: string) {
   return Boolean(variable && draft.semantic.variables.some(item => item.code === variable));
 }
 
+function functionMappingType(component: Record<string, unknown>) {
+  const id = String(component.type || component.component_id || '');
+  if (id === 'function_mapping_2d_component') return 'piecewise_2d';
+  if (id === 'function_mapping_component' || id === 'piecewise_linear_curve') return 'piecewise_1d';
+  return undefined;
+}
+
 function assetOptionLabel(asset: FunctionAsset) {
   const status = asset.validation_status || 'valid';
   const suffix = status === 'invalid' ? ` - 异常：${(asset.validation_errors || []).map(item => String(item.message || item.error || '')).filter(Boolean).join('; ') || '校验未通过'}` : '';
@@ -134,13 +141,24 @@ export function Step3MathExpansion({ draft, onChange }: { draft: ModelDraft; onC
   const [selectedComponentKey, setSelectedComponentKey] = useState<string>();
   const [compileError, setCompileError] = useState('');
   const [mappingOpen, setMappingOpen] = useState(false);
+  const [mappingTargetIndex, setMappingTargetIndex] = useState<number | null>(null);
   const [mappingForm] = Form.useForm();
   const functionAssets = useQuery({ queryKey: ['function-assets'], queryFn: getFunctionAssets, enabled: mappingOpen });
   const selectedFunctionAssetId = Form.useWatch('function_asset_id', mappingForm);
   const selectedStrategy = Form.useWatch('solve_strategy', mappingForm);
   const selectedMappingType = Form.useWatch('mapping_type', mappingForm);
   const selectedAsset = (functionAssets.data || []).find(asset => asset.function_id === selectedFunctionAssetId);
-  const effectiveMappingType = selectedAsset?.function_type === 'piecewise_2d' || selectedMappingType === 'piecewise_2d' ? 'piecewise_2d' : 'piecewise_1d';
+  const effectiveMappingType = selectedMappingType === 'piecewise_2d'
+    ? 'piecewise_2d'
+    : selectedMappingType === 'piecewise_1d'
+      ? 'piecewise_1d'
+      : selectedAsset?.function_type === 'piecewise_2d'
+        ? 'piecewise_2d'
+        : 'piecewise_1d';
+  const targetMappingType = mappingTargetIndex === null ? undefined : functionMappingType(draft.components[mappingTargetIndex] || {});
+  const matchingFunctionAssets = targetMappingType
+    ? (functionAssets.data || []).filter(asset => asset.function_type === targetMappingType)
+    : (functionAssets.data || []);
   const selectedConvexity = selectedAsset?.convexity || selectedAsset?.diagnostics?.convexity;
   const symbols = {
     sets: Object.fromEntries(draft.semantic.sets.map(x => [x.code, x.name || x.code])),
@@ -171,12 +189,13 @@ export function Step3MathExpansion({ draft, onChange }: { draft: ModelDraft; onC
   const nonlinearDetails = <div className="model-diagnostic-details">{nonlinearMessageGroups.map(item => <div key={item.messageText}><span>{item.messageText}</span>{item.count > 1 && <Tag>{item.count} 处</Tag>}</div>)}</div>;
 
   useEffect(() => {
-    if (!mappingOpen || !functionAssets.data?.length || mappingForm.getFieldValue('function_asset_id')) return;
-    const firstSelectable = functionAssets.data.find(asset => asset.validation_status !== 'invalid');
-    if (firstSelectable) {
-      mappingForm.setFieldValue('function_asset_id', firstSelectable.function_id);
-    }
-  }, [functionAssets.data, mappingForm, mappingOpen]);
+    if (!mappingOpen || !functionAssets.data?.length) return;
+    const currentId = mappingForm.getFieldValue('function_asset_id');
+    const current = functionAssets.data.find(asset => asset.function_id === currentId);
+    if (current && current.validation_status !== 'invalid' && (!targetMappingType || current.function_type === targetMappingType)) return;
+    const firstSelectable = functionAssets.data.find(asset => (!targetMappingType || asset.function_type === targetMappingType) && asset.validation_status !== 'invalid');
+    mappingForm.setFieldValue('function_asset_id', firstSelectable?.function_id);
+  }, [functionAssets.data, mappingForm, mappingOpen, targetMappingType]);
 
   useEffect(() => {
     if (!mappingOpen || !selectedAsset) return;
@@ -280,27 +299,53 @@ export function Step3MathExpansion({ draft, onChange }: { draft: ModelDraft; onC
     message.success('已生成 McCormick 松弛组件，请确认 x/y 上下界后再发布。');
   };
 
-  const openFunctionMapping = () => {
+  const openFunctionMapping = (targetIndex?: number) => {
     const variables = variableExpressionOptions(draft);
     const sets = setOptions(draft);
+    const existing = targetIndex === undefined ? undefined : draft.components[targetIndex];
+    const existingMappingType = existing ? functionMappingType(existing) : undefined;
+    const existingIndex = Array.isArray(existing?.indices) ? existing.indices[0] as Record<string, unknown> | undefined : undefined;
+    mappingForm.resetFields();
     mappingForm.setFieldsValue({
-      function_asset_id: undefined,
-      mapping_type: 'piecewise_1d',
-      x: variables[0]?.value,
-      x_pick: variables[0]?.value,
-      y: variables[1]?.value || variables[0]?.value,
-      y_pick: variables[1]?.value || variables[0]?.value,
-      z: variables[2]?.value || variables[1]?.value || variables[0]?.value,
-      z_pick: variables[2]?.value || variables[1]?.value || variables[0]?.value,
-      index_set: sets.find(item => item.value === 'time')?.value || sets[0]?.value,
-      index_alias: 't',
-      solve_strategy: 'convex_combination_lp',
-      constraint_id: `function_mapping_${Date.now()}`,
+      function_asset_id: existing?.function_asset_id,
+      mapping_type: existingMappingType || 'piecewise_1d',
+      x: existing?.x || variables[0]?.value,
+      x_pick: existing?.x || variables[0]?.value,
+      y: existing?.y || variables[1]?.value || variables[0]?.value,
+      y_pick: existing?.y || variables[1]?.value || variables[0]?.value,
+      z: existing?.z || variables[2]?.value || variables[1]?.value || variables[0]?.value,
+      z_pick: existing?.z || variables[2]?.value || variables[1]?.value || variables[0]?.value,
+      index_set: existingIndex?.set || sets.find(item => item.value === 'time')?.value || sets[0]?.value,
+      index_alias: existingIndex?.alias || 't',
+      solve_strategy: existing?.solve_strategy || (existingMappingType === 'piecewise_2d' ? 'triangulated_milp_exact' : 'convex_combination_lp'),
+      constraint_id: existing?.constraint_id || `function_mapping_${Date.now()}`,
     });
+    setMappingTargetIndex(targetIndex ?? null);
     setMappingOpen(true);
   };
 
   const addFunctionMappingComponent = (values: Record<string, string>) => {
+    const persistMappingComponent = (component: Record<string, unknown>) => {
+      const nextComponents = [...draft.components];
+      let selectedIndex = nextComponents.length;
+      if (mappingTargetIndex !== null && nextComponents[mappingTargetIndex]) {
+        const existing = nextComponents[mappingTargetIndex];
+        nextComponents[mappingTargetIndex] = {
+          ...existing,
+          ...component,
+          name: existing.name || component.name,
+          display_name: existing.display_name || component.display_name,
+        };
+        selectedIndex = mappingTargetIndex;
+      } else {
+        nextComponents.push(component);
+      }
+      onChange({ ...draft, components: nextComponents });
+      setSelectedComponentKey(String(nextComponents[selectedIndex].constraint_id || nextComponents[selectedIndex].function_asset_id));
+      message.success(mappingTargetIndex === null ? '函数映射已添加' : '函数资产绑定已更新');
+      setMappingTargetIndex(null);
+      setMappingOpen(false);
+    };
     const selectedAssetForMapping = (functionAssets.data || []).find(asset => asset.function_id === values.function_asset_id);
     const is2dMapping = selectedAssetForMapping?.function_type === 'piecewise_2d' || values.mapping_type === 'piecewise_2d';
     if (is2dMapping) {
@@ -348,10 +393,7 @@ export function Step3MathExpansion({ draft, onChange }: { draft: ModelDraft; onC
           point_count: selectedAssetForMapping.surface_diagnostics?.point_count || selectedAssetForMapping.diagnostics?.point_count,
         },
       };
-      const nextComponents = [...draft.components, component];
-      onChange({ ...draft, components: nextComponents });
-      setSelectedComponentKey(String(component.constraint_id || component.function_asset_id));
-      setMappingOpen(false);
+      persistMappingComponent(component);
       return;
     }
     if (!/^[A-Za-z_]\w*(\[[^\]]+\])?$/.test(values.x || '') || !/^[A-Za-z_]\w*(\[[^\]]+\])?$/.test(values.y || '')) {
@@ -394,13 +436,11 @@ export function Step3MathExpansion({ draft, onChange }: { draft: ModelDraft; onC
         monotonicity: selectedAsset.monotonicity,
       },
     };
-    const nextComponents = [...draft.components, component];
-    onChange({ ...draft, components: nextComponents });
-    setSelectedComponentKey(String(component.constraint_id || component.function_asset_id));
-    setMappingOpen(false);
+    persistMappingComponent(component);
   };
 
   const componentStatus = (component: Record<string, unknown>) => {
+    if (functionMappingType(component) && !component.function_asset_id) return { color: 'red', text: '未绑定函数资产' };
     if (component.solve_strategy === 'display_only') return { color: 'default', text: '不参与求解' };
     if (component.solve_strategy === 'binary_segment_milp' || component.solve_strategy === 'convex_hull_lp_approx') return { color: 'orange', text: '有风险' };
     if (component.function_asset_id && (!component.x || !component.y || (String(component.type || component.component_id) === 'function_mapping_2d_component' && !component.z))) return { color: 'red', text: '缺少配置' };
@@ -490,7 +530,15 @@ export function Step3MathExpansion({ draft, onChange }: { draft: ModelDraft; onC
         const name = String(component.display_name || component.name || component.component_id || `组件 ${index + 1}`);
         const dependencies = [...new Set([...(Array.isArray(component.dependencies) ? component.dependencies : []), ...(Array.isArray(component.depends_on) ? component.depends_on : [])])];
         return (
-          <Card key={`${name}-${index}`} title={name}>
+          <Card
+            key={`${name}-${index}`}
+            title={name}
+            extra={functionMappingType(component) ? (
+              <Button type={component.function_asset_id ? 'default' : 'primary'} onClick={() => openFunctionMapping(index)}>
+                {component.function_asset_id ? '编辑函数资产绑定' : '绑定函数资产'}
+              </Button>
+            ) : undefined}
+          >
             <Descriptions size="small" column={3} items={[
               { key: 'constraints', label: '生成约束', children: componentRows(component, 'generated_constraints').length || componentRows(component, 'constraints').length },
               { key: 'objectives', label: '目标项', children: componentRows(component, 'generated_objective_terms').length || componentRows(component, 'objective_terms').length },
@@ -526,7 +574,7 @@ export function Step3MathExpansion({ draft, onChange }: { draft: ModelDraft; onC
       />
       <Space wrap className="section-gap">
         <Button onClick={() => setEditing(newFormula('constraint'))}>添加自定义公式</Button>
-        <Button type="primary" onClick={openFunctionMapping}>添加函数映射</Button>
+        <Button type="primary" onClick={() => openFunctionMapping()}>添加函数映射</Button>
         {nonlinearReport.relationships.some(item => item.nonlinear_type === 'bilinear' && !item.converted) && (
           <Button onClick={addMccormickFromDiagnostic}>一键生成 McCormick 组件</Button>
         )}
@@ -552,7 +600,17 @@ export function Step3MathExpansion({ draft, onChange }: { draft: ModelDraft; onC
       />
       {draft.basic_info.builder_mode === 'component_based' && renderComponentSummaryList()}
       <Collapse className="section-gap" items={[{ key: 'debug', label: '高级调试', children: renderComponentWorkbench() }]} />
-      <Modal width={720} open={mappingOpen} destroyOnHidden onCancel={() => setMappingOpen(false)} title="添加函数映射" footer={null}>
+      <Modal
+        width={720}
+        open={mappingOpen}
+        destroyOnHidden
+        onCancel={() => {
+          setMappingTargetIndex(null);
+          setMappingOpen(false);
+        }}
+        title={mappingTargetIndex === null ? '添加函数映射' : '绑定函数资产'}
+        footer={null}
+      >
         <Form form={mappingForm} layout="vertical" onFinish={addFunctionMappingComponent}>
           <Form.Item name="function_asset_id" label="函数/曲线资产" rules={[{ required: true, message: '请选择函数/曲线资产' }]}>
             <Select
@@ -561,7 +619,7 @@ export function Step3MathExpansion({ draft, onChange }: { draft: ModelDraft; onC
               optionFilterProp="label"
               optionLabelProp="labelText"
               filterOption={(input, option) => String(option?.labelText || '').toLowerCase().includes(input.toLowerCase())}
-              options={(functionAssets.data || []).map(asset => ({
+              options={matchingFunctionAssets.map(asset => ({
                 value: asset.function_id,
                 labelText: assetOptionLabel(asset),
                 label: asset.validation_status === 'invalid'
@@ -575,6 +633,7 @@ export function Step3MathExpansion({ draft, onChange }: { draft: ModelDraft; onC
           <Descriptions size="small" column={1} items={[{ key: 'binary', label: '精确分段 MILP', children: '该策略需要二进制变量选择具体曲线分段，目前作为预留能力展示，暂不能发布为可求解模型。' }]} />
           <Form.Item name="mapping_type" label="函数映射类型" rules={[{ required: true }]}>
             <Select
+              disabled={mappingTargetIndex !== null}
               options={[
                 { value: 'piecewise_1d', label: '一维函数映射 y = f(x)' },
                 { value: 'piecewise_2d', label: '二维函数映射 z = f(x,y)' },
@@ -692,8 +751,11 @@ export function Step3MathExpansion({ draft, onChange }: { draft: ModelDraft; onC
             <Input />
           </Form.Item>
           <Space>
-            <Button onClick={() => setMappingOpen(false)}>取消</Button>
-            <Button type="primary" htmlType="submit">添加</Button>
+            <Button onClick={() => {
+              setMappingTargetIndex(null);
+              setMappingOpen(false);
+            }}>取消</Button>
+            <Button type="primary" htmlType="submit">{mappingTargetIndex === null ? '添加' : '保存绑定'}</Button>
           </Space>
         </Form>
       </Modal>

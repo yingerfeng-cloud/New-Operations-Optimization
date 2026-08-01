@@ -5,9 +5,10 @@ from copy import deepcopy
 import app.model_components  # noqa: F401
 from fastapi import APIRouter, HTTPException
 
+from app.model_components.dependency_graph import component_dependency_ids, component_id, component_is_available, selected_dependency_errors
 from app.model_components.formula_components import normalize_component_payload as normalize_formula_component
 from app.model_components.formula_components import validate_component_definition
-from app.model_components.registry import COMPONENT_DEPENDENCIES, component_definition, list_component_catalog
+from app.model_components.registry import component_definition, list_component_catalog
 from app.model_components.solver_capabilities import normalize_capabilities
 from app.services.model_service import model_service
 from app.storage.memory_store import STORE
@@ -44,19 +45,35 @@ def validate_component_dependencies(payload: dict) -> dict:
         for item in raw_components
         if _component_enabled(item)
     }
-    errors = []
-    catalog_ids = {item["component_id"] for item in get_component_catalog()}
-    for component_id in sorted(enabled):
-        dependencies = set(COMPONENT_DEPENDENCIES.get(component_id, []))
-        try:
-            dependencies.update(get_component(component_id).get("depends_on") or [])
-        except HTTPException:
-            pass
-        for dependency in sorted(dependencies):
-            if dependency not in catalog_ids:
-                errors.append({"component_id": component_id, "missing_dependency": dependency, "message": f"组件 {component_id} 依赖组件 {dependency} 不存在"})
-            elif dependency not in enabled:
-                errors.append({"component_id": component_id, "missing_dependency": dependency, "message": f"组件 {component_id} 缺少依赖组件 {dependency}"})
+    catalog = get_component_catalog()
+    catalog_by_id = {item["component_id"]: item for item in catalog}
+    catalog_dependency_graph = {
+        component_id: component_dependency_ids(component)
+        for component_id, component in catalog_by_id.items()
+    }
+    errors = [
+        {
+            "field": f"components[{index}]",
+            "error": "component id required",
+            "error_code": "COMPONENT_ID_REQUIRED",
+            "message": "组件编码不能为空",
+            "suggestion": "请从组件库重新选择组件。",
+        }
+        for index, item in enumerate(raw_components)
+        if _component_enabled(item) and not _component_id_from_payload_item(item)
+    ]
+    errors.extend(
+        selected_dependency_errors(
+            enabled,
+            catalog_dependency_graph,
+            known_ids=catalog_by_id,
+            available_ids={
+                component_id
+                for component_id, component in catalog_by_id.items()
+                if component_is_available(component)
+            },
+        )
+    )
     return {"valid": not errors, "errors": errors}
 
 
@@ -176,9 +193,9 @@ def offline_component(component_id: str) -> dict:
 
 def _component_id_from_payload_item(item: object) -> str:
     if isinstance(item, str):
-        return item
+        return item.strip()
     if isinstance(item, dict):
-        return str(item.get("type") or item.get("component_id") or item.get("code") or "")
+        return component_id(item)
     return ""
 
 
@@ -193,13 +210,14 @@ def _normalize_component_payload(payload: dict, *, creating: bool) -> dict:
     if not component_id:
         raise HTTPException(status_code=422, detail="component_id is required")
     timestamp = now_text()
+    dependencies = component_dependency_ids(payload)
     normalized = normalize_formula_component(
         {
             **payload,
             "component_id": component_id,
             "type": component_id,
-            "depends_on": list(payload.get("depends_on") or payload.get("dependencies") or []),
-            "dependencies": list(payload.get("dependencies") or payload.get("depends_on") or []),
+            "depends_on": dependencies,
+            "dependencies": dependencies,
         }
     )
     return {
@@ -220,7 +238,8 @@ def _normalize_component_payload(payload: dict, *, creating: bool) -> dict:
         "variable_types": list(normalized.get("variable_types") or payload.get("variable_types") or ["continuous"]),
         "expression_class": normalized.get("expression_class") or payload.get("expression_class") or "linear",
         "problem_type_effect": normalized.get("problem_type_effect") or payload.get("problem_type_effect") or "LP",
-        "depends_on": list(payload.get("depends_on") or payload.get("dependencies") or []),
+        "depends_on": dependencies,
+        "dependencies": dependencies,
         "inputs": normalized.get("parameters") or [_schema_item(item) for item in list(payload.get("inputs") or [])],
         "outputs": list(payload.get("outputs") or []),
         "generated_constraints": normalized.get("generated_constraints") or [],

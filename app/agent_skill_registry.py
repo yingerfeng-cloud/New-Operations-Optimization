@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
-import shutil
+import re
 from pathlib import Path
 from typing import Any
 
@@ -14,24 +14,6 @@ from app.services.skill_registry import skill_registry
 
 ROOT = Path(__file__).resolve().parents[1]
 AGENT_SKILLS_DIR = ROOT / "agent_skills"
-
-BUSINESS_DISPLAY_NAMES = {
-    "economic_dispatch": "经济调度",
-    "unit_commitment_day_ahead": "日前机组组合",
-    "storage_dispatch": "储能调度",
-    "renewable_storage_dispatch": "风光储协同",
-    "chp_dispatch": "电热协同",
-    "cascade_hydro_dispatch": "梯级水电调度",
-    "cascade_hydro_dispatch_v1": "梯级水电调度 v1",
-    "pv_storage_day_ahead_dispatch": "光储日前调度",
-    "pv_storage_intraday_dispatch": "光储日内调度",
-    "pv_storage_dispatch_v2": "光储调度 v2",
-    "pv_storage_day_ahead_dispatch_v2": "光储日前调度 v2",
-    "pv_storage_intraday_dispatch_v2": "光储日内调度 v2",
-    "nonlinear_hydro_power_demo": "非线性水电出力 NLP 试点",
-    "contract_spot_exposure_v1": "合约现货暴露控制",
-    "retail_da_spot_bidding_v1": "售电公司日前现货申报",
-}
 
 
 class AgentSkillRegistry:
@@ -55,9 +37,9 @@ class AgentSkillRegistry:
             raise HTTPException(status_code=404, detail=f"Agent Skill not found: {name}")
         meta = self._read_yaml(path / "skill.yaml")
         meta.setdefault("name", safe_name)
-        meta["display_name"] = BUSINESS_DISPLAY_NAMES.get(safe_name, str(meta.get("display_name") or safe_name).replace(" Agent Skill", ""))
         api_skill_name = meta.get("canonical_api_skill_name")
         api_skill = self._safe_api_skill(api_skill_name) if include_api else {}
+        meta["display_name"] = self._display_name(meta, api_skill, safe_name)
         examples = self._read_json(path / "examples.json", {})
         instruction = self._read_text(path / "SKILL.md")
         input_schema = self._read_json(path / "input_schema.json", [])
@@ -68,12 +50,21 @@ class AgentSkillRegistry:
             output_schema = api_skill.get("output_schema", {})
         v2 = normalize_agent_skill_v2(meta, input_schema, examples)
         platform_fields = self._platform_fields(api_skill_name, api_skill, input_schema, output_schema)
+        configured_enabled = v2["state"] == AgentSkillState.ENABLED.value
+        platform_available = (
+            True
+            if not include_api
+            else bool(api_skill)
+            and api_skill.get("callable") is True
+            and api_skill.get("skill_status") == "enabled"
+        )
         return {
             **meta,
             **v2,
             **platform_fields,
             "path": str(path),
-            "enabled": v2["state"] == AgentSkillState.ENABLED.value,
+            "configured_enabled": configured_enabled,
+            "enabled": configured_enabled and platform_available,
             "instruction": instruction,
             "input_schema": input_schema,
             "output_schema": output_schema,
@@ -141,13 +132,53 @@ class AgentSkillRegistry:
                 errors.append({"code": f"missing_{field}", "message": f"Agent Skill v2 requires {field}"})
         if not v2.get("do_not_invoke_examples"):
             errors.append({"code": "missing_do_not_invoke_example", "message": "Agent Skill v2 requires do_not_invoke_examples"})
+        quality_score = self._quality_score(v2)
+        quality_policy = meta.get("quality_policy") or {}
+        if isinstance(quality_policy, dict):
+            example_minimums = quality_policy.get("minimum_examples") or {}
+            for field, minimum in example_minimums.items():
+                if field not in {"positive_examples", "negative_examples", "do_not_invoke_examples"}:
+                    continue
+                try:
+                    minimum = int(minimum)
+                except (TypeError, ValueError):
+                    errors.append({
+                        "code": "invalid_quality_policy",
+                        "message": f"quality_policy.minimum_examples.{field} must be an integer",
+                    })
+                    continue
+                actual = len(v2.get(field) or [])
+                if actual < minimum:
+                    errors.append({
+                        "code": f"insufficient_{field}",
+                        "message": f"{field} requires at least {minimum} examples by declared quality_policy; got {actual}",
+                    })
+            required_data = v2.get("required_data") or []
+            if quality_policy.get("require_missing_data_questions") and (
+                not required_data or any(not item.get("ask_when_missing") for item in required_data)
+            ):
+                errors.append({
+                    "code": "incomplete_required_data_questions",
+                    "message": "every required_data item must define ask_when_missing",
+                })
+            execution = v2.get("execution_policy") or {}
+            if quality_policy.get("require_advisory_only") and not execution.get("advisory_only"):
+                errors.append({
+                    "code": "unsafe_execution_policy",
+                    "message": "declared quality_policy requires advisory_only execution",
+                })
+            if quality_policy.get("require_human_review") and not execution.get("requires_human_review"):
+                errors.append({
+                    "code": "unsafe_execution_policy",
+                    "message": "declared quality_policy requires human review",
+                })
         if "confirmation_required" not in meta:
             errors.append({"code": "missing_confirmation_required", "message": "confirmation_required is required"})
         api_policy = api_skill.get("execution_policy") if api_skill else None
         agent_policy = (meta.get("execution_policy") or {}).get("mode")
         if api_policy and agent_policy and api_policy != agent_policy:
             errors.append({"code": "execution_policy_conflict", "message": "Agent Skill execution_policy conflicts with API Skill"})
-        return self._validation(errors, raise_on_missing)
+        return self._validation(errors, raise_on_missing, quality_score=quality_score)
 
     def set_state(self, name: str, state: str) -> dict[str, Any]:
         allowed = {item.value for item in AgentSkillState}
@@ -172,6 +203,13 @@ class AgentSkillRegistry:
                 break
         if not replaced:
             lines.insert(1, f"state: {state}")
+        enabled_line = f"enabled: {'true' if state == AgentSkillState.ENABLED.value else 'false'}"
+        for index, line in enumerate(lines):
+            if line.startswith("enabled:"):
+                lines[index] = enabled_line
+                break
+        else:
+            lines.insert(2, enabled_line)
         path.write_text("\n".join(lines) + "\n", encoding="utf-8")
         return self.load_skill(name)
 
@@ -261,28 +299,19 @@ class AgentSkillRegistry:
 
     def create_from_api_skill(self, api_skill_name: str, agent_skill_name: str | None = None) -> dict[str, Any]:
         api_skill = skill_registry.get_skill(api_skill_name)
-        name = agent_skill_name or str(api_skill.get("model_code") or api_skill_name.removeprefix("run_"))
+        if not isinstance(api_skill.get("definition"), dict):
+            api_skill = skill_registry.generate_skill(str(api_skill["model_id"]), {"use_llm": False})
+        definition = dict(api_skill.get("definition") or {})
+        raw_name = agent_skill_name or str(api_skill.get("model_code") or api_skill_name.removeprefix("run_"))
+        name = re.sub(r"[^\w-]+", "_", str(raw_name), flags=re.UNICODE).strip("_-")
+        if not name:
+            raise HTTPException(status_code=422, detail="agent_skill_name must contain an alphanumeric identifier")
         target = self.root / name
         target.mkdir(parents=True, exist_ok=True)
-        template = self.root / "economic_dispatch"
-        if template.is_dir() and name != "economic_dispatch":
-            for item in ("prompts",):
-                src = template / item
-                dst = target / item
-                if src.is_dir() and not dst.exists():
-                    shutil.copytree(src, dst)
-                elif src.is_file() and not dst.exists():
-                    shutil.copy2(src, dst)
         if not (target / "skill.yaml").exists():
-            self._write_text(target / "skill.yaml", self._default_skill_yaml(name, api_skill))
+            self._write_text(target / "skill.yaml", self._default_skill_yaml(name, api_skill, enabled=False))
         if not (target / "SKILL.md").exists():
-            display_name = api_skill.get("display_name") or name
-            self._write_text(
-                target / "SKILL.md",
-                f"# {display_name} Agent Skill\n\n"
-                "Use this skill to collect parameters, require explicit user confirmation, invoke the bound platform Skill, "
-                "and explain optimization results as advisory-only analysis requiring human review.\n",
-            )
+            self._write_text(target / "SKILL.md", self._skill_markdown(name, api_skill, definition))
         if not (target / "adapter.py").exists():
             self._write_text(target / "adapter.py", self._default_adapter_py(api_skill))
         if not (target / "examples.json").exists():
@@ -290,14 +319,22 @@ class AgentSkillRegistry:
             self._write_json(
                 target / "examples.json",
                 {
-                    "positive_examples": [{"user": f"做{api_skill.get('display_name') or name}", "intent": "optimization_request", "expected_skill": name}],
+                    "positive_examples": [
+                        {"user": text, "intent": "optimization_request", "expected_skill": name}
+                        for text in definition.get("trigger_examples") or [f"运行{api_skill.get('display_name') or name}"]
+                    ],
                     "help_examples": [{"intent": "parameter_example", "text": "show parameter example"}],
-                    "negative_examples": [{"user": "你好", "intent": "casual_chat"}],
+                    "negative_examples": [
+                        {"user": text, "intent": "do_not_invoke"}
+                        for text in definition.get("non_trigger_examples") or ["仅解释模型原理，不运行模型"]
+                    ],
                     "sample_parameters": sample,
                 },
             )
+        self._write_generated_prompts(target, api_skill, definition)
         self._write_json(target / "input_schema.json", api_skill.get("input_schema", []))
         self._write_json(target / "output_schema.json", api_skill.get("output_schema", {}))
+        self._write_json(target / "skill_definition.snapshot.json", definition)
         self._write_agent_skill_tests(target, api_skill)
         validation = self.validate_skill(name, raise_on_missing=False)
         if validation.get("status") != "valid":
@@ -308,7 +345,7 @@ class AgentSkillRegistry:
         validation = skill.get("validation") or {}
         return {
             "name": skill.get("name"),
-            "display_name": BUSINESS_DISPLAY_NAMES.get(str(skill.get("name")), str(skill.get("display_name") or skill.get("name") or "").replace(" Agent Skill", "")),
+            "display_name": self._display_name(skill, skill.get("api_skill") or {}, str(skill.get("name") or "")),
             "canonical_api_skill_name": skill.get("canonical_api_skill_name"),
             "api_skill_available": skill.get("api_skill_available"),
             "enabled": skill.get("enabled", True),
@@ -327,6 +364,7 @@ class AgentSkillRegistry:
             "has_instruction": skill.get("has_instruction"),
             "has_examples": skill.get("has_examples"),
             "validation_status": validation.get("status", "invalid"),
+            "quality_score": validation.get("quality_score", self._quality_score(skill)),
         }
 
     def _summary_from_path(self, path: Path) -> dict[str, Any]:
@@ -349,14 +387,23 @@ class AgentSkillRegistry:
         has_examples = (path / "examples.json").is_file()
         examples = self._read_json(path / "examples.json", {})
         v2 = normalize_agent_skill_v2(meta, input_schema, examples)
-        validation_status = self.validate_skill(name, raise_on_missing=False).get("status", "invalid")
+        validation = self.validate_skill(name, raise_on_missing=False)
+        validation_status = validation.get("status", "invalid")
+        api_skill = self._safe_api_skill(api_skill_name)
+        configured_enabled = v2["state"] == AgentSkillState.ENABLED.value
+        platform_available = (
+            bool(api_skill)
+            and api_skill.get("callable") is True
+            and api_skill.get("skill_status") == "enabled"
+        )
         return {
             "name": name,
-            "display_name": BUSINESS_DISPLAY_NAMES.get(name, str(meta.get("display_name") or name).replace(" Agent Skill", "")),
+            "display_name": self._display_name(meta, api_skill, name),
             "canonical_api_skill_name": api_skill_name,
-            **self._platform_fields(api_skill_name, self._safe_api_skill(api_skill_name), input_schema, output_schema),
-            "api_skill_available": bool(api_skill_name),
-            "enabled": v2["state"] == AgentSkillState.ENABLED.value,
+            **self._platform_fields(api_skill_name, api_skill, input_schema, output_schema),
+            "api_skill_available": bool(api_skill),
+            "configured_enabled": configured_enabled,
+            "enabled": configured_enabled and platform_available,
             "schema_version": v2["schema_version"],
             "state": v2["state"],
             "business_domain": v2["business_domain"],
@@ -379,6 +426,7 @@ class AgentSkillRegistry:
             "has_instruction": has_instruction,
             "has_examples": has_examples,
             "validation_status": validation_status,
+            "quality_score": validation.get("quality_score", self._quality_score(v2)),
         }
 
     def _platform_fields(
@@ -458,6 +506,8 @@ class AgentSkillRegistry:
                     "intent_policy",
                     "execution_policy",
                     "safety_policy",
+                    "quality_policy",
+                    "minimum_examples",
                     "result_explanation",
                     "error_handling",
                 } else []
@@ -499,6 +549,10 @@ class AgentSkillRegistry:
             return {}
         return {item.stem: item.read_text(encoding="utf-8") for item in path.glob("*.md")}
 
+    def _display_name(self, meta: dict[str, Any], api_skill: dict[str, Any], fallback: str) -> str:
+        value = meta.get("display_name") or api_skill.get("display_name") or fallback
+        return str(value).removesuffix(" Agent Skill").strip() or fallback
+
     def _write_json(self, path: Path, value: Any) -> None:
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(json.dumps(value, ensure_ascii=False, indent=2), encoding="utf-8")
@@ -507,7 +561,96 @@ class AgentSkillRegistry:
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(value, encoding="utf-8")
 
+    def _skill_markdown(self, name: str, api_skill: dict[str, Any], definition: dict[str, Any]) -> str:
+        display_name = str(definition.get("display_name") or api_skill.get("display_name") or name)
+        instructions = definition.get("instructions") or []
+        triggers = definition.get("trigger_examples") or []
+        non_triggers = definition.get("non_trigger_examples") or []
+        explanation = definition.get("explanation_spec") or {}
+        metric_keys = [str(item.get("key")) for item in explanation.get("metrics") or [] if item.get("key")]
+        sections = [
+            f"# {display_name} Agent Skill",
+            "",
+            str(definition.get("description") or api_skill.get("description") or ""),
+            "",
+            "## Workflow",
+            "",
+            *[f"{index}. {item}" for index, item in enumerate(instructions, start=1)],
+            "",
+            "## Invoke when",
+            "",
+            *[f"- {item}" for item in triggers],
+            "",
+            "## Do not invoke when",
+            "",
+            *[f"- {item}" for item in non_triggers],
+            "",
+            "## Result explanation contract",
+            "",
+            "Explain only from `evidence_package`; separate facts, inferences, recommendations, and limitations.",
+            "Every numerical statement must reference solver, metric, variable, or constraint evidence.",
+            "Never infer undeclared thresholds or claim that an external action was executed.",
+            f"Declared explanation metrics: {', '.join(metric_keys) if metric_keys else 'objective/status evidence only'}.",
+            "Human review is required before operational use.",
+            "",
+        ]
+        return "\n".join(sections)
+
+    def _write_generated_prompts(self, target: Path, api_skill: dict[str, Any], definition: dict[str, Any]) -> None:
+        schema = api_skill.get("input_schema") or []
+        explanation = definition.get("explanation_spec") or {}
+        prompts = {
+            "parameter_collection.md": "\n".join([
+                "# Parameter collection",
+                "",
+                "Collect only parameters declared in input_schema. Never invent missing data.",
+                *[
+                    f"- `{item.get('key')}` ({item.get('name') or item.get('key')}): dimensions={item.get('dimension') or []}, unit={item.get('unit') or '-'}, policy={item.get('default_policy') or 'declared-requiredness'}"
+                    for item in schema
+                    if item.get("key")
+                ],
+                "",
+            ]),
+            "default_confirmation.md": "\n".join([
+                "# Default confirmation",
+                "",
+                "Present every contract-declared default and its source to the user.",
+                "Apply a default only after explicit confirmation; never treat sample data as a confirmed business value.",
+                "",
+            ]),
+            "result_explanation.md": "\n".join([
+                "# Grounded result explanation",
+                "",
+                "Read `explanation_structured` and `evidence_package` returned by the platform.",
+                "Do not replace them with a fixed scenario narrative.",
+                "For each fact, retain its `evidence_refs`; put interpretation in `inferences`, not `facts`.",
+                "Do not introduce numbers, thresholds, causal claims, or guarantees absent from evidence.",
+                "If evidence is missing, state the limitation explicitly.",
+                "Require human review before operational use.",
+                "",
+                "Declared metrics:",
+                *[
+                    f"- `{item.get('key')}` <- {json.dumps(item.get('source') or {}, ensure_ascii=False)} / {item.get('function') or 'identity'}"
+                    for item in explanation.get("metrics") or []
+                    if item.get("key")
+                ],
+                "",
+            ]),
+            "error_handling.md": "\n".join([
+                "# Error handling",
+                "",
+                "Report the returned status, error evidence, and remediation without fabricating a result.",
+                "A failed, infeasible, cancelled, or timed-out run is not an optimization recommendation.",
+                "",
+            ]),
+        }
+        for filename, content in prompts.items():
+            path = target / "prompts" / filename
+            if not path.exists():
+                self._write_text(path, content)
+
     def _default_skill_yaml(self, name: str, api_skill: dict[str, Any], enabled: bool = True) -> str:
+        definition = api_skill.get("definition") or {}
         required = [
             item.get("key")
             for item in api_skill.get("input_schema", [])
@@ -522,19 +665,20 @@ class AgentSkillRegistry:
             'schema_version: "2.0"',
             f"name: {name}",
             f"agent_skill_name: {name}",
-            f"display_name: {api_skill.get('display_name') or name}",
+            f"display_name: {json.dumps(api_skill.get('display_name') or name, ensure_ascii=False)}",
             f"canonical_api_skill_name: {api_skill.get('skill_name')}",
             f"platform_skill_name: {api_skill.get('skill_name')}",
-            "state: draft",
-            "enabled: false",
+            f"state: {'enabled' if enabled else 'draft'}",
+            f"enabled: {'true' if enabled else 'false'}",
             f"business_domain: {api_skill.get('model_code') or name}",
             "model_family: optimization",
             "supported_intents: [\"optimization_run\", \"parameter_check\", \"result_explanation\"]",
             "business_goals: [\"optimize\"]",
-            f"explanation_profile: {api_skill.get('model_code') or name}",
+            f"explanation_profile: {json.dumps('contract:' + str(api_skill.get('skill_name') or name), ensure_ascii=False)}",
             "confirmation_required: true",
             "execution_policy:",
-            "  mode: advisory_only",
+            f"  mode: {(definition.get('execution_policy') or {}).get('mode') or api_skill.get('execution_policy') or 'advisory_only'}",
+            f"  requires_human_review: {'true' if (definition.get('execution_policy') or {}).get('requires_human_review', True) else 'false'}",
             "required_parameters:",
         ]
         lines.extend(f"  - {item}" for item in required)
@@ -608,8 +752,34 @@ class AgentSkillRegistry:
         spec.loader.exec_module(module)
         return module
 
-    def _validation(self, errors: list[dict[str, Any]], raise_on_missing: bool) -> dict[str, Any]:
-        result = {"status": "valid" if not errors else "invalid", "errors": errors}
+    def _quality_score(self, skill: dict[str, Any]) -> int:
+        score = 0
+        score += min(25, round(25 * len(skill.get("positive_examples") or []) / 10))
+        score += min(15, round(15 * len(skill.get("negative_examples") or []) / 8))
+        score += min(15, round(15 * len(skill.get("do_not_invoke_examples") or []) / 8))
+        required = skill.get("required_data") or []
+        if required:
+            score += round(15 * len([item for item in required if item.get("ask_when_missing")]) / len(required))
+        if skill.get("parameter_policy") and skill.get("intent_policy"):
+            score += 10
+        execution = skill.get("execution_policy") or {}
+        if execution.get("advisory_only") and execution.get("requires_human_review"):
+            score += 10
+        if skill.get("explanation_profile"):
+            score += 10
+        return min(100, score)
+
+    def _validation(
+        self,
+        errors: list[dict[str, Any]],
+        raise_on_missing: bool,
+        quality_score: int = 0,
+    ) -> dict[str, Any]:
+        result = {
+            "status": "valid" if not errors else "invalid",
+            "errors": errors,
+            "quality_score": quality_score,
+        }
         if errors and raise_on_missing:
             raise HTTPException(status_code=422, detail=result)
         return result

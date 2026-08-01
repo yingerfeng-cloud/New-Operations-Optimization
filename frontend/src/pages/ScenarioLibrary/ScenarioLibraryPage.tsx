@@ -7,7 +7,7 @@ import { getSystemConfig } from '../../api/systemConfig';
 import { PageHeader } from '../../components/PageHeader';
 import { ConfigurationMissingState } from '../../components/PageStates';
 import { StatusTag } from '../../components/StatusTag';
-import { FilterBar, MetricCard } from '../../components/WorkspaceUI';
+import { FilterBar, MetricCard, MetricGrid } from '../../components/WorkspaceUI';
 import { modelBelongsToScenario, scenarioCatalog, scenariosFromDictionary } from '../../features/model-creation/data/scenarioCatalog';
 
 const statusOptions = ['全部', '已发布', '试运行'];
@@ -17,7 +17,7 @@ function statusLabel(status: string) {
 }
 
 function publishedStatus(status: unknown) {
-  return ['published', 'trial', 'tested', '已发布', '试运行', '已测试'].includes(String(status || ''));
+  return String(status || '') === 'published';
 }
 
 function builderText(value: unknown) {
@@ -43,6 +43,7 @@ export function ScenarioLibraryPage() {
       ...scenario,
       ownedModelCount: ownedModels.length,
       publishedModelCount: ownedModels.filter(model => publishedStatus(model.status)).length,
+      trialModelCount: ownedModels.filter(model => String(model.status || '') === 'trial').length,
       recommendedModelCount: scenario.models.length,
       recommendedModelId: ownedModels.find(model => publishedStatus(model.status))?.id,
     };
@@ -86,10 +87,11 @@ export function ScenarioLibraryPage() {
             extra={<Tag color="blue">推荐模型 {scenario.recommendedModelCount}</Tag>}
           >
             <Typography.Paragraph>{scenario.description}</Typography.Paragraph>
-            <div className="metric-grid metric-grid-2">
+            <MetricGrid columns={3}>
               <MetricCard title="模型资产" value={scenario.ownedModelCount} tone="blue" />
               <MetricCard title="已发布模型" value={scenario.publishedModelCount} tone="green" />
-            </div>
+              <MetricCard title="试运行模型" value={scenario.trialModelCount} tone="purple" />
+            </MetricGrid>
             <div className="scenario-primary-actions section-gap">
               <Button type="primary" disabled={!scenario.recommendedModelId} title={!scenario.recommendedModelId ? '暂无已发布模型' : undefined} onClick={() => nav(`/tasks?create=1&scene=${encodeURIComponent(scenario.name)}&model=${encodeURIComponent(scenario.recommendedModelId || '')}`)}>使用推荐模型发起任务</Button>
               <Button onClick={() => nav('/models/create?mode=new')}>创建空白模型</Button>

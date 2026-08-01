@@ -1,6 +1,6 @@
-negative_examples: ["仅咨询模型原理"]
-do_not_invoke_examples: ["只咨询业务知识，不运行优化"]
-positive_examples: ["做光储日内滚动调度", "根据最新预测做光储日内滚动优化"]
+positive_examples: ["根据最新预测做光储日内滚动优化", "用当前实测数据修正剩余时段计划", "重新计算今天后续光储出力", "按更新后的云量预测滚动调度", "在当前SOC基础上优化日内计划", "处理光伏预测偏差并重排储能", "生成未来四小时光储滚动方案", "根据最新电价修正日内充放电", "保持已执行时段不变并优化后续", "检查预测更新时间后运行日内模型", "减少本日剩余时段弃光并求解", "生成可衔接下一窗口的滚动计划"]
+negative_examples: ["生成明天的光储日前计划", "只做独立储能分时套利", "控制中长期合约敞口", "生成售电公司日前申报", "安排火电机组组合", "计算梯级水电调度", "规划光伏储能装机容量", "分析历史光伏预测误差"]
+do_not_invoke_examples: ["日内滚动调度是什么", "解释滚动窗口原理", "日前和日内有什么区别", "只咨询预测更新频率", "介绍光储协同业务", "为什么需要状态衔接", "有哪些日内交易规则", "不要运行模型只讲方法"]
 schema_version: "2.0"
 state: enabled
 business_domain:
@@ -8,7 +8,8 @@ business_domain:
   secondary: ["optimization"]
 model_family: optimization
 supported_intents: ["optimization_run", "parameter_check", "result_explanation"]
-business_goals: ["optimize"]
+business_goals: ["吸收最新预测偏差", "降低滚动执行成本", "保持状态连续", "形成可复核的后续时段计划"]
+required_data: [{"name": "pv_forecast", "label": "最新光伏预测", "ask_when_missing": "请提供带更新时间的剩余时段光伏预测。", "required": true}, {"name": "schedule", "label": "既有计划", "ask_when_missing": "请提供已执行和待调整的基准计划。", "required": true}, {"name": "initial_soc", "label": "当前SOC", "ask_when_missing": "请提供滚动窗口起点的实际SOC。", "required": true}, {"name": "price", "label": "最新价格", "ask_when_missing": "请提供剩余时段最新价格序列。", "required": true}]
 explanation_profile: pv_storage_intraday_dispatch
 parameter_policy: {"allow_defaults": true, "require_default_confirmation": true, "allow_sample_data": true, "sample_data_must_be_confirmed": true}
 intent_policy: {"router_mode": "llm_plus_rules", "confidence_threshold": 0.75, "clarify_threshold": 0.6, "clarify_when_top_scores_close": true, "top_score_margin_threshold": 0.15}
@@ -18,8 +19,7 @@ display_name: 光储协同日内滚动调度
 canonical_api_skill_name: run_pv_storage_intraday_dispatch
 enabled: true
 confirmation_required: true
-execution_policy:
-  mode: advisory_only
+execution_policy: {"advisory_only": true, "requires_human_review": true, "requires_invoke_confirmation": true}
 required_parameters:
   - horizon
   - time

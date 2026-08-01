@@ -9,6 +9,7 @@ export const testModel = (id: string, params: Record<string, unknown>) => unwrap
 export const invokeModel = (id: string, params: Record<string, unknown>) => unwrap(apiClient.post('/api/tasks', { model_id: id, runtime_parameters: params, parameters: params }));
 export const copyModel = (id: string) => unwrap<ModelAsset>(apiClient.post(`/api/models/${id}/copy`));
 export const offlineModel = (id: string) => unwrap<ModelAsset>(apiClient.post(`/api/models/${id}/offline`));
+export const returnModelToDraft = (id: string) => unwrap<ModelAsset>(apiClient.post(`/api/models/${id}/return-to-draft`));
 export const deleteModel = (id: string) => unwrap<{ status: string }>(apiClient.delete(`/api/models/${id}`));
 export const getModelSchema = (id: string) => unwrap<Record<string, unknown>>(apiClient.get(`/api/models/${id}/schema`));
 export const getModelAssetDetail = (id: string) => unwrap<Record<string, unknown>>(apiClient.get(`/api/models/${id}/asset-detail`));

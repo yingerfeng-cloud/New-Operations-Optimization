@@ -4,7 +4,14 @@ from copy import deepcopy
 from typing import Any
 
 import app.model_components  # noqa: F401
+from app.model_components.dependency_graph import merged_component_dependency_ids
 from app.model_components.formula_components import normalize_component_payload
+from app.model_components.formula_contracts import (
+    formula_expression,
+    participates_in_solve,
+    participation_fields,
+    synchronize_formula_fields,
+)
 from app.model_components.registry import component_definition, list_component_catalog
 from app.problem_type_diagnosis import infer_problem_type_from_draft, normalize_problem_type
 from app.storage.memory_store import STORE
@@ -40,6 +47,7 @@ def create_model_draft_from_template(template: dict[str, Any]) -> dict[str, Any]
         if definition:
             definition = normalize_component_payload({**definition, "component_id": definition.get("component_id") or component_type})
         config = deepcopy(item.get("config") or {})
+        dependencies = _resolved_component_dependencies(item, definition)
         draft_item = {
             "component_id": component_type,
             "type": component_type,
@@ -48,6 +56,8 @@ def create_model_draft_from_template(template: dict[str, Any]) -> dict[str, Any]
             "required": item.get("required", definition.get("required", False)),
             "config": config,
             "definition": definition,
+            "depends_on": dependencies,
+            "dependencies": list(dependencies),
             "generated_constraints": deepcopy(definition.get("generated_constraints") or []),
             "generated_objective_terms": deepcopy(definition.get("generated_objective_terms") or []),
         }
@@ -123,6 +133,17 @@ def _component_definition_or_metadata(component_type: str) -> dict[str, Any]:
         }
 
 
+def _resolved_component_dependencies(
+    component: dict[str, Any],
+    definition: dict[str, Any] | None = None,
+) -> list[str]:
+    resolved_definition = definition
+    if resolved_definition is None:
+        component_type = str(component.get("component_id") or component.get("type") or component.get("code") or "")
+        resolved_definition = _component_definition_or_metadata(component_type)
+    return merged_component_dependency_ids(component, resolved_definition)
+
+
 def create_generic_model_draft_from_template(template: dict[str, Any]) -> dict[str, Any]:
     objective = _generic_objective(template)
     draft = {
@@ -171,6 +192,10 @@ def finalize_model_draft(draft: dict[str, Any]) -> dict[str, Any]:
     semantic["sets"] = generate_set_members(merge_component_required_sets(draft))
     for component in draft.get("components") or []:
         component_id = component.get("component_id") or component.get("type")
+        definition = component.get("definition") or _component_definition_or_metadata(str(component_id or ""))
+        dependencies = _resolved_component_dependencies(component, definition)
+        component["depends_on"] = dependencies
+        component["dependencies"] = list(dependencies)
         component["generated_constraints"] = [_normalize_constraint_row(item, source_component=component_id) for item in component.get("generated_constraints") or []]
         component["generated_objective_terms"] = [_normalize_objective_term(item, source_component=component_id) for item in component.get("generated_objective_terms") or []]
     objective = draft.setdefault("objective", {})
@@ -381,14 +406,12 @@ def generate_objective_strategy(objective: dict[str, Any]) -> dict[str, Any]:
     active = [
         deepcopy(term)
         for term in objective.get("terms") or []
-        if term.get("enabled", True) is not False
-        and str(term.get("solve_participation") or "solve_active") not in {"display_only", "remark_only", "none"}
+        if participates_in_solve(term)
     ]
     inactive = [
         deepcopy(term)
         for term in objective.get("terms") or []
-        if term.get("enabled", True) is False
-        or str(term.get("solve_participation") or "solve_active") in {"display_only", "remark_only", "none"}
+        if not participates_in_solve(term)
     ]
     if not active:
         return {
@@ -545,9 +568,7 @@ def _first_non_blank(*values: Any) -> str:
 
 
 def _constraint_formula(item: dict[str, Any]) -> str:
-    return _first_non_blank(
-        item.get("formula"),
-        item.get("expression"),
+    return formula_expression(item) or _first_non_blank(
         item.get("dsl"),
         item.get("math_expression"),
         item.get("generated_formula"),
@@ -558,9 +579,7 @@ def _constraint_formula(item: dict[str, Any]) -> str:
 
 
 def _objective_formula(item: dict[str, Any]) -> str:
-    return _first_non_blank(
-        item.get("formula"),
-        item.get("expression"),
+    return formula_expression(item) or _first_non_blank(
         item.get("dsl"),
         item.get("math_expression"),
         item.get("generated_formula"),
@@ -570,10 +589,9 @@ def _objective_formula(item: dict[str, Any]) -> str:
 
 
 def _normalize_constraint_row(item: dict[str, Any], *, source_component: str | None = None) -> dict[str, Any]:
-    row = deepcopy(item)
-    formula = _constraint_formula(row)
-    row.setdefault("formula", formula)
-    row.setdefault("expression", formula)
+    formula = _constraint_formula(item)
+    row = synchronize_formula_fields(item, formula)
+    row.update(participation_fields(item))
     row.setdefault("display_formula", formula)
     row.setdefault("indices", row.get("foreach") or [])
     row.setdefault("source_component", source_component or row.get("component_id") or row.get("source_component") or "")
@@ -582,10 +600,9 @@ def _normalize_constraint_row(item: dict[str, Any], *, source_component: str | N
 
 
 def _normalize_objective_term(item: dict[str, Any], *, source_component: str | None = None) -> dict[str, Any]:
-    row = deepcopy(item)
-    formula = _objective_formula(row)
-    row.setdefault("formula", formula)
-    row.setdefault("expression", formula)
+    formula = _objective_formula(item)
+    row = synchronize_formula_fields(item, formula)
+    row.update(participation_fields(item))
     row.setdefault("display_formula", formula)
     row.setdefault("indices", row.get("foreach") or row.get("key") or [])
     row.setdefault("source_component", source_component or row.get("component_id") or row.get("source_component") or "")
@@ -596,33 +613,34 @@ def _normalize_objective_term(item: dict[str, Any], *, source_component: str | N
 def build_constraints_from_draft(draft: dict[str, Any]) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
     for component in draft.get("components", []) or []:
-        enabled = component.get("enabled", True)
+        component_enabled = component.get("enabled", True) is not False
         component_id = component.get("component_id") or component.get("type")
         for constraint in component.get("generated_constraints") or []:
+            normalized = _normalize_constraint_row(constraint, source_component=component_id)
             rows.append(
                 {
-                    **_normalize_constraint_row(constraint, source_component=component_id),
+                    **normalized,
                     "source": "component",
                     "source_component": component_id,
-                    "enabled": enabled,
+                    "enabled": component_enabled and normalized.get("enabled", True) is not False,
+                    "participates_in_solve": component_enabled and participates_in_solve(normalized),
                     "core": True,
                     "editable": False,
                 }
             )
     for index, item in enumerate(draft.get("constraints") or []):
+        normalized = _normalize_constraint_row(item)
         rows.append(
             {
+                **normalized,
                 "constraint_id": item.get("constraint_id") or item.get("name") or f"custom_constraint_{index + 1}",
                 "name": item.get("name") or f"custom constraint {index + 1}",
                 "type": item.get("type") or item.get("scope") or "additional_boundary",
-                "formula": _constraint_formula(item),
-                "expression": _constraint_formula(item),
                 "display_formula": _constraint_formula(item),
                 "business_meaning": item.get("business_meaning") or item.get("business_rule") or item.get("description") or "user-defined additional constraint",
                 "indices": item.get("indices") or item.get("foreach") or [],
                 "source": "custom",
                 "source_component": "",
-                "enabled": item.get("enabled", True),
                 "core": False,
                 "editable": True,
             }
@@ -633,7 +651,7 @@ def build_constraints_from_draft(draft: dict[str, Any]) -> list[dict[str, Any]]:
 def build_mathematical_expansion(draft: dict[str, Any]) -> dict[str, Any]:
     objective = deepcopy(draft.get("objective") or {})
     objective["terms"] = [_normalize_objective_term(term, source_component=term.get("source_component")) for term in objective.get("terms", [])]
-    enabled_terms = [term for term in objective.get("terms", []) if term.get("enabled", True)]
+    enabled_terms = [term for term in objective.get("terms", []) if participates_in_solve(term)]
     formula = " + ".join(f"{term.get('weight_key', 'w')} * {_objective_formula(term)}" for term in enabled_terms)
     sections = []
     for constraint in build_constraints_from_draft(draft):
@@ -642,12 +660,14 @@ def build_mathematical_expansion(draft: dict[str, Any]) -> dict[str, Any]:
                 "type": "constraint",
                 "title": constraint.get("name"),
                 "formula": _constraint_formula(constraint),
+                "dsl_formula": _constraint_formula(constraint),
                 "expression": _constraint_formula(constraint),
                 "display_formula": _constraint_formula(constraint),
                 "business_meaning": constraint.get("business_meaning"),
                 "source_component": constraint.get("source_component"),
                 "source": constraint.get("source"),
                 "enabled": constraint.get("enabled", True),
+                "participates_in_solve": participates_in_solve(constraint),
                 "core": constraint.get("core", False),
                 "editable": constraint.get("editable", False),
                 "curve": constraint.get("curve"),
@@ -673,7 +693,7 @@ def build_mathematical_expansion(draft: dict[str, Any]) -> dict[str, Any]:
                     "source_component": component.get("component_id") or component.get("type"),
                     "source": "component",
                     "enabled": True,
-                    "solve_participation": curve.get("solve_participation", "display_only"),
+                    **participation_fields(curve.get("solve_participation") or "preview_only"),
                 }
             )
     return {
@@ -763,6 +783,7 @@ def _draft_components_from_component_spec(component_spec: dict[str, Any]) -> lis
         if definition:
             definition = normalize_component_payload({**definition, "component_id": definition.get("component_id") or component_type})
         config = deepcopy(item.get("config") or {})
+        dependencies = _resolved_component_dependencies(item, definition)
         draft_item = {
             "component_id": component_type,
             "type": component_type,
@@ -771,6 +792,8 @@ def _draft_components_from_component_spec(component_spec: dict[str, Any]) -> lis
             "required": item.get("required", definition.get("required", False)),
             "config": config,
             "definition": definition,
+            "depends_on": dependencies,
+            "dependencies": list(dependencies),
             "generated_constraints": deepcopy(item.get("generated_constraints") or definition.get("generated_constraints") or []),
             "generated_objective_terms": deepcopy(item.get("generated_objective_terms") or definition.get("generated_objective_terms") or []),
         }

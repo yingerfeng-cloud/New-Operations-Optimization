@@ -93,7 +93,9 @@ def test_agent_router_prioritizes_market_and_pv_storage_phrases() -> None:
     skills = agent_skill_service.list_skills()
     assert agent_skill_router.route("做售电公司日前现货申报优化", {}, skills)["agent_skill_name"] == "retail_da_spot_bidding_v1"
     assert agent_skill_router.route("做合约现货暴露控制", {}, skills)["agent_skill_name"] == "contract_spot_exposure_v1"
-    assert agent_skill_router.route("做光储日前调度", {}, skills)["agent_skill_name"] == "pv_storage_day_ahead_dispatch"
+    pv_route = agent_skill_router.route("做光储日前调度", {}, skills)
+    assert pv_route["intent"] == "skill_selection_required"
+    assert pv_route["agent_skill_name"] is None
     route = agent_skill_router.route("日前", {}, skills)
     assert route["agent_skill_name"] != "unit_commitment_day_ahead"
 
@@ -110,8 +112,9 @@ def test_agent_router_prioritizes_market_and_pv_storage_phrases() -> None:
 )
 def test_agent_router_recognizes_pv_storage_intraday_rolling_phrases(message: str) -> None:
     route = agent_skill_router.route(message, {}, agent_skill_service.list_skills())
-    assert route["agent_skill_name"] in {"pv_storage_intraday_dispatch", "pv_storage_intraday_dispatch_v2"}
-    assert route["api_skill_name"] in {"run_pv_storage_intraday_dispatch", "run_pv_storage_intraday_dispatch_v2"}
+    assert route["intent"] == "skill_selection_required"
+    assert route["agent_skill_name"] is None
+    assert route["api_skill_name"] is None
 
 
 def test_storage_parameter_extraction_keeps_price_clean_and_updates_power_pair() -> None:

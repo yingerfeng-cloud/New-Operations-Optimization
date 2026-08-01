@@ -38,3 +38,10 @@ test('management panel filters, copies, toggles and batch compiles formulas', as
   await waitFor(() => expect(analyzeFormulaMock).toHaveBeenCalledTimes(1));
   await waitFor(() => expect(onChange).toHaveBeenCalledWith(expect.arrayContaining([expect.objectContaining({ formula_id: 'reserve', compile_status: 'compile_valid', compiler_version: '2.0.0' })])));
 });
+
+test('keeps successful dependency analysis in the card header instead of a large alert', () => {
+  render(<FormulaManagementPanel formulas={[]} semantic={{ sets: [], parameters: [], variables: [] }} symbols={{ sets: {}, parameters: {}, variables: {} }} onChange={vi.fn()} onEdit={vi.fn()} />);
+
+  expect(screen.getByRole('button', { name: /依赖分析：通过/ })).toBeInTheDocument();
+  expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+});

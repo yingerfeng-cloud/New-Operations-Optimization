@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 from app.model_components.formula_components import _eval_formula_node
+from app.model_components.formula_contracts import formula_expression, participates_in_solve
 
 
 DEFAULT_OBJECTIVE_WEIGHTS = {
@@ -39,8 +40,7 @@ def build_weighted_objective(model: Any, objective_spec: dict[str, Any], context
         unsupported_terms = [
             str(term.get("term_id") or term.get("name") or term.get("weight_key") or "")
             for term in configured_terms
-            if term.get("enabled", True)
-            and term.get("solve_participation", "solve") not in {"display_only", "remark_only", "none"}
+            if participates_in_solve(term)
             and str(term.get("weight_key") or "") not in SUPPORTED_OBJECTIVE_WEIGHT_KEYS
             and term.get("supported_by_backend") is not True
         ]
@@ -49,10 +49,11 @@ def build_weighted_objective(model: Any, objective_spec: dict[str, Any], context
         enabled_weight_keys = {
             str(term.get("weight_key"))
             for term in configured_terms
-            if term.get("enabled", True)
-            and term.get("solve_participation", "solve") not in {"display_only", "remark_only", "none"}
+            if participates_in_solve(term)
         }
         for term in configured_terms:
+            if not participates_in_solve(term):
+                continue
             key = str(term.get("weight_key") or "")
             if key and term.get("weight") is not None:
                 weights[key] = float(term["weight"])
@@ -142,16 +143,14 @@ def _build_dynamic_objective_terms(model: Any, terms: list[dict[str, Any]], weig
 
     expr = 0
     for term in terms:
-        if term.get("enabled", True) is False:
-            continue
-        if term.get("solve_participation", "solve") in {"display_only", "remark_only", "none"}:
+        if not participates_in_solve(term):
             continue
         key = str(term.get("weight_key") or "")
         if key in SUPPORTED_OBJECTIVE_WEIGHT_KEYS and key != "piecewise_cost":
             continue
         if term.get("supported_by_backend") is not True:
             continue
-        expression = str(term.get("expression") or "").strip()
+        expression = formula_expression(term)
         if not expression:
             continue
         try:

@@ -6,6 +6,8 @@ import sys
 from copy import deepcopy
 from typing import Any
 
+from app.model_components.formula_contracts import formula_expression, participates_in_solve, participation_fields
+
 from app.services.nonlinear_analyzer import analyze_component_spec, analyze_draft, analyze_expression, build_nonlinear_report
 
 
@@ -242,7 +244,7 @@ def is_problem_type_override_valid(inferred: str, requested: str) -> bool:
 def component_problem_type_fields(payload: dict[str, Any]) -> dict[str, Any]:
     variables = list(payload.get("variables") or [])
     constraints = [item for item in list(payload.get("generated_constraints") or payload.get("constraints") or []) if _constraint_affects_problem_type(item)]
-    terms = list(payload.get("objective_terms") or payload.get("generated_objective_terms") or [])
+    terms = [item for item in list(payload.get("objective_terms") or payload.get("generated_objective_terms") or []) if _constraint_affects_problem_type(item)]
     variable_types = payload.get("variable_types") or _variable_types(variables) or ["continuous"]
     variable_names = _variable_names(variables)
     expression_class = _max_expression_class([_expression_class(item, variable_names) for item in constraints + terms])
@@ -273,7 +275,7 @@ def component_problem_type_fields(payload: dict[str, Any]) -> dict[str, Any]:
 
 def _analyze_problem_type_expression(item: dict[str, Any] | str, variable_names: set[str], solver_name: str | None, has_integer: bool) -> list[dict[str, Any]]:
     if isinstance(item, dict):
-        expression = str(item.get("expression") or item.get("formula") or item.get("math_constraint") or "")
+        expression = formula_expression(item) or str(item.get("math_constraint") or "")
         if not _constraint_affects_problem_type(item):
             return []
     else:
@@ -321,22 +323,16 @@ def _apply_nonlinear_diagnosis(diagnosis: dict[str, Any], nonlinear_report: dict
 
 
 def _is_active_piecewise(item: dict[str, Any]) -> bool:
-    if not isinstance(item, dict) or item.get("enabled", True) is False:
+    if not isinstance(item, dict) or not participates_in_solve(item):
         return False
-    if item.get("participates_in_solve") is False:
-        return False
-    if str(item.get("solve_participation") or "solve_active") in {"display_only", "remark_only", "none"}:
-        return False
-    expression = str(item.get("expression") or item.get("formula") or "").lower()
+    expression = formula_expression(item).lower()
     return str(item.get("type") or "").lower() in {"piecewise", "piecewise_2d"} or "piecewise(" in expression or "piecewise_2d(" in expression
 
 
 def _constraint_affects_problem_type(item: dict[str, Any]) -> bool:
     if not isinstance(item, dict):
         return True
-    if item.get("enabled", True) is False or item.get("participates_in_solve") is False:
-        return False
-    return str(item.get("solve_participation") or "solve_active") not in {"display_only", "remark_only", "none"}
+    return participates_in_solve(item)
 
 
 def _resolve_components(components: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -367,8 +363,7 @@ def _resolve_component_definition(component: dict[str, Any]) -> dict[str, Any]:
             for row in definition.get("generated_constraints") or []:
                 row["piecewise_method"] = strategy
                 row["compiler"] = strategy
-                row["solve_participation"] = "display_only" if strategy == "display_only" else row.get("solve_participation", "solve_active")
-                row["participates_in_solve"] = strategy != "display_only"
+                row.update(participation_fields("preview_only" if strategy == "display_only" else row))
             if strategy == "binary_segment_milp":
                 definition["variable_types"] = ["continuous", "binary"]
                 definition["problem_type"] = "MILP"
@@ -500,7 +495,7 @@ def _expression_class(item: dict[str, Any] | str, variable_names: set[str] | Non
         explicit = item.get("expression_class")
         if explicit in {"linear", "quadratic", "nonlinear"}:
             return str(explicit)
-        expression = str(item.get("expression") or item.get("formula") or item.get("math_constraint") or "")
+        expression = formula_expression(item) or str(item.get("math_constraint") or "")
     else:
         expression = str(item or "")
     lowered = expression.lower()

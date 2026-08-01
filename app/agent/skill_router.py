@@ -28,10 +28,19 @@ OPTIMIZATION_MARKERS = ["帮我", "做", "运行", "求解", "优化", "调度",
 class AgentSkillRouter:
     def route(self, message: str, conversation_state: dict[str, Any] | None = None, available_agent_skills: list[dict[str, Any]] | None = None) -> dict[str, Any]:
         state = conversation_state or {}
-        skills = available_agent_skills or []
+        skills = [
+            skill
+            for skill in (available_agent_skills or [])
+            if skill.get("enabled") is not False
+            and skill.get("api_skill_available") is not False
+            and skill.get("platform_skill_status", "enabled") == "enabled"
+        ]
         text = str(message or "")
         compact = "".join(text.lower().split())
         current_agent_skill = state.get("agent_skill_name")
+        available_names = {skill.get("name") for skill in skills}
+        if current_agent_skill not in available_names:
+            current_agent_skill = None
         current_api_skill = state.get("resolved_skill_name") or state.get("selected_skill")
         mentioned = self._match_skill(text, skills)
 
@@ -142,7 +151,13 @@ class AgentSkillRouter:
             ),
             ("economic_dispatch", ["经济调度", "经济负荷分配", "出力分配", "负荷分配", "economic dispatch"]),
         ]
-        available = {item.get("name") for item in skills}
+        available = {
+            item.get("name")
+            for item in skills
+            if item.get("enabled") is not False
+            and item.get("api_skill_available") is not False
+            and item.get("platform_skill_status", "enabled") == "enabled"
+        }
         for name, markers in aliases:
             if name in available and any(marker in text for marker in markers):
                 return name
@@ -150,7 +165,13 @@ class AgentSkillRouter:
 
     def _agent_skill_from_api(self, api_skill_name: str | None, skills: list[dict[str, Any]]) -> str | None:
         for skill in skills:
-            if api_skill_name and skill.get("canonical_api_skill_name") == api_skill_name:
+            if (
+                api_skill_name
+                and skill.get("enabled") is not False
+                and skill.get("api_skill_available") is not False
+                and skill.get("platform_skill_status", "enabled") == "enabled"
+                and skill.get("canonical_api_skill_name") == api_skill_name
+            ):
                 return skill.get("name")
         return None
 

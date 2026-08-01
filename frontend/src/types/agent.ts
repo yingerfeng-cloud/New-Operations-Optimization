@@ -48,8 +48,10 @@ export interface AgentSkill {
   negative_examples?: string[];
   do_not_invoke_examples?: string[];
   explanation_profile?: string;
+  quality_score?: number;
   validation?: {
     status?: string;
+    quality_score?: number;
     errors?: unknown[];
     warnings?: unknown[];
   };

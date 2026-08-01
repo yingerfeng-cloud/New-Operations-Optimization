@@ -174,7 +174,7 @@ def test_cascade_hydro_model_invoke_complete_chain() -> None:
     model = next(
         item
         for item in models.json()
-        if item.get("template_id") == "cascade_hydro_dispatch" and item.get("status") in {"published", "trial", "tested"}
+        if item.get("template_id") == "cascade_hydro_dispatch" and item.get("status") in {"published", "trial"}
     )
     template = get_template("cascade_hydro_dispatch")
     params = deepcopy(template["sample_runtime_parameters"])

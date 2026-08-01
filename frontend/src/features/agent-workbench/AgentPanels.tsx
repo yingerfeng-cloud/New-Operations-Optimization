@@ -143,6 +143,9 @@ export function AgentResultPanel({ response }: { response?: AgentAnalyzeResponse
   const manual = Array.isArray(structured.manual_review_points) ? structured.manual_review_points : [];
   const limitations = Array.isArray(structured.limitations) ? structured.limitations : [];
   const evidence = resultRecord.evidence_package;
+  const evidenceRecord = (evidence && typeof evidence === 'object' ? evidence : {}) as Record<string, unknown>;
+  const evidenceModel = (evidenceRecord.model && typeof evidenceRecord.model === 'object' ? evidenceRecord.model : {}) as Record<string, unknown>;
+  const derivedMetrics = (evidenceRecord.derived_metrics && typeof evidenceRecord.derived_metrics === 'object' ? evidenceRecord.derived_metrics : {}) as Record<string, unknown>;
   return (
     <>
       <Descriptions size="small" bordered column={1}>
@@ -151,6 +154,7 @@ export function AgentResultPanel({ response }: { response?: AgentAnalyzeResponse
         <Descriptions.Item label="任务编号">{valueText(response.task_session?.task_id)}</Descriptions.Item>
         <Descriptions.Item label="目标值">{valueText(response.objective_value)}</Descriptions.Item>
       </Descriptions>
+      {Object.keys(derivedMetrics).length > 0 && <Card size="small" title={`业务指标 · ${valueText(evidenceModel.profile_name || 'generic')}`} className="section-gap"><JsonViewer value={derivedMetrics} /></Card>}
       {(facts.length + inferences.length + recommendations.length + risks.length + manual.length + limitations.length > 0) && <Space orientation="vertical" size={8} className="full-width section-gap">
         <Card size="small" title="事实">{facts.length ? facts.map((item, index) => <div key={`fact-${index}`}>{valueText(item)}</div>) : '无'}</Card>
         <Card size="small" title="推断">{inferences.length ? inferences.map((item, index) => <div key={`inference-${index}`}>{valueText(item)}</div>) : '无'}</Card>

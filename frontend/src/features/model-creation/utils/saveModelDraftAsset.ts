@@ -3,6 +3,7 @@ import type { ModelDraft } from '../stores/modelCreationStore';
 import { inferModelProblemType } from './inferModelProblemType';
 import { normalizeModelDraft } from './normalizeModelDraft';
 import { validateModelDraft } from './validateModelDraft';
+import { activeDraftForBuilderMode } from './builderModeTransition';
 
 function mergeByCode(base: unknown, additions: unknown, preferredKey: 'code' | 'name' = 'code') {
   const rows: Array<Record<string, unknown>> = [];
@@ -72,9 +73,10 @@ export function buildComponentSpecFromDraft(normalizedDraft: ModelDraft) {
 }
 
 export function buildModelDraftPayload(draft: ModelDraft) {
-  const normalized = normalizeModelDraft(draft);
+  const normalized = activeDraftForBuilderMode(normalizeModelDraft(draft));
   const componentSpec = buildComponentSpecFromDraft(normalized);
   const existingUiMetadata = normalized.advanced.ui_metadata || {};
+  const description = String(normalized.advanced.description || existingUiMetadata.description || '').trim();
   const semanticSpec = {
     ...normalized.semantic,
     ui_metadata: { ...(normalized.semantic.ui_metadata || {}), time_dimension: normalized.time_dimension },
@@ -93,7 +95,12 @@ export function buildModelDraftPayload(draft: ModelDraft) {
     template_id: normalized.basic_info.model_code,
     build_mode: normalized.basic_info.builder_mode,
     solver: normalized.basic_info.solver,
-    ui_metadata: { ...existingUiMetadata, time_dimension: normalized.time_dimension },
+    ui_metadata: {
+      ...existingUiMetadata,
+      ...(description ? { description } : {}),
+      documentation_source: 'model_creation',
+      time_dimension: normalized.time_dimension,
+    },
     model_draft: normalized as unknown as Record<string, unknown>,
     semantic_spec: semanticSpec,
     generic_spec: genericSpec,
@@ -112,7 +119,7 @@ export async function saveModelDraftAsset(
   },
   requireValid = false,
 ) {
-  const normalized = normalizeModelDraft(draft);
+  const normalized = activeDraftForBuilderMode(normalizeModelDraft(draft));
   if (requireValid && !validateModelDraft(normalized).valid) throw new Error('发布前校验未通过');
   const payload = buildModelDraftPayload(normalized);
   return currentDraftModelId ? deps.updateModel(currentDraftModelId, payload) : deps.createModel(payload);

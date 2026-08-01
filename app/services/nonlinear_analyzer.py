@@ -6,6 +6,8 @@ import re
 from copy import deepcopy
 from typing import Any
 
+from app.model_components.formula_contracts import formula_expression, participates_in_solve
+
 
 GENERAL_NONLINEAR_FUNCTIONS = {"exp", "log", "sin", "cos", "sqrt", "tan"}
 LINEARIZED_COMPONENT_TYPES = {
@@ -77,11 +79,11 @@ def analyze_draft(draft: dict[str, Any], *, solver_name: str | None = "HiGHS") -
     has_integer = any(_is_integer_variable(item) for item in semantic.get("variables") or [])
     relationships: list[dict[str, Any]] = []
     for index, formula in enumerate(draft.get("formulas") or []):
-        if formula.get("solve_participation") == "preview_only":
+        if not participates_in_solve(formula):
             continue
         relationships.extend(
             analyze_expression(
-                str(formula.get("dsl_formula") or formula.get("expression") or ""),
+                formula_expression(formula),
                 variables=variable_names,
                 parameters=parameter_names,
                 source=f"model_draft.formulas[{index}]",
@@ -343,14 +345,12 @@ def _component_cfg(component: dict[str, Any]) -> dict[str, Any]:
 
 def _is_linearization_expression(row: dict[str, Any]) -> bool:
     row_type = str(row.get("type") or "").lower()
-    expression = str(row.get("expression") or row.get("formula") or "").lower()
+    expression = formula_expression(row).lower()
     return row_type in {"piecewise", "piecewise_2d", "mccormick"} or "piecewise(" in expression or "piecewise_2d(" in expression
 
 
 def _is_solve_active(row: dict[str, Any]) -> bool:
-    if not isinstance(row, dict) or row.get("enabled", True) is False or row.get("participates_in_solve") is False:
-        return False
-    return str(row.get("solve_participation") or "solve_active") not in {"display_only", "remark_only", "none", "preview_only"}
+    return isinstance(row, dict) and participates_in_solve(row)
 
 
 def _pythonize_expression(expression: str) -> str:

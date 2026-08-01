@@ -137,7 +137,7 @@ def test_publish_rejects_invalid_additional_custom_constraints() -> None:
         assert expected in published.text
         current = client.get(f"/api/models/{model_id}")
         assert current.status_code == 200, current.text
-        assert current.json()["status"] == "publish_failed"
+        assert current.json()["status"] == "developing"
 
 
 def test_component_catalog_and_dependency_api() -> None:

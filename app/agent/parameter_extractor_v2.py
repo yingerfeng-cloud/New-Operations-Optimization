@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 from enum import Enum
+import re
 from typing import Any
 
 from app.agent.parameter_extractor import parameter_extractor
-from app.services.invocation_service import invocation_service
+from app.agent.schema_parameter_analyzer import schema_parameter_analyzer
 
 
 class ParameterSource(str, Enum):
@@ -32,10 +33,16 @@ class SchemaDrivenParameterExtractorV2:
     ) -> dict[str, Any]:
         existing = dict(existing_parameters or {})
         imported = dict(file_parameters or {})
+        removed = self._removed_keys(message, input_schema)
+        for key in removed:
+            existing.pop(key, None)
+            imported.pop(key, None)
         meta = parameter_extractor.extract_with_meta(message, input_schema, allow_llm=allow_llm)
         updates = dict(meta.get("parameters") or {})
+        for key in removed:
+            updates.pop(key, None)
         parameters = {**existing, **imported, **updates}
-        analysis = invocation_service.analyze_parameters(input_schema, parameters)
+        analysis = schema_parameter_analyzer.analyze(input_schema, parameters)
         sources: dict[str, str] = {key: ParameterSource.PREVIOUS_CONTEXT.value for key in existing}
         sources.update({key: ParameterSource.FILE_IMPORT.value for key in imported})
         extracted_source = ParameterSource.LLM_EXTRACTED if meta.get("llm_attempted") and not meta.get("llm_timeout") else ParameterSource.RULE_EXTRACTED
@@ -55,6 +62,7 @@ class SchemaDrivenParameterExtractorV2:
         return {
             "parameters": parameters,
             "updates": updates,
+            "removed_keys": removed,
             "missing_required": analysis.get("missing_required") or [],
             "invalid_params": analysis.get("invalid_parameters") or [],
             "default_candidates": default_candidates,
@@ -66,6 +74,19 @@ class SchemaDrivenParameterExtractorV2:
             "llm_timeout": bool(meta.get("llm_timeout")),
             "fallback_mode": meta.get("fallback_mode"),
         }
+
+    def _removed_keys(self, message: str, input_schema: list[dict[str, Any]]) -> list[str]:
+        text = str(message or "")
+        if not re.search(r"(?:删除|移除|清空|不要|去掉)", text):
+            return []
+        removed: list[str] = []
+        for item in input_schema or []:
+            key = str(item.get("key") or "")
+            aliases = [key, str(item.get("name") or "")]
+            aliases.extend(str(value) for value in item.get("aliases") or [])
+            if key and any(alias and alias in text for alias in aliases):
+                removed.append(key)
+        return removed
 
 
 parameter_extractor_v2 = SchemaDrivenParameterExtractorV2()

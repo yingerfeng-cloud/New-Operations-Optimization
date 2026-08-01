@@ -12,7 +12,7 @@ type ModelAsset = {
   published_at?: string;
 };
 
-const callable = new Set(['published', 'trial', 'tested']);
+const callable = new Set(['published', 'trial']);
 
 async function json<T>(response: APIResponse): Promise<T> {
   expect(response.ok(), await response.text()).toBeTruthy();

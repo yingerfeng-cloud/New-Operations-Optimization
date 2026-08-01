@@ -4,6 +4,8 @@ import { bindingCode, hasBindingValue, isBindingComplete } from './bindingValida
 import { analyzeDraftNonlinear } from './nonlinearDiagnostics';
 import { systemTimeFieldCodes, validateDraftTimeDimension } from './timeDimensionDraft';
 import { dimensionFieldConflict, extractDimensions } from './modelDimensions';
+import { activeDraftForBuilderMode } from './builderModeTransition';
+import { componentDependencyErrors } from '../../../utils/componentDependencies';
 
 export interface DraftValidation { valid: boolean; sections: Record<string, { valid: boolean; errors: string[]; warnings?: string[] }> }
 
@@ -12,16 +14,9 @@ function componentId(component: Record<string, unknown>) {
 }
 
 function dependencyErrors(draft: ModelDraft) {
-  if (draft.basic_info.builder_mode !== 'component_based') return [];
-  const enabled = new Set(draft.components.filter(component => component.enabled !== false).map(componentId).filter(Boolean));
-  return draft.components.flatMap(component => {
-    const id = componentId(component);
-    const dependencies = [
-      ...((Array.isArray(component.dependencies) ? component.dependencies : []) as string[]),
-      ...((Array.isArray(component.depends_on) ? component.depends_on : []) as string[]),
-    ].filter(Boolean);
-    return dependencies.filter(item => !enabled.has(String(item))).map(item => `${id || '组件'} 缺少依赖 ${item}`);
-  });
+  return draft.basic_info.builder_mode === 'component_based'
+    ? componentDependencyErrors(draft.components)
+    : [];
 }
 
 function parameterBindingErrors(draft: ModelDraft) {
@@ -80,7 +75,8 @@ function problemTypeErrors(draft: ModelDraft) {
   return [...functionMappingErrors(draft), ...nonlinear.blocking_items.map(item => item.message)];
 }
 
-export function validateModelDraft(d: ModelDraft): DraftValidation {
+export function validateModelDraft(sourceDraft: ModelDraft): DraftValidation {
+  const d = activeDraftForBuilderMode(sourceDraft);
   const basicInfoErrors: string[] = [];
   if (!d.basic_info.name) basicInfoErrors.push('模型名称必填');
   if (!d.basic_info.model_code) basicInfoErrors.push('模型编码必填');

@@ -47,6 +47,16 @@ def sync_skill_schema(skill_name: str) -> dict:
     return skill_registry.sync_schema(skill_name)
 
 
+@router.post("/skills/{skill_name}/validate")
+def validate_skill_definition(skill_name: str, body: dict | None = None) -> dict:
+    return skill_registry.validate_skill_definition(skill_name, body)
+
+
+@router.get("/skills/{skill_name}/versions")
+def list_skill_versions(skill_name: str) -> list[dict]:
+    return skill_registry.list_skill_versions(skill_name)
+
+
 @router.get("/skills/{skill_name}/invocations")
 def list_skill_invocations(skill_name: str) -> list[dict]:
     return skill_registry.list_invocations(skill_name)
@@ -57,9 +67,14 @@ def create_agent_skill(skill_name: str, body: dict | None = None) -> dict:
     return skill_registry.create_agent_skill(skill_name, (body or {}).get("agent_skill_name"))
 
 
+@router.post("/models/{model_id}/skills/preview")
+def preview_model_skill(model_id: str, body: dict | None = None) -> dict:
+    return skill_registry.preview_skill(model_id, body)
+
+
 @router.post("/models/{model_id}/skills/generate")
-def generate_model_skill(model_id: str) -> dict:
-    return skill_registry.generate_skill(model_id)
+def generate_model_skill(model_id: str, body: dict | None = None) -> dict:
+    return skill_registry.generate_skill(model_id, body)
 
 
 @router.put("/skills/{skill_name}")

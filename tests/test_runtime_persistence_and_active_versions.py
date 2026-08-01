@@ -51,7 +51,7 @@ def _model(
     )
 
 
-def test_runtime_schema_v2_restores_models_versions_assets_tasks_and_results(tmp_path, monkeypatch) -> None:
+def test_runtime_schema_v3_restores_models_versions_assets_tasks_and_results(tmp_path, monkeypatch) -> None:
     path = tmp_path / "runtime_store.json"
     monkeypatch.setenv("COPT_RUNTIME_STORE", str(path))
     store = MemoryStore()
@@ -74,7 +74,7 @@ def test_runtime_schema_v2_restores_models_versions_assets_tasks_and_results(tmp
 
     store.save_runtime()
     payload = json.loads(path.read_text(encoding="utf-8"))
-    assert payload["schema_version"] == 2
+    assert payload["schema_version"] == 3
     assert "TOP-SECRET-RUNTIME-KEY" not in path.read_text(encoding="utf-8")
     assert set(payload["models"]) == {user_model.id}
     assert "builtin:runtime_case" not in payload["model_versions"]
@@ -91,6 +91,35 @@ def test_runtime_schema_v2_restores_models_versions_assets_tasks_and_results(tmp
     assert restored.results["TASK-SUCCESS"]["result"]["status"] == "SUCCESS"
     persisted_after_restart = json.loads(path.read_text(encoding="utf-8"))
     assert persisted_after_restart["tasks"]["TASK-RUNNING"]["status"] == "INTERRUPTED"
+
+
+def test_runtime_schema_v2_permanently_migrates_tested_model_status_to_trial(tmp_path, monkeypatch) -> None:
+    path = tmp_path / "runtime_store_v2.json"
+    legacy_model = _model("MODEL-LEGACY-TESTED", "legacy_tested", family="FAMILY-LEGACY", version="v1.0", active=True, status="trial").model_dump(mode="json")
+    legacy_model["status"] = "tested"
+    path.write_text(json.dumps({
+        "schema_version": 2,
+        "models": {legacy_model["id"]: legacy_model},
+        "model_versions": {
+            "FAMILY-LEGACY": [{
+                "model_id": legacy_model["id"],
+                "model_family_id": "FAMILY-LEGACY",
+                "version": "v1.0",
+                "status": "tested",
+            }],
+        },
+        "active_model_versions": {"FAMILY-LEGACY": legacy_model["id"]},
+    }, ensure_ascii=False), encoding="utf-8")
+    monkeypatch.setenv("COPT_RUNTIME_STORE", str(path))
+
+    restored = MemoryStore()
+
+    assert restored.models[legacy_model["id"]].status == "trial"
+    assert restored.model_versions["FAMILY-LEGACY"][0]["status"] == "trial"
+    migrated_payload = json.loads(path.read_text(encoding="utf-8"))
+    assert migrated_payload["schema_version"] == 3
+    assert migrated_payload["models"][legacy_model["id"]]["status"] == "trial"
+    assert migrated_payload["model_versions"]["FAMILY-LEGACY"][0]["status"] == "trial"
 
 
 def test_runtime_persistence_survives_fresh_backend_process(tmp_path) -> None:
@@ -161,7 +190,7 @@ def test_resolver_prefers_user_active_version_but_explicit_id_keeps_history() ->
 def test_duplicate_active_code_from_another_user_family_is_blocked() -> None:
     code = "duplicate_family_case"
     existing = _model("MODEL-FAMILY-A", code, family="FAMILY-A", version="v1.0", active=True)
-    candidate = _model("MODEL-FAMILY-B", code, family="FAMILY-B", version="v1.0", active=False, status="tested")
+    candidate = _model("MODEL-FAMILY-B", code, family="FAMILY-B", version="v1.0", active=False, status="trial")
     with STORE.lock:
         STORE.models[existing.id] = existing
         STORE.models[candidate.id] = candidate
@@ -248,9 +277,9 @@ def test_publish_new_version_switches_skill_and_agent_to_new_asset(monkeypatch) 
 
     assert model_service.resolve_model(model_code=code).id == second.id
     assert second.published_by == "system"
-    assert model_service.resolve_model(model_id=first.id).id == first.id
+    assert model_service.resolve_model(model_id=first.id, require_published=False).id == first.id
     assert model_service.get_model(first.id).is_active_version is False
-    assert model_service.get_model(first.id).status == "published"
+    assert model_service.get_model(first.id).status == "offline"
     with STORE.lock:
         STORE.skills[skill_name] = {"skill_name": skill_name, "model_id": first.id, "status": "enabled"}
 

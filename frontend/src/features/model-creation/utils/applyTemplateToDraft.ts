@@ -22,7 +22,11 @@ export function applyTemplateToDraft(draft: ModelDraft, template: ModelTemplate,
     },
     semantic: { ...draft.semantic, ...(source.semantic || {}) },
   } as ModelDraft;
-  candidate.advanced = { ...candidate.advanced, ui_metadata: { ...objectValue(template.ui_metadata), ...(candidate.advanced.ui_metadata || {}) } };
+  candidate.advanced = {
+    ...candidate.advanced,
+    description: String(template.description || candidate.advanced.description || ''),
+    ui_metadata: { ...objectValue(template.ui_metadata), ...(candidate.advanced.ui_metadata || {}) },
+  };
   const templateConfig = objectValue(template.ui_metadata).time_dimension
     || source.time_dimension
     || objectValue(objectValue(source.advanced).ui_metadata).time_dimension

@@ -1,8 +1,9 @@
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { EditorView } from '@codemirror/view';
 import { vi } from 'vitest';
 import { FormulaEditor } from '../../features/formula-editor/FormulaEditor';
 import { formulaCompletionOptions } from '../../features/formula-editor/FormulaCodeEditor';
+import type { FormulaDef } from '../../types/formula';
 
 const { analyzeFormulaMock } = vi.hoisted(() => ({ analyzeFormulaMock: vi.fn() }));
 vi.mock('../../api/formulas', () => ({ analyzeFormula: analyzeFormulaMock, expandFormula: analyzeFormulaMock }));
@@ -35,6 +36,25 @@ const compiledResult = (expression: string) => ({
   estimated_expansion: { constraint_count: 1, term_count: 1, exact: true }, status: 'compile_valid',
   checks: { syntax: 'passed', symbol_dimension_unit: 'passed', classification: 'linear', compile: 'passed' },
 });
+
+function existingFormula(overrides: Partial<FormulaDef> = {}): FormulaDef {
+  return {
+    formula_id: 'existing',
+    name: '已有公式',
+    kind: 'constraint',
+    solve_participation: 'solve_active',
+    display_formula: 'p_grid[time] >= load[time]',
+    dsl_formula: 'p_grid[time] >= load[time]',
+    tokens: [],
+    foreach: ['time'],
+    referenced_sets: [],
+    referenced_parameters: [],
+    referenced_variables: [],
+    free_indices: [],
+    compile_status: 'ready',
+    ...overrides,
+  };
+}
 
 test('solve_active formula cannot be applied until authoritative compilation succeeds', async () => {
   const onChange = vi.fn();
@@ -69,6 +89,50 @@ test('inserts variable at cursor and applies', async () => {
   expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ referenced_variables: expect.arrayContaining(['p_grid']) }));
 });
 
+test('offers click-to-insert tags for symbols, operators and function syntax', () => {
+  render(<FormulaEditor symbols={symbols} />);
+  expect(screen.getByRole('button', { name: /机组/ })).toBeInTheDocument();
+
+  fireEvent.click(screen.getByRole('tab', { name: '运算符' }));
+  expect(screen.getByRole('button', { name: '插入运算符 >=' })).toBeInTheDocument();
+
+  fireEvent.click(screen.getByRole('tab', { name: '函数' }));
+  fireEvent.click(screen.getByRole('button', { name: /插入函数 求和/ }));
+  const view = EditorView.findFromDOM(screen.getByLabelText('公式表达式'))!;
+  expect(view.state.doc.toString()).toBe('sum(value for i in set)');
+  expect(view.state.sliceDoc(view.state.selection.main.from, view.state.selection.main.to)).toBe('value');
+
+  fireEvent.click(screen.getByRole('tab', { name: '变量' }));
+  fireEvent.click(screen.getByRole('button', { name: /机组出力/ }));
+  expect(view.state.doc.toString()).toBe('sum(unit_output[u,t] for i in set)');
+});
+
+test('search filters function templates and shows a clear empty state', () => {
+  render(<FormulaEditor symbols={symbols} />);
+  fireEvent.change(screen.getByRole('searchbox', { name: '搜索集合、变量、参数、函数' }), { target: { value: '求和' } });
+  fireEvent.click(screen.getByRole('tab', { name: '函数' }));
+  expect(screen.getByRole('button', { name: /插入函数 求和/ })).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: /插入函数 最小值/ })).not.toBeInTheDocument();
+
+  fireEvent.change(screen.getByRole('searchbox', { name: '搜索集合、变量、参数、函数' }), { target: { value: '不存在' } });
+  expect(screen.getAllByText('没有匹配项').length).toBeGreaterThan(0);
+});
+
+test('hydrates tokens for an existing formula before validating it', () => {
+  render(<FormulaEditor value={existingFormula({ dsl_formula: 'missing_var[t] >= load_forecast[t]' })} symbols={symbols} />);
+  expect(screen.getByText('引用变量不存在：missing_var')).toBeInTheDocument();
+});
+
+test('asks for confirmation before deleting an existing formula', () => {
+  const onDelete = vi.fn();
+  render(<FormulaEditor value={existingFormula()} symbols={symbols} onDelete={onDelete} />);
+  fireEvent.click(screen.getByRole('button', { name: '删除公式' }));
+  expect(screen.getByText('确认删除这条公式？')).toBeInTheDocument();
+  expect(onDelete).not.toHaveBeenCalled();
+  fireEvent.click(within(screen.getByRole('dialog', { name: '确认删除这条公式？' })).getByRole('button', { name: '删除公式' }));
+  expect(onDelete).toHaveBeenCalledWith('existing');
+});
+
 test('empty formula cannot be applied', () => {
   const onChange = vi.fn();
   render(<FormulaEditor onChange={onChange} symbols={symbols} />);
@@ -82,6 +146,16 @@ test('uses the professional code editor and supports focus mode', () => {
   fireEvent.click(screen.getByRole('button', { name: '全屏聚焦' }));
   expect(screen.getByRole('button', { name: '退出全屏' })).toBeInTheDocument();
   expect(screen.getByText(/Ctrl\+Space 补全/)).toBeInTheDocument();
+});
+
+test('exits focus mode without discarding or prompting for unsaved edits', async () => {
+  render(<FormulaEditor symbols={symbols} />);
+  await setFormula('p_grid[time] >= load[time]');
+  fireEvent.click(screen.getByRole('button', { name: '全屏聚焦' }));
+  fireEvent.click(screen.getByRole('button', { name: '退出全屏' }));
+  expect(screen.queryByText('存在未保存的公式修改')).not.toBeInTheDocument();
+  const view = EditorView.findFromDOM(screen.getByLabelText('公式表达式'))!;
+  expect(view.state.doc.toString()).toBe('p_grid[time] >= load[time]');
 });
 
 test('destroys the CodeMirror view exactly once when the editor unmounts', () => {

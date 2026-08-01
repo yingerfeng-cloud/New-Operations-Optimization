@@ -74,6 +74,11 @@ def offline_model(model_id: str) -> ModelView:
     return model_service.offline_model(model_id)
 
 
+@router.post("/models/{model_id}/return-to-draft", response_model=ModelView)
+def return_model_to_draft(model_id: str) -> ModelView:
+    return model_service.return_model_to_draft(model_id)
+
+
 @router.delete("/models/{model_id}")
 def delete_model(model_id: str) -> dict[str, str]:
     return model_service.delete_model(model_id)

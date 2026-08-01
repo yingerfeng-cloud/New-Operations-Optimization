@@ -1,7 +1,7 @@
 import { ApiOutlined, BugOutlined, LinkOutlined, ReloadOutlined } from '@ant-design/icons';
-import { Alert, Button, Card, Descriptions, Drawer, Input, Modal, Space, Statistic, Table, Tabs, Tag, Typography, message } from 'antd';
+import { Alert, Button, Card, Checkbox, Descriptions, Drawer, Input, Modal, Space, Statistic, Table, Tabs, Tag, Typography, message } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   createAgentSkill,
@@ -9,9 +9,14 @@ import {
   enableSkill,
   getSkill,
   getSkillInvocations,
+  getSkillVersions,
   getSkills,
+  generateModelSkill,
   runSkill,
   syncSkillSchema,
+  updateSkill,
+  validateSkill,
+  type SkillDefinition,
   type PlatformSkill,
   type SkillInputField,
 } from '../../api/skills';
@@ -59,10 +64,17 @@ export function SkillCenterPage() {
   const [debugOpen, setDebugOpen] = useState(false);
   const [debugPayload, setDebugPayload] = useState('{}');
   const [debugResult, setDebugResult] = useState<Record<string, unknown>>();
+  const [definitionDraft, setDefinitionDraft] = useState('{}');
+  const [useLlmGeneration, setUseLlmGeneration] = useState(false);
   const skills = useQuery({ queryKey: ['platform-skills'], queryFn: getSkills });
   const selected = useQuery({ queryKey: ['platform-skill', selectedName], queryFn: () => getSkill(selectedName!), enabled: !!selectedName });
   const agentDetail = useQuery({ queryKey: ['agent-skill-v2', selected.data?.agent_skill_name], queryFn: () => getAgentSkill(String(selected.data?.agent_skill_name)), enabled: Boolean(selected.data?.agent_skill_name) });
   const invocations = useQuery({ queryKey: ['skill-invocations', selectedName], queryFn: () => getSkillInvocations(selectedName!), enabled: !!selectedName });
+  const versions = useQuery({ queryKey: ['skill-versions', selectedName], queryFn: () => getSkillVersions(selectedName!), enabled: !!selectedName && Boolean(selected.data?.generated) });
+
+  useEffect(() => {
+    setDefinitionDraft(JSON.stringify(selected.data?.definition || {}, null, 2));
+  }, [selected.data?.definition, selectedName]);
 
   const rows = skills.data || [];
   const stats = useMemo(() => {
@@ -80,6 +92,7 @@ export function SkillCenterPage() {
     if (selectedName) {
       qc.invalidateQueries({ queryKey: ['platform-skill', selectedName] });
       qc.invalidateQueries({ queryKey: ['skill-invocations', selectedName] });
+      qc.invalidateQueries({ queryKey: ['skill-versions', selectedName] });
     }
   };
 
@@ -87,6 +100,39 @@ export function SkillCenterPage() {
   const disableMutation = useMutation({ mutationFn: disableSkill, onSuccess: () => { message.success('Skill 已停用'); refresh(); } });
   const syncMutation = useMutation({ mutationFn: syncSkillSchema, onSuccess: () => { message.success('Schema 已同步'); refresh(); } });
   const agentMutation = useMutation({ mutationFn: createAgentSkill, onSuccess: () => { message.success('Agent Skill 已生成'); refresh(); } });
+  const generateMutation = useMutation({
+    mutationFn: (skill: PlatformSkill) => {
+      if (!skill.model_id) throw new Error('Skill 未绑定模型');
+      return generateModelSkill(skill.model_id, { use_llm: useLlmGeneration, status: skill.skill_status || 'enabled' });
+    },
+    onSuccess: data => {
+      setSelectedName(data.skill_name);
+      setDefinitionDraft(JSON.stringify(data.definition || {}, null, 2));
+      message.success('完整 Skill 已生成并完成校验');
+      refresh();
+    },
+    onError: error => message.error(error instanceof Error ? error.message : String(error)),
+  });
+  const validateMutation = useMutation({
+    mutationFn: async () => {
+      if (!selectedName) throw new Error('请选择 Skill');
+      return validateSkill(selectedName, parseJsonObject(definitionDraft) as SkillDefinition);
+    },
+    onSuccess: validation => validation.status === 'valid' ? message.success('SkillDefinition 校验通过') : message.error('SkillDefinition 校验失败'),
+    onError: error => message.error(error instanceof Error ? error.message : String(error)),
+  });
+  const saveDefinitionMutation = useMutation({
+    mutationFn: async () => {
+      if (!selectedName) throw new Error('请选择 Skill');
+      return updateSkill(selectedName, { definition: parseJsonObject(definitionDraft) as SkillDefinition });
+    },
+    onSuccess: data => {
+      setDefinitionDraft(JSON.stringify(data.definition || {}, null, 2));
+      message.success('人工修改已保存为新修订');
+      refresh();
+    },
+    onError: error => message.error(error instanceof Error ? error.message : String(error)),
+  });
   const runMutation = useMutation({
     mutationFn: async () => {
       if (!selectedName) throw new Error('请选择 Skill');
@@ -130,11 +176,12 @@ export function SkillCenterPage() {
     {
       title: '操作',
       fixed: 'right',
-      width: 330,
+      width: 420,
       render: (_, row) => (
         <Space wrap>
           <Button size="small" onClick={() => setSelectedName(row.skill_name)}>详情</Button>
           <Button size="small" icon={<BugOutlined />} onClick={() => openDebug(row)}>测试</Button>
+          <Button size="small" type={row.generated ? 'default' : 'primary'} onClick={() => generateMutation.mutate(row)}>{row.generated ? '重新生成' : '生成完整 Skill'}</Button>
           <Button size="small" onClick={() => (row.skill_status === 'enabled' ? disableMutation : enableMutation).mutate(row.skill_name)}>{row.skill_status === 'enabled' ? '停用' : '启用'}</Button>
           <Button size="small" icon={<ReloadOutlined />} onClick={() => syncMutation.mutate(row.skill_name)}>同步</Button>
           <Button size="small" icon={<LinkOutlined />} onClick={() => agentMutation.mutate(row.skill_name)}>生成 Agent</Button>
@@ -211,6 +258,50 @@ export function SkillCenterPage() {
                 ]} />,
               },
               {
+                key: 'definition',
+                label: '生成与结果解释',
+                children: (
+                  <Space orientation="vertical" size={12} style={{ width: '100%' }}>
+                    <Alert
+                      showIcon
+                      type={detail.definition_validation?.status === 'valid' ? 'success' : detail.generated ? 'error' : 'info'}
+                      title={detail.generated ? `SkillDefinition ${detail.definition_validation?.status || '待校验'}，当前修订 r${detail.definition_revision || '-'}` : '尚未持久化完整 SkillDefinition'}
+                      description="生成器只从模型契约建立输入、输出、解释指标与证据引用；大模型仅可增强文案，不能修改计算和阈值。"
+                    />
+                    <Descriptions bordered size="small" column={2} items={[
+                      { key: 'binding', label: '绑定策略', children: text(detail.binding_policy) },
+                      { key: 'revision', label: '修订', children: text(detail.definition_revision) },
+                      { key: 'hash', label: '定义 Hash', span: 2, children: <Typography.Text copyable>{text(detail.definition_hash)}</Typography.Text> },
+                      { key: 'score', label: '校验分', children: text(detail.definition_validation?.score) },
+                      { key: 'llm', label: '生成方式', children: text((detail.definition?.generation as Record<string, unknown> | undefined)?.mode) },
+                    ]} />
+                    <Space wrap>
+                      <Checkbox checked={useLlmGeneration} onChange={event => setUseLlmGeneration(event.target.checked)}>使用已配置大模型增强文案</Checkbox>
+                      <Button type="primary" loading={generateMutation.isPending} onClick={() => generateMutation.mutate(detail)}>{detail.generated ? '按模型契约重新生成' : '自动生成完整 Skill'}</Button>
+                      <Button loading={validateMutation.isPending} onClick={() => validateMutation.mutate()}>校验人工修改</Button>
+                      <Button loading={saveDefinitionMutation.isPending} onClick={() => saveDefinitionMutation.mutate()}>保存为新修订</Button>
+                    </Space>
+                    {validateMutation.data && <JsonViewer value={validateMutation.data} />}
+                    <Typography.Text strong>可人工修改的 SkillDefinition</Typography.Text>
+                    <Input.TextArea aria-label="SkillDefinition JSON" rows={24} value={definitionDraft} onChange={event => setDefinitionDraft(event.target.value)} />
+                    <Typography.Text strong>修订历史</Typography.Text>
+                    <Table
+                      size="small"
+                      pagination={false}
+                      loading={versions.isFetching}
+                      rowKey={row => String(row.definition_hash || row.revision)}
+                      dataSource={versions.data || []}
+                      columns={[
+                        { title: '修订', dataIndex: 'revision' },
+                        { title: '来源', dataIndex: 'source' },
+                        { title: '校验', render: (_, row: Record<string, unknown>) => text((row.validation as Record<string, unknown> | undefined)?.status) },
+                        { title: '时间', dataIndex: 'created_at' },
+                      ]}
+                    />
+                  </Space>
+                ),
+              },
+              {
                 key: 'output',
                 label: '输出 Schema',
                 children: <JsonViewer value={detail.output_schema || {}} />,
@@ -218,7 +309,7 @@ export function SkillCenterPage() {
               {
                 key: 'agent',
                 label: 'Agent 绑定',
-                children: <Space orientation="vertical" size={12} style={{ width: '100%' }}><JsonViewer value={{ agent_enabled: detail.agent_enabled, agent_skill_name: detail.agent_skill_name, has_agent_package: detail.has_agent_package, agent_package_status: detail.agent_package_status }} />{agentDetail.data && <><Descriptions bordered size="small" column={2} items={[{ key: 'schema', label: 'schema_version', children: agentDetail.data.schema_version }, { key: 'state', label: 'state', children: agentDetail.data.state }, { key: 'profile', label: 'explanation_profile', children: agentDetail.data.explanation_profile }, { key: 'validation', label: 'validation', children: agentDetail.data.validation?.status }]} /><JsonViewer value={{ business_domain: agentDetail.data.business_domain, supported_intents: agentDetail.data.supported_intents, business_goals: agentDetail.data.business_goals, positive_examples: agentDetail.data.positive_examples, negative_examples: agentDetail.data.negative_examples, do_not_invoke_examples: agentDetail.data.do_not_invoke_examples }} /></>}</Space>,
+                children: <Space orientation="vertical" size={12} style={{ width: '100%' }}><JsonViewer value={{ agent_enabled: detail.agent_enabled, agent_skill_name: detail.agent_skill_name, has_agent_package: detail.has_agent_package, agent_package_status: detail.agent_package_status }} />{agentDetail.data && <><Descriptions bordered size="small" column={2} items={[{ key: 'schema', label: 'schema_version', children: agentDetail.data.schema_version }, { key: 'state', label: 'state', children: agentDetail.data.state }, { key: 'profile', label: 'explanation_profile', children: agentDetail.data.explanation_profile }, { key: 'validation', label: 'validation', children: agentDetail.data.validation?.status }, { key: 'quality', label: '语义质量分', children: <Tag color={Number(agentDetail.data.validation?.quality_score ?? agentDetail.data.quality_score ?? 0) >= 90 ? 'green' : 'orange'}>{Number(agentDetail.data.validation?.quality_score ?? agentDetail.data.quality_score ?? 0)} / 100</Tag> }]} /><JsonViewer value={{ business_domain: agentDetail.data.business_domain, supported_intents: agentDetail.data.supported_intents, business_goals: agentDetail.data.business_goals, positive_examples: agentDetail.data.positive_examples, negative_examples: agentDetail.data.negative_examples, do_not_invoke_examples: agentDetail.data.do_not_invoke_examples }} /></>}</Space>,
               },
               {
                 key: 'invocations',
@@ -246,8 +337,14 @@ export function SkillCenterPage() {
       >
         <Space orientation="vertical" size={12} style={{ width: '100%' }}>
           <Alert showIcon type="info" icon={<ApiOutlined />} title="测试调用会执行真实 Skill；高风险生产参数请先人工复核。" />
-          <Input.TextArea rows={10} value={debugPayload} onChange={event => setDebugPayload(event.target.value)} />
-          {debugResult && <Card size="small" title="原始返回"><JsonViewer value={debugResult} /></Card>}
+          <Input.TextArea aria-label="Skill 测试参数 JSON" rows={10} value={debugPayload} onChange={event => setDebugPayload(event.target.value)} />
+          {debugResult && (
+            <>
+              {Boolean(debugResult.explanation_structured) && <Card size="small" title="证据化结果解释"><JsonViewer value={debugResult.explanation_structured} /></Card>}
+              {Boolean(debugResult.evidence_package) && <Card size="small" title="EvidencePackage"><JsonViewer value={debugResult.evidence_package} /></Card>}
+              <Card size="small" title="原始返回"><JsonViewer value={debugResult} /></Card>
+            </>
+          )}
         </Space>
       </Modal>
       {skills.isError && <Alert className="section-gap" showIcon type="error" title="Skill 列表加载失败" />}

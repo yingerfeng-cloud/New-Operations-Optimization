@@ -25,8 +25,16 @@ const testState = vi.hoisted(() => {
       ],
     },
   };
+  const trialSample: ModelAsset = {
+    ...modelSample,
+    id: 'model_service_trial_001',
+    name: '试运行验收模型',
+    version: 'v1.1',
+    status: 'trial',
+  };
   return {
     modelSample,
+    trialSample,
     assetDetail: {
       parameter_schema: {
         parameters: [
@@ -42,7 +50,7 @@ const testState = vi.hoisted(() => {
 });
 
 vi.mock('../../api/models', () => ({
-  getModels: async () => [testState.modelSample],
+  getModels: async () => [testState.modelSample, testState.trialSample],
   getModelAssetDetail: async () => testState.assetDetail,
 }));
 
@@ -73,6 +81,7 @@ test('renders model services page and service list', async () => {
 
   expect(screen.getByText('模型服务治理与在线调用')).toBeInTheDocument();
   expect((await screen.findAllByText('日前调度服务')).length).toBeGreaterThan(0);
+  expect(screen.queryByText('试运行验收模型')).not.toBeInTheDocument();
   expect(screen.getByRole('tab', { name: '在线调试' })).toBeInTheDocument();
 });
 

@@ -11,6 +11,11 @@ function rowsFrom(value: unknown): Array<Record<string, unknown>> {
   return Array.isArray(value) ? value as Array<Record<string, unknown>> : [];
 }
 
+function preferredRows(primary: unknown, legacy: unknown) {
+  const primaryRows = rowsFrom(primary);
+  return primaryRows.length ? primaryRows : rowsFrom(legacy);
+}
+
 export function SchemaItemTable({ rows, title }: { rows?: SchemaItem[]; title: string }) {
   const dataSource = (rows || []).map((row, index) => ({ ...row, __row_key: row.code || row.key || `${title}-${index}` }));
   return (
@@ -35,8 +40,8 @@ export function SchemaItemTable({ rows, title }: { rows?: SchemaItem[]; title: s
 }
 
 export function ComponentMathDefinition({ component }: { component: ComponentDef }) {
-  const constraints = [...rowsFrom(component.generated_constraints), ...rowsFrom(component.constraints)].map((row, index) => ({ ...row, __row_key: row.constraint_id || row.name || `constraint-${index}` }));
-  const objectiveTerms = [...rowsFrom(component.generated_objective_terms), ...rowsFrom(component.objective_terms)].map((row, index) => ({ ...row, __row_key: row.term_id || row.name || `objective-${index}` }));
+  const constraints = preferredRows(component.generated_constraints, component.constraints).map((row, index) => ({ ...row, __row_key: row.constraint_id || row.name || `constraint-${index}` }));
+  const objectiveTerms = preferredRows(component.generated_objective_terms, component.objective_terms).map((row, index) => ({ ...row, __row_key: row.term_id || row.name || `objective-${index}` }));
   const columns = [
     { title: '名称', dataIndex: 'name', render: (value: unknown, row: Record<string, unknown>) => String(value || row.constraint_id || row.term_id || '-') },
     { title: '公式', render: (_value: unknown, row: Record<string, unknown>) => <FormulaDisplay row={row} /> },

@@ -9,7 +9,7 @@ const navigate = vi.hoisted(() => vi.fn());
 const testState = vi.hoisted(() => ({
   models: [
     { id: 'm1', name: '日前模型', scene: '日前机组组合优化', status: 'published', template_id: 'unit_commitment_day_ahead' },
-    { id: 'm2', name: '水电模型', scene: '梯级水电日前调度', status: 'tested', template_id: 'cascade_hydro_dispatch' },
+    { id: 'm2', name: '水电模型', scene: '梯级水电日前调度', status: 'trial', template_id: 'cascade_hydro_dispatch' },
   ] as Array<Record<string, unknown>>,
   scenarioItems: undefined as undefined | Array<{ code: string; label: string; enabled: boolean; sort_order: number }>,
 }));
@@ -39,7 +39,7 @@ beforeEach(() => {
   navigate.mockReset();
   testState.models = [
     { id: 'm1', name: '日前模型', scene: '日前机组组合优化', status: 'published', template_id: 'unit_commitment_day_ahead' },
-    { id: 'm2', name: '水电模型', scene: '梯级水电日前调度', status: 'tested', template_id: 'cascade_hydro_dispatch' },
+    { id: 'm2', name: '水电模型', scene: '梯级水电日前调度', status: 'trial', template_id: 'cascade_hydro_dispatch' },
   ];
   testState.scenarioItems = undefined;
 });

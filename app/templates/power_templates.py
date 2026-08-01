@@ -10,7 +10,7 @@ from app.model_components.registry import list_component_catalog
 
 TEMPLATE_DISPLAY_NAMES = {
     "unit_commitment_day_ahead": ("日前机组组合优化 Unit Commitment", "日前机组组合优化，生成机组启停、启动和出力计划。"),
-    "economic_dispatch": ("经济负荷分配", "已知机组在线状态下分配出力并降低发电成本。"),
+    "economic_dispatch": ("经济调度", "已知机组在线状态下分配出力并降低发电成本。"),
     "storage_dispatch": ("储能充放电优化", "根据电价预测优化储能充放电计划。"),
     "renewable_storage_dispatch": ("风光储协同", "优化新能源消纳、弃电和储能配合。"),
     "chp_dispatch": ("热电协同优化", "热电联产机组同时满足电负荷与热负荷。"),
@@ -62,6 +62,8 @@ def power_template_library() -> dict[str, dict[str, Any]]:
                 "rolling_horizon、current_time 和窗口滚动逻辑由滚动运行服务处理。"
             )
             template.setdefault("ui_metadata", {})["capability_boundary"] = template["description"]
+        template.setdefault("ui_metadata", {})["description"] = template.get("description", template.get("scenario", ""))
+        template["ui_metadata"]["documentation_source"] = "template_definition"
         if code == "pv_storage_capacity_planning":
             _normalize_pv_storage_capacity_template(template)
         _normalize_template_time_sets(template)
@@ -234,7 +236,16 @@ def _base(code: str, name: str, scenario: str, tags: list[str]) -> dict[str, Any
     }
 
 
-def _param(code: str, name: str, unit: str, dimension: list[str], source: str, sample: Any, validation: dict[str, Any] | None = None) -> dict[str, Any]:
+def _param(
+    code: str,
+    name: str,
+    unit: str,
+    dimension: list[str],
+    source: str,
+    sample: Any,
+    validation: dict[str, Any] | None = None,
+    default_policy: str | None = None,
+) -> dict[str, Any]:
     return {
         "code": code,
         "name": name,
@@ -246,6 +257,7 @@ def _param(code: str, name: str, unit: str, dimension: list[str], source: str, s
         "default": None,
         "sample": sample,
         "validation": validation or {},
+        **({"default_policy": default_policy} if default_policy else {}),
     }
 
 
@@ -300,11 +312,11 @@ def _economic_dispatch() -> dict[str, Any]:
         sets=[{"code": "unit", "name": "机组集合", "values": sample["unit"]}, {"code": "time", "name": "时段集合", "values": list(range(4))}],
         parameters=[
             _param("load_forecast", "负荷预测", "MW", ["time"], "forecast", sample["load_forecast"], {"type": "array", "min": 0}),
-            _param("unit_min_output", "机组最小出力", "MW", ["unit"], "EAM", sample["unit_min_output"], {"type": "dict", "min": 0}),
+            _param("unit_min_output", "机组最小出力", "MW", ["unit"], "EAM", sample["unit_min_output"], {"type": "dict", "min": 0}, "default_allowed"),
             _param("unit_max_output", "机组最大出力", "MW", ["unit"], "EAM", sample["unit_max_output"], {"type": "dict", "min": 0}),
             _param("fuel_cost", "燃料成本", "元/MWh", ["unit"], "cost_system", sample["fuel_cost"], {"type": "dict", "min": 0}),
-            _param("ramp_up_limit", "上爬坡限制", "MW/h", ["unit"], "EAM", sample["ramp_up_limit"], {"type": "dict", "min": 0}),
-            _param("ramp_down_limit", "下爬坡限制", "MW/h", ["unit"], "EAM", sample["ramp_down_limit"], {"type": "dict", "min": 0}),
+            _param("ramp_up_limit", "上爬坡限制", "MW/h", ["unit"], "EAM", sample["ramp_up_limit"], {"type": "dict", "min": 0}, "default_allowed"),
+            _param("ramp_down_limit", "下爬坡限制", "MW/h", ["unit"], "EAM", sample["ramp_down_limit"], {"type": "dict", "min": 0}, "default_allowed"),
         ],
         variables=[_var("unit_output", "机组出力", "MW", ["unit", "time"])],
         constraints=[
@@ -339,9 +351,9 @@ def _storage_dispatch() -> dict[str, Any]:
             _param("storage_capacity", "储能容量", "MWh", ["storage"], "BMS", sample["storage_capacity"], {"type": "dict", "min": 0}),
             _param("charge_power_max", "最大充电功率", "MW", ["storage"], "BMS", sample["charge_power_max"], {"type": "dict", "min": 0}),
             _param("discharge_power_max", "最大放电功率", "MW", ["storage"], "BMS", sample["discharge_power_max"], {"type": "dict", "min": 0}),
-            _param("charge_efficiency", "充电效率", "p.u.", ["storage"], "BMS", sample["charge_efficiency"], {"type": "dict", "min": 0, "max": 1}),
-            _param("discharge_efficiency", "放电效率", "p.u.", ["storage"], "BMS", sample["discharge_efficiency"], {"type": "dict", "min": 0, "max": 1}),
-            _param("initial_soc", "初始SOC", "MWh", ["storage"], "BMS", sample["initial_soc"], {"type": "dict", "min": 0}),
+            _param("charge_efficiency", "充电效率", "p.u.", ["storage"], "BMS", sample["charge_efficiency"], {"type": "dict", "min": 0, "max": 1}, "default_allowed"),
+            _param("discharge_efficiency", "放电效率", "p.u.", ["storage"], "BMS", sample["discharge_efficiency"], {"type": "dict", "min": 0, "max": 1}, "default_allowed"),
+            _param("initial_soc", "初始SOC", "MWh", ["storage"], "BMS", sample["initial_soc"], {"type": "dict", "min": 0}, "default_allowed"),
         ],
         variables=[
             _var("storage_charge", "储能充电", "MW", ["storage", "time"]),
@@ -1450,24 +1462,24 @@ def _retail_da_spot_bidding_v1() -> dict[str, Any]:
         },
         "metrics_config": {
             "metrics": [
-                {"key": "average_spot_price", "expression": "avg(spot_price_forecast)"},
-                {"key": "contract_cost", "expression": "sum(contract_price[t] * contract_energy[t] for t in time)"},
-                {"key": "spot_purchase_cost", "expression": "sum(spot_price_forecast[t] * spot_buy[t] for t in time)"},
-                {"key": "storage_cycle_cost_total", "expression": "sum(storage_cycle_cost * (charge[t] + discharge[t]) * delta_t for t in time)"},
-                {"key": "flex_load_cost", "expression": "sum(shift_cost[t] * (load_shift_in[t] + load_shift_out[t]) for t in time)"},
-                {"key": "cut_load_cost", "expression": "sum(cut_cost[t] * load_cut[t] for t in time)"},
-                {"key": "deviation_risk_cost", "expression": "sum(deviation_penalty[t] * (deviation_short[t] + deviation_long[t]) for t in time)"},
-                {"key": "total_expected_cost", "expression": "contract_cost + spot_purchase_cost + storage_cycle_cost_total + flex_load_cost + cut_load_cost + deviation_risk_cost + terminal_soc_penalty * (terminal_soc_dev_pos + terminal_soc_dev_neg)"},
-                {"key": "total_spot_buy_energy", "expression": "sum(spot_buy[t] for t in time)"},
-                {"key": "total_load_cut", "expression": "sum(load_cut[t] for t in time)"},
-                {"key": "deviation_short_total", "expression": "sum(deviation_short[t] for t in time)"},
-                {"key": "deviation_long_total", "expression": "sum(deviation_long[t] for t in time)"},
-                {"key": "terminal_soc_penalty_cost", "expression": "terminal_soc_penalty * (terminal_soc_dev_pos + terminal_soc_dev_neg)"},
-                {"key": "shift_balance_gap", "expression": "abs(sum(load_shift_out[t] for t in time) - sum(load_shift_in[t] for t in time))"},
-                {"key": "soc_min_actual", "expression": "min(soc[tv] for tv in time_volume)"},
-                {"key": "soc_max_actual", "expression": "max(soc[tv] for tv in time_volume)"},
-                {"key": "charge_discharge_conflict_count", "expression": "sum(charge[t] > 0.000001 and discharge[t] > 0.000001 for t in time)"},
-                {"key": "terminal_soc_gap", "expression": "abs(soc[horizon] - terminal_soc_target)"},
+                {"key": "average_spot_price", "name": "平均现货价格", "expression": "avg(spot_price_forecast)"},
+                {"key": "contract_cost", "name": "合约成本", "expression": "sum(contract_price[t] * contract_energy[t] for t in time)"},
+                {"key": "spot_purchase_cost", "name": "现货购电成本", "expression": "sum(spot_price_forecast[t] * spot_buy[t] for t in time)"},
+                {"key": "storage_cycle_cost_total", "name": "储能循环总成本", "expression": "sum(storage_cycle_cost * (charge[t] + discharge[t]) * delta_t for t in time)"},
+                {"key": "flex_load_cost", "name": "可调负荷成本", "expression": "sum(shift_cost[t] * (load_shift_in[t] + load_shift_out[t]) for t in time)"},
+                {"key": "cut_load_cost", "name": "负荷削减成本", "expression": "sum(cut_cost[t] * load_cut[t] for t in time)"},
+                {"key": "deviation_risk_cost", "name": "偏差风险成本", "expression": "sum(deviation_penalty[t] * (deviation_short[t] + deviation_long[t]) for t in time)"},
+                {"key": "total_expected_cost", "name": "预期总成本", "expression": "contract_cost + spot_purchase_cost + storage_cycle_cost_total + flex_load_cost + cut_load_cost + deviation_risk_cost + terminal_soc_penalty * (terminal_soc_dev_pos + terminal_soc_dev_neg)"},
+                {"key": "total_spot_buy_energy", "name": "现货购电总量", "expression": "sum(spot_buy[t] for t in time)"},
+                {"key": "total_load_cut", "name": "负荷削减总量", "expression": "sum(load_cut[t] for t in time)"},
+                {"key": "deviation_short_total", "name": "短缺偏差总量", "expression": "sum(deviation_short[t] for t in time)"},
+                {"key": "deviation_long_total", "name": "富余偏差总量", "expression": "sum(deviation_long[t] for t in time)"},
+                {"key": "terminal_soc_penalty_cost", "name": "期末 SOC 偏差成本", "expression": "terminal_soc_penalty * (terminal_soc_dev_pos + terminal_soc_dev_neg)"},
+                {"key": "shift_balance_gap", "name": "负荷转移平衡差", "expression": "abs(sum(load_shift_out[t] for t in time) - sum(load_shift_in[t] for t in time))"},
+                {"key": "soc_min_actual", "name": "实际最低 SOC", "expression": "min(soc[tv] for tv in time_volume)"},
+                {"key": "soc_max_actual", "name": "实际最高 SOC", "expression": "max(soc[tv] for tv in time_volume)"},
+                {"key": "charge_discharge_conflict_count", "name": "充放电冲突次数", "expression": "sum(charge[t] > 0.000001 and discharge[t] > 0.000001 for t in time)"},
+                {"key": "terminal_soc_gap", "name": "期末 SOC 偏差", "expression": "abs(soc[horizon] - terminal_soc_target)"},
             ],
             "business_metrics": [
                 "total_expected_cost",
@@ -1644,8 +1656,36 @@ def _pv_storage_base_sample() -> dict[str, Any]:
     return {"horizon": 4, "time": [0, 1, 2, 3], "time_volume": [0, 1, 2, 3, 4], "pv_forecast": [20, 100, 80, 10], "grid_limit": [80, 80, 80, 80], "schedule": [40, 80, 70, 30], "price": [300, 300, 450, 500], "deviation_limit": [0, 0, 0, 0], "deviation_penalty_price": 1, "eta_ch": 0.95, "eta_dis": 0.95, "delta_t": 1, "initial_soc": 0, "terminal_time": 4, "terminal_soc_target": 0, "storage_power_capacity": 30, "storage_energy_capacity": 60, "soc_min": 0.1, "soc_max": 1.0, "capex_power": 1000, "capex_energy": 500, "curtailment_penalty": 100, "storage_cycle_cost": 1, "degradation_cost_yuan_per_mwh": 0}
 
 
+def _pv_storage_metric_definitions() -> list[dict[str, str]]:
+    return [
+        {"key": "objective_value", "name": "目标函数值"},
+        {"key": "total_pv_generation_used", "name": "光伏消纳总量"},
+        {"key": "total_pv_curtailment", "name": "弃光总量"},
+        {"key": "curtailment_rate", "name": "弃光率"},
+        {"key": "storage_charge_energy", "name": "储能充电量"},
+        {"key": "storage_discharge_energy", "name": "储能放电量"},
+        {"key": "soc_start", "name": "期初 SOC"},
+        {"key": "soc_end", "name": "期末 SOC"},
+        {"key": "schedule_deviation", "name": "计划偏差"},
+        {"key": "total_deviation", "name": "总偏差量"},
+        {"key": "total_deviation_penalty_energy", "name": "超限偏差电量"},
+        {"key": "market_revenue", "name": "市场收益"},
+        {"key": "deviation_penalty_cost", "name": "偏差考核成本"},
+        {"key": "storage_degradation_cost", "name": "储能衰减成本"},
+        {"key": "net_objective_proxy", "name": "净收益代理值"},
+        {"key": "soc_min_actual", "name": "实际最低 SOC"},
+        {"key": "soc_max_actual", "name": "实际最高 SOC"},
+        {"key": "revenue", "name": "收益"},
+        {"key": "investment_cost", "name": "投资成本"},
+        {"key": "total_cost", "name": "总成本"},
+        {"key": "payback_period_years", "name": "投资回收期"},
+        {"key": "storage_power_capacity", "name": "储能功率容量"},
+        {"key": "storage_energy_capacity", "name": "储能能量容量"},
+    ]
+
+
 def _pv_storage_component_template_v2(code: str, name: str, scenario: str, components: list[dict[str, Any]], sample: dict[str, Any], problem_type: str, mode: str) -> dict[str, Any]:
-    component_spec = {"model_code": code, "build_mode": "component_based", "name": name, "model_problem_type": problem_type, "required_solver_capabilities": [problem_type], "sets": [{"code": "time", "name": "调度时段", "values": sample["time"]}, {"code": "time_volume", "name": "SOC时点", "values": sample["time_volume"]}], "variables": [], "components": components, "objective": {"type": "weighted_sum", "sense": "minimize", "terms": _pv_storage_objective_terms_v2(mode), "weights": sample.get("weights", {})}, "ui_language": "zh-CN", "dispatch_mode": mode}
+    component_spec = {"model_code": code, "build_mode": "component_based", "name": name, "model_problem_type": problem_type, "required_solver_capabilities": [problem_type], "sets": [{"code": "time", "name": "调度时段", "values": sample["time"]}, {"code": "time_volume", "name": "SOC时点", "values": sample["time_volume"]}], "variables": [], "components": components, "objective": {"type": "weighted_sum", "sense": "minimize", "terms": _pv_storage_objective_terms_v2(mode), "weights": sample.get("weights", {})}, "metrics_config": {"metrics": _pv_storage_metric_definitions()}, "ui_language": "zh-CN", "dispatch_mode": mode}
     params = [
         _param("horizon", "调度时段数", "period", [], "dispatch_plan", sample["horizon"], {"type": "integer", "min": 1}),
         _param("time", "调度时段", "", ["time"], "dispatch_plan", sample["time"], {"type": "array"}),

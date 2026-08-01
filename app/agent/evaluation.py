@@ -8,6 +8,7 @@ from app.agent.intent_router_v2 import intent_router_v2
 from app.agent.parameter_extractor_v2 import parameter_extractor_v2
 from app.explainers.evidence_builder import evidence_builder
 from app.explainers.generic_explainer import generic_explainer
+from app.explainers.grounded_output_validator import grounded_output_validator
 
 
 def load_jsonl(path: str | Path) -> list[dict[str, Any]]:
@@ -22,11 +23,24 @@ def evaluate_intent_cases(cases: list[dict[str, Any]], skills: list[dict[str, An
     clarification_expected = 0
     clarification_found = 0
     unsafe_auto_invoke_count = 0
+    knowledge_expected = 0
+    knowledge_correct = 0
+    knowledge_predicted = 0
+    safety_expected = 0
+    safety_correct = 0
     failures: list[dict[str, Any]] = []
     for case in cases:
         result = intent_router_v2.route(str(case.get("utterance") or ""), {}, skills)
         expected_intent = case.get("expected_intent_type")
         actual_intent = result.get("intent_type")
+        if expected_intent == "knowledge_question":
+            knowledge_expected += 1
+        if actual_intent == "knowledge_question":
+            knowledge_predicted += 1
+            knowledge_correct += int(expected_intent == "knowledge_question")
+        if expected_intent == "safety_refusal":
+            safety_expected += 1
+            safety_correct += int(actual_intent == "safety_refusal")
         if expected_intent == actual_intent or (expected_intent == "clarification_required" and result.get("need_clarification")):
             intent_correct += 1
         expected_skill = case.get("expected_skill")
@@ -50,6 +64,9 @@ def evaluate_intent_cases(cases: list[dict[str, Any]], skills: list[dict[str, An
         "wrong_invocation_rate": round(wrong_invocations / max(1, total), 4),
         "clarification_recall": round(clarification_found / max(1, clarification_expected), 4),
         "unsafe_auto_invoke_count": unsafe_auto_invoke_count,
+        "knowledge_question_precision": round(knowledge_correct / max(1, knowledge_predicted), 4),
+        "knowledge_question_recall": round(knowledge_correct / max(1, knowledge_expected), 4),
+        "safety_reject_recall": round(safety_correct / max(1, safety_expected), 4),
         "failures": failures,
         "case_count": total,
     }
@@ -60,9 +77,19 @@ def evaluate_parameter_cases(cases: list[dict[str, Any]], skill_lookup: dict[str
     failures: list[dict[str, Any]] = []
     for case in cases:
         skill = skill_lookup.get(str(case.get("skill"))) or {}
-        result = parameter_extractor_v2.extract(str(case.get("utterance") or ""), skill.get("input_schema") or [], allow_llm=False)
+        result = parameter_extractor_v2.extract(
+            str(case.get("utterance") or ""),
+            skill.get("input_schema") or [],
+            existing_parameters=case.get("existing_parameters") or {},
+            allow_llm=False,
+        )
         expected = case.get("expected_params") or {}
-        if all(result.get("parameters", {}).get(key) == value for key, value in expected.items()):
+        expected_removed = set(case.get("expected_removed") or [])
+        actual = result.get("parameters", {})
+        if (
+            all(actual.get(key) == value for key, value in expected.items())
+            and all(key not in actual for key in expected_removed)
+        ):
             correct += 1
         else:
             failures.append({"case": case, "actual": result.get("parameters")})
@@ -71,6 +98,7 @@ def evaluate_parameter_cases(cases: list[dict[str, Any]], skill_lookup: dict[str
 
 def evaluate_explanation_cases(cases: list[dict[str, Any]]) -> dict[str, Any]:
     grounded = 0
+    unsupported_claim_count = 0
     failures: list[dict[str, Any]] = []
     for case in cases:
         evidence = evidence_builder.build(result=case, model={"id": "eval"}, skill_name="eval")
@@ -80,8 +108,18 @@ def evaluate_explanation_cases(cases: list[dict[str, Any]]) -> dict[str, Any]:
         valid = explanation.get("grounded_on") == "evidence_package"
         valid = valid and (objective is None or str(objective) in text)
         valid = valid and ("成本降低" not in text or "baseline" in str(evidence))
+        _, validation = grounded_output_validator.validate(explanation, evidence, explanation)
+        unsupported = [
+            reason for reason in validation.get("reasons") or []
+            if str(reason).startswith(("UNSUPPORTED_CLAIM", "UNSUPPORTED_NUMBER"))
+        ]
+        unsupported_claim_count += len(unsupported)
         if valid:
             grounded += 1
         else:
             failures.append({"case": case, "evidence": evidence, "explanation": explanation})
-    return {"explanation_groundedness": round(grounded / max(1, len(cases)), 4), "explanation_failures": failures}
+    return {
+        "explanation_groundedness": round(grounded / max(1, len(cases)), 4),
+        "unsupported_claim_count": unsupported_claim_count,
+        "explanation_failures": failures,
+    }

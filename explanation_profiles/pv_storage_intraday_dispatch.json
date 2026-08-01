@@ -1,11 +1,20 @@
 {
   "profile_name": "pv_storage_intraday_dispatch",
-  "applies_to": {"tags": ["pv_storage_intraday", "光储日内"]},
+  "profile_version": "1.0",
+  "applies_to": {"tags": ["pv_storage_intraday", "光储日内"], "business_domains": ["pv_storage"], "model_families": ["pv_storage_intraday_dispatch"]},
   "key_metrics": [
-    {"name": "rolling_curtailment", "label": "滚动窗口弃电量", "expression": "sum(pv_curtailment)", "unit": "MWh"},
-    {"name": "rolling_storage_discharge", "label": "滚动窗口储能放电量", "expression": "sum(storage_discharge)", "unit": "MWh"}
+    {"name": "rolling_curtailment", "label": "滚动窗口弃电量", "function": "total_energy", "args": ["pv_curtailment"], "unit": "MWh"},
+    {"name": "rolling_storage_discharge", "label": "滚动窗口储能放电量", "function": "total_energy", "args": ["storage_discharge"], "unit": "MWh"},
+    {"name": "rolling_storage_charge", "label": "滚动窗口储能充电量", "function": "total_energy", "args": ["storage_charge"], "unit": "MWh"},
+    {"name": "soc_range", "label": "SOC 波动范围", "function": "range_value", "args": ["soc"], "unit": "MWh"},
+    {"name": "peak_export_period", "label": "最大并网出力时段", "function": "max_period", "args": ["grid_export"], "unit": ""},
+    {"name": "dispatch_switch_count", "label": "充放电切换次数", "function": "switch_count", "args": ["storage_power"], "unit": "次"}
   ],
-  "risk_rules": [],
-  "manual_review_points": ["确认最新预测数据的更新时间与完整性。", "复核滚动窗口末端状态的衔接。"],
+  "risk_rules": [
+    {"name": "forecast_freshness", "condition": "forecast_age_minutes > 60", "level": "high", "message": "预测数据更新时间过早，滚动结果可能失真。"},
+    {"name": "soc_boundary", "condition": "soc_min <= 0", "level": "high", "message": "滚动窗口内 SOC 触及下边界。"},
+    {"name": "frequent_switching", "condition": "dispatch_switch_count > 6", "level": "medium", "message": "滚动计划切换频繁，需复核执行稳定性。"}
+  ],
+  "manual_review_points": ["确认最新预测数据的更新时间与完整性。", "复核滚动窗口末端状态的衔接。", "复核计划变更幅度和现场执行能力。"],
   "explanation_limits": ["滚动优化仅基于当前输入数据，不代表未来实际最优。"]
 }

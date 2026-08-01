@@ -80,19 +80,6 @@ function functionTypeText(type?: string) {
   return type || '-';
 }
 
-function hydroAssetLabel(id?: string, name?: string) {
-  const map: Record<string, string> = {
-    cascade_hydro_level_storage_v1: '水位库容曲线',
-    cascade_hydro_tailwater_outflow_v1: '尾水位流量曲线',
-    cascade_hydro_power_surface_v1: '水电出力二维曲面',
-  };
-  return map[String(id || '')] || name || id || '-';
-}
-
-function isHydroDemoAsset(asset?: FunctionAsset) {
-  return ['cascade_hydro_level_storage_v1', 'cascade_hydro_tailwater_outflow_v1', 'cascade_hydro_power_surface_v1'].includes(String(asset?.function_id || ''));
-}
-
 function solveStrategyText(strategy?: string) {
   const map: Record<string, string> = {
     display_only: '仅展示',
@@ -470,7 +457,6 @@ export function FunctionAssetsPage() {
   const [importForm] = Form.useForm();
   const list = useQuery({ queryKey: ['function-assets'], queryFn: getFunctionAssets });
   const rows = list.data || [];
-  const sortedRows = useMemo(() => [...rows].sort((a, b) => Number(isHydroDemoAsset(b)) - Number(isHydroDemoAsset(a))), [rows]);
   const importPreview = useMemo(() => parseCsvRows(importCsvText), [importCsvText]);
 
   const usedCount = rows.filter(item => (item.referenced_by || []).length > 0).length;
@@ -761,10 +747,10 @@ export function FunctionAssetsPage() {
         <Table<FunctionAsset>
           rowKey="function_id"
           loading={list.isLoading}
-          dataSource={sortedRows}
+          dataSource={rows}
           pagination={false}
           columns={[
-            { title: '名称', render: (_, row) => <Space orientation="vertical" size={0}><Typography.Text strong>{hydroAssetLabel(row.function_id, row.name)}</Typography.Text><Typography.Text type="secondary">{row.function_id}</Typography.Text>{isHydroDemoAsset(row) && <Tag color="geekblue">水电调度演示资产</Tag>}</Space> },
+            { title: '名称', render: (_, row) => <Space orientation="vertical" size={0}><Typography.Text strong>{row.name || row.function_id}</Typography.Text><Typography.Text type="secondary">{row.function_id}</Typography.Text></Space> },
             { title: '类型', render: (_, row) => functionTypeText(row.function_type) },
             { title: '校验状态', render: (_, row) => <Tag color={validationColor(row.validation_status)}>{validationText(row.validation_status)}</Tag> },
             { title: '求解策略', render: (_, row) => solveStrategyText(row.solve_strategy) },
@@ -965,7 +951,7 @@ export function FunctionAssetsPage() {
           <Space orientation="vertical" size={16} style={{ width: '100%' }}>
             <Descriptions bordered size="small" column={2}>
               <Descriptions.Item label="函数 ID">{selected.function_id}</Descriptions.Item>
-              <Descriptions.Item label="业务展示名">{hydroAssetLabel(selected.function_id, selected.name)}</Descriptions.Item>
+              <Descriptions.Item label="业务展示名">{selected.name || selected.function_id}</Descriptions.Item>
               <Descriptions.Item label="类型">{functionTypeText(selected.function_type)}</Descriptions.Item>
               <Descriptions.Item label="校验状态"><Tag color={validationColor(selected.validation_status)}>{validationText(selected.validation_status)}</Tag></Descriptions.Item>
               <Descriptions.Item label="求解策略">{solveStrategyText(selected.solve_strategy)}</Descriptions.Item>

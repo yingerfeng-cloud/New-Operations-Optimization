@@ -430,7 +430,7 @@ export function ModelCreationPage() {
       {modalContextHolder}
       <PageHeader
         title={workspaceTitles[resolvedMode]}
-        description={resolvedMode === 'version' ? '基于已发布模型创建独立的新版本，旧发布版本不会被直接修改。' : '当前工作台仅使用本模式指定的数据源，模式之间不会自动恢复其他草稿。'}
+        description={resolvedMode === 'version' ? '创建同一模型族的新草稿并继承选定版本；原试运行、已发布或已下线版本不会被直接覆盖。' : '当前工作台仅使用本模式指定的数据源，模式之间不会自动恢复其他草稿。'}
         extra={(
           <Space wrap>
             <Dropdown

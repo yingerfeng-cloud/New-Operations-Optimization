@@ -1,5 +1,6 @@
 import { autocompletion, type CompletionContext } from '@codemirror/autocomplete';
 import { linter, type Diagnostic } from '@codemirror/lint';
+import { Prec } from '@codemirror/state';
 import { EditorView, keymap } from '@codemirror/view';
 import { python } from '@codemirror/lang-python';
 import CodeMirror, { type ReactCodeMirrorRef } from '@uiw/react-codemirror';
@@ -9,7 +10,7 @@ import { getFormulaSymbolDictionary } from './formulaDictionary';
 import type { FormulaSymbols } from './formulaParser';
 
 export interface FormulaCodeEditorHandle {
-  insert: (text: string) => void;
+  insert: (text: string, selection?: { start: number; end: number }) => void;
   focus: () => void;
   focusRange: (start: number, end: number) => void;
 }
@@ -76,7 +77,7 @@ export const FormulaCodeEditor = forwardRef<FormulaCodeEditorHandle, FormulaCode
       autocompletion({ override: [completionSource], activateOnTyping: true }),
       diagnosticsExtension,
       EditorView.lineWrapping,
-      keymap.of([{ key: 'Mod-Enter', run: () => { onCompile?.(); return true; } }]),
+      Prec.highest(keymap.of([{ key: 'Mod-Enter', preventDefault: true, run: () => { onCompile?.(); return true; } }])),
       EditorView.theme({
         '&': { fontSize: '14px', minHeight: '168px' },
         '.cm-content': { fontFamily: 'JetBrains Mono, Consolas, monospace', padding: '12px 0' },
@@ -88,17 +89,27 @@ export const FormulaCodeEditor = forwardRef<FormulaCodeEditorHandle, FormulaCode
   }, [completionOptions, diagnostics, onCompile]);
 
   useImperativeHandle(ref, () => ({
-    insert(text: string) {
+    insert(text: string, selectedRange) {
       const view = editorRef.current?.view;
       if (!view) return;
-      const selection = view.state.selection.main;
+      const currentSelection = view.state.selection.main;
       const source = view.state.doc.toString();
-      const left = selection.from > 0 && !/\s$/.test(source.slice(0, selection.from)) ? ' ' : '';
-      const right = selection.to < source.length && !/^\s/.test(source.slice(selection.to)) ? ' ' : '';
+      const before = source.slice(0, currentSelection.from);
+      const after = source.slice(currentSelection.to);
+      const compactToken = /^[()[\],]$/.test(text);
+      const suppressLeftSpace = compactToken || /[(\[,]$/.test(before);
+      const suppressRightSpace = compactToken || /^[)\],]/.test(after);
+      const left = currentSelection.from > 0 && !/\s$/.test(before) && !suppressLeftSpace ? ' ' : '';
+      const right = currentSelection.to < source.length && !/^\s/.test(after) && !suppressRightSpace ? ' ' : '';
       const inserted = `${left}${text}${right}`;
       view.dispatch({
-        changes: { from: selection.from, to: selection.to, insert: inserted },
-        selection: { anchor: selection.from + left.length + text.length },
+        changes: { from: currentSelection.from, to: currentSelection.to, insert: inserted },
+        selection: selectedRange
+          ? {
+            anchor: currentSelection.from + left.length + selectedRange.start,
+            head: currentSelection.from + left.length + selectedRange.end,
+          }
+          : { anchor: currentSelection.from + left.length + text.length },
       });
       view.focus();
     },

@@ -1,4 +1,4 @@
-import { Alert, Button, Collapse, Form, Input, InputNumber, Modal, Radio, Space, Tabs, Tag, Typography } from 'antd';
+import { Alert, Button, Collapse, Empty, Form, Input, InputNumber, Modal, Radio, Select, Space, Tabs, Tag, Typography } from 'antd';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { FormulaCompileResult, FormulaDef } from '../../types/formula';
 import { JsonViewer } from '../../components/JsonViewer';
@@ -13,11 +13,27 @@ import { markFormulaCompiled, withCurrentFormulaVersion } from './formulaVersion
 
 const now = () => new Date().toISOString();
 
+const operatorTokens = ['+', '-', '×', '÷', '>=', '<=', '==', '(', ')', '[', ']', ','];
+const operatorInsertText: Record<string, string> = { '×': '*', '÷': '/' };
+const functionTemplates = [
+  { name: '求和', syntax: 'sum(value for i in set)', selection: { start: 4, end: 9 } },
+  { name: '最小值', syntax: 'min(value for i in set)', selection: { start: 4, end: 9 } },
+  { name: '最大值', syntax: 'max(value for i in set)', selection: { start: 4, end: 9 } },
+  { name: '绝对值', syntax: 'abs(value)', selection: { start: 4, end: 9 } },
+  { name: '自然对数（非线性）', syntax: 'log(value)', selection: { start: 4, end: 9 } },
+  { name: '指数（非线性）', syntax: 'exp(value)', selection: { start: 4, end: 9 } },
+  { name: '平方根（非线性）', syntax: 'sqrt(value)', selection: { start: 5, end: 10 } },
+  { name: '分段函数', syntax: 'piecewise(x, curve_id)', selection: { start: 10, end: 11 } },
+];
+
 const newFormula = (kind: 'constraint' | 'objective'): FormulaDef => ({
   formula_id: crypto.randomUUID(),
   name: kind === 'constraint' ? '新约束' : '目标函数',
   kind,
   solve_participation: 'solve_active',
+  boundary_strategy: kind === 'constraint' ? 'strict' : undefined,
+  objective_direction: kind === 'objective' ? 'minimize' : undefined,
+  weight: kind === 'objective' ? 1 : undefined,
   display_formula: '',
   dsl_formula: '',
   tokens: [],
@@ -52,6 +68,27 @@ function mergeFormula(base: FormulaDef, dsl: string, symbols: FormulaSymbols): F
   };
 }
 
+function hydrateFormula(base: FormulaDef, symbols: FormulaSymbols, lockedKind?: FormulaDef['kind']) {
+  const legacyBoundary = base.boundary_strategy as string | undefined;
+  const boundary_strategy = legacyBoundary === 'normal'
+    ? 'strict'
+    : legacyBoundary === 'use_initial_value'
+      ? 'skip_first'
+      : legacyBoundary === 'use_terminal_value'
+        ? 'skip_last'
+        : base.boundary_strategy || ((lockedKind || base.kind) === 'constraint' ? 'strict' : undefined);
+  const hydrated = mergeFormula({ ...base, boundary_strategy, kind: lockedKind || base.kind }, base.dsl_formula, symbols);
+  return {
+    ...hydrated,
+    compile_status: base.compile_status,
+    compile_error: base.compile_error,
+    authoritative_artifact: base.authoritative_artifact,
+    compiler_version: base.compiler_version,
+    ast_version: base.ast_version,
+    diagnostics: base.diagnostics,
+  };
+}
+
 function symbolExpression(item: ReturnType<typeof getFormulaSymbolDictionary>[number]) {
   if (item.type === 'set') return item.code;
   const aliases = item.indices?.length ? `[${item.indices.join(',')}]` : '';
@@ -64,6 +101,7 @@ function editableSnapshot(formula: FormulaDef) {
     kind: formula.kind,
     expression: formula.dsl_formula,
     participation: formula.solve_participation,
+    boundary_strategy: formula.boundary_strategy,
     direction: formula.objective_direction,
     weight: formula.weight,
     priority: formula.priority,
@@ -79,6 +117,7 @@ export function FormulaBuilder({
   onCancel,
   onDelete,
   compileContext,
+  lockedKind,
 }: {
   value?: FormulaDef;
   symbols?: FormulaSymbols;
@@ -86,41 +125,61 @@ export function FormulaBuilder({
   onCancel?: () => void;
   onDelete?: (formulaId: string) => void;
   compileContext?: AuthoritativeCompileContext;
+  lockedKind?: FormulaDef['kind'];
 }) {
   const initialRef = useRef<FormulaDef | null>(null);
-  if (!initialRef.current) initialRef.current = value || newFormula('constraint');
+  if (!initialRef.current) {
+    const initial = value || newFormula(lockedKind || 'constraint');
+    initialRef.current = hydrateFormula(initial, symbols, lockedKind);
+  }
   const [formula, setFormula] = useState<FormulaDef>(initialRef.current);
-  const [savedFormula, setSavedFormula] = useState<FormulaDef>(initialRef.current);
   const [baseline, setBaseline] = useState(() => editableSnapshot(initialRef.current!));
   const [keyword, setKeyword] = useState('');
   const [authoritative, setAuthoritative] = useState<FormulaCompileResult>();
   const [compiling, setCompiling] = useState(false);
   const [focusMode, setFocusMode] = useState(false);
-  const [closeIntent, setCloseIntent] = useState<'cancel' | 'focus'>();
+  const [closeIntent, setCloseIntent] = useState(false);
+  const [deleteIntent, setDeleteIntent] = useState(false);
   const inputRef = useRef<FormulaCodeEditorHandle>(null);
-  const effectiveCompileContext: AuthoritativeCompileContext = compileContext || {
+  const baseCompileContext: AuthoritativeCompileContext = compileContext || {
     symbols: {
       sets: Object.fromEntries(Object.keys(symbols.sets || {}).map(code => [code, { values: [] }])),
       parameters: Object.entries(symbols.parameters || {}).map(([code, meta]) => ({ code, ...meta, dimension: meta.indices || [] })),
       variables: Object.entries(symbols.variables || {}).map(([code, meta]) => ({ code, ...meta, dimension: meta.indices || [] })),
     },
   };
+  const effectiveCompileContext: AuthoritativeCompileContext = {
+    ...baseCompileContext,
+    model_context: {
+      ...(baseCompileContext.model_context || {}),
+      boundary_strategy: formula.boundary_strategy || 'strict',
+    },
+  };
 
   useEffect(() => {
-    const next = value || newFormula('constraint');
+    const seed = value || newFormula(lockedKind || 'constraint');
+    const next = hydrateFormula(seed, symbols, lockedKind);
     setFormula(next);
-    setSavedFormula(next);
     setBaseline(editableSnapshot(next));
-  }, [value]);
+  }, [value, lockedKind]);
 
   const dirty = editableSnapshot(formula) !== baseline;
 
   const dictionary = useMemo(() => getFormulaSymbolDictionary({ symbols }), [symbols]);
+  const normalizedKeyword = keyword.trim().toLowerCase();
   const filtered = useMemo(() => {
-    const text = keyword.trim().toLowerCase();
-    if (!text) return dictionary;
-    return dictionary.filter(item => `${item.code} ${item.name} ${item.typeLabel}`.toLowerCase().includes(text));
-  }, [dictionary, keyword]);
+    if (!normalizedKeyword) return dictionary;
+    return dictionary.filter(item => `${item.code} ${item.name} ${item.typeLabel}`.toLowerCase().includes(normalizedKeyword));
+  }, [dictionary, normalizedKeyword]);
+  const filteredFunctions = useMemo(
+    () => normalizedKeyword
+      ? functionTemplates.filter(item => `${item.name} ${item.syntax}`.toLowerCase().includes(normalizedKeyword))
+      : functionTemplates,
+    [normalizedKeyword],
+  );
+  const filteredOperators = normalizedKeyword
+    ? operatorTokens.filter(item => item.includes(normalizedKeyword))
+    : operatorTokens;
   const check = useMemo(
     () => validateFormula(formula.dsl_formula, formula.kind, formula.tokens, symbols, formula.foreach),
     [formula, symbols],
@@ -192,48 +251,46 @@ export function FormulaBuilder({
     inputRef.current?.insert(text);
   };
 
-  const symbolList = (type: 'set' | 'variable' | 'parameter') => (
-    <div className="formula-object-list">
-      {filtered.filter(item => item.type === type).map(item => (
-        <button type="button" key={`${item.type}-${item.code}`} onClick={() => insertText(symbolExpression(item))}>
-          <span>
-            <strong>{item.name}</strong>
-            <small>{item.code}{item.unit ? ` · ${item.unit}` : ''}</small>
-          </span>
-          <Tag>{item.typeLabel}</Tag>
+  const symbolList = (type: 'set' | 'variable' | 'parameter') => {
+    const items = filtered.filter(item => item.type === type);
+    if (!items.length) return <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="没有匹配项" />;
+    return (
+      <div className="formula-tag-cloud">
+        {items.map(item => (
+        <button
+          type="button"
+          className={`formula-insert-tag is-${item.type}`}
+          key={`${item.type}-${item.code}`}
+          title={`插入 ${item.name}（${symbolExpression(item)}）`}
+          onClick={() => insertText(symbolExpression(item))}
+        >
+          <span className="formula-insert-tag-name">{item.name}</span>
+          <code>{symbolExpression(item)}</code>
+          {item.unit && <span className="formula-insert-tag-unit">{item.unit}</span>}
         </button>
-      ))}
-    </div>
-  );
+        ))}
+      </div>
+    );
+  };
 
   const participation = formula.solve_participation || 'solve_active';
   const authoritativeCurrent = isAuthoritativeArtifactCurrent(formula, effectiveCompileContext);
   const canApply = check.valid && Boolean(formula.dsl_formula.trim()) && (participation !== 'solve_active' || authoritativeCurrent);
 
-  const finishClose = (discard: boolean) => {
-    if (closeIntent === 'focus') {
-      if (discard) setFormula(savedFormula);
-      setFocusMode(false);
-    } else {
-      onCancel?.();
-    }
-    setCloseIntent(undefined);
-  };
-
-  const requestClose = (intent: 'cancel' | 'focus') => {
+  const requestClose = () => {
     if (!dirty) {
-      if (intent === 'focus') setFocusMode(false);
-      else onCancel?.();
+      onCancel?.();
       return;
     }
-    setCloseIntent(intent);
+    setCloseIntent(true);
   };
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key !== 'Escape') return;
       event.preventDefault();
-      requestClose(focusMode ? 'focus' : 'cancel');
+      if (focusMode) setFocusMode(false);
+      else requestClose();
     };
     window.addEventListener('keydown', onKeyDown, true);
     return () => window.removeEventListener('keydown', onKeyDown, true);
@@ -256,11 +313,17 @@ export function FormulaBuilder({
           <Form.Item label="业务分组" style={{ margin: 0 }}>
             <Input aria-label="业务分组" placeholder="例如：状态递推" value={formula.business_group} onChange={event => commit({ ...formula, business_group: event.target.value })} />
           </Form.Item>
-          <Radio.Group
-            value={formula.kind}
-            onChange={event => commit({ ...formula, kind: event.target.value })}
-            options={[{ value: 'constraint', label: '约束' }, { value: 'objective', label: '目标函数' }]}
-          />
+          {lockedKind ? (
+            <Tag color={lockedKind === 'constraint' ? 'blue' : 'purple'}>
+              {lockedKind === 'constraint' ? '约束' : '目标函数'}
+            </Tag>
+          ) : (
+            <Radio.Group
+              value={formula.kind}
+              onChange={event => commit({ ...formula, kind: event.target.value })}
+              options={[{ value: 'constraint', label: '约束' }, { value: 'objective', label: '目标函数' }]}
+            />
+          )}
           {formula.kind === 'objective' && (
             <>
               <Radio.Group
@@ -281,16 +344,36 @@ export function FormulaBuilder({
             onChange={event => commit({ ...formula, solve_participation: event.target.value })}
             options={[{ value: 'solve_active', label: '参与求解' }, { value: 'preview_only', label: '仅预览' }, { value: 'disabled', label: '停用' }]}
           />
+          {formula.kind === 'constraint' && (
+            <Form.Item label="边界策略" style={{ margin: 0 }}>
+              <Select
+                aria-label="边界策略"
+                style={{ width: 180 }}
+                value={formula.boundary_strategy || 'strict'}
+                onChange={boundary_strategy => commit({ ...formula, boundary_strategy })}
+                options={[
+                  { value: 'strict', label: '严格校验（默认）' },
+                  { value: 'skip_first', label: '跳过首时点' },
+                  { value: 'skip_last', label: '跳过末时点' },
+                  { value: 'skip_out_of_range', label: '越界时跳过（兼容）' },
+                  { value: 'explicit_subset', label: '显式子集' },
+                ]}
+              />
+            </Form.Item>
+          )}
         </Space>
         <Space>
-          <Button onClick={() => focusMode ? requestClose('focus') : setFocusMode(true)}>{focusMode ? '退出全屏' : '全屏聚焦'}</Button>
+          <Button onClick={() => setFocusMode(current => !current)}>{focusMode ? '退出全屏' : '全屏聚焦'}</Button>
           <Tag color={check.valid ? 'green' : 'red'}>{check.valid ? '校验通过' : '需要修正'}</Tag>
         </Space>
       </div>
 
       <div className="formula-builder-grid">
         <aside className="formula-object-panel">
-          <Input.Search allowClear placeholder="搜索集合、变量、参数、函数" value={keyword} onChange={event => setKeyword(event.target.value)} />
+          <Input.Search aria-label="搜索集合、变量、参数、函数" allowClear placeholder="搜索集合、变量、参数、函数" value={keyword} onChange={event => setKeyword(event.target.value)} />
+          <Typography.Text className="formula-insert-help" type="secondary">
+            点击标签即可插入；函数模板会选中首个占位符，可继续用标签替换并组合嵌套公式。
+          </Typography.Text>
           <Tabs
             className="section-gap"
             items={[
@@ -300,12 +383,43 @@ export function FormulaBuilder({
               {
                 key: 'operators',
                 label: '运算符',
-                children: <div className="formula-object-list compact">{['+', '-', '*', '/', '>=', '<=', '=='].map(op => <button type="button" key={op} onClick={() => insertText(op)}>{op}</button>)}</div>,
+                children: (
+                  <div className="formula-tag-cloud is-compact">
+                    {filteredOperators.map(op => (
+                      <button
+                        type="button"
+                        className="formula-insert-tag is-operator"
+                        key={op}
+                        aria-label={`插入运算符 ${op}`}
+                        onClick={() => insertText(operatorInsertText[op] || op)}
+                      >
+                        <code>{op}</code>
+                      </button>
+                    ))}
+                    {!filteredOperators.length && <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="没有匹配项" />}
+                  </div>
+                ),
               },
               {
                 key: 'functions',
                 label: '函数',
-                children: <div className="formula-object-list compact">{['sum( for i in set)', 'min( for i in set)', 'max( for i in set)', 'piecewise(x, curve_id)'].map(fn => <button type="button" key={fn} onClick={() => insertText(fn)}>{fn}</button>)}</div>,
+                children: (
+                  <div className="formula-tag-cloud">
+                    {filteredFunctions.map(template => (
+                      <button
+                        type="button"
+                        className="formula-insert-tag is-function"
+                        key={template.name}
+                        aria-label={`插入函数 ${template.name}，语法 ${template.syntax}`}
+                        onClick={() => inputRef.current?.insert(template.syntax, template.selection)}
+                      >
+                        <span className="formula-insert-tag-name">{template.name}</span>
+                        <code>{template.syntax}</code>
+                      </button>
+                    ))}
+                    {!filteredFunctions.length && <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="没有匹配项" />}
+                  </div>
+                ),
               },
             ]}
           />
@@ -396,24 +510,38 @@ export function FormulaBuilder({
       </div>
 
       <div className="formula-builder-actions">
-        <Button danger disabled={!value} onClick={() => onDelete?.(formula.formula_id)}>删除公式</Button>
+        <Button danger disabled={!value || !onDelete} onClick={() => setDeleteIntent(true)}>删除公式</Button>
         <Space>
-          <Button onClick={() => requestClose('cancel')}>取消</Button>
+          <Button onClick={requestClose}>取消</Button>
           <Button loading={compiling} disabled={!check.valid || !formula.dsl_formula.trim()} onClick={runAuthoritativeCompile}>后端编译与展开</Button>
           <Button type="primary" disabled={!canApply} onClick={() => onApply?.(formula)}>应用公式</Button>
         </Space>
       </div>
       <Modal
-        open={Boolean(closeIntent)}
+        open={closeIntent}
         title="存在未保存的公式修改"
         closable={false}
         footer={[
-          <Button key="continue" onClick={() => setCloseIntent(undefined)}>继续编辑</Button>,
-          <Button key="discard" danger onClick={() => finishClose(true)}>放弃修改</Button>,
-          <Button key="save" type="primary" disabled={!canApply} onClick={() => { onApply?.(formula); finishClose(false); }}>保存并退出</Button>,
+          <Button key="continue" onClick={() => setCloseIntent(false)}>继续编辑</Button>,
+          <Button key="discard" danger onClick={() => { setCloseIntent(false); onCancel?.(); }}>放弃修改</Button>,
+          <Button key="save" type="primary" disabled={!canApply} onClick={() => { onApply?.(formula); setCloseIntent(false); onCancel?.(); }}>保存并退出</Button>,
         ]}
       >
         关闭后未保存的表达式、作用域和参与状态将丢失，请选择处理方式。
+      </Modal>
+      <Modal
+        open={deleteIntent}
+        title="确认删除这条公式？"
+        okText="删除公式"
+        cancelText="保留公式"
+        okButtonProps={{ danger: true }}
+        onCancel={() => setDeleteIntent(false)}
+        onOk={() => {
+          onDelete?.(formula.formula_id);
+          setDeleteIntent(false);
+        }}
+      >
+        删除后该公式会从当前编辑草稿中移除；只有保存组件或模型后才会正式生效。
       </Modal>
     </div>
   );
@@ -427,6 +555,7 @@ export function FormulaBuilderModal({
   onCancel,
   onDelete,
   compileContext,
+  lockedKind,
 }: {
   open: boolean;
   value?: FormulaDef;
@@ -435,6 +564,7 @@ export function FormulaBuilderModal({
   onCancel: () => void;
   onDelete?: (formulaId: string) => void;
   compileContext?: AuthoritativeCompileContext;
+  lockedKind?: FormulaDef['kind'];
 }) {
   return (
     <Modal
@@ -446,7 +576,7 @@ export function FormulaBuilderModal({
       closable={false}
       keyboard={false}
     >
-      {open && <FormulaBuilder value={value} symbols={symbols} compileContext={compileContext} onApply={onApply} onCancel={onCancel} onDelete={onDelete} />}
+      {open && <FormulaBuilder value={value} symbols={symbols} compileContext={compileContext} lockedKind={lockedKind} onApply={onApply} onCancel={onCancel} onDelete={onDelete} />}
     </Modal>
   );
 }

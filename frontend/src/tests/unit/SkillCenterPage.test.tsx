@@ -14,6 +14,10 @@ const apiMocks = vi.hoisted(() => ({
   syncSkillSchema: vi.fn(),
   createAgentSkill: vi.fn(),
   getSkillInvocations: vi.fn(),
+  getSkillVersions: vi.fn(),
+  generateModelSkill: vi.fn(),
+  validateSkill: vi.fn(),
+  updateSkill: vi.fn(),
 }));
 
 vi.mock('../../api/skills', () => ({
@@ -25,6 +29,10 @@ vi.mock('../../api/skills', () => ({
   syncSkillSchema: apiMocks.syncSkillSchema,
   createAgentSkill: apiMocks.createAgentSkill,
   getSkillInvocations: apiMocks.getSkillInvocations,
+  getSkillVersions: apiMocks.getSkillVersions,
+  generateModelSkill: apiMocks.generateModelSkill,
+  validateSkill: apiMocks.validateSkill,
+  updateSkill: apiMocks.updateSkill,
 }));
 
 vi.mock('@ant-design/icons', async () => {
@@ -48,6 +56,8 @@ vi.mock('antd', async () => {
   };
   const Button = ({ children, disabled, loading, onClick, icon }: any) =>
     h('button', { type: 'button', disabled: disabled || loading, onClick }, icon, children);
+  const Checkbox = ({ children, checked, onChange }: any) =>
+    h('label', null, h('input', { type: 'checkbox', checked, onChange }), children);
   const Space = ({ children, style }: any) => h('div', { style }, children);
   const Tag = ({ children }: any) => h('span', null, children);
   const Card = ({ children, title, className }: any) => h('section', { className }, title ? h('h3', null, title) : null, children);
@@ -60,7 +70,7 @@ vi.mock('antd', async () => {
     h('div', null, items.map((item: any) => h('section', { key: item.key }, h('button', { type: 'button' }, item.label), item.children)));
   const Alert = ({ title, message, description, className }: any) =>
     h('div', { role: 'alert', className }, textFrom(title), textFrom(message), textFrom(description));
-  const TextArea = ({ rows, value, onChange }: any) => h('textarea', { rows, value, onChange });
+  const TextArea = ({ rows, value, onChange, ...rest }: any) => h('textarea', { rows, value, onChange, ...rest });
   const Input = Object.assign(({ value, onChange }: any) => h('input', { value, onChange }), { TextArea });
   const Table = ({ dataSource = [], columns = [], rowKey }: any) =>
     h(
@@ -88,7 +98,7 @@ vi.mock('antd', async () => {
     Title: ({ children }: any) => h('h3', null, children),
   };
   const message = { success: noop, error: noop, warning: noop, info: noop, destroy: noop, loading: vi.fn(() => noop) };
-  return { Alert, Button, Card, Descriptions, Drawer, Input, Modal, Space, Statistic, Table, Tabs, Tag, Typography, message };
+  return { Alert, Button, Card, Checkbox, Descriptions, Drawer, Input, Modal, Space, Statistic, Table, Tabs, Tag, Typography, message };
 });
 
 const baseSkill: PlatformSkill = {
@@ -149,6 +159,20 @@ beforeEach(() => {
   apiMocks.getSkillInvocations.mockResolvedValue([
     { invocation_id: 'INV-1', status: 'SUCCESS', duration_seconds: 0.2, created_at: '2026-07-08T01:00:00Z' },
   ]);
+  apiMocks.getSkillVersions.mockResolvedValue([]);
+  apiMocks.generateModelSkill.mockImplementation(async (_modelId: string) => ({
+    ...baseSkill,
+    generated: true,
+    definition_revision: 1,
+    definition: { schema_version: '2.0', skill_name: baseSkill.skill_name, explanation_spec: { schema_version: '2.0', metrics: [] } },
+  }));
+  apiMocks.validateSkill.mockResolvedValue({ status: 'valid', score: 100, errors: [], warnings: [] });
+  apiMocks.updateSkill.mockImplementation(async (_name: string, body: Record<string, unknown>) => ({
+    ...baseSkill,
+    generated: true,
+    definition_revision: 2,
+    definition: body.definition,
+  }));
 });
 
 function renderPage() {
@@ -189,7 +213,7 @@ test('runs skill test with sample payload and reports invalid JSON', async () =>
   ));
   expect((await screen.findAllByText(/SUCCESS/)).length).toBeGreaterThan(0);
 
-  fireEvent.change(screen.getByRole('textbox'), { target: { value: '{bad json' } });
+  fireEvent.change(screen.getByLabelText('Skill 测试参数 JSON'), { target: { value: '{bad json' } });
   fireEvent.click(screen.getByRole('button', { name: '运行测试' }));
   expect(await screen.findByText(/ERROR/)).toBeInTheDocument();
 });
@@ -209,4 +233,40 @@ test('supports enable disable sync schema and create agent actions', async () =>
 
   fireEvent.click(within(enabledRow).getByRole('button', { name: /生成 Agent/ }));
   await waitFor(() => expect(apiMocks.createAgentSkill.mock.calls[0]?.[0]).toBe('run_storage_dispatch'));
+});
+
+test('generates a complete skill and supports validated manual revisions', async () => {
+  const generated = {
+    ...baseSkill,
+    generated: true,
+    definition_revision: 1,
+    definition_hash: 'definition-v1',
+    binding_policy: 'fixed',
+    definition_validation: { status: 'valid', score: 100, errors: [], warnings: [] },
+    definition: {
+      schema_version: '2.0',
+      skill_name: baseSkill.skill_name,
+      description: 'generated from model contract',
+      explanation_spec: { schema_version: '2.0', metrics: [] },
+    },
+  } as PlatformSkill;
+  apiMocks.skills = [generated];
+  apiMocks.getSkill.mockResolvedValue(generated);
+  apiMocks.getSkillVersions.mockResolvedValue([{ revision: 1, source: 'contract_compiler', created_at: '2026-07-08T01:00:00Z' }]);
+
+  renderPage();
+  const row = (await screen.findByText('储能调度')).closest('tr')!;
+  fireEvent.click(within(row).getByRole('button', { name: /重新生成/ }));
+  await waitFor(() => expect(apiMocks.generateModelSkill).toHaveBeenCalledWith(
+    'MODEL-POWER-STORAGE-DISPATCH',
+    { use_llm: false, status: 'enabled' },
+  ));
+
+  const textArea = await screen.findByLabelText('SkillDefinition JSON');
+  const editedDefinition = { ...generated.definition, description: 'human reviewed' };
+  fireEvent.change(textArea, { target: { value: JSON.stringify(editedDefinition) } });
+  fireEvent.click(screen.getByRole('button', { name: '校验人工修改' }));
+  await waitFor(() => expect(apiMocks.validateSkill).toHaveBeenCalledWith(baseSkill.skill_name, editedDefinition));
+  fireEvent.click(screen.getByRole('button', { name: '保存为新修订' }));
+  await waitFor(() => expect(apiMocks.updateSkill).toHaveBeenCalledWith(baseSkill.skill_name, { definition: editedDefinition }));
 });

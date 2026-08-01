@@ -77,7 +77,7 @@ def test_skill_schema_can_be_viewed() -> None:
     assert body["output_schema"]
     assert body["canonical_skill_name"]
 def test_one_published_model_version_generates_one_skill() -> None:
-    models = [m for m in client.get("/api/models").json() if m["status"] in {"published", "tested"}]
+    models = [m for m in client.get("/api/models").json() if m["status"] == "published"]
     skills = client.get("/api/skills").json()
     skill_names = [s["skill_name"] for s in skills]
     assert len(skill_names) == len(set(skill_names))

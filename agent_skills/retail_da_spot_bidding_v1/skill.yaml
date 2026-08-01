@@ -1,6 +1,6 @@
-negative_examples: ["仅咨询模型原理"]
-do_not_invoke_examples: ["只咨询业务知识，不运行优化"]
-positive_examples: ["帮我生成售电日前申报曲线", "生成售电公司日前现货申报曲线"]
+positive_examples: ["生成售电公司明天的日前申报曲线", "按用户负荷预测优化日前报价电量", "考虑合约电量形成现货申报计划", "在申报上下限内运行日前优化", "降低偏差考核成本并生成申报建议", "结合储能和柔性负荷制定申报曲线", "按明日电价预测计算各时段申报量", "检查负荷和合约后运行售电申报模型", "找出高偏差时段并重排日前申报", "在末端SOC约束下优化售电计划", "生成需要交易员审批的日前方案", "按市场限价形成二十四小时申报曲线"]
+negative_examples: ["只生成储能充放电策略", "安排光储日前电站调度", "根据实测做光储日内滚动", "只计算中长期合约敞口", "安排火电机组组合", "求梯级水电计划", "规划光伏储能容量", "分析零售套餐定价"]
+do_not_invoke_examples: ["日前申报是什么", "介绍售电公司业务", "解释偏差考核规则", "只查询市场限价", "申报曲线一般怎么做", "有哪些售电交易风险", "为什么要预测用户负荷", "不要运行模型只讲申报原理"]
 schema_version: "2.0"
 state: enabled
 business_domain:
@@ -8,7 +8,8 @@ business_domain:
   secondary: ["optimization"]
 model_family: optimization
 supported_intents: ["optimization_run", "parameter_check", "result_explanation"]
-business_goals: ["optimize"]
+business_goals: ["降低偏差成本", "形成日前申报曲线", "协调合约与灵活资源", "保留人工审批边界"]
+required_data: [{"name": "load_forecast", "label": "用户负荷预测", "ask_when_missing": "请提供次日各时段用户负荷预测。", "required": true}, {"name": "spot_price_forecast", "label": "现货价格预测", "ask_when_missing": "请提供次日现货价格预测。", "required": true}, {"name": "contract_energy", "label": "合约电量", "ask_when_missing": "请提供各时段或周期合约电量。", "required": true}, {"name": "bid_max", "label": "申报上限", "ask_when_missing": "请提供市场或业务允许的申报上限。", "required": true}]
 explanation_profile: retail_da_spot_bidding
 parameter_policy: {"allow_defaults": true, "require_default_confirmation": true, "allow_sample_data": true, "sample_data_must_be_confirmed": true}
 intent_policy: {"router_mode": "llm_plus_rules", "confidence_threshold": 0.75, "clarify_threshold": 0.6, "clarify_when_top_scores_close": true, "top_score_margin_threshold": 0.15}
@@ -18,8 +19,7 @@ display_name: 售电公司日前现货申报优化模型
 canonical_api_skill_name: run_retail_da_spot_bidding_v1
 enabled: true
 confirmation_required: true
-execution_policy:
-  mode: advisory_only
+execution_policy: {"advisory_only": true, "requires_human_review": true, "requires_invoke_confirmation": true}
 required_parameters:
   - horizon
   - time

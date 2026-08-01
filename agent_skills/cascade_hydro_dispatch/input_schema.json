@@ -152,7 +152,10 @@
   {
     "key": "availability",
     "name": "机组可用状态",
-    "dimension": [],
+    "dimension": [
+      "unit",
+      "time"
+    ],
     "type": "dict",
     "unit": "0/1",
     "required": true,
@@ -255,7 +258,10 @@
   {
     "key": "local_inflow",
     "name": "区间来水过程",
-    "dimension": [],
+    "dimension": [
+      "station",
+      "time"
+    ],
     "type": "dict",
     "unit": "m3/s",
     "required": true,

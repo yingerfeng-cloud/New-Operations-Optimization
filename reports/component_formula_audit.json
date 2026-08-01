@@ -1,0 +1,1392 @@
+{
+  "component_count": 36,
+  "builtin_component_count": 26,
+  "fixture_component_count": 10,
+  "constraint_count": 41,
+  "objective_count": 10,
+  "empty_formula_count": 0,
+  "compile_failure_count": 0,
+  "participation_mismatch_count": 0,
+  "details": [
+    {
+      "component_id": "balance_equation_component",
+      "source": "builtin",
+      "formula_id": "balance_eq",
+      "kind": "constraint",
+      "source_field": "expression",
+      "normalized_expression": "supply[t] + slack_pos[t] - slack_neg[t] == demand[t]",
+      "empty": false,
+      "participation": "solve_active",
+      "enters_solve": true,
+      "participation_mismatch": false,
+      "boundary_strategy": "strict",
+      "has_state_offset": false,
+      "compile_status": "compile_valid",
+      "compile_success": true,
+      "boundary_artifact": {
+        "boundary_strategy": "strict",
+        "effective_scope": [
+          {
+            "alias": "t",
+            "set": "time"
+          }
+        ],
+        "excluded_boundary_count": 0
+      },
+      "diagnostics": []
+    },
+    {
+      "component_id": "capacity_bounds_component",
+      "source": "builtin",
+      "formula_id": "capacity_lower_bound",
+      "kind": "constraint",
+      "source_field": "expression",
+      "normalized_expression": "bounded_value[t] >= lower_bound[t]",
+      "empty": false,
+      "participation": "solve_active",
+      "enters_solve": true,
+      "participation_mismatch": false,
+      "boundary_strategy": "strict",
+      "has_state_offset": false,
+      "compile_status": "compile_valid",
+      "compile_success": true,
+      "boundary_artifact": {
+        "boundary_strategy": "strict",
+        "effective_scope": [
+          {
+            "alias": "t",
+            "set": "time"
+          }
+        ],
+        "excluded_boundary_count": 0
+      },
+      "diagnostics": []
+    },
+    {
+      "component_id": "capacity_bounds_component",
+      "source": "builtin",
+      "formula_id": "capacity_upper_bound",
+      "kind": "constraint",
+      "source_field": "expression",
+      "normalized_expression": "bounded_value[t] <= upper_bound[t]",
+      "empty": false,
+      "participation": "solve_active",
+      "enters_solve": true,
+      "participation_mismatch": false,
+      "boundary_strategy": "strict",
+      "has_state_offset": false,
+      "compile_status": "compile_valid",
+      "compile_success": true,
+      "boundary_artifact": {
+        "boundary_strategy": "strict",
+        "effective_scope": [
+          {
+            "alias": "t",
+            "set": "time"
+          }
+        ],
+        "excluded_boundary_count": 0
+      },
+      "diagnostics": []
+    },
+    {
+      "component_id": "hydro_cascade_inflow_delay",
+      "source": "builtin",
+      "formula_id": "hydro_cascade_inflow_delay_generated_1",
+      "kind": "constraint",
+      "source_field": "dsl_formula",
+      "normalized_expression": "inflow[s,t] == local_inflow[s,t]",
+      "empty": false,
+      "participation": "solve_active",
+      "enters_solve": true,
+      "participation_mismatch": false,
+      "boundary_strategy": "strict",
+      "has_state_offset": false,
+      "compile_status": "compile_valid",
+      "compile_success": true,
+      "boundary_artifact": {
+        "boundary_strategy": "strict",
+        "effective_scope": [
+          {
+            "alias": "s",
+            "set": "station"
+          },
+          {
+            "alias": "t",
+            "set": "time"
+          }
+        ],
+        "excluded_boundary_count": 0
+      },
+      "diagnostics": []
+    },
+    {
+      "component_id": "hydro_ecological_flow",
+      "source": "builtin",
+      "formula_id": "hydro_ecological_flow_generated_1",
+      "kind": "constraint",
+      "source_field": "dsl_formula",
+      "normalized_expression": "q_out[s,t] >= ecological_flow_min[s]",
+      "empty": false,
+      "participation": "solve_active",
+      "enters_solve": true,
+      "participation_mismatch": false,
+      "boundary_strategy": "strict",
+      "has_state_offset": false,
+      "compile_status": "compile_valid",
+      "compile_success": true,
+      "boundary_artifact": {
+        "boundary_strategy": "strict",
+        "effective_scope": [
+          {
+            "alias": "s",
+            "set": "station"
+          },
+          {
+            "alias": "t",
+            "set": "time"
+          }
+        ],
+        "excluded_boundary_count": 0
+      },
+      "diagnostics": []
+    },
+    {
+      "component_id": "hydro_generation_flow_bounds",
+      "source": "builtin",
+      "formula_id": "hydro_gen_flow_min",
+      "kind": "constraint",
+      "source_field": "dsl_formula",
+      "normalized_expression": "q_gen[s,t] >= gen_flow_min[s]",
+      "empty": false,
+      "participation": "solve_active",
+      "enters_solve": true,
+      "participation_mismatch": false,
+      "boundary_strategy": "strict",
+      "has_state_offset": false,
+      "compile_status": "compile_valid",
+      "compile_success": true,
+      "boundary_artifact": {
+        "boundary_strategy": "strict",
+        "effective_scope": [
+          {
+            "alias": "s",
+            "set": "station"
+          },
+          {
+            "alias": "t",
+            "set": "time"
+          }
+        ],
+        "excluded_boundary_count": 0
+      },
+      "diagnostics": []
+    },
+    {
+      "component_id": "hydro_generation_flow_bounds",
+      "source": "builtin",
+      "formula_id": "hydro_gen_flow_max",
+      "kind": "constraint",
+      "source_field": "dsl_formula",
+      "normalized_expression": "q_gen[s,t] <= gen_flow_max[s]",
+      "empty": false,
+      "participation": "solve_active",
+      "enters_solve": true,
+      "participation_mismatch": false,
+      "boundary_strategy": "strict",
+      "has_state_offset": false,
+      "compile_status": "compile_valid",
+      "compile_success": true,
+      "boundary_artifact": {
+        "boundary_strategy": "strict",
+        "effective_scope": [
+          {
+            "alias": "s",
+            "set": "station"
+          },
+          {
+            "alias": "t",
+            "set": "time"
+          }
+        ],
+        "excluded_boundary_count": 0
+      },
+      "diagnostics": []
+    },
+    {
+      "component_id": "hydro_head_calculation",
+      "source": "builtin",
+      "formula_id": "hydro_head_calculation_generated_1",
+      "kind": "constraint",
+      "source_field": "dsl_formula",
+      "normalized_expression": "head[s,t] == forebay_level[s,t] - tailwater_level[s,t] - head_loss[s]",
+      "empty": false,
+      "participation": "solve_active",
+      "enters_solve": true,
+      "participation_mismatch": false,
+      "boundary_strategy": "strict",
+      "has_state_offset": false,
+      "compile_status": "compile_valid",
+      "compile_success": true,
+      "boundary_artifact": {
+        "boundary_strategy": "strict",
+        "effective_scope": [
+          {
+            "alias": "s",
+            "set": "station"
+          },
+          {
+            "alias": "t",
+            "set": "time"
+          }
+        ],
+        "excluded_boundary_count": 0
+      },
+      "diagnostics": []
+    },
+    {
+      "component_id": "hydro_initial_volume",
+      "source": "builtin",
+      "formula_id": "hydro_initial_volume_generated_1",
+      "kind": "constraint",
+      "source_field": "dsl_formula",
+      "normalized_expression": "volume[s,0] == initial_volume[s]",
+      "empty": false,
+      "participation": "solve_active",
+      "enters_solve": true,
+      "participation_mismatch": false,
+      "boundary_strategy": "strict",
+      "has_state_offset": false,
+      "compile_status": "compile_valid",
+      "compile_success": true,
+      "boundary_artifact": {
+        "boundary_strategy": "strict",
+        "effective_scope": [
+          {
+            "alias": "s",
+            "set": "station"
+          }
+        ],
+        "excluded_boundary_count": 0
+      },
+      "diagnostics": []
+    },
+    {
+      "component_id": "hydro_load_tracking",
+      "source": "builtin",
+      "formula_id": "hydro_load_tracking_generated_1",
+      "kind": "constraint",
+      "source_field": "dsl_formula",
+      "normalized_expression": "sum(station_power[s,t] for s in station) - load_forecast[t] == load_dev_pos[t] - load_dev_neg[t]",
+      "empty": false,
+      "participation": "solve_active",
+      "enters_solve": true,
+      "participation_mismatch": false,
+      "boundary_strategy": "strict",
+      "has_state_offset": false,
+      "compile_status": "compile_valid",
+      "compile_success": true,
+      "boundary_artifact": {
+        "boundary_strategy": "strict",
+        "effective_scope": [
+          {
+            "alias": "t",
+            "set": "time"
+          }
+        ],
+        "excluded_boundary_count": 0
+      },
+      "diagnostics": []
+    },
+    {
+      "component_id": "hydro_load_tracking",
+      "source": "builtin",
+      "formula_id": "load_tracking_penalty",
+      "kind": "objective",
+      "source_field": "expression",
+      "normalized_expression": "sum(load_dev_pos[t] + load_dev_neg[t] for t in time)",
+      "empty": false,
+      "participation": "solve_active",
+      "enters_solve": true,
+      "participation_mismatch": false,
+      "boundary_strategy": null,
+      "has_state_offset": false,
+      "compile_status": "compile_valid",
+      "compile_success": true,
+      "boundary_artifact": {
+        "boundary_strategy": "strict",
+        "effective_scope": [],
+        "excluded_boundary_count": 0
+      },
+      "diagnostics": []
+    },
+    {
+      "component_id": "hydro_outflow_balance",
+      "source": "builtin",
+      "formula_id": "hydro_outflow_balance_generated_1",
+      "kind": "constraint",
+      "source_field": "dsl_formula",
+      "normalized_expression": "q_out[s,t] == q_gen[s,t] + q_spill[s,t]",
+      "empty": false,
+      "participation": "solve_active",
+      "enters_solve": true,
+      "participation_mismatch": false,
+      "boundary_strategy": "strict",
+      "has_state_offset": false,
+      "compile_status": "compile_valid",
+      "compile_success": true,
+      "boundary_artifact": {
+        "boundary_strategy": "strict",
+        "effective_scope": [
+          {
+            "alias": "s",
+            "set": "station"
+          },
+          {
+            "alias": "t",
+            "set": "time"
+          }
+        ],
+        "excluded_boundary_count": 0
+      },
+      "diagnostics": []
+    },
+    {
+      "component_id": "hydro_outflow_bounds",
+      "source": "builtin",
+      "formula_id": "hydro_outflow_min",
+      "kind": "constraint",
+      "source_field": "dsl_formula",
+      "normalized_expression": "q_out[s,t] >= outflow_min[s]",
+      "empty": false,
+      "participation": "solve_active",
+      "enters_solve": true,
+      "participation_mismatch": false,
+      "boundary_strategy": "strict",
+      "has_state_offset": false,
+      "compile_status": "compile_valid",
+      "compile_success": true,
+      "boundary_artifact": {
+        "boundary_strategy": "strict",
+        "effective_scope": [
+          {
+            "alias": "s",
+            "set": "station"
+          },
+          {
+            "alias": "t",
+            "set": "time"
+          }
+        ],
+        "excluded_boundary_count": 0
+      },
+      "diagnostics": []
+    },
+    {
+      "component_id": "hydro_outflow_bounds",
+      "source": "builtin",
+      "formula_id": "hydro_outflow_max",
+      "kind": "constraint",
+      "source_field": "dsl_formula",
+      "normalized_expression": "q_out[s,t] <= outflow_max[s]",
+      "empty": false,
+      "participation": "solve_active",
+      "enters_solve": true,
+      "participation_mismatch": false,
+      "boundary_strategy": "strict",
+      "has_state_offset": false,
+      "compile_status": "compile_valid",
+      "compile_success": true,
+      "boundary_artifact": {
+        "boundary_strategy": "strict",
+        "effective_scope": [
+          {
+            "alias": "s",
+            "set": "station"
+          },
+          {
+            "alias": "t",
+            "set": "time"
+          }
+        ],
+        "excluded_boundary_count": 0
+      },
+      "diagnostics": []
+    },
+    {
+      "component_id": "hydro_power_flow_conversion",
+      "source": "builtin",
+      "formula_id": "hydro_power_flow_conversion_generated_1",
+      "kind": "constraint",
+      "source_field": "dsl_formula",
+      "normalized_expression": "station_power[s,t] == power_conversion[s] * q_gen[s,t]",
+      "empty": false,
+      "participation": "solve_active",
+      "enters_solve": true,
+      "participation_mismatch": false,
+      "boundary_strategy": "strict",
+      "has_state_offset": false,
+      "compile_status": "compile_valid",
+      "compile_success": true,
+      "boundary_artifact": {
+        "boundary_strategy": "strict",
+        "effective_scope": [
+          {
+            "alias": "s",
+            "set": "station"
+          },
+          {
+            "alias": "t",
+            "set": "time"
+          }
+        ],
+        "excluded_boundary_count": 0
+      },
+      "diagnostics": []
+    },
+    {
+      "component_id": "hydro_ramp_smoothing",
+      "source": "builtin",
+      "formula_id": "hydro_ramp_up",
+      "kind": "constraint",
+      "source_field": "dsl_formula",
+      "normalized_expression": "ramp_abs[s,t] >= station_power[s,t] - station_power[s,t-1]",
+      "empty": false,
+      "participation": "solve_active",
+      "enters_solve": true,
+      "participation_mismatch": false,
+      "boundary_strategy": "skip_first",
+      "has_state_offset": true,
+      "compile_status": "compile_valid",
+      "compile_success": true,
+      "boundary_artifact": {
+        "boundary_strategy": "skip_first",
+        "source_set": "time",
+        "target_set": "time",
+        "offset": -1,
+        "effective_scope": [
+          1
+        ],
+        "excluded_boundary_count": 1
+      },
+      "diagnostics": []
+    },
+    {
+      "component_id": "hydro_ramp_smoothing",
+      "source": "builtin",
+      "formula_id": "hydro_ramp_down",
+      "kind": "constraint",
+      "source_field": "dsl_formula",
+      "normalized_expression": "ramp_abs[s,t] >= station_power[s,t-1] - station_power[s,t]",
+      "empty": false,
+      "participation": "solve_active",
+      "enters_solve": true,
+      "participation_mismatch": false,
+      "boundary_strategy": "skip_first",
+      "has_state_offset": true,
+      "compile_status": "compile_valid",
+      "compile_success": true,
+      "boundary_artifact": {
+        "boundary_strategy": "skip_first",
+        "source_set": "time",
+        "target_set": "time",
+        "offset": -1,
+        "effective_scope": [
+          1
+        ],
+        "excluded_boundary_count": 1
+      },
+      "diagnostics": []
+    },
+    {
+      "component_id": "hydro_ramp_smoothing",
+      "source": "builtin",
+      "formula_id": "ramp_smoothing_penalty",
+      "kind": "objective",
+      "source_field": "expression",
+      "normalized_expression": "sum(ramp_abs[s,t] for s in station for t in time)",
+      "empty": false,
+      "participation": "solve_active",
+      "enters_solve": true,
+      "participation_mismatch": false,
+      "boundary_strategy": null,
+      "has_state_offset": false,
+      "compile_status": "compile_valid",
+      "compile_success": true,
+      "boundary_artifact": {
+        "boundary_strategy": "strict",
+        "effective_scope": [],
+        "excluded_boundary_count": 0
+      },
+      "diagnostics": []
+    },
+    {
+      "component_id": "hydro_reservoir_balance",
+      "source": "builtin",
+      "formula_id": "hydro_reservoir_balance_generated_1",
+      "kind": "constraint",
+      "source_field": "dsl_formula",
+      "normalized_expression": "volume[s,t+1] == volume[s,t] + (inflow[s,t] - q_out[s,t]) * delta_v",
+      "empty": false,
+      "participation": "solve_active",
+      "enters_solve": true,
+      "participation_mismatch": false,
+      "boundary_strategy": "skip_out_of_range",
+      "has_state_offset": true,
+      "compile_status": "compile_valid",
+      "compile_success": true,
+      "boundary_artifact": {
+        "boundary_strategy": "skip_out_of_range",
+        "source_set": "time",
+        "target_set": "time_volume",
+        "offset": 1,
+        "effective_scope": [
+          0,
+          1
+        ],
+        "excluded_boundary_count": 0
+      },
+      "diagnostics": []
+    },
+    {
+      "component_id": "hydro_spill_bounds",
+      "source": "builtin",
+      "formula_id": "hydro_spill_min",
+      "kind": "constraint",
+      "source_field": "dsl_formula",
+      "normalized_expression": "q_spill[s,t] >= 0",
+      "empty": false,
+      "participation": "solve_active",
+      "enters_solve": true,
+      "participation_mismatch": false,
+      "boundary_strategy": "strict",
+      "has_state_offset": false,
+      "compile_status": "compile_valid",
+      "compile_success": true,
+      "boundary_artifact": {
+        "boundary_strategy": "strict",
+        "effective_scope": [
+          {
+            "alias": "s",
+            "set": "station"
+          },
+          {
+            "alias": "t",
+            "set": "time"
+          }
+        ],
+        "excluded_boundary_count": 0
+      },
+      "diagnostics": []
+    },
+    {
+      "component_id": "hydro_spill_bounds",
+      "source": "builtin",
+      "formula_id": "hydro_spill_max",
+      "kind": "constraint",
+      "source_field": "dsl_formula",
+      "normalized_expression": "q_spill[s,t] <= spill_max[s]",
+      "empty": false,
+      "participation": "solve_active",
+      "enters_solve": true,
+      "participation_mismatch": false,
+      "boundary_strategy": "strict",
+      "has_state_offset": false,
+      "compile_status": "compile_valid",
+      "compile_success": true,
+      "boundary_artifact": {
+        "boundary_strategy": "strict",
+        "effective_scope": [
+          {
+            "alias": "s",
+            "set": "station"
+          },
+          {
+            "alias": "t",
+            "set": "time"
+          }
+        ],
+        "excluded_boundary_count": 0
+      },
+      "diagnostics": []
+    },
+    {
+      "component_id": "hydro_spill_bounds",
+      "source": "builtin",
+      "formula_id": "spill_penalty",
+      "kind": "objective",
+      "source_field": "expression",
+      "normalized_expression": "sum(q_spill[s,t] for s in station for t in time)",
+      "empty": false,
+      "participation": "solve_active",
+      "enters_solve": true,
+      "participation_mismatch": false,
+      "boundary_strategy": null,
+      "has_state_offset": false,
+      "compile_status": "compile_valid",
+      "compile_success": true,
+      "boundary_artifact": {
+        "boundary_strategy": "strict",
+        "effective_scope": [],
+        "excluded_boundary_count": 0
+      },
+      "diagnostics": []
+    },
+    {
+      "component_id": "hydro_station_available_capacity",
+      "source": "builtin",
+      "formula_id": "hydro_station_available_capacity_generated_1",
+      "kind": "constraint",
+      "source_field": "dsl_formula",
+      "normalized_expression": "station_power[s,t] <= station_pmax[s,t]",
+      "empty": false,
+      "participation": "solve_active",
+      "enters_solve": true,
+      "participation_mismatch": false,
+      "boundary_strategy": "strict",
+      "has_state_offset": false,
+      "compile_status": "compile_valid",
+      "compile_success": true,
+      "boundary_artifact": {
+        "boundary_strategy": "strict",
+        "effective_scope": [
+          {
+            "alias": "s",
+            "set": "station"
+          },
+          {
+            "alias": "t",
+            "set": "time"
+          }
+        ],
+        "excluded_boundary_count": 0
+      },
+      "diagnostics": []
+    },
+    {
+      "component_id": "hydro_terminal_volume",
+      "source": "builtin",
+      "formula_id": "hydro_terminal_volume_generated_1",
+      "kind": "constraint",
+      "source_field": "dsl_formula",
+      "normalized_expression": "volume[s,2] - target_terminal_volume[s] == terminal_dev_pos[s] - terminal_dev_neg[s]",
+      "empty": false,
+      "participation": "solve_active",
+      "enters_solve": true,
+      "participation_mismatch": false,
+      "boundary_strategy": "strict",
+      "has_state_offset": false,
+      "compile_status": "compile_valid",
+      "compile_success": true,
+      "boundary_artifact": {
+        "boundary_strategy": "strict",
+        "effective_scope": [
+          {
+            "alias": "s",
+            "set": "station"
+          }
+        ],
+        "excluded_boundary_count": 0
+      },
+      "diagnostics": []
+    },
+    {
+      "component_id": "hydro_terminal_volume",
+      "source": "builtin",
+      "formula_id": "terminal_volume_penalty",
+      "kind": "objective",
+      "source_field": "expression",
+      "normalized_expression": "sum(terminal_dev_pos[s] + terminal_dev_neg[s] for s in station)",
+      "empty": false,
+      "participation": "solve_active",
+      "enters_solve": true,
+      "participation_mismatch": false,
+      "boundary_strategy": null,
+      "has_state_offset": false,
+      "compile_status": "compile_valid",
+      "compile_success": true,
+      "boundary_artifact": {
+        "boundary_strategy": "strict",
+        "effective_scope": [],
+        "excluded_boundary_count": 0
+      },
+      "diagnostics": []
+    },
+    {
+      "component_id": "hydro_volume_bounds",
+      "source": "builtin",
+      "formula_id": "hydro_volume_min",
+      "kind": "constraint",
+      "source_field": "dsl_formula",
+      "normalized_expression": "volume[s,t] >= volume_min[s]",
+      "empty": false,
+      "participation": "solve_active",
+      "enters_solve": true,
+      "participation_mismatch": false,
+      "boundary_strategy": "strict",
+      "has_state_offset": false,
+      "compile_status": "compile_valid",
+      "compile_success": true,
+      "boundary_artifact": {
+        "boundary_strategy": "strict",
+        "effective_scope": [
+          {
+            "alias": "s",
+            "set": "station"
+          },
+          {
+            "alias": "t",
+            "set": "time_volume"
+          }
+        ],
+        "excluded_boundary_count": 0
+      },
+      "diagnostics": []
+    },
+    {
+      "component_id": "hydro_volume_bounds",
+      "source": "builtin",
+      "formula_id": "hydro_volume_max",
+      "kind": "constraint",
+      "source_field": "dsl_formula",
+      "normalized_expression": "volume[s,t] <= volume_max[s]",
+      "empty": false,
+      "participation": "solve_active",
+      "enters_solve": true,
+      "participation_mismatch": false,
+      "boundary_strategy": "strict",
+      "has_state_offset": false,
+      "compile_status": "compile_valid",
+      "compile_success": true,
+      "boundary_artifact": {
+        "boundary_strategy": "strict",
+        "effective_scope": [
+          {
+            "alias": "s",
+            "set": "station"
+          },
+          {
+            "alias": "t",
+            "set": "time_volume"
+          }
+        ],
+        "excluded_boundary_count": 0
+      },
+      "diagnostics": []
+    },
+    {
+      "component_id": "mccormick_bilinear_relaxation_component",
+      "source": "builtin",
+      "formula_id": "mccormick_programmatic_envelope",
+      "kind": "constraint",
+      "source_field": "dsl_formula",
+      "normalized_expression": "w ~= x * y",
+      "empty": false,
+      "participation": "solve_active",
+      "enters_solve": true,
+      "participation_mismatch": false,
+      "boundary_strategy": "strict",
+      "has_state_offset": false,
+      "compile_status": "programmatic",
+      "compile_success": true,
+      "boundary_artifact": {},
+      "diagnostics": []
+    },
+    {
+      "component_id": "network_delay_flow_component",
+      "source": "builtin",
+      "formula_id": "network_delay_eq",
+      "kind": "constraint",
+      "source_field": "expression",
+      "normalized_expression": "downstream_inflow[t] == upstream_outflow[t-1]",
+      "empty": false,
+      "participation": "solve_active",
+      "enters_solve": true,
+      "participation_mismatch": false,
+      "boundary_strategy": "skip_first",
+      "has_state_offset": true,
+      "compile_status": "compile_valid",
+      "compile_success": true,
+      "boundary_artifact": {
+        "boundary_strategy": "skip_first",
+        "source_set": "time",
+        "target_set": "time",
+        "offset": -1,
+        "effective_scope": [
+          1,
+          2
+        ],
+        "excluded_boundary_count": 1
+      },
+      "diagnostics": []
+    },
+    {
+      "component_id": "ramp_smoothing_component",
+      "source": "builtin",
+      "formula_id": "ramp_up",
+      "kind": "constraint",
+      "source_field": "expression",
+      "normalized_expression": "ramp_abs[t] >= value[t] - value[t-1]",
+      "empty": false,
+      "participation": "solve_active",
+      "enters_solve": true,
+      "participation_mismatch": false,
+      "boundary_strategy": "skip_first",
+      "has_state_offset": true,
+      "compile_status": "compile_valid",
+      "compile_success": true,
+      "boundary_artifact": {
+        "boundary_strategy": "skip_first",
+        "source_set": "time",
+        "target_set": "time",
+        "offset": -1,
+        "effective_scope": [
+          1,
+          2
+        ],
+        "excluded_boundary_count": 1
+      },
+      "diagnostics": []
+    },
+    {
+      "component_id": "ramp_smoothing_component",
+      "source": "builtin",
+      "formula_id": "ramp_down",
+      "kind": "constraint",
+      "source_field": "expression",
+      "normalized_expression": "ramp_abs[t] >= value[t-1] - value[t]",
+      "empty": false,
+      "participation": "solve_active",
+      "enters_solve": true,
+      "participation_mismatch": false,
+      "boundary_strategy": "skip_first",
+      "has_state_offset": true,
+      "compile_status": "compile_valid",
+      "compile_success": true,
+      "boundary_artifact": {
+        "boundary_strategy": "skip_first",
+        "source_set": "time",
+        "target_set": "time",
+        "offset": -1,
+        "effective_scope": [
+          1,
+          2
+        ],
+        "excluded_boundary_count": 1
+      },
+      "diagnostics": []
+    },
+    {
+      "component_id": "ramp_smoothing_component",
+      "source": "builtin",
+      "formula_id": "ramp_smoothing_penalty",
+      "kind": "objective",
+      "source_field": "expression",
+      "normalized_expression": "sum(ramp_abs[t] for t in time)",
+      "empty": false,
+      "participation": "solve_active",
+      "enters_solve": true,
+      "participation_mismatch": false,
+      "boundary_strategy": null,
+      "has_state_offset": false,
+      "compile_status": "compile_valid",
+      "compile_success": true,
+      "boundary_artifact": {
+        "boundary_strategy": "strict",
+        "effective_scope": [],
+        "excluded_boundary_count": 0
+      },
+      "diagnostics": []
+    },
+    {
+      "component_id": "schedule_tracking_component",
+      "source": "builtin",
+      "formula_id": "schedule_tracking_eq",
+      "kind": "constraint",
+      "source_field": "expression",
+      "normalized_expression": "actual[t] + dev_pos[t] - dev_neg[t] == schedule[t]",
+      "empty": false,
+      "participation": "solve_active",
+      "enters_solve": true,
+      "participation_mismatch": false,
+      "boundary_strategy": "strict",
+      "has_state_offset": false,
+      "compile_status": "compile_valid",
+      "compile_success": true,
+      "boundary_artifact": {
+        "boundary_strategy": "strict",
+        "effective_scope": [
+          {
+            "alias": "t",
+            "set": "time"
+          }
+        ],
+        "excluded_boundary_count": 0
+      },
+      "diagnostics": []
+    },
+    {
+      "component_id": "schedule_tracking_component",
+      "source": "builtin",
+      "formula_id": "schedule_tracking_penalty",
+      "kind": "objective",
+      "source_field": "expression",
+      "normalized_expression": "sum(dev_pos[t] + dev_neg[t] for t in time)",
+      "empty": false,
+      "participation": "solve_active",
+      "enters_solve": true,
+      "participation_mismatch": false,
+      "boundary_strategy": null,
+      "has_state_offset": false,
+      "compile_status": "compile_valid",
+      "compile_success": true,
+      "boundary_artifact": {
+        "boundary_strategy": "strict",
+        "effective_scope": [],
+        "excluded_boundary_count": 0
+      },
+      "diagnostics": []
+    },
+    {
+      "component_id": "state_balance_component",
+      "source": "builtin",
+      "formula_id": "state_balance_eq",
+      "kind": "constraint",
+      "source_field": "expression",
+      "normalized_expression": "state[t+1] == state[t] + inflow[t] - outflow[t] - state_loss",
+      "empty": false,
+      "participation": "solve_active",
+      "enters_solve": true,
+      "participation_mismatch": false,
+      "boundary_strategy": "skip_last",
+      "has_state_offset": true,
+      "compile_status": "compile_valid",
+      "compile_success": true,
+      "boundary_artifact": {
+        "boundary_strategy": "skip_last",
+        "source_set": "time",
+        "target_set": "time_volume",
+        "offset": 1,
+        "effective_scope": [
+          0,
+          1,
+          2
+        ],
+        "excluded_boundary_count": 0
+      },
+      "diagnostics": []
+    },
+    {
+      "component_id": "terminal_state_tracking_component",
+      "source": "builtin",
+      "formula_id": "terminal_state_tracking_eq",
+      "kind": "constraint",
+      "source_field": "expression",
+      "normalized_expression": "state[terminal_time] + terminal_dev_pos - terminal_dev_neg == terminal_target",
+      "empty": false,
+      "participation": "solve_active",
+      "enters_solve": true,
+      "participation_mismatch": false,
+      "boundary_strategy": "strict",
+      "has_state_offset": false,
+      "compile_status": "compile_valid",
+      "compile_success": true,
+      "boundary_artifact": {
+        "boundary_strategy": "strict",
+        "effective_scope": [
+          {
+            "alias": "terminal_time",
+            "set": "time_volume"
+          }
+        ],
+        "excluded_boundary_count": 0
+      },
+      "diagnostics": [
+        {
+          "code": "FORMULA_SCOPE_INFERRED_REQUIRES_CONFIRMATION",
+          "severity": "warning",
+          "stage": "dimension",
+          "message": "已推断索引 terminal_time 映射到集合 time_volume，保存前请确认。",
+          "start": 6,
+          "end": 19,
+          "symbolCode": "state",
+          "expected": {
+            "alias": "terminal_time",
+            "set": "time_volume"
+          }
+        }
+      ]
+    },
+    {
+      "component_id": "terminal_state_tracking_component",
+      "source": "builtin",
+      "formula_id": "terminal_state_penalty",
+      "kind": "objective",
+      "source_field": "expression",
+      "normalized_expression": "terminal_dev_pos + terminal_dev_neg",
+      "empty": false,
+      "participation": "solve_active",
+      "enters_solve": true,
+      "participation_mismatch": false,
+      "boundary_strategy": null,
+      "has_state_offset": false,
+      "compile_status": "compile_valid",
+      "compile_success": true,
+      "boundary_artifact": {
+        "boundary_strategy": "strict",
+        "effective_scope": [],
+        "excluded_boundary_count": 0
+      },
+      "diagnostics": []
+    },
+    {
+      "component_id": "audit_legacy_expression",
+      "source": "fixture",
+      "formula_id": "legacy_expression",
+      "kind": "constraint",
+      "source_field": "expression",
+      "normalized_expression": "x[t] >= limit[t]",
+      "empty": false,
+      "participation": "solve_active",
+      "enters_solve": true,
+      "participation_mismatch": false,
+      "boundary_strategy": "strict",
+      "has_state_offset": false,
+      "compile_status": "compile_valid",
+      "compile_success": true,
+      "boundary_artifact": {
+        "boundary_strategy": "strict",
+        "effective_scope": [
+          {
+            "alias": "t",
+            "set": "time"
+          }
+        ],
+        "excluded_boundary_count": 0
+      },
+      "diagnostics": []
+    },
+    {
+      "component_id": "audit_legacy_formula",
+      "source": "fixture",
+      "formula_id": "legacy_formula",
+      "kind": "constraint",
+      "source_field": "formula",
+      "normalized_expression": "x[t] <= limit[t]",
+      "empty": false,
+      "participation": "preview_only",
+      "enters_solve": false,
+      "participation_mismatch": false,
+      "boundary_strategy": "strict",
+      "has_state_offset": false,
+      "compile_status": "preview_only",
+      "compile_success": true,
+      "boundary_artifact": {},
+      "diagnostics": [
+        {
+          "code": "FORMULA_PREVIEW_ONLY_EXCLUDED",
+          "severity": "info",
+          "stage": "compile",
+          "message": "preview_only 公式已完成语法与语义分析，但不会生成求解片段。",
+          "start": 0,
+          "end": 0
+        }
+      ]
+    },
+    {
+      "component_id": "audit_dsl_formula",
+      "source": "fixture",
+      "formula_id": "dsl_formula",
+      "kind": "constraint",
+      "source_field": "dsl_formula",
+      "normalized_expression": "x[t] <= limit[t]",
+      "empty": false,
+      "participation": "solve_active",
+      "enters_solve": true,
+      "participation_mismatch": false,
+      "boundary_strategy": "strict",
+      "has_state_offset": false,
+      "compile_status": "compile_valid",
+      "compile_success": true,
+      "boundary_artifact": {
+        "boundary_strategy": "strict",
+        "effective_scope": [
+          {
+            "alias": "t",
+            "set": "time"
+          }
+        ],
+        "excluded_boundary_count": 0
+      },
+      "diagnostics": []
+    },
+    {
+      "component_id": "audit_preview_only",
+      "source": "fixture",
+      "formula_id": "preview",
+      "kind": "constraint",
+      "source_field": "dsl_formula",
+      "normalized_expression": "x >= 20",
+      "empty": false,
+      "participation": "preview_only",
+      "enters_solve": false,
+      "participation_mismatch": false,
+      "boundary_strategy": "strict",
+      "has_state_offset": false,
+      "compile_status": "preview_only",
+      "compile_success": true,
+      "boundary_artifact": {},
+      "diagnostics": [
+        {
+          "code": "FORMULA_PREVIEW_ONLY_EXCLUDED",
+          "severity": "info",
+          "stage": "compile",
+          "message": "preview_only 公式已完成语法与语义分析，但不会生成求解片段。",
+          "start": 0,
+          "end": 0
+        }
+      ]
+    },
+    {
+      "component_id": "audit_disabled",
+      "source": "fixture",
+      "formula_id": "disabled",
+      "kind": "constraint",
+      "source_field": "dsl_formula",
+      "normalized_expression": "x >= 30",
+      "empty": false,
+      "participation": "disabled",
+      "enters_solve": false,
+      "participation_mismatch": false,
+      "boundary_strategy": "strict",
+      "has_state_offset": false,
+      "compile_status": "preview_only",
+      "compile_success": true,
+      "boundary_artifact": {},
+      "diagnostics": [
+        {
+          "code": "FORMULA_PREVIEW_ONLY_EXCLUDED",
+          "severity": "info",
+          "stage": "compile",
+          "message": "preview_only 公式已完成语法与语义分析，但不会生成求解片段。",
+          "start": 0,
+          "end": 0
+        }
+      ]
+    },
+    {
+      "component_id": "audit_state_transition",
+      "source": "fixture",
+      "formula_id": "transition",
+      "kind": "constraint",
+      "source_field": "dsl_formula",
+      "normalized_expression": "state[t+1] == state[t] + input[t] - output[t]",
+      "empty": false,
+      "participation": "solve_active",
+      "enters_solve": true,
+      "participation_mismatch": false,
+      "boundary_strategy": "strict",
+      "has_state_offset": true,
+      "compile_status": "compile_valid",
+      "compile_success": true,
+      "boundary_artifact": {
+        "boundary_strategy": "strict",
+        "source_set": "time",
+        "target_set": "state_time",
+        "offset": 1,
+        "effective_scope": [
+          0,
+          1
+        ],
+        "excluded_boundary_count": 0
+      },
+      "diagnostics": []
+    },
+    {
+      "component_id": "audit_objective",
+      "source": "fixture",
+      "formula_id": "lower",
+      "kind": "constraint",
+      "source_field": "dsl_formula",
+      "normalized_expression": "x >= 1",
+      "empty": false,
+      "participation": "solve_active",
+      "enters_solve": true,
+      "participation_mismatch": false,
+      "boundary_strategy": "strict",
+      "has_state_offset": false,
+      "compile_status": "compile_valid",
+      "compile_success": true,
+      "boundary_artifact": {
+        "boundary_strategy": "strict",
+        "effective_scope": [],
+        "excluded_boundary_count": 0
+      },
+      "diagnostics": []
+    },
+    {
+      "component_id": "audit_objective",
+      "source": "fixture",
+      "formula_id": "min_x",
+      "kind": "objective",
+      "source_field": "dsl_formula",
+      "normalized_expression": "x",
+      "empty": false,
+      "participation": "solve_active",
+      "enters_solve": true,
+      "participation_mismatch": false,
+      "boundary_strategy": null,
+      "has_state_offset": false,
+      "compile_status": "compile_valid",
+      "compile_success": true,
+      "boundary_artifact": {
+        "boundary_strategy": "strict",
+        "effective_scope": [],
+        "excluded_boundary_count": 0
+      },
+      "diagnostics": []
+    },
+    {
+      "component_id": "audit_multiple_constraints",
+      "source": "fixture",
+      "formula_id": "lower",
+      "kind": "constraint",
+      "source_field": "expression",
+      "normalized_expression": "x >= lower",
+      "empty": false,
+      "participation": "solve_active",
+      "enters_solve": true,
+      "participation_mismatch": false,
+      "boundary_strategy": "strict",
+      "has_state_offset": false,
+      "compile_status": "compile_valid",
+      "compile_success": true,
+      "boundary_artifact": {
+        "boundary_strategy": "strict",
+        "effective_scope": [],
+        "excluded_boundary_count": 0
+      },
+      "diagnostics": []
+    },
+    {
+      "component_id": "audit_multiple_constraints",
+      "source": "fixture",
+      "formula_id": "upper",
+      "kind": "constraint",
+      "source_field": "formula",
+      "normalized_expression": "x <= upper",
+      "empty": false,
+      "participation": "solve_active",
+      "enters_solve": true,
+      "participation_mismatch": false,
+      "boundary_strategy": "strict",
+      "has_state_offset": false,
+      "compile_status": "compile_valid",
+      "compile_success": true,
+      "boundary_artifact": {
+        "boundary_strategy": "strict",
+        "effective_scope": [],
+        "excluded_boundary_count": 0
+      },
+      "diagnostics": []
+    },
+    {
+      "component_id": "audit_backward_transition",
+      "source": "fixture",
+      "formula_id": "backward",
+      "kind": "constraint",
+      "source_field": "dsl_formula",
+      "normalized_expression": "x[t] >= x[t-1]",
+      "empty": false,
+      "participation": "solve_active",
+      "enters_solve": true,
+      "participation_mismatch": false,
+      "boundary_strategy": "skip_first",
+      "has_state_offset": true,
+      "compile_status": "compile_valid",
+      "compile_success": true,
+      "boundary_artifact": {
+        "boundary_strategy": "skip_first",
+        "source_set": "time",
+        "target_set": "time",
+        "offset": -1,
+        "effective_scope": [
+          1
+        ],
+        "excluded_boundary_count": 1
+      },
+      "diagnostics": []
+    },
+    {
+      "component_id": "audit_multiple_objectives",
+      "source": "fixture",
+      "formula_id": "bounds",
+      "kind": "constraint",
+      "source_field": "dsl_formula",
+      "normalized_expression": "x >= 0",
+      "empty": false,
+      "participation": "solve_active",
+      "enters_solve": true,
+      "participation_mismatch": false,
+      "boundary_strategy": "strict",
+      "has_state_offset": false,
+      "compile_status": "compile_valid",
+      "compile_success": true,
+      "boundary_artifact": {
+        "boundary_strategy": "strict",
+        "effective_scope": [],
+        "excluded_boundary_count": 0
+      },
+      "diagnostics": []
+    },
+    {
+      "component_id": "audit_multiple_objectives",
+      "source": "fixture",
+      "formula_id": "active",
+      "kind": "objective",
+      "source_field": "dsl_formula",
+      "normalized_expression": "x",
+      "empty": false,
+      "participation": "solve_active",
+      "enters_solve": true,
+      "participation_mismatch": false,
+      "boundary_strategy": null,
+      "has_state_offset": false,
+      "compile_status": "compile_valid",
+      "compile_success": true,
+      "boundary_artifact": {
+        "boundary_strategy": "strict",
+        "effective_scope": [],
+        "excluded_boundary_count": 0
+      },
+      "diagnostics": []
+    },
+    {
+      "component_id": "audit_multiple_objectives",
+      "source": "fixture",
+      "formula_id": "preview",
+      "kind": "objective",
+      "source_field": "dsl_formula",
+      "normalized_expression": "-x",
+      "empty": false,
+      "participation": "preview_only",
+      "enters_solve": false,
+      "participation_mismatch": false,
+      "boundary_strategy": null,
+      "has_state_offset": false,
+      "compile_status": "preview_only",
+      "compile_success": true,
+      "boundary_artifact": {},
+      "diagnostics": [
+        {
+          "code": "FORMULA_PREVIEW_ONLY_EXCLUDED",
+          "severity": "info",
+          "stage": "compile",
+          "message": "preview_only 公式已完成语法与语义分析，但不会生成求解片段。",
+          "start": 0,
+          "end": 0
+        }
+      ]
+    }
+  ]
+}

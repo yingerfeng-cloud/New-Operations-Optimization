@@ -52,7 +52,7 @@ export function ResultCenterPage() {
   const detail = useQuery({ queryKey: ['result', id], queryFn: () => getResult(id!), enabled: !!id });
   const detailModelId = String(detail.data?.model_id || '');
   const detailModel = useQuery({ queryKey: ['model', detailModelId], queryFn: () => getModel(detailModelId), enabled: !!detailModelId });
-  const labelMap = buildResultLabelMap(detailModel.data);
+  const labelMap = buildResultLabelMap(detailModel.data, detail.data);
   const rows = list.data || [];
   const coveredModels = new Set(rows.map(result => String(result.model || result.model_id || '')).filter(Boolean)).size;
   const latestFinishedAt = rows

@@ -21,52 +21,6 @@ from app.solvers.status import solver_status
 from app.templates.power_templates import get_power_templates
 
 
-PARAMETER_DISPLAY_NAMES = {
-    "electricity_price": "电价",
-    "storage_capacity": "储能容量",
-    "charge_power_max": "最大充电功率",
-    "discharge_power_max": "最大放电功率",
-    "charge_efficiency": "充电效率",
-    "discharge_efficiency": "放电效率",
-    "initial_soc": "初始SOC",
-    "soc_min": "SOC下限比例",
-    "eta_ch": "充电效率",
-    "eta_dis": "放电效率",
-    "load_forecast": "系统负荷预测",
-    "unit_min_output": "机组最小出力",
-    "unit_max_output": "机组最大出力",
-    "fuel_cost": "燃料成本",
-    "ramp_up_limit": "上爬坡限制",
-    "ramp_down_limit": "下爬坡限制",
-    "renewable_forecast": "新能源预测出力",
-    "grid_export_limit": "并网功率上限",
-    "electric_load": "电负荷",
-    "heat_load": "热负荷",
-    "electric_max": "电出力上限",
-    "heat_max": "热出力上限",
-    "local_inflow": "区间来水过程",
-    "load": "系统负荷预测",
-    "station": "电站清单",
-    "units": "机组清单",
-    "availability": "机组可用状态",
-    "power_conversion": "出力转换系数",
-    "volume_min": "最小库容",
-    "volume_max": "最大库容",
-    "initial_volume": "初始库容",
-    "target_terminal_volume": "目标期末库容",
-    "outflow_min": "最小下泄流量",
-    "outflow_max": "最大下泄流量",
-    "spill_max": "最大弃水流量",
-    "edges": "梯级拓扑关系",
-    "initial_upstream_outflow": "初始上游出库流量",
-    "horizon": "调度时段数",
-    "time": "调度时段",
-    "time_volume": "库容时点",
-    "time_step_seconds": "时段长度",
-    "weights": "目标函数权重",
-}
-
-
 class AgentOrchestrator:
     PLATFORM_UNAVAILABLE_MESSAGE = (
         "Agent service is online, but the optimization platform is unavailable. "
@@ -94,54 +48,16 @@ class AgentOrchestrator:
         available_agent_skills = agent_skill_service.list_skills()
         legacy_router_result = agent_skill_router.route(message, existing, available_agent_skills)
         llm_intent_parse = llm_intent_parser_v2.parse(message, existing, available_agent_skills)
-        v2_router_result = intent_router_v2.route(message, existing, available_agent_skills, llm_parse=llm_intent_parse)
-        v2_router_result["llm_intent_parse"] = llm_intent_parse
-        legacy_intent = legacy_router_result.get("intent")
-        legacy_compat_intents = {
-            "how_to_use", "explain_required_parameters", "parameter_example", "skill_availability_query",
-            "switch_skill", "confirm_defaults", "confirm_invoke", "result_explanation",
-            "confirm_switch_clear", "confirm_switch_migrate", "cancel_switch", "parameter_supplement",
-        }
-        if legacy_intent in legacy_compat_intents:
-            router_result = legacy_router_result
-        elif legacy_intent == "optimization_request" and legacy_router_result.get("agent_skill_name"):
-            # Preserve deterministic, explicit scenario aliases while exposing
-            # the v2 ranking evidence for diagnostics.  A weak/close v2 score
-            # must not turn a known storage or hydro request into clarification.
-            router_result = {
-                **v2_router_result,
-                **legacy_router_result,
-                "need_clarification": False,
-                "clarification_question": None,
-                "router_version": v2_router_result.get("router_version", "2.0"),
-                "candidate_skills": v2_router_result.get("candidate_skills", []),
-                "audit": {
-                    **(v2_router_result.get("audit") or {}),
-                    "compatibility_fallback": "legacy_explicit_skill_match",
-                },
-            }
-        else:
-            router_result = v2_router_result
+        router_result = intent_router_v2.route(
+            message,
+            existing,
+            available_agent_skills,
+            llm_parse=llm_intent_parse,
+            legacy_signal=legacy_router_result,
+            requested_skill=manual_skill,
+        )
+        router_result["llm_intent_parse"] = llm_intent_parse
         timing["router_ms"] = self._elapsed_ms(router_started)
-        fallback_intent = self.intent_router(message, existing, body)
-        if (
-            fallback_intent == "parameter_supplement"
-            and existing.get("resolved_skill_name")
-            and router_result.get("intent") not in legacy_compat_intents
-        ):
-            router_result = {
-                **v2_router_result,
-                "intent": "parameter_supplement",
-                "agent_skill_name": existing.get("agent_skill_name") or self._agent_skill_for_api(existing.get("resolved_skill_name")),
-                "api_skill_name": existing.get("resolved_skill_name"),
-                "platform_skill_name": existing.get("resolved_skill_name"),
-                "need_clarification": False,
-                "clarification_question": None,
-                "audit": {
-                    **(v2_router_result.get("audit") or {}),
-                    "compatibility_fallback": "active_task_parameter_supplement",
-                },
-            }
         router_intent = router_result.get("intent")
         intent = router_intent if router_intent in {
             "how_to_use",
@@ -159,7 +75,7 @@ class AgentOrchestrator:
             "skill_selection_required",
             "knowledge_question",
             "safety_refusal",
-        } else fallback_intent
+        } else "unknown"
 
         if intent == "safety_refusal":
             return self._finalize_analyze_response(
@@ -452,6 +368,9 @@ class AgentOrchestrator:
             "workflow_state": "RESULT_READY",
             "result": response,
             "explanation": response.get("explanation") or response.get("suggestion"),
+            "explanation_structured": response.get("explanation_structured"),
+            "evidence_package": response.get("evidence_package"),
+            "explanation_audit": response.get("explanation_audit"),
             "execution_policy": response.get("execution_policy", "advisory_only"),
             "requires_human_review": response.get("requires_human_review", True),
         }
@@ -610,20 +529,19 @@ class AgentOrchestrator:
 
     def explain_result(self, body: dict[str, Any]) -> dict[str, Any]:
         conversation = self._existing_conversation(body.get("conversation_id"))
-        explanation = {
-            "summary": "优化结果已生成，可结合目标值、变量出力和约束校验复核。",
-            "skill": self._safe_skill_context(conversation.get("resolved_skill_name")),
-            "risk_notes": ["结果为辅助决策建议，执行前需要人工复核。"],
-            "next_actions": ["复核输入参数、约束边界和业务解释。"],
-        }
+        explanation, result = self._actual_result_explanation(conversation)
+        agent_text = self._format_explanation_text(explanation)
         return {
             "conversation_id": conversation.get("conversation_id"),
             "response_type": "result_explanation",
             "summary": explanation["summary"],
             "explanation": explanation,
-            "message": self._format_explanation_text(explanation),
-            "agent_message": self._format_explanation_text(explanation),
-            "requires_human_review": True,
+            "evidence_package": result.get("evidence_package") if result else None,
+            "explanation_audit": result.get("explanation_audit") if result else None,
+            "message": agent_text,
+            "agent_message": agent_text,
+            "status": "RESULT_READY" if result else "NO_RESULT",
+            "requires_human_review": bool(result.get("requires_human_review", True)) if result else True,
         }
 
     def optimize_legacy(self, body: Any) -> dict[str, Any]:
@@ -796,8 +714,6 @@ class AgentOrchestrator:
 
     def _clean_parameter_name(self, key: str, name: Any) -> str:
         text = str(name or "").strip()
-        if key in PARAMETER_DISPLAY_NAMES:
-            return PARAMETER_DISPLAY_NAMES[key]
         if not text or self._looks_like_mojibake(text) or self._looks_like_technical_english(text):
             return key
         return text
@@ -884,20 +800,28 @@ class AgentOrchestrator:
         return kept, dropped
 
     def _result_explanation_chat(self, conversation_id: str | None, existing: dict[str, Any], message: str) -> dict[str, Any]:
-        explanation = {"summary": "结果解释已生成。", "skill": self._safe_skill_context(existing.get("resolved_skill_name")), "risk_notes": ["请关注约束边界和输入参数。"], "next_actions": ["复核结果后再执行。"]}
+        explanation, result = self._actual_result_explanation(existing)
         agent_text = self._format_explanation_text(explanation)
-        conversation = conversation_store.upsert(conversation_id, {"status": "RESULT_READY", "messages": self._append_messages(existing.get("messages") or [], message, agent_text, False), "recent_turns": self._recent_turns(existing, message, "result_explanation", "result_explanation", agent_text)})
-        return {**self._chat_response(conversation, agent_text, preserve_task=True), "response_type": "result_explanation", "intent": "result_explanation", "explanation": explanation}
+        conversation = conversation_store.upsert(conversation_id, {"status": "RESULT_READY" if result else existing.get("status", "NO_RESULT"), "messages": self._append_messages(existing.get("messages") or [], message, agent_text, False), "recent_turns": self._recent_turns(existing, message, "result_explanation", "result_explanation", agent_text)})
+        return {
+            **self._chat_response(conversation, agent_text, preserve_task=True),
+            "response_type": "result_explanation",
+            "intent": "result_explanation",
+            "explanation": explanation,
+            "evidence_package": result.get("evidence_package") if result else None,
+            "explanation_audit": result.get("explanation_audit") if result else None,
+        }
 
     def _how_to_use_response(self, conversation_id: str | None, existing: dict[str, Any], message: str) -> dict[str, Any]:
+        available_skills = self._skill_list_text()
         agent_text = "\n".join(
             [
                 "使用流程分 5 步：",
-                "1. 选择场景：从经济调度、日前机组组合、储能调度、风光储协同、电热协同、梯级水电调度中选择。",
-                "2. 提供参数：按场景补充负荷、机组、储能、水库、来水或价格等关键数据。",
+                f"1. 选择场景 / Skill：从平台当前已启用能力中选择（{available_skills}）。",
+                "2. 提供参数：按照该 Skill 自动生成的输入契约补充数据。",
                 "3. 确认默认值：系统会列出可用默认值，确认后才会写入参数草稿。",
                 "4. 确认调用：参数齐全后再明确确认调用优化模型。",
-                "5. 查看结果解释 / 方案对比：读取目标值、关键变量、风险提示和后续动作。",
+                "5. 查看结果解释：核对目标值、变量、约束、风险、证据引用与人工复核项。",
             ]
         )
         conversation = conversation_store.upsert(conversation_id, {"status": "HELP", "messages": self._append_messages(existing.get("messages") or [], message, agent_text, False), "recent_turns": self._recent_turns(existing, message, "how_to_use", "how_to_use", agent_text)})
@@ -959,16 +883,16 @@ class AgentOrchestrator:
     def _skill_list_text(self) -> str:
         try:
             names = [s.get("display_name") or s.get("name") for s in agent_skill_service.list_skills() if s.get("enabled", True)]
-            return "、".join(str(name) for name in names if name) or "经济调度、储能调度、机组组合"
+            return "、".join(str(name) for name in names if name) or "暂无已启用 Skill"
         except Exception:
-            return "经济调度、储能调度、机组组合"
+            return "暂时无法读取 Skill 列表"
 
     def _skill_availability_response(self, conversation_id: str | None, existing: dict[str, Any], message: str, agent_skill_name: str | None) -> dict[str, Any]:
         if agent_skill_name:
             skill = agent_skill_service.get_skill_local(agent_skill_name)
             api_skill_name = skill.get("canonical_api_skill_name")
             display_name = skill.get("display_name") or agent_skill_name
-            description = skill.get("description") or "该模型用于流域梯级电站在来水、负荷、水库容量、流量边界和电站拓扑约束下的调度优化。"
+            description = skill.get("description") or "该能力的输入、输出与解释范围以绑定的模型契约为准。"
             agent_text = f"有的。当前平台支持{display_name}模型，对应 Agent Skill 为 {agent_skill_name}，API Skill 为 {api_skill_name}。{description}"
             conversation = conversation_store.upsert(
                 conversation_id,
@@ -1322,6 +1246,7 @@ class AgentOrchestrator:
             return {}
 
     def _broadcast_scalars(self, extracted: dict[str, Any], input_schema: list[dict[str, Any]], reference_draft: dict[str, Any]) -> dict[str, Any]:
+        schema = {item.get("key"): item for item in input_schema if isinstance(item, dict) and item.get("key")}
         unit_keys: list[str] = []
         for value in (reference_draft or {}).values():
             if isinstance(value, dict):
@@ -1333,16 +1258,13 @@ class AgentOrchestrator:
                     unit_keys = list(value.keys())
                     break
         if not unit_keys:
-            storage_scalar_keys = {"storage_capacity", "charge_power_max", "discharge_power_max", "charge_efficiency", "discharge_efficiency", "initial_soc", "soc_min"}
-            if set(extracted).intersection(storage_scalar_keys):
-                for item in input_schema or []:
-                    sample = item.get("sample_value") or item.get("default_value")
-                    if isinstance(sample, dict) and sample:
-                        unit_keys = list(sample.keys())
-                        break
+            for key, value in extracted.items():
+                sample = (schema.get(key) or {}).get("sample_value") or (schema.get(key) or {}).get("default_value")
+                if isinstance(value, (int, float)) and isinstance(sample, dict) and sample:
+                    unit_keys = list(sample.keys())
+                    break
         if not unit_keys:
             return extracted
-        schema = {item.get("key"): item for item in input_schema}
         result: dict[str, Any] = {}
         for key, value in extracted.items():
             sample = (schema.get(key) or {}).get("sample_value") or (schema.get(key) or {}).get("default_value")
@@ -1388,39 +1310,97 @@ class AgentOrchestrator:
     def _agent_skill_for_api(self, api_skill_name: str | None) -> str | None:
         if not api_skill_name:
             return None
-        raw = str(api_skill_name)
-        if raw.startswith("run_"):
-            raw = raw[4:]
-        for base in [
-            "economic_dispatch",
-            "storage_dispatch",
-            "unit_commitment_day_ahead",
-            "cascade_hydro_dispatch_v1",
-            "cascade_hydro_dispatch",
-            "renewable_storage_dispatch",
-            "chp_dispatch",
-            "pv_storage_day_ahead_dispatch_v2",
-            "pv_storage_intraday_dispatch_v2",
-            "pv_storage_dispatch_v2",
-            "pv_storage_day_ahead_dispatch",
-            "pv_storage_intraday_dispatch",
-            "nonlinear_hydro_power_demo",
-            "contract_spot_exposure_v1",
-            "retail_da_spot_bidding_v1",
-        ]:
-            if raw == base or raw.startswith(f"{base}_"):
-                return base
-        return raw
+        api_name = str(api_skill_name)
+        raw_name = api_name.removeprefix("run_")
+        try:
+            skills = agent_skill_service.list_skills()
+        except Exception:
+            skills = []
+        matches: list[tuple[int, str]] = []
+        for skill in skills:
+            name = str(skill.get("name") or skill.get("agent_skill_name") or "")
+            canonical = str(skill.get("canonical_api_skill_name") or skill.get("platform_skill_name") or "")
+            if not name:
+                continue
+            if api_name == canonical or raw_name == name:
+                matches.append((len(canonical or name) + 10000, name))
+            elif canonical and api_name.startswith(f"{canonical}_"):
+                matches.append((len(canonical), name))
+        if matches:
+            return sorted(matches, reverse=True)[0][1]
+        return raw_name
 
     def _agent_skill_for_select_skill(self, api_skill_name: str | None) -> str | None:
         return self._agent_skill_for_api(api_skill_name)
 
+    def _actual_result_explanation(self, conversation: dict[str, Any]) -> tuple[dict[str, Any], dict[str, Any] | None]:
+        result = conversation.get("last_result") if isinstance(conversation.get("last_result"), dict) else None
+        invocation_id = conversation.get("last_invocation_id")
+        if invocation_id and (not result or str(result.get("status") or "").upper() in {"PENDING", "RUNNING", "QUEUED"}):
+            try:
+                invocation = platform_client.get_invocation(str(invocation_id))
+                refreshed = invocation.get("response") if isinstance(invocation.get("response"), dict) else None
+                if refreshed:
+                    result = refreshed
+                    conversation_store.upsert(str(conversation.get("conversation_id")), {"last_result": refreshed})
+            except Exception:
+                pass
+        if not result:
+            return ({
+                "summary": "当前会话尚未产生可解释的模型实例化结果。请先完成一次模型调用。",
+                "facts": [],
+                "inferences": [],
+                "recommendations": [],
+                "risk_notes": [],
+                "manual_review_points": [],
+                "limitations": ["没有结果证据，平台不会生成推测性解释。"],
+                "next_actions": ["先补齐参数并运行模型，再请求结果解释。"],
+                "skill": self._safe_skill_context(conversation.get("resolved_skill_name")),
+                "grounded_on": None,
+            }, None)
+        nested_result = result.get("result") if isinstance(result.get("result"), dict) else {}
+        structured = result.get("explanation_structured") or nested_result.get("explanation_structured")
+        evidence = result.get("evidence_package") or nested_result.get("evidence_package")
+        audit = result.get("explanation_audit") or nested_result.get("explanation_audit")
+        if not isinstance(structured, dict):
+            return ({
+                "summary": "当前结果没有通过统一解释器生成结构化解释。",
+                "facts": [],
+                "inferences": [],
+                "recommendations": [],
+                "risk_notes": [],
+                "manual_review_points": [],
+                "limitations": ["缺少 explanation_structured，平台不会用固定文案代替结果证据。"],
+                "next_actions": ["重新运行模型，或检查 SkillDefinition 与结果后处理状态。"],
+                "skill": self._safe_skill_context(conversation.get("resolved_skill_name")),
+                "grounded_on": None,
+                "explanation_audit": audit,
+            }, result)
+        explanation = dict(structured)
+        explanation["skill"] = self._safe_skill_context(conversation.get("resolved_skill_name"))
+        explanation["evidence_package"] = evidence
+        explanation["explanation_audit"] = audit
+        explanation["next_actions"] = list(explanation.get("recommendations") or explanation.get("manual_review_points") or [])
+        return explanation, result
+
     def _format_explanation_text(self, explanation: dict[str, Any]) -> str:
         parts = [str(explanation.get("summary") or "优化结果解释已生成。")]
+        facts = [str(item) for item in explanation.get("facts") or []]
+        if facts:
+            parts.append("事实：" + "；".join(facts))
+        inferences = [str(item) for item in explanation.get("inferences") or []]
+        if inferences:
+            parts.append("推断：" + "；".join(inferences))
         if explanation.get("risk_notes"):
-            parts.append("风险提示：" + "；".join(str(item) for item in explanation["risk_notes"]))
+            risk_text = [
+                str(item.get("message") or item.get("name") or item) if isinstance(item, dict) else str(item)
+                for item in explanation["risk_notes"]
+            ]
+            parts.append("风险提示：" + "；".join(risk_text))
         if explanation.get("next_actions"):
             parts.append("下一步动作：" + "；".join(str(item) for item in explanation["next_actions"]))
+        if explanation.get("limitations"):
+            parts.append("解释边界：" + "；".join(str(item) for item in explanation["limitations"]))
         return "\n".join(parts)
 
     def _last_agent_message(self, existing: dict[str, Any]) -> str:

@@ -1,7 +1,39 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { useState } from 'react';
+import { vi } from 'vitest';
 import { Step2SemanticModel } from '../../features/model-creation/steps/Step2SemanticModel';
 import { createInitialDraft, type ModelDraft } from '../../features/model-creation/stores/modelCreationStore';
+import { renderWithQueryClient } from '../testUtils';
+
+const componentApi = vi.hoisted(() => ({
+  getComponents: vi.fn(async () => [
+    {
+      component_id: 'power_balance',
+      type: 'power_balance',
+      name: '功率平衡组件',
+      status: 'published',
+      enabled: true,
+      implemented: true,
+      version: '1.0.0',
+      domain: '电力优化',
+      category: '平衡约束',
+      depends_on: ['capacity_bounds'],
+    },
+    {
+      component_id: 'capacity_bounds',
+      type: 'capacity_bounds',
+      name: '容量边界组件',
+      status: 'published',
+      enabled: true,
+      implemented: true,
+      version: '1.0.0',
+      domain: '通用运筹优化',
+      category: '边界约束',
+    },
+  ]),
+}));
+
+vi.mock('../../api/components', () => ({ getComponents: componentApi.getComponents }));
 
 function Step2Harness({ initial }: { initial?: ModelDraft }) {
   const [draft, setDraft] = useState<ModelDraft>(initial || createInitialDraft());
@@ -87,6 +119,8 @@ test('renders component builder writeback without raw JSON block', () => {
   expect(screen.getAllByText('time_volume').length).toBeGreaterThan(0);
   fireEvent.click(screen.getByText('组件依赖'));
   expect(screen.getByText('storage_power_limit')).toBeInTheDocument();
+  expect(screen.getByText(/缺少依赖 storage_power_limit/)).toBeInTheDocument();
+  expect(screen.queryByText(/依赖 time_volume/)).not.toBeInTheDocument();
 });
 
 test('opens parameter binding drawer from missing component dependency', () => {
@@ -107,4 +141,92 @@ test('opens parameter binding drawer from missing component dependency', () => {
   expect(screen.getByText('编辑参数绑定')).toBeInTheDocument();
   expect(screen.getByText('启停逻辑组件 / startup_cost')).toBeInTheDocument();
   expect(screen.getByText('仍缺少 startup_cost 的必填映射')).toBeInTheDocument();
+});
+
+test('selects components from catalog and automatically includes dependencies', async () => {
+  const draft = createInitialDraft();
+  draft.basic_info.builder_mode = 'component_based';
+
+  renderWithQueryClient(<Step2Harness initial={draft} />);
+  fireEvent.click(screen.getByRole('button', { name: /从组件库选择/ }));
+
+  expect(await screen.findByText('功率平衡组件')).toBeInTheDocument();
+  const row = screen.getByText('功率平衡组件').closest('tr');
+  expect(row).not.toBeNull();
+  fireEvent.click(within(row!).getByRole('checkbox'));
+
+  expect(screen.getByText('将自动补齐组件依赖')).toBeInTheDocument();
+  expect(screen.getByText('capacity_bounds', { selector: '.ant-alert-description' })).toBeInTheDocument();
+  const dependencyRow = screen.getByText('容量边界组件').closest('tr');
+  expect(dependencyRow).not.toBeNull();
+  expect(within(dependencyRow!).getByRole('checkbox')).toBeChecked();
+  expect(within(dependencyRow!).getByRole('checkbox')).toBeDisabled();
+  expect(screen.getByText(/已选 2 个/)).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: '应用选择' }));
+
+  await waitFor(() => expect(screen.getByText('2 个组件')).toBeInTheDocument());
+  expect(screen.getByText(/组件：功率平衡组件/)).toBeInTheDocument();
+  expect(screen.getByText(/组件：容量边界组件/)).toBeInTheDocument();
+});
+
+test('cascade removes components that depend on the selected base component', async () => {
+  const draft = createInitialDraft();
+  draft.basic_info.builder_mode = 'component_based';
+  draft.components = [
+    { component_id: 'capacity_bounds', name: '容量边界组件' },
+    { component_id: 'power_balance', name: '功率平衡组件', depends_on: ['capacity_bounds'] },
+    { component_id: 'independent', name: '独立组件' },
+  ];
+
+  render(<Step2Harness initial={draft} />);
+  fireEvent.click(screen.getByRole('button', { name: '移除 容量边界组件' }));
+
+  expect(await screen.findByText('同时移除 2 个组件？')).toBeInTheDocument();
+  expect(screen.getByText(/被 功率平衡组件 依赖/)).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: '同时移除' }));
+
+  await waitFor(() => expect(screen.getByText('1 个组件')).toBeInTheDocument());
+  expect(screen.queryByText(/组件：容量边界组件/)).not.toBeInTheDocument();
+  expect(screen.queryByText(/组件：功率平衡组件/)).not.toBeInTheDocument();
+  expect(screen.getByText(/组件：独立组件/)).toBeInTheDocument();
+});
+
+test('blocks applying a component selection that contains a dependency cycle', async () => {
+  componentApi.getComponents.mockResolvedValueOnce([
+    {
+      component_id: 'cycle_a',
+      type: 'cycle_a',
+      name: '循环组件 A',
+      status: 'published',
+      enabled: true,
+      implemented: true,
+      version: '1.0.0',
+      domain: '测试',
+      category: '循环依赖',
+      depends_on: ['cycle_b'],
+    },
+    {
+      component_id: 'cycle_b',
+      type: 'cycle_b',
+      name: '循环组件 B',
+      status: 'published',
+      enabled: true,
+      implemented: true,
+      version: '1.0.0',
+      domain: '测试',
+      category: '循环依赖',
+      depends_on: ['cycle_a'],
+    },
+  ]);
+  const draft = createInitialDraft();
+  draft.basic_info.builder_mode = 'component_based';
+
+  renderWithQueryClient(<Step2Harness initial={draft} />);
+  fireEvent.click(screen.getByRole('button', { name: /从组件库选择/ }));
+  const row = (await screen.findByText('循环组件 A')).closest('tr');
+  fireEvent.click(within(row!).getByRole('checkbox'));
+
+  expect(await screen.findByText('组件依赖存在循环')).toBeInTheDocument();
+  expect(screen.getByText('cycle_a → cycle_b → cycle_a')).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: '应用选择' })).toBeDisabled();
 });

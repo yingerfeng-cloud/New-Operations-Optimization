@@ -1,4 +1,5 @@
-import { Alert, Button, Card, Input, Modal, Progress, Select, Space, Table, Tag, Typography, message } from 'antd';
+import { Alert, Button, Card, Input, Modal, Popover, Progress, Select, Space, Table, Tag, Typography, message } from 'antd';
+import { CheckCircleOutlined, WarningOutlined } from '@ant-design/icons';
 import { useMemo, useState } from 'react';
 import type { FormulaDef, FormulaVersionSnapshot } from '../../types/formula';
 import type { FormulaSymbols } from './formulaParser';
@@ -45,6 +46,20 @@ export function FormulaManagementPanel({
   const groups = useMemo(() => [...new Set(formulas.map(item => item.business_group || '未分组'))], [formulas]);
   const filtered = useMemo(() => filterFormulas(formulas, { keyword, kind: kind as FormulaDef['kind'] | 'all', status, group }), [formulas, group, keyword, kind, status]);
   const dependencies = useMemo(() => dependencyAnalysis(formulas, semantic), [formulas, semantic]);
+  const dependencyIssueCount = dependencies.unusedVariables.length
+    + dependencies.unusedParameters.length
+    + dependencies.unusedSets.length
+    + dependencies.variablesOutsideObjective.length
+    + dependencies.duplicateConstraintGroups.length;
+  const dependencyDetails = (
+    <Space orientation="vertical" size={4}>
+      <span>孤立变量：{dependencies.unusedVariables.join('、') || '无'}</span>
+      <span>冗余参数：{dependencies.unusedParameters.join('、') || '无'}</span>
+      <span>未使用集合：{dependencies.unusedSets.join('、') || '无'}</span>
+      <span>未参与目标的变量：{dependencies.variablesOutsideObjective.join('、') || '无'}</span>
+      <span>重复约束组：{dependencies.duplicateConstraintGroups.length}</span>
+    </Space>
+  );
   const effectiveCompileContext = compileContext || {
     symbols: {
       sets: Object.fromEntries(semantic.sets.map(item => [item.code, { values: [] }])),
@@ -125,7 +140,23 @@ export function FormulaManagementPanel({
   const diffSnapshot = diffFormula ? ({ saved: diffFormula.last_saved_version, compiled: diffFormula.last_compiled_version, applied: diffFormula.applied_version, published: diffFormula.published_version }[diffBaseline]) : undefined;
   const diffRows = diffFormula ? versionRows(diffSnapshot, formulaSnapshot(diffFormula)) : [];
   return (
-    <Card className="section-gap" title="公式管理工作台">
+    <Card
+      className="section-gap"
+      title="公式管理工作台"
+      extra={(
+        <Popover title="依赖分析" content={dependencyDetails} trigger="click">
+          <Button
+            type="text"
+            size="small"
+            icon={dependencyIssueCount
+              ? <WarningOutlined style={{ color: '#d97706' }} />
+              : <CheckCircleOutlined style={{ color: '#16a34a' }} />}
+          >
+            依赖分析：{dependencyIssueCount ? `${dependencyIssueCount} 项` : '通过'}
+          </Button>
+        </Popover>
+      )}
+    >
       <Space wrap style={{ marginBottom: 12 }}>
         <Input.Search aria-label="搜索公式" allowClear placeholder="名称、表达式、变量或参数" value={keyword} onChange={event => setKeyword(event.target.value)} style={{ width: 280 }} />
         <Select aria-label="公式类型筛选" value={kind} onChange={setKind} style={{ width: 130 }} options={[{ value: 'all', label: '全部类型' }, { value: 'objective', label: '目标函数' }, { value: 'constraint', label: '约束' }]} />
@@ -154,19 +185,6 @@ export function FormulaManagementPanel({
             <Button size="small" onClick={() => setDiffFormula(row)}>差异</Button>
           </Space> },
         ]}
-      />
-      <Alert
-        className="section-gap"
-        type={dependencies.duplicateConstraintGroups.length ? 'warning' : 'info'}
-        showIcon
-        title="依赖分析"
-        description={<Space orientation="vertical" size={4}>
-          <span>孤立变量：{dependencies.unusedVariables.join('、') || '无'}</span>
-          <span>冗余参数：{dependencies.unusedParameters.join('、') || '无'}</span>
-          <span>未使用集合：{dependencies.unusedSets.join('、') || '无'}</span>
-          <span>未参与目标的变量：{dependencies.variablesOutsideObjective.join('、') || '无'}</span>
-          <span>重复约束组：{dependencies.duplicateConstraintGroups.length}</span>
-        </Space>}
       />
       <Modal open={Boolean(diffFormula)} title="公式版本差异" footer={<Button onClick={() => setDiffFormula(undefined)}>关闭</Button>} onCancel={() => setDiffFormula(undefined)}>
         <Select aria-label="差异基线" value={diffBaseline} onChange={setDiffBaseline} style={{ width: '100%', marginBottom: 12 }} options={[
