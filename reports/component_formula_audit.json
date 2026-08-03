@@ -1040,9 +1040,9 @@
       "diagnostics": []
     },
     {
-      "component_id": "audit_legacy_expression",
+      "component_id": "audit_historical_expression",
       "source": "fixture",
-      "formula_id": "legacy_expression",
+      "formula_id": "historical_expression",
       "kind": "constraint",
       "source_field": "expression",
       "normalized_expression": "x[t] >= limit[t]",
@@ -1067,9 +1067,9 @@
       "diagnostics": []
     },
     {
-      "component_id": "audit_legacy_formula",
+      "component_id": "audit_historical_formula",
       "source": "fixture",
-      "formula_id": "legacy_formula",
+      "formula_id": "historical_formula",
       "kind": "constraint",
       "source_field": "formula",
       "normalized_expression": "x[t] <= limit[t]",

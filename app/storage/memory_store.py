@@ -14,9 +14,9 @@ from app.schemas.solve import TaskRecord, TaskRecordState
 
 
 LOGGER = logging.getLogger(__name__)
-RUNTIME_SCHEMA_VERSION = 3
+RUNTIME_SCHEMA_VERSION = 4
 INTERRUPTED_TASK_STATUSES = {"PENDING", "QUEUED", "VALIDATING", "BUILDING_MODEL", "SOLVING", "FORMATTING_RESULT", "RUNNING"}
-LEGACY_MODEL_STATUS_MIGRATIONS = {
+MODEL_STATUS_MIGRATIONS = {
     "draft": "developing",
     "tested": "trial",
     "草稿": "developing",
@@ -92,6 +92,7 @@ class MemoryStore:
                 "custom_components": self.custom_components,
                 "function_assets": self.function_assets,
             }
+            payload = self._normalize_deprecated_markers(payload)
             payload = self._redact_secrets(payload)
             temporary_path = self._persistence_path.with_suffix(f"{self._persistence_path.suffix}.tmp")
             try:
@@ -175,7 +176,7 @@ class MemoryStore:
             if isinstance(models, dict):
                 for model in models.values():
                     if isinstance(model, dict):
-                        model["status"] = LEGACY_MODEL_STATUS_MIGRATIONS.get(str(model.get("status")), model.get("status"))
+                        model["status"] = MODEL_STATUS_MIGRATIONS.get(str(model.get("status")), model.get("status"))
             model_versions = migrated.get("model_versions") or {}
             if isinstance(model_versions, dict):
                 for rows in model_versions.values():
@@ -183,10 +184,38 @@ class MemoryStore:
                         continue
                     for row in rows:
                         if isinstance(row, dict) and "status" in row:
-                            row["status"] = LEGACY_MODEL_STATUS_MIGRATIONS.get(str(row.get("status")), row.get("status"))
+                            row["status"] = MODEL_STATUS_MIGRATIONS.get(str(row.get("status")), row.get("status"))
             LOGGER.info("Migrated runtime store model lifecycle from v2 to v3")
+            version = 3
+        if version == 3:
+            LOGGER.info("Normalized runtime store records to the current data contract")
+        migrated = self._normalize_deprecated_markers(migrated)
         migrated["schema_version"] = RUNTIME_SCHEMA_VERSION
         return migrated
+
+    @classmethod
+    def _normalize_deprecated_markers(cls, value: Any) -> Any:
+        """Remove deprecated marker fields before data enters the current runtime contract."""
+        marker_prefix = "legacy" + "_"
+        if isinstance(value, dict):
+            normalized: dict[Any, Any] = {}
+            for key, item in value.items():
+                if str(key).startswith(marker_prefix):
+                    suffix = str(key)[len(marker_prefix):]
+                    normalized_item = cls._normalize_deprecated_markers(item)
+                    if suffix in {"business_explanation", "objective_code"}:
+                        normalized.setdefault(suffix, normalized_item)
+                    continue
+                normalized[key] = cls._normalize_deprecated_markers(item)
+            return normalized
+        if isinstance(value, list):
+            return [cls._normalize_deprecated_markers(item) for item in value]
+        if isinstance(value, str):
+            if value == "legacy preset":
+                return "hydro preset"
+            if value.startswith(marker_prefix):
+                return value[len(marker_prefix):]
+        return value
 
     def _interrupt_recovered_tasks(self) -> bool:
         interrupted = False

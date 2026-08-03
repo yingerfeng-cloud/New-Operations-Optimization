@@ -13,7 +13,7 @@ Skill 是模型服务化后的平台一等能力，承接模型发布后的接�
 - FastAPI
 - Pyomo
 - HiGHS
-- 单文件前端原型
+- React/Vite/TypeScript 正式前端
 - 本地文件运行时存储
 
 ## 2. 当前迭代目标
@@ -327,25 +327,21 @@ station_summary[].spill_volume_million_m3
 
 | 服务 | 端口 | 地址 |
 |---|---:|---|
-| 平台 API | 8000 | `http://127.0.0.1:8000/api` |
-| Agent API | 8091 | `http://127.0.0.1:8091/api` |
-| 静态前端 | 8092 | `http://127.0.0.1:8092` |
+| FastAPI API | 8000 | `http://127.0.0.1:8000/api` |
+| React/Vite 开发前端 | 5173 | `http://127.0.0.1:5173` |
+| FastAPI 生产托管前端 | 8000 | `http://127.0.0.1:8000/` |
 
-启动脚本要求：
+启动要求：
 
-- 默认启动平台 API 和静态前端。
-- `-Mode both` 同时启动平台和 Agent。
-- `-Restart` 停止目标端口上的旧进程后重启。
-- 启动后检查 `/api/health`。
-- 平台能力缺少组件化 Builder 或梯级水电模板时，提示使用 `-Restart` 清理旧进程。
-- 默认通过 React/Vite 或 FastAPI 托管入口打开页面，不再依赖 `file://`。
+- 在仓库根目录执行 `.\启动前后端.ps1` 可启动核心平台和 React/Vite 开发前端。
+- 需要使用 Agent 与 Skill 时，以 `SERVICE_MODE=combined` 启动 FastAPI，并将 Agent 平台地址配置为本机 8000 端口。
+- 启动后检查 `/api/health` 和 `/api/solvers/status`。
+- 生产托管模式先在 `frontend/` 执行 `npm run build`，再用 `server.py` 启动 FastAPI。
 
-停止脚本要求：
+停止要求：
 
-- 默认停止平台 API 和静态前端。
-- `-Both` 停止平台 API、Agent API 和静态前端。
-- `-All` 停止全部默认端口。
-- 支持 `-AgentOnly` 和 `-UiOnly`。
+- 在仓库根目录执行 `.\停用前后端.ps1` 停止当前项目启动的 API 和前端进程。
+- 进程 PID 和日志位于 `logs/`，端口冲突时先确认当前项目进程再处理。
 
 ## 11. 自动化测试
 

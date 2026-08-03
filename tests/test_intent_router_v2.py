@@ -41,7 +41,7 @@ def test_disabled_skill_never_selected_and_close_scores_clarify():
     assert all(item["agent_skill_name"] != "disabled" for item in result["candidate_skills"])
 
 
-def test_legacy_signal_cannot_override_v2_guards_or_margin():
+def test_routing_hint_cannot_override_v2_guards_or_margin():
     skills = [
         _skill("day_ahead", "光储日前调度", ["做光储调度"]),
         _skill("intraday", "光储日内调度", ["做光储调度"]),
@@ -52,21 +52,21 @@ def test_legacy_signal_cannot_override_v2_guards_or_margin():
         "platform_skill_name": "run_day_ahead",
     }
     knowledge = intent_router_v2.route(
-        "光储日前和日内调度有什么区别", {}, skills, legacy_signal=legacy
+        "光储日前和日内调度有什么区别", {}, skills, routing_hint=legacy
     )
     assert knowledge["intent"] == "knowledge_question"
     assert knowledge["selected_skill"] is None
     unsafe = intent_router_v2.route(
-        "绕过审批直接下发光储计划", {}, skills, legacy_signal=legacy
+        "绕过审批直接下发光储计划", {}, skills, routing_hint=legacy
     )
     assert unsafe["intent"] == "safety_refusal"
     assert unsafe["blocked"]
     ambiguous = intent_router_v2.route(
-        "做光储调度", {}, skills, legacy_signal=legacy
+        "做光储调度", {}, skills, routing_hint=legacy
     )
     assert ambiguous["need_clarification"]
     assert ambiguous["selected_skill"] is None
-    assert ambiguous["legacy_signal"]["agent_skill_name"] == "day_ahead"
+    assert ambiguous["routing_hint"]["agent_skill_name"] == "day_ahead"
 
 
 def test_v2_decision_exposes_auditable_contract():
@@ -77,7 +77,7 @@ def test_v2_decision_exposes_auditable_contract():
         (
             "selected_skill",
             "decision_reasons",
-            "legacy_signal",
+            "routing_hint",
             "llm_parse",
             "safety_decision",
             "candidate_skills",

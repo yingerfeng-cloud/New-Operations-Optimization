@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import re
 import time
@@ -46,14 +46,14 @@ class AgentOrchestrator:
         manual_skill = body.get("skill_name")
         router_started = time.perf_counter()
         available_agent_skills = agent_skill_service.list_skills()
-        legacy_router_result = agent_skill_router.route(message, existing, available_agent_skills)
+        routing_hint = agent_skill_router.route(message, existing, available_agent_skills)
         llm_intent_parse = llm_intent_parser_v2.parse(message, existing, available_agent_skills)
         router_result = intent_router_v2.route(
             message,
             existing,
             available_agent_skills,
             llm_parse=llm_intent_parse,
-            legacy_signal=legacy_router_result,
+            routing_hint=routing_hint,
             requested_skill=manual_skill,
         )
         router_result["llm_intent_parse"] = llm_intent_parse
@@ -544,7 +544,7 @@ class AgentOrchestrator:
             "requires_human_review": bool(result.get("requires_human_review", True)) if result else True,
         }
 
-    def optimize_legacy(self, body: Any) -> dict[str, Any]:
+    def optimize(self, body: Any) -> dict[str, Any]:
         payload = body.model_dump() if hasattr(body, "model_dump") else dict(body or {})
         text = str(payload.get("scenario") or payload.get("business_goal") or payload.get("goal") or payload.get("message") or "")
         skill_name = self._select_skill(text) or "run_economic_dispatch"

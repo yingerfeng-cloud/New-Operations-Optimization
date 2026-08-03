@@ -89,10 +89,6 @@ python -m pytest `
 
 该组覆盖 12 个模板的 clone/publish/test 路径、24 个组件 validate、通用 LP、光储 V2 与梯级水电。
 
-## Legacy 前端
-
-legacy prototype 前端已下线并删除；旧静态前端 pytest 已迁移到 `frontend/src/tests/unit/` 与 `frontend/src/tests/e2e/` 的 React/Vite 测试体系。
-
 ## Agent
 
 ```powershell

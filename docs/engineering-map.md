@@ -1,6 +1,6 @@
 # Engineering Map
 
-本文件是后续迭代的代码入口索引。正式前端唯一位于 `frontend/`；`HTML 原型入口`、`Agent 控制台入口` 和 `static/` legacy 前端已下线并删除。
+本文件是后续迭代的代码入口索引。正式前端源码和页面入口统一位于 `frontend/`。
 
 ## React 应用框架
 
@@ -85,7 +85,7 @@
 - React 挂载：`app/frontend.py`
 - 应用工厂：`app/main.py`、`app/platform_main.py`
 
-生产构建存在时，FastAPI 在 `/` 提供 React SPA；`/legacy`、HTML 原型入口 与 `/static/*` 旧前端路径返回 404。
+生产构建存在时，FastAPI 在 `/` 提供 React SPA，并将未命中 API 的客户端路由回退到 `frontend/dist/index.html`。
 
 ## Agent
 
@@ -95,7 +95,7 @@
 - 参数抽取：`app/agent/parameter_extractor.py`
 - 平台 Client：`app/agent/platform_client.py`
 
-当前只完成页面迁移，Agent 后端不属于本次前端工程化重构范围。
+Agent 工作台通过 `/api/agent/*` 与后端编排服务连接；Skill、会话、参数确认和调用结果由后端服务提供。
 
 ## 测试入口
 

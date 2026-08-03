@@ -17,8 +17,8 @@ def mount_frontends(app: FastAPI) -> None:
 
     @app.get("/legacy", include_in_schema=False)
     @app.get(REMOVED_PROTOTYPE_ROUTE, include_in_schema=False)
-    def legacy_frontend_removed() -> None:
-        raise HTTPException(status_code=404, detail="Legacy frontend has been removed")
+    def removed_frontend_entry() -> None:
+        raise HTTPException(status_code=404, detail="Removed frontend entry")
 
     if dist_dir.joinpath("index.html").exists():
         assets = dist_dir / "assets"

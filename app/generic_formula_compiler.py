@@ -114,7 +114,7 @@ def compile_generic_formula_spec(generic_spec: dict[str, Any], semantic_spec: di
             merged["compiler_version"] = result.get("compiler_version")
             merged["migration_status"] = row.get("migration_status") or "migrated"
             migration_report.append({"formula_id": merged.get("formula_id"), "status": merged["migration_status"], "diagnostics": merged["diagnostics"]})
-            _legacy_rhs_shortcut(merged)
+            _rhs_parameter_shortcut(merged)
             compiled_constraints.append(merged)
     spec["constraints"] = compiled_constraints
 
@@ -306,7 +306,7 @@ def _analyzed_preview(row: dict[str, Any], formula: str, kind: str, symbols: dic
     return {**row, "participation": "preview_only", "compile_status": "preview_only", "analysis": result}
 
 
-def _legacy_rhs_shortcut(row: dict[str, Any]) -> None:
+def _rhs_parameter_shortcut(row: dict[str, Any]) -> None:
     terms = row.get("rhs_terms") or []
     if len(terms) != 1:
         return

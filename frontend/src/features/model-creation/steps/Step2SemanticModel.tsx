@@ -90,6 +90,7 @@ export function Step2SemanticModel({ draft, onChange }: { draft: ModelDraft; onC
     } as const;
     const next = row || defaults[kind];
     setEditing({ kind, index, row: next });
+    form.resetFields();
     form.setFieldsValue({
       ...next,
       dimensionText: formatList(('indices' in next ? next.indices : undefined) || ('dimension' in next ? next.dimension : undefined)),
@@ -116,9 +117,14 @@ export function Step2SemanticModel({ draft, onChange }: { draft: ModelDraft; onC
     onChange({ ...draft, components });
   };
 
-  const saveEditing = () => {
+  const saveEditing = async () => {
     if (!editing) return;
-    const values = form.getFieldsValue();
+    let values: Record<string, unknown>;
+    try {
+      values = await form.validateFields();
+    } catch {
+      return;
+    }
     let row: SemanticRow;
     if (editing.kind === 'sets') {
       row = {
@@ -333,8 +339,8 @@ export function Step2SemanticModel({ draft, onChange }: { draft: ModelDraft; onC
         footer={<Space style={{ width: '100%', justifyContent: 'flex-end' }}><Button onClick={() => setEditing(undefined)}>取消</Button><Button type="primary" onClick={saveEditing}>保存</Button></Space>}
       >
         <Form form={form} layout="vertical">
-          <Form.Item name="code" label="编码" rules={[{ required: true }]}><Input /></Form.Item>
-          <Form.Item name="name" label="名称"><Input /></Form.Item>
+          <Form.Item name="code" label="编码" rules={[{ required: true, whitespace: true, message: '请输入编码' }]}><Input /></Form.Item>
+          <Form.Item name="name" label="名称" rules={[{ required: true, whitespace: true, message: '请输入便于业务理解的名称' }]} extra="名称用于界面、校验提示和结果解释；编码用于公式与求解。"><Input /></Form.Item>
           {editing?.kind === 'sets' && (
             <>
               <Form.Item name="dimensionType" label="结构类型"><Input placeholder="time / business" /></Form.Item>

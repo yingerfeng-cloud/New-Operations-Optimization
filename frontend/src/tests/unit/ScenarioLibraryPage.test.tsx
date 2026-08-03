@@ -60,6 +60,12 @@ test('renders React scenario library and navigates to an explicit backend-templa
   expect(navigate).toHaveBeenCalledWith('/models/create?mode=template&template=cascade_hydro_dispatch');
 });
 
+test('page-level modeling entry starts blank instead of silently selecting the first scenario template', () => {
+  renderPage();
+  fireEvent.click(screen.getAllByRole('button', { name: '进入建模' })[0]);
+  expect(navigate).toHaveBeenCalledWith('/models/create?mode=new');
+});
+
 test('shows real published count zero without static fallback', async () => {
   testState.models = [];
   renderPage();

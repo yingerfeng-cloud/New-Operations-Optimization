@@ -1,17 +1,17 @@
 [
   {
-    "component_id": "audit_legacy_expression",
+    "component_id": "audit_historical_expression",
     "sets": [{"code": "time"}],
     "parameters": [{"code": "limit", "dimension": ["time"]}],
     "variables": [{"code": "x", "dimension": ["time"]}],
-    "constraints": [{"constraint_id": "legacy_expression", "indices": [{"set": "time", "alias": "t"}], "expression": "x[t] >= limit[t]", "solve_participation": "solve_active"}]
+    "constraints": [{"constraint_id": "historical_expression", "indices": [{"set": "time", "alias": "t"}], "expression": "x[t] >= limit[t]", "solve_participation": "solve_active"}]
   },
   {
-    "component_id": "audit_legacy_formula",
+    "component_id": "audit_historical_formula",
     "sets": [{"code": "time"}],
     "parameters": [{"code": "limit", "dimension": ["time"]}],
     "variables": [{"code": "x", "dimension": ["time"]}],
-    "constraints": [{"constraint_id": "legacy_formula", "indices": [{"set": "time", "alias": "t"}], "formula": "x[t] <= limit[t]", "solve_participation": "display_only"}]
+    "constraints": [{"constraint_id": "historical_formula", "indices": [{"set": "time", "alias": "t"}], "formula": "x[t] <= limit[t]", "solve_participation": "display_only"}]
   },
   {
     "component_id": "audit_dsl_formula",

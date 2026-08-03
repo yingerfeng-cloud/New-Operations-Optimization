@@ -102,7 +102,7 @@ def _normalized_config(raw: dict, *, available_sets: set[str]) -> dict:
         raise HTTPException(status_code=422, detail={"message": "模型时间维度配置无效", "errors": [{"field": "ui_metadata.time_dimension", "error": str(exc)}]}) from exc
 
 
-def _clean_legacy_mode_fields(raw: dict) -> dict:
+def _clean_incompatible_mode_fields(raw: dict) -> dict:
     data = deepcopy(raw)
     policy = str(data.get("policy") or ("fixed" if data.get("enabled") else "not_applicable"))
     if policy == "not_applicable":
@@ -185,7 +185,7 @@ def normalize_model_time_dimension_contract(model: ModelPackage) -> ModelPackage
     if explicit is not None:
         _validate_explicit_config(explicit)
     else:
-        raw = _clean_legacy_mode_fields(raw)
+        raw = _clean_incompatible_mode_fields(raw)
     config = _normalized_config(raw, available_sets=_available_set_names(semantic, component, generic))
     ui_metadata = deepcopy(model.ui_metadata or {})
     ui_metadata["time_dimension"] = deepcopy(config)

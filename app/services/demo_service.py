@@ -28,11 +28,7 @@ class DemoService:
         current = self._wait(task.id)
         solve_result = result_service.get_result(task.id)
         explanation = solve_result.get("business_explanation", {})
-        scenario_explanation = solve_result.get("legacy_business_explanation", {})
-        if isinstance(scenario_explanation, dict) and scenario_explanation.get("summary"):
-            summary = str(scenario_explanation["summary"])
-        else:
-            summary = explanation.get("summary") if isinstance(explanation, dict) else str(explanation)
+        summary = explanation.get("summary") if isinstance(explanation, dict) else str(explanation)
         warnings = self._warnings(scenario, solve_result)
         return {
             "scenario": scenario,

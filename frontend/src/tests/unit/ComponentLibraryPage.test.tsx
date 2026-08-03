@@ -79,12 +79,12 @@ test('legacy formula fields are normalized for editing and synchronized on save'
   const onSave = vi.fn();
   const legacyComponent: ComponentDef = {
     ...componentSample,
-    component_id: 'legacy_component',
+    component_id: 'historical_component',
     depends_on: [],
     generated_constraints: [],
     generated_objective_terms: [],
-    constraints: [{ constraint_id: 'legacy_limit', name: '旧版出力上限', expression: 'soc[t] <= soc_max[t]' }],
-    objective_terms: [{ term_id: 'legacy_cost', name: '旧版成本', expression: 'sum(cost[t] for t in time)' }],
+    constraints: [{ constraint_id: 'historical_limit', name: '旧版出力上限', expression: 'soc[t] <= soc_max[t]' }],
+    objective_terms: [{ term_id: 'historical_cost', name: '旧版成本', expression: 'sum(cost[t] for t in time)' }],
   };
   const normalized = normalizeComponentForEditor(legacyComponent);
   expect(normalized?.generated_constraints).toHaveLength(1);
@@ -123,6 +123,17 @@ test('objective rows retain direction, weight, priority and participation metada
     priority: 3,
     solve_participation: 'preview_only',
   });
+});
+
+test('fills historical blank formula names with an explainable component label', () => {
+  const normalized = normalizeComponentForEditor({
+    ...componentSample,
+    generated_constraints: [{ constraint_id: 'balance_eq', expression: 'soc[t] == 1' }],
+  });
+
+  expect(normalized?.generated_constraints).toEqual([
+    expect.objectContaining({ constraint_id: 'balance_eq', name: '储能 SOC 约束' }),
+  ]);
 });
 
 test('confirming deletion removes the selected formula from the component draft', async () => {

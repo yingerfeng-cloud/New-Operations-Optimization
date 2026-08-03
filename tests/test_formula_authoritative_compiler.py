@@ -280,7 +280,7 @@ def test_formula_api_rejects_excessive_scope_rows(client) -> None:
     assert response.status_code == 422
 
 
-def test_disabled_and_legacy_formulas_are_migrated_without_entering_solver_structure() -> None:
+def test_disabled_and_historical_formulas_are_migrated_without_entering_solver_structure() -> None:
     spec = {
         "sense": "minimize",
         "sets": {"time": [0, 1]},

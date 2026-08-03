@@ -185,6 +185,21 @@ def test_component_catalog_has_chinese_metadata_and_problem_types() -> None:
         assert "pv_storage /" not in item["category"]
 
 
+def test_builtin_component_catalog_never_exposes_blank_semantic_or_formula_names() -> None:
+    response = client.get("/api/components/catalog")
+    assert response.status_code == 200, response.text
+    catalog = response.json()
+
+    balance = next(item for item in catalog if item["component_id"] == "balance_equation_component")
+    assert balance["generated_constraints"][0]["constraint_id"] == "balance_eq"
+    assert balance["generated_constraints"][0]["name"] == "平衡方程组件"
+
+    for component in catalog:
+        for section in ("sets", "required_sets", "parameters", "variables", "generated_constraints", "generated_objective_terms"):
+            for row in component.get(section) or []:
+                assert str(row.get("name") or "").strip(), f"{component['component_id']} {section} has a blank name"
+
+
 def _formula_component(component_id: str, expression: str, indices: list[dict] | None = None, variables: list[dict] | None = None, parameters: list[dict] | None = None) -> dict:
     variables = variables or [{"code": "x", "dimension": ["time"], "type": "continuous"}, {"code": "p_ch", "dimension": ["time"], "type": "continuous"}, {"code": "is_charging", "dimension": ["time"], "type": "binary"}]
     parameters = parameters or [{"code": "limit", "dimension": ["time"], "default": 100}, {"code": "total", "dimension": [], "default": 100}, {"code": "M", "dimension": [], "default": 100}]

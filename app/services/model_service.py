@@ -467,7 +467,6 @@ class ModelService:
         if strategy.get("summary") and strategy.get("status") == "generated":
             objective = strategy["summary"]
         elif objective == "total_cost_min":
-            ui_metadata["legacy_objective_code"] = objective
             objective = None
         time_granularity = model.time_granularity
         if not self._model_has_time_set(model):
@@ -537,9 +536,9 @@ class ModelService:
         return model_version_service.prepare_identity(model, source, family_models)
 
     def _validate_version_uniqueness_locked(self, model: ModelView) -> None:
-        family_id = str(model.model_family_id or f"legacy-{model.id}")
+        family_id = str(model.model_family_id or f"FAMILY-{model.id}")
         for candidate in STORE.models.values():
-            candidate_family = str(candidate.model_family_id or f"legacy-{candidate.id}")
+            candidate_family = str(candidate.model_family_id or f"FAMILY-{candidate.id}")
             if candidate.id != model.id and candidate_family == family_id and candidate.version == model.version:
                 raise HTTPException(status_code=409, detail={"code": "MODEL_VERSION_CONFLICT", "message": "同一模型家族中版本号必须唯一。"})
 
@@ -1717,13 +1716,13 @@ class ModelService:
             STORE.save_runtime()
 
     def reconcile_version_state(self) -> None:
-        """Deterministically migrate legacy duplicate codes and rebuild version indexes."""
+        """Deterministically resolve duplicate codes and rebuild version indexes."""
         with STORE.lock:
             normalized: dict[str, ModelView] = {}
             by_code: dict[str, list[ModelView]] = {}
             for model_id, model in STORE.models.items():
                 code = self._model_code(model)
-                family_id = model.model_family_id or (f"builtin:{code}" if self._is_managed_default(model) else f"legacy:{model.id}")
+                family_id = model.model_family_id or (f"builtin:{code}" if self._is_managed_default(model) else f"FAMILY-{model.id}")
                 current = model if model.model_family_id else model.model_copy(update={"model_family_id": family_id})
                 lifecycle_updates: dict[str, Any] = {}
                 if current.status != "published" and current.is_active_version:
@@ -1746,7 +1745,7 @@ class ModelService:
 
                 winner = sorted(candidates, key=score, reverse=True)[0]
                 if len(candidates) > 1:
-                    LOGGER.info("Resolved legacy duplicate model_code=%s to active model_id=%s", code, winner.id)
+                    LOGGER.info("Resolved duplicate model_code=%s to active model_id=%s", code, winner.id)
                 for candidate in candidates:
                     normalized[candidate.id] = normalized[candidate.id].model_copy(
                         update={

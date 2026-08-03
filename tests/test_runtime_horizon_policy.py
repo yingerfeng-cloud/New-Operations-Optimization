@@ -310,7 +310,7 @@ def test_scalar_time_granularity_rejects_explicit_runtime_conflict() -> None:
     }
 
 
-def test_legacy_data_derived_runtime_ignores_stale_allowed_horizons() -> None:
+def test_historical_data_derived_runtime_ignores_stale_allowed_horizons() -> None:
     params, _, _, _ = normalize_runtime_time_dimension(
         semantic_spec={"sets": {"time": [0]}, "parameters": [{"code": "load", "dimensions": ["time"]}]},
         component_spec=None,
@@ -435,7 +435,7 @@ def test_explicit_null_state_time_set_never_generates_time_volume(policy: str) -
         assert all(item.get("code") != "time_volume" for item in component["sets"])
 
 
-def test_missing_state_time_set_uses_legacy_set_presence_only() -> None:
+def test_missing_state_time_set_uses_prior_set_presence_only() -> None:
     with_state = {"sets": {"time": [0, 1], "time_volume": [0, 1, 2]}, "ui_metadata": {"time_dimension": {"enabled": True, "policy": "fixed", "default_horizon": 2, "time_set": "time"}}}
     without_state = {"sets": {"time": [0, 1]}, "ui_metadata": {"time_dimension": {"enabled": True, "policy": "fixed", "default_horizon": 2, "time_set": "time"}}}
     assert resolve_time_dimension_config(model=None, semantic_spec=with_state, component_spec=None, generic_spec=None, runtime_parameters={})["state_time_set"] == "time_volume"

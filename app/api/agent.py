@@ -15,7 +15,7 @@ router = APIRouter(prefix="/api/agent", tags=["agent"])
 
 @router.post("/optimize")
 def agent_optimize(req: AgentOptimizeRequest) -> dict:
-    return agent_orchestrator.optimize_legacy(req)
+    return agent_orchestrator.optimize(req)
 
 
 @router.post("/analyze")

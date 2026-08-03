@@ -66,5 +66,5 @@ Skill 生成阶段，大模型只能新增或润色说明、示例和审阅文�
 
 ## 兼容策略
 
-`explanation_structured` 和 `evidence_package` 是新的权威解释契约。旧客户端仍可读取顶层 `explanation`，但新界面和 Agent 优先使用结构化解释。旧场景解释器仅作为兼容输出保留，不参与新证据链的计算与风险判断。
+`explanation_structured` 与 `evidence_package` 是当前唯一权威解释契约；顶层 `explanation` 只是同一解释的便捷摘要，不再额外生成或保留旧解释字段。运行时存储升级到 schema v4 后，载入时会一次性清理旧标记，后续保存的新数据不再写入旧标记。
 

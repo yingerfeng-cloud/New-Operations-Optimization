@@ -1,6 +1,6 @@
 # 电力业务语义驱动运筹优化平台
 
-本项目是面向电力优化场景的模型资产与求解平台。后端保留 FastAPI + Pyomo + HiGHS，正式前端为 Vite + React + TypeScript；旧 `HTML 原型入口` / `Agent 控制台入口` / `static/` legacy 前端已下线并删除。
+本项目是面向电力优化场景的模型资产与求解平台。后端使用 FastAPI + Pyomo + HiGHS，正式前端使用 Vite + React + TypeScript，前端源码和页面入口统一位于 `frontend/`。
 
 ## 技术栈
 
@@ -43,7 +43,7 @@ python -m venv .venv
 Windows PowerShell 下可直接使用仓库根目录脚本启动新版平台：
 
 ```powershell
-.\启动-运筹优化底座.ps1
+.\启动前后端.ps1
 ```
 
 该脚本会启动：
@@ -54,16 +54,10 @@ Windows PowerShell 下可直接使用仓库根目录脚本启动新版平台：
 停用服务：
 
 ```powershell
-.\停用-运筹优化底座.ps1
+.\停用前后端.ps1
 ```
 
-兼容脚本 `.\启动-Agent工作台.ps1` 和 `.\停用-Agent工作台.ps1` 仍可使用；Agent 工作台现在位于 React 前端 `/agents`。
-
-如只需生产/后端托管模式，可先执行 `cd frontend; npm run build`，再运行：
-
-```powershell
-.\启动-运筹优化底座.ps1 -NoFrontend
-```
+启动脚本支持 `-NoBrowser`、`-ApiPort` 和 `-FrontendPort` 参数。脚本默认以 `SERVICE_MODE=platform` 启动核心平台；需要完整使用 Agent 与 Skill 时，请按下方“Skill / Agent 部署模式”手工启动 `combined` 模式。
 
 ### 3. 手工开发环境
 
@@ -79,7 +73,7 @@ $env:PORT='8000'
 ```powershell
 cd frontend
 Copy-Item .env.example .env -ErrorAction SilentlyContinue
-npm install
+npm ci
 npm run dev
 ```
 
@@ -105,7 +99,7 @@ $env:AGENT_ALLOW_IN_PROCESS_PLATFORM_FALLBACK='false'
 ```
 
 - `combined`：平台与 Agent 在同一个 FastAPI 应用中，Agent 通过 in-process 网关访问 `/api/skills`。
-- `platform`：仅暴露平台、模型、任务、结果和 Skill API。
+- `platform`：仅暴露平台、模型、任务和结果 API。
 - `agent`：仅暴露 Agent API，需配置 `OPTIMIZATION_PLATFORM_BASE_URL` 指向远端平台。
 
 LLM Key 通过环境变量或安全配置注入；前端和普通 runtime JSON 不返回明文 Key。
@@ -114,9 +108,10 @@ LLM Key 通过环境变量或安全配置注入；前端和普通 runtime JSON �
 
 ```powershell
 cd frontend
-npm install
+npm ci
 npm run build
 cd ..
+$env:SERVICE_MODE='combined'
 $env:PORT='8000'
 .\.venv\Scripts\python.exe server.py
 ```
@@ -125,7 +120,6 @@ FastAPI 自动托管 `frontend/dist`：
 
 - `/`：React 应用
 - `/api/*`：后端 API
-- `/legacy`、HTML 原型入口、`/static/*`：已下线，返回 404
 
 React 客户端路由支持直接刷新。
 
@@ -273,7 +267,7 @@ React 前端迁移已按阶段拆分交付，覆盖五步模型创建、统一�
 
 交付包不得包含 `frontend/node_modules`、`frontend/dist`、`frontend/playwright-report`、`frontend/test-results`、`frontend/tsconfig*.tsbuildinfo`、`logs/`、`artifacts/`、`.agents/`、`.claude/`、`.codex/`、`__pycache__/` 等本地依赖、构建缓存和运行产物。解压后进入 `frontend` 执行 `npm ci` 安装依赖；不要提交或打包 `node_modules`。
 
-交付入口见 [React 前端迁移交付说明](docs/react-frontend-delivery.md)。正式功能只使用 `frontend/`；旧 `HTML 原型入口`、`Agent 控制台入口` 与 `static/` 已删除。
+交付入口见 [React 前端迁移交付说明](docs/react-frontend-delivery.md)。正式功能和前端构建入口统一位于 `frontend/`。
 
 ## 已知边界
 
@@ -281,7 +275,7 @@ React 前端迁移已按阶段拆分交付，覆盖五步模型创建、统一�
 - 结果导出按钮当前仅预留。
 - Agent 工作台已对齐 `/api/agent/*` 状态、Skill、会话、分析、默认值确认和调用确认接口；后端 Agent 编排仍沿用现有服务实现。
 - Ant Design/ECharts vendor chunk 存在构建体积提示，不影响构建和运行。
-- legacy prototype 前端已彻底下线；新增和回归前端能力只进入 `frontend/` 的 React/Vite 测试体系。
+- 新增和回归前端能力只进入 `frontend/` 的 React/Vite 测试体系。
 
 详细操作见 [操作手册](OPERATION_MANUAL.md)，代码入口见 [Engineering Map](docs/engineering-map.md)。
 

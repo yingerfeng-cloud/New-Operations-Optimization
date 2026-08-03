@@ -53,14 +53,12 @@ export function ScenarioLibraryPage() {
     const templateCode = scenarios.find(item => item.id === scenarioId)?.models.find(model => model.id === modelId)?.templateCode;
     nav(templateCode ? `/models/create?mode=template&template=${encodeURIComponent(templateCode)}` : '/models/create?mode=new');
   };
-  const firstScenario = scenarios[0];
-
   return (
     <>
       <PageHeader
         title="业务场景库"
         description="按业务场景组织模型模板和建模入口，支持快速进入建模或发起求解。"
-        extra={<Button type="primary" disabled={!firstScenario?.models[0]} onClick={() => firstScenario?.models[0] && openModelCreation(firstScenario.id, firstScenario.models[0].id)}>进入建模</Button>}
+        extra={<Button type="primary" disabled={!scenarios.length} title="进入空白建模流程后再选择业务场景或模板" onClick={() => nav('/models/create?mode=new')}>进入建模</Button>}
       />
       {!scenarios.length && (
         <ConfigurationMissingState

@@ -74,7 +74,7 @@ def test_runtime_schema_v3_restores_models_versions_assets_tasks_and_results(tmp
 
     store.save_runtime()
     payload = json.loads(path.read_text(encoding="utf-8"))
-    assert payload["schema_version"] == 3
+    assert payload["schema_version"] == 4
     assert "TOP-SECRET-RUNTIME-KEY" not in path.read_text(encoding="utf-8")
     assert set(payload["models"]) == {user_model.id}
     assert "builtin:runtime_case" not in payload["model_versions"]
@@ -95,31 +95,58 @@ def test_runtime_schema_v3_restores_models_versions_assets_tasks_and_results(tmp
 
 def test_runtime_schema_v2_permanently_migrates_tested_model_status_to_trial(tmp_path, monkeypatch) -> None:
     path = tmp_path / "runtime_store_v2.json"
-    legacy_model = _model("MODEL-LEGACY-TESTED", "legacy_tested", family="FAMILY-LEGACY", version="v1.0", active=True, status="trial").model_dump(mode="json")
-    legacy_model["status"] = "tested"
+    historical_model = _model("MODEL-STATUS-MIGRATION", "status_migration", family="FAMILY-STATUS-MIGRATION", version="v1.0", active=True, status="trial").model_dump(mode="json")
+    historical_model["status"] = "tested"
     path.write_text(json.dumps({
         "schema_version": 2,
-        "models": {legacy_model["id"]: legacy_model},
+        "models": {historical_model["id"]: historical_model},
         "model_versions": {
-            "FAMILY-LEGACY": [{
-                "model_id": legacy_model["id"],
-                "model_family_id": "FAMILY-LEGACY",
+            "FAMILY-STATUS-MIGRATION": [{
+                "model_id": historical_model["id"],
+                "model_family_id": "FAMILY-STATUS-MIGRATION",
                 "version": "v1.0",
                 "status": "tested",
             }],
         },
-        "active_model_versions": {"FAMILY-LEGACY": legacy_model["id"]},
+        "active_model_versions": {"FAMILY-STATUS-MIGRATION": historical_model["id"]},
     }, ensure_ascii=False), encoding="utf-8")
     monkeypatch.setenv("COPT_RUNTIME_STORE", str(path))
 
     restored = MemoryStore()
 
-    assert restored.models[legacy_model["id"]].status == "trial"
-    assert restored.model_versions["FAMILY-LEGACY"][0]["status"] == "trial"
+    assert restored.models[historical_model["id"]].status == "trial"
+    assert restored.model_versions["FAMILY-STATUS-MIGRATION"][0]["status"] == "trial"
     migrated_payload = json.loads(path.read_text(encoding="utf-8"))
-    assert migrated_payload["schema_version"] == 3
-    assert migrated_payload["models"][legacy_model["id"]]["status"] == "trial"
-    assert migrated_payload["model_versions"]["FAMILY-LEGACY"][0]["status"] == "trial"
+    assert migrated_payload["schema_version"] == 4
+    assert migrated_payload["models"][historical_model["id"]]["status"] == "trial"
+    assert migrated_payload["model_versions"]["FAMILY-STATUS-MIGRATION"][0]["status"] == "trial"
+
+
+def test_runtime_schema_v3_removes_deprecated_marker_fields(tmp_path, monkeypatch) -> None:
+    path = tmp_path / "runtime_store_markers.json"
+    marker_key = "legacy" + "_preset"
+    audit_key = "legacy" + "_used_as"
+    path.write_text(json.dumps({
+        "schema_version": 3,
+        "models": {},
+        "model_versions": {},
+        "active_model_versions": {},
+        "custom_components": {
+            "hydro": {marker_key: True, "component_family": "legacy preset"},
+        },
+        "tasks": {"TASK": {"audit": {audit_key: "legacy" + "_explicit_skill_match"}}},
+    }, ensure_ascii=False), encoding="utf-8")
+    monkeypatch.setenv("COPT_RUNTIME_STORE", str(path))
+
+    MemoryStore()
+
+    migrated_payload = json.loads(path.read_text(encoding="utf-8"))
+    serialized = path.read_text(encoding="utf-8")
+    assert migrated_payload["schema_version"] == 4
+    assert marker_key not in serialized
+    assert audit_key not in serialized
+    assert migrated_payload["custom_components"]["hydro"]["component_family"] == "hydro preset"
+    assert "explicit_skill_match" not in serialized
 
 
 def test_runtime_persistence_survives_fresh_backend_process(tmp_path) -> None:

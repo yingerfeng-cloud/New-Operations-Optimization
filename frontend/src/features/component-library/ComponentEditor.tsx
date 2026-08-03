@@ -109,8 +109,14 @@ export function componentFormulaCompileContext(
 
 export function normalizeComponentForEditor(component?: ComponentDef): Partial<ComponentDef> | undefined {
   if (!component) return undefined;
-  const generatedConstraints = preferredRows(component.generated_constraints, component.constraints);
-  const generatedObjectiveTerms = preferredRows(component.generated_objective_terms, component.objective_terms);
+  const componentLabel = String(component.display_name || component.name || component.component_id || '组件');
+  const withFormulaNames = (rows: FormulaRow[], kind: 'constraint' | 'objective') => rows.map((row, index) => {
+    const code = String(row.constraint_id || row.term_id || row.code || `${kind}_${index + 1}`);
+    const fallback = rows.length === 1 ? componentLabel : `${componentLabel} · ${code}`;
+    return { ...row, name: String(row.name || fallback) };
+  });
+  const generatedConstraints = withFormulaNames(preferredRows(component.generated_constraints, component.constraints), 'constraint');
+  const generatedObjectiveTerms = withFormulaNames(preferredRows(component.generated_objective_terms, component.objective_terms), 'objective');
   return {
     ...component,
     required_sets: (component.required_sets?.length ? component.required_sets : rowsFrom(component.sets)) as SchemaItem[],
@@ -142,7 +148,7 @@ function SchemaList({ name, title }: { name: 'required_sets' | 'parameters' | 'v
             >
               <Row gutter={12}>
                 <Col xs={24} md={8}><Form.Item name={[field.name, 'code']} label="编码" rules={[{ required: true }]}><Input /></Form.Item></Col>
-                <Col xs={24} md={8}><Form.Item name={[field.name, 'name']} label="名称"><Input /></Form.Item></Col>
+                <Col xs={24} md={8}><Form.Item name={[field.name, 'name']} label="名称" rules={[{ required: true, whitespace: true, message: `请输入${title}名称` }]}><Input /></Form.Item></Col>
                 <Col xs={24} md={8}><Form.Item name={[field.name, 'unit']} label="单位"><Input /></Form.Item></Col>
                 <Col xs={24} md={12}><Form.Item name={[field.name, 'dimension']} label="维度"><Select mode="tags" /></Form.Item></Col>
                 <Col xs={24} md={12}><Form.Item name={[field.name, 'source_system']} label="数据来源"><Input /></Form.Item></Col>
@@ -238,6 +244,8 @@ function FormulaList({ name, title, form, component }: { name: 'generated_constr
     next[index] = {
       ...(next[index] || {}),
       name: formula.name,
+      constraint_id: kind === 'constraint' ? formula.formula_id : undefined,
+      term_id: kind === 'objective' ? formula.formula_id : undefined,
       formula: formula.dsl_formula,
       dsl_formula: formula.dsl_formula,
       expression: formula.dsl_formula,
@@ -271,7 +279,10 @@ function FormulaList({ name, title, form, component }: { name: 'generated_constr
   };
   const addFormula = () => {
     const nextIndex = currentRows.length;
-    const draft = formulaFromRow(undefined, kind);
+    const draft = {
+      ...formulaFromRow(undefined, kind),
+      formula_id: `${kind === 'constraint' ? 'constraint' : 'objective'}_${nextIndex + 1}`,
+    };
     setRows([...currentRows, {
       name: draft.name,
       constraint_id: draft.formula_id,

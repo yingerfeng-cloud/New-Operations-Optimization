@@ -1,7 +1,7 @@
 from app.agent.agent_skill_schema import AgentSkillState, AgentSkillV2, normalize_agent_skill_v2
 
 
-def test_v2_schema_normalizes_legacy_package():
+def test_v2_schema_normalizes_historical_package():
     payload = normalize_agent_skill_v2(
         {"name": "demo", "canonical_api_skill_name": "run_demo", "trigger_intents": ["运行示例"], "enabled": True},
         [{"key": "load", "name": "负荷", "required": True}],

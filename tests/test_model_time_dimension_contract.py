@@ -210,7 +210,7 @@ def test_explicit_top_level_contract_rejects_fields_from_other_modes(config: dic
     assert any(item["field"].endswith(field) and item["error"] == "field_not_allowed_for_policy" for item in errors)
 
 
-def test_legacy_nested_contract_is_cleaned_during_migration() -> None:
+def test_historical_nested_contract_is_cleaned_during_migration() -> None:
     payload = _generic_payload(_config("fixed", 24, allowed_horizons=[24, 48], interval_minutes_by_horizon={"24": 60, "48": 30}))
     payload["ui_metadata"].pop("time_dimension")
     response = client.post("/api/models", json=payload)

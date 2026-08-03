@@ -88,7 +88,7 @@ class EvidenceBuilder:
                 "profile_name": (profile or {}).get("profile_name") or "generic",
                 "skill_definition_revision": definition.get("revision"),
                 "skill_definition_hash": definition.get("definition_hash"),
-                "explanation_spec_version": declared_explanation.get("schema_version") or "legacy-profile",
+                "explanation_spec_version": declared_explanation.get("schema_version") or "default-profile",
                 "objective": objective,
             },
             "inputs_summary": {

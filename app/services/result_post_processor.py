@@ -74,9 +74,6 @@ class ResultPostProcessor:
                 enabled=True,
                 generator=llm_service.summarize_evidence,
             )
-        existing_business_explanation = output.get("business_explanation")
-        if existing_business_explanation and existing_business_explanation != explanation:
-            output["legacy_business_explanation"] = existing_business_explanation
         output.update(
             {
                 "evidence_package": evidence,

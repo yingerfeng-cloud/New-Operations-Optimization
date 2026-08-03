@@ -16,7 +16,7 @@ class AgentOptimizeRequest(BaseModel):
 
 class AgentService:
     def optimize(self, req: AgentOptimizeRequest) -> dict[str, Any]:
-        return agent_orchestrator.optimize_legacy(req)
+        return agent_orchestrator.optimize(req)
 
 
 agent_service = AgentService()

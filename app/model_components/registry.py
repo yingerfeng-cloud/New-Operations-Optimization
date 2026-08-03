@@ -314,9 +314,30 @@ def component_definition(component_type: str, builder: Any | None = None) -> dic
     }
     if hasattr(builder, "explain"):
         item.update(builder.explain())
+    component_label = str(item.get("display_name") or item.get("name") or display_name)
+    for schema_key in ("sets", "required_sets", "parameters", "variables"):
+        rows = item.get(schema_key) or []
+        item[schema_key] = [
+            {
+                **deepcopy(row),
+                "name": row.get("name") or row.get("code") or row.get("key") or f"{schema_key}_{index + 1}",
+            }
+            if isinstance(row, dict)
+            else {"code": str(row), "name": str(row)}
+            for index, row in enumerate(rows)
+        ]
+    for formula_key, id_key in (("generated_constraints", "constraint_id"), ("generated_objective_terms", "term_id")):
+        rows = item.get(formula_key) or []
+        normalized_rows = []
+        for index, row in enumerate(rows):
+            normalized = deepcopy(row) if isinstance(row, dict) else {"expression": str(row)}
+            formula_code = str(normalized.get(id_key) or normalized.get("code") or f"{component_type}_{formula_key}_{index + 1}")
+            normalized[id_key] = formula_code
+            normalized["name"] = normalized.get("name") or (component_label if len(rows) == 1 else f"{component_label} · {formula_code}")
+            normalized_rows.append(normalized)
+        item[formula_key] = normalized_rows
     if component_type.startswith("hydro_"):
-        item.setdefault("legacy_preset", True)
-        item["component_family"] = "legacy preset"
+        item["component_family"] = "hydro preset"
         item.setdefault("can_be_composed_from", _hydro_generic_composition(component_type))
     problem_type = item.get("problem_type") or item.get("problem_type_effect") or "LP"
     item["problem_type"] = problem_type

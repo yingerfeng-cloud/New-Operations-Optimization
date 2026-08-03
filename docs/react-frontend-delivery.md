@@ -17,7 +17,7 @@
 开发模式：
 
 ```powershell
-.\启动-运筹优化底座.ps1
+.\启动前后端.ps1 -NoBrowser
 ```
 
 访问：
@@ -29,9 +29,12 @@
 
 ```powershell
 cd frontend
+npm ci
 npm run build
 cd ..
-.\启动-运筹优化底座.ps1 -NoFrontend
+$env:SERVICE_MODE='combined'
+$env:PORT='8000'
+.\.venv\Scripts\python.exe server.py
 ```
 
 访问 `http://localhost:8000/`。
@@ -71,9 +74,9 @@ python -m pytest -q
 
 当前沙箱中 `npm run test:phase`、`npm run build` 的 Vite/Vitest 部分会在 esbuild 子进程启动时报 `spawn EPERM`。这属于执行环境权限限制；在本地非沙箱环境或 CI 中仍应运行完整 gate。
 
-## 保留边界
+## 当前边界
 
-- legacy `HTML 原型入口`、`Agent 控制台入口` 与 `static/` 已下线并删除；正式前端唯一入口为 `frontend/`。
+- 正式前端唯一入口为 `frontend/`；开发入口使用 Vite，生产入口由 FastAPI 托管 `frontend/dist`。
 - 求解核心、模板注册表、组件注册表和 Agent 后端编排仍由现有 FastAPI 服务承担，React 前端不重写求解内核。
 - Monaco Editor 未引入；当前公式编辑器以结构化 TokenCanvas 为主。
 - 结果导出按钮仍为预留能力。

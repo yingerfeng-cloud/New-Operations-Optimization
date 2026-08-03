@@ -9,8 +9,6 @@
 - FastAPI：`http://localhost:8000/api`
 - 健康检查：`http://localhost:8000/api/health`
 
-legacy prototype 前端已下线；`/legacy`、HTML 原型入口 与 `/static/*` 返回 404。日常模型、组件、任务和结果操作均使用 React 前端。
-
 ## 2. 环境准备
 
 后端：
@@ -41,36 +39,32 @@ VITE_API_BASE_URL=http://localhost:8000
 在仓库根目录执行：
 
 ```powershell
-.\启动-运筹优化底座.ps1
+.\启动前后端.ps1
 ```
 
 脚本会同时启动 FastAPI `8000` 和 React/Vite `5173`，并写入 PID 文件：
 
-- `logs/.platform-api.pid`
-- `logs/.platform-frontend.pid`
+- `logs/.react-stack-api.pid`
+- `logs/.react-stack-frontend.pid`
 
 停用服务：
 
 ```powershell
-.\停用-运筹优化底座.ps1
+.\停用前后端.ps1
 ```
 
-Agent 兼容脚本仍可使用：
-
-```powershell
-.\启动-Agent工作台.ps1
-.\停用-Agent工作台.ps1
-```
-
-Agent 工作台入口为 `http://localhost:5173/agents`。旧的 `8090/8091` 端口仅作为停用脚本的兼容清理对象。
+当前脚本默认以 `SERVICE_MODE=platform` 启动核心平台。需要使用 Agent 和 Skill 时，请按第 3.2 节的 `SERVICE_MODE=combined` 方式启动后端。
 
 生产/后端托管模式：
 
 ```powershell
 cd frontend
+npm ci
 npm run build
 cd ..
-.\启动-运筹优化底座.ps1 -NoFrontend
+$env:SERVICE_MODE='combined'
+$env:PORT='8000'
+.\.venv\Scripts\python.exe server.py
 ```
 
 打开 `http://localhost:8000/`。
@@ -80,7 +74,11 @@ cd ..
 终端 1：
 
 ```powershell
+$env:SERVICE_MODE='combined'
 $env:PORT='8000'
+$env:OPTIMIZATION_PLATFORM_BASE_URL='http://127.0.0.1:8000'
+$env:AGENT_PLATFORM_ACCESS_MODE='in_process'
+$env:AGENT_ALLOW_IN_PROCESS_PLATFORM_FALLBACK='false'
 .\.venv\Scripts\python.exe server.py
 ```
 
@@ -97,8 +95,10 @@ npm run dev
 
 ```powershell
 cd frontend
+npm ci
 npm run build
 cd ..
+$env:SERVICE_MODE='combined'
 $env:PORT='8000'
 .\.venv\Scripts\python.exe server.py
 ```
@@ -308,10 +308,6 @@ Invoke-RestMethod http://localhost:8000/api/health
 
 必须先运行 `npm run build`，并通过 `server.py` 启动包含 `app/frontend.py` 挂载逻辑的 FastAPI 应用。
 
-### legacy 页面已下线
-
-旧 `/legacy`、HTML 原型入口 与 `/static/*` 入口已删除，返回 404。请使用 React 前端 `/` 与 `/agents` 等正式路由。
-
 ### Pyomo 或 highspy 不可用
 
 ```powershell
@@ -328,7 +324,7 @@ Playwright 固定使用 5178。不要将其改回 `reuseExistingServer` 的共�
 - 结果导出尚未接入。
 - Agent 工作台已接入真实 Agent API，后端编排仍沿用现有服务。
 - 复杂函数在完成可靠线性化前不会进入通用线性求解结构。
-- legacy prototype 前端已删除；正式功能和测试只进入 React/Vite 前端。
+- 正式功能和测试只进入 React/Vite 前端。
 
 ## 16. NLP / Ipopt 操作
 

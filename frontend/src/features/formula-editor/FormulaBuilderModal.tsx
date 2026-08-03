@@ -97,6 +97,7 @@ function symbolExpression(item: ReturnType<typeof getFormulaSymbolDictionary>[nu
 
 function editableSnapshot(formula: FormulaDef) {
   return JSON.stringify({
+    formula_id: formula.formula_id,
     name: formula.name,
     kind: formula.kind,
     expression: formula.dsl_formula,
@@ -275,7 +276,10 @@ export function FormulaBuilder({
 
   const participation = formula.solve_participation || 'solve_active';
   const authoritativeCurrent = isAuthoritativeArtifactCurrent(formula, effectiveCompileContext);
-  const canApply = check.valid && Boolean(formula.dsl_formula.trim()) && (participation !== 'solve_active' || authoritativeCurrent);
+  const formulaCode = formula.formula_id.trim();
+  const formulaName = formula.name.trim();
+  const formulaCodeValid = /^[A-Za-z0-9_][A-Za-z0-9_.-]*$/.test(formulaCode);
+  const canApply = Boolean(formulaName) && formulaCodeValid && check.valid && Boolean(formula.dsl_formula.trim()) && (participation !== 'solve_active' || authoritativeCurrent);
 
   const requestClose = () => {
     if (!dirty) {
@@ -307,8 +311,17 @@ export function FormulaBuilder({
     <div className={`formula-builder${focusMode ? ' is-focus-mode' : ''}`}>
       <div className="formula-builder-head">
         <Space wrap>
-          <Form.Item label="公式名称" style={{ margin: 0 }}>
+          <Form.Item label="公式名称" required validateStatus={formulaName ? undefined : 'error'} help={formulaName ? undefined : '请输入便于业务理解的公式名称'} style={{ margin: 0 }}>
             <Input value={formula.name} onChange={event => commit({ ...formula, name: event.target.value })} />
+          </Form.Item>
+          <Form.Item
+            label="公式编码"
+            required
+            validateStatus={formulaCodeValid ? undefined : 'error'}
+            help={formulaCodeValid ? '新建时自动生成，可按需修改' : '请输入由字母、数字、下划线、点或连字符组成的唯一编码'}
+            style={{ margin: 0 }}
+          >
+            <Input aria-label="公式编码" value={formula.formula_id} onChange={event => commit({ ...formula, formula_id: event.target.value })} />
           </Form.Item>
           <Form.Item label="业务分组" style={{ margin: 0 }}>
             <Input aria-label="业务分组" placeholder="例如：状态递推" value={formula.business_group} onChange={event => commit({ ...formula, business_group: event.target.value })} />

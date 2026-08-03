@@ -75,6 +75,27 @@ function problemTypeErrors(draft: ModelDraft) {
   return [...functionMappingErrors(draft), ...nonlinear.blocking_items.map(item => item.message)];
 }
 
+function semanticIdentityErrors(draft: ModelDraft) {
+  const errors: string[] = [];
+  const groups = [
+    ['集合', draft.semantic.sets],
+    ['参数', draft.semantic.parameters],
+    ['变量', draft.semantic.variables],
+  ] as const;
+  groups.forEach(([label, rows]) => {
+    const codes = new Set<string>();
+    rows.forEach((row, index) => {
+      const code = String(row.code || '').trim();
+      const name = String(row.name || '').trim();
+      if (!code) errors.push(`${label}第 ${index + 1} 项编码必填`);
+      if (!name) errors.push(`${label} ${code || `第 ${index + 1} 项`}名称必填（用于模型解释）`);
+      if (code && codes.has(code)) errors.push(`${label}编码重复：${code}`);
+      if (code) codes.add(code);
+    });
+  });
+  return errors;
+}
+
 export function validateModelDraft(sourceDraft: ModelDraft): DraftValidation {
   const d = activeDraftForBuilderMode(sourceDraft);
   const basicInfoErrors: string[] = [];
@@ -83,13 +104,26 @@ export function validateModelDraft(sourceDraft: ModelDraft): DraftValidation {
   if (!d.basic_info.scenario) basicInfoErrors.push('业务场景必填');
 
   const semanticStructureErrors: string[] = [];
+  semanticStructureErrors.push(...semanticIdentityErrors(d));
   if (!d.semantic.sets.length && (d.semantic.parameters.some(item => extractDimensions(item as unknown as Record<string, unknown>).length) || d.semantic.variables.some(item => extractDimensions(item as unknown as Record<string, unknown>).length))) semanticStructureErrors.push('存在有维度参数或变量时至少需要一个集合');
   [...d.semantic.parameters, ...d.semantic.variables].forEach(item => {
     if (dimensionFieldConflict(item as unknown as Record<string, unknown>)) semanticStructureErrors.push(`${item.code} 的维度字段定义不一致`);
   });
   if (!d.semantic.variables.length && d.basic_info.builder_mode === 'generic_linear') semanticStructureErrors.push('通用线性 Builder 至少需要一个变量');
 
-  const formulaErrors = d.formulas.flatMap(f => validateFormulaDef(f).errors.map(e => `${f.name}: ${e}`));
+  const formulaErrors = d.formulas.flatMap(f => validateFormulaDef(f).errors.map(e => `${f.name || f.formula_id || '未命名公式'}: ${e}`));
+  const formulaCodes = new Set<string>();
+  const formulaNames = new Set<string>();
+  d.formulas.forEach((formula, index) => {
+    const code = String(formula.formula_id || '').trim();
+    const name = String(formula.name || '').trim();
+    if (!code) formulaErrors.push(`第 ${index + 1} 个公式编码必填`);
+    if (!name) formulaErrors.push(`公式 ${code || `第 ${index + 1} 项`}名称必填（用于模型解释）`);
+    if (code && formulaCodes.has(code)) formulaErrors.push(`公式编码必须唯一：${code}`);
+    if (name && formulaNames.has(name)) formulaErrors.push(`公式名称必须唯一：${name}`);
+    if (code) formulaCodes.add(code);
+    if (name) formulaNames.add(name);
+  });
   const activeObjectives = d.formulas.filter(f => f.kind === 'objective' && (f.solve_participation || 'solve_active') === 'solve_active');
   const objectiveMode = d.objective?.mode || (d.objective?.type === 'weighted_sum' ? 'weighted_sum' : 'single');
   if (d.basic_info.builder_mode === 'generic_linear' && !activeObjectives.length) formulaErrors.push('通用线性 Builder 至少需要一个参与求解的目标公式');

@@ -820,6 +820,11 @@ body {
 }
 
 .component-formula-table .ant-table {
+  border-radius: 8px;
+}
+
+.component-formula-table .ant-table-container {
+  overflow: hidden;
   border: 1px solid var(--proto-line);
   border-radius: 8px;
 }

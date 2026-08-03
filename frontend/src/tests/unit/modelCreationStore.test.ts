@@ -182,7 +182,7 @@ test('model asset edit falls back to asset specs when model_draft is absent', ()
     problem_type: 'LP',
     build_mode: 'generic_linear',
     updated_at: '2026-07-07',
-    template_id: 'legacy_model',
+    template_id: 'historical_model',
     semantic_spec: {
       sets: [{ code: 'time', name: '时段', values: [0, 1, 2] }],
       parameters: [{ code: 'price', name: '电价', dimension: ['time'] }],
@@ -196,7 +196,7 @@ test('model asset edit falls back to asset specs when model_draft is absent', ()
     parameters: { horizon: 3 },
   });
 
-  expect(restored.basic_info.model_code).toBe('legacy_model');
+  expect(restored.basic_info.model_code).toBe('historical_model');
   expect(restored.semantic.sets.find(item => item.code === 'time')?.values).toHaveLength(3);
   expect(restored.semantic.parameters[0].code).toBe('price');
   expect(restored.semantic.variables[0].code).toBe('p');

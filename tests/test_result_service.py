@@ -24,7 +24,7 @@ def test_result_list_uses_solver_objective_instead_of_stale_summary_total() -> N
     assert row["total_cost"] == 0
 
 
-def test_result_list_remains_compatible_with_flat_legacy_results() -> None:
+def test_result_list_remains_compatible_with_flat_historical_results() -> None:
     with STORE.lock:
         STORE.results.clear()
         STORE.results["OPT-LEGACY"] = {

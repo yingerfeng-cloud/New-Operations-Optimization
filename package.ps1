@@ -27,13 +27,7 @@ $IncludeItems = @(
   "requirements.txt",
   "server.py",
   "solver_adapter.py",
-  "docker-compose.yml",
-  "停用-Agent工作台.ps1",
-  "停用-React前后端.ps1",
-  "停用-运筹优化底座.ps1",
-  "启动-Agent工作台.ps1",
-  "启动-React前后端.ps1",
-  "启动-运筹优化底座.ps1"
+  "docker-compose.yml"
 )
 
 $RequiredPackageItems = @(
@@ -79,10 +73,6 @@ $RemovePatterns = @(
   "\\frontend\\vite\.config\.(?:js|d\.ts)$",
   "\\frontend\\playwright\.config\.(?:js|d\.ts)$",
   "\\reports\\.*\.html$",
-  "\\prototype\.html$",
-  "\\agent_console\.html$",
-  "\\static\\js\\platform-[^\\]*$",
-  "\\static\\css\\platform-[^\\]*$",
   "\\data\\runtime_store\.json$",
   "\\data\\runtime_store\.local\.json$",
   "\\data\\runtime_store_test_[^\\]*\.json$",

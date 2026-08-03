@@ -13,7 +13,7 @@ def test_react_dist_is_hosted_with_spa_fallback() -> None:
     assert client.get("/models/create").status_code == 200
 
 
-def test_legacy_frontend_is_offline_and_api_remains_available() -> None:
+def test_removed_frontend_is_offline_and_api_remains_available() -> None:
     client = TestClient(create_app())
     removed_html_entry = "/" + "prototype" + ".html"
     assert client.get("/legacy").status_code == 404

@@ -53,7 +53,7 @@ class IntentRouterV2:
         available_agent_skills: list[dict[str, Any]] | None = None,
         llm_parse: dict[str, Any] | None = None,
         user_permissions: set[str] | None = None,
-        legacy_signal: dict[str, Any] | None = None,
+        routing_hint: dict[str, Any] | None = None,
         requested_skill: str | None = None,
     ) -> dict[str, Any]:
         text = str(message or "").strip()
@@ -64,7 +64,7 @@ class IntentRouterV2:
             "message": text,
             "guards": [],
             "candidate_count": len(skills),
-            "legacy_used_as": "candidate_signal_only",
+            "hint_role": "candidate_signal_only",
         }
 
         if any(marker in compact for marker in AUTO_CONTROL_MARKERS):
@@ -72,14 +72,14 @@ class IntentRouterV2:
             return self._decision(
                 "safety_refusal", None, [], False, True,
                 "平台仅支持辅助分析，不能自动下发生产控制或交易申报指令。",
-                audit, llm_parse, legacy_signal,
+                audit, llm_parse, routing_hint,
             )
 
         if any(marker in compact for marker in RESULT_MARKERS):
             audit["guards"].append("RESULT_EXPLANATION")
             return self._decision(
                 "result_explanation", None, [], False, False, None,
-                audit, llm_parse, legacy_signal,
+                audit, llm_parse, routing_hint,
             )
 
         is_execution = any(marker in compact for marker in EXECUTION_MARKERS)
@@ -91,24 +91,24 @@ class IntentRouterV2:
             audit["guards"].append("KNOWLEDGE_ONLY")
             return self._decision(
                 "knowledge_question", None, [], False, False, None,
-                audit, llm_parse, legacy_signal,
+                audit, llm_parse, routing_hint,
             )
 
-        workflow_intent = self._workflow_intent(compact, state, legacy_signal)
+        workflow_intent = self._workflow_intent(compact, state, routing_hint)
         if workflow_intent:
             audit["guards"].append("V2_WORKFLOW_DECISION")
             workflow_selected = self._selected_for_workflow(
-                workflow_intent, state, skills, legacy_signal
+                workflow_intent, state, skills, routing_hint
             )
             return self._decision(
                 workflow_intent, workflow_selected, [], False,
-                False, None, audit, llm_parse, legacy_signal,
+                False, None, audit, llm_parse, routing_hint,
             )
 
         candidates = [
             self._score(
                 text, state, skill, llm_parse, user_permissions,
-                legacy_signal=legacy_signal, requested_skill=requested_skill,
+                routing_hint=routing_hint, requested_skill=requested_skill,
             )
             for skill in skills
         ]
@@ -125,7 +125,7 @@ class IntentRouterV2:
                 re.IGNORECASE,
             ):
                 candidate["final_score"] = round(candidate["final_score"] * 0.72, 4)
-                candidate["pre_legacy_score"] = round(candidate["pre_legacy_score"] * 0.72, 4)
+                candidate["base_score"] = round(candidate["base_score"] * 0.72, 4)
                 candidate["score_breakdown"]["implicit_version_penalty"] = 0.72
         candidates = [item for item in candidates if item["final_score"] > 0]
         candidates.sort(key=lambda item: item["final_score"], reverse=True)
@@ -135,18 +135,18 @@ class IntentRouterV2:
             question = "请说明要优化的业务场景、目标和时间范围。"
             return self._decision(
                 "optimization_request" if is_execution else "unknown", None, candidates,
-                True, False, question, audit, llm_parse, legacy_signal,
+                True, False, question, audit, llm_parse, routing_hint,
             )
         margin = top["final_score"] - (second["final_score"] if second else 0.0)
-        pre_legacy_margin = top["pre_legacy_score"] - (
-            second["pre_legacy_score"] if second else 0.0
+        base_margin = top["base_score"] - (
+            second["base_score"] if second else 0.0
         )
         threshold = float(top.get("confidence_threshold", 0.75))
         margin_threshold = float(top.get("top_score_margin_threshold", 0.15))
         needs_clarification = (
             top["final_score"] < threshold
             or (second is not None and margin < margin_threshold)
-            or (second is not None and pre_legacy_margin < margin_threshold)
+            or (second is not None and base_margin < margin_threshold)
         )
         if needs_clarification:
             labels = "、".join(str(item.get("display_name") or item.get("agent_skill_name")) for item in candidates[:3])
@@ -163,7 +163,7 @@ class IntentRouterV2:
             question,
             audit,
             llm_parse,
-            legacy_signal,
+            routing_hint,
         )
 
     def _score(
@@ -173,7 +173,7 @@ class IntentRouterV2:
         skill: dict[str, Any],
         llm_parse: dict[str, Any] | None,
         user_permissions: set[str] | None,
-        legacy_signal: dict[str, Any] | None,
+        routing_hint: dict[str, Any] | None,
         requested_skill: str | None,
     ) -> dict[str, Any]:
         name = str(skill.get("agent_skill_name") or skill.get("name") or "")
@@ -205,15 +205,15 @@ class IntentRouterV2:
             + self.weights.keyword * keyword
             + self.weights.availability * available
         )
-        pre_legacy_score = min(1.0, score)
-        legacy_name = str(
-            (legacy_signal or {}).get("agent_skill_name")
-            or (legacy_signal or {}).get("platform_skill_name")
+        base_score = min(1.0, score)
+        hint_name = str(
+            (routing_hint or {}).get("agent_skill_name")
+            or (routing_hint or {}).get("platform_skill_name")
             or ""
         )
-        legacy_match = 1.0 if legacy_name in {name, platform} else 0.0
+        hint_match = 1.0 if hint_name in {name, platform} else 0.0
         requested_match = 1.0 if requested_skill in {name, platform} else 0.0
-        score = min(1.0, score + 0.25 * legacy_match + 0.35 * requested_match)
+        score = min(1.0, score + 0.25 * hint_match + 0.35 * requested_match)
         policy = skill.get("intent_policy") or {}
         return {
             "agent_skill_name": name,
@@ -221,7 +221,7 @@ class IntentRouterV2:
             "api_skill_name": platform,
             "display_name": skill.get("display_name") or name,
             "final_score": round(min(1.0, score), 4),
-            "pre_legacy_score": round(pre_legacy_score, 4),
+            "base_score": round(base_score, 4),
             "reason": self._reason(semantic, schema_fit, business_domain, context, llm_score),
             "score_breakdown": {
                 "llm_intent_score": round(llm_score, 4),
@@ -231,7 +231,7 @@ class IntentRouterV2:
                 "business_domain_score": round(business_domain, 4),
                 "keyword_score": round(keyword, 4),
                 "availability_score": round(available, 4),
-                "legacy_candidate_score": legacy_match,
+                "hint_score": hint_match,
                 "requested_skill_score": requested_match,
             },
             "confidence_threshold": policy.get("confidence_threshold", 0.75),
@@ -248,7 +248,7 @@ class IntentRouterV2:
         question: str | None,
         audit: dict[str, Any],
         llm_parse: dict[str, Any] | None,
-        legacy_signal: dict[str, Any] | None,
+        routing_hint: dict[str, Any] | None,
     ) -> dict[str, Any]:
         top = candidates[0] if candidates else None
         selected_skill = selected.get("agent_skill_name") if selected else None
@@ -277,7 +277,7 @@ class IntentRouterV2:
                 "reason": "AUTO_CONTROL_REJECTED" if blocked else None,
             },
             "llm_parse": llm_parse or {},
-            "legacy_signal": self._sanitized_legacy_signal(legacy_signal),
+            "routing_hint": self._sanitized_routing_hint(routing_hint),
             "audit": audit,
         }
 
@@ -285,39 +285,39 @@ class IntentRouterV2:
         self,
         compact: str,
         state: dict[str, Any],
-        legacy_signal: dict[str, Any] | None,
+        routing_hint: dict[str, Any] | None,
     ) -> str | None:
-        legacy_intent = str((legacy_signal or {}).get("intent") or "")
-        if legacy_intent not in WORKFLOW_INTENTS:
+        hint_intent = str((routing_hint or {}).get("intent") or "")
+        if hint_intent not in WORKFLOW_INTENTS:
             return None
         active = bool(
             state.get("resolved_skill_name")
             or state.get("agent_skill_name")
             or state.get("parameter_draft")
         )
-        if legacy_intent in {
+        if hint_intent in {
             "how_to_use", "skill_availability_query", "explain_required_parameters",
             "parameter_example", "confirm_defaults", "confirm_invoke",
         }:
-            return legacy_intent
-        if legacy_intent in {"switch_skill"} and any(word in compact for word in ("切换", "换成", "改用")):
-            return legacy_intent
-        return legacy_intent if active else None
+            return hint_intent
+        if hint_intent in {"switch_skill"} and any(word in compact for word in ("切换", "换成", "改用")):
+            return hint_intent
+        return hint_intent if active else None
 
     def _selected_for_workflow(
         self,
         intent: str,
         state: dict[str, Any],
         skills: list[dict[str, Any]],
-        legacy_signal: dict[str, Any] | None,
+        routing_hint: dict[str, Any] | None,
     ) -> dict[str, Any] | None:
-        legacy_target = (
-            (legacy_signal or {}).get("agent_skill_name")
-            or (legacy_signal or {}).get("platform_skill_name")
+        hint_target = (
+            (routing_hint or {}).get("agent_skill_name")
+            or (routing_hint or {}).get("platform_skill_name")
         )
-        if legacy_target:
+        if hint_target:
             for skill in skills:
-                if legacy_target in {
+                if hint_target in {
                     skill.get("agent_skill_name"),
                     skill.get("name"),
                     skill.get("platform_skill_name"),
@@ -348,7 +348,7 @@ class IntentRouterV2:
                 }
         return None
 
-    def _sanitized_legacy_signal(self, signal: dict[str, Any] | None) -> dict[str, Any]:
+    def _sanitized_routing_hint(self, signal: dict[str, Any] | None) -> dict[str, Any]:
         return {
             key: (signal or {}).get(key)
             for key in ("intent", "agent_skill_name", "platform_skill_name", "reason")

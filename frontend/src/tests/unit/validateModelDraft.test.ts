@@ -36,6 +36,17 @@ test('blocks missing required runtime parameters', () => {
   expect(result.sections.runtime_parameters.errors).toContain('运行参数 负荷 load 缺少必填值');
 });
 
+test('requires semantic and formula names for explainability', () => {
+  const draft = baseDraft();
+  draft.semantic.parameters[0].name = '';
+  draft.formulas[0].name = '';
+
+  const result = validateModelDraft(draft);
+
+  expect(result.sections.semantic_structure.errors).toContain('参数 load名称必填（用于模型解释）');
+  expect(result.sections.formula.errors).toContain('公式 obj名称必填（用于模型解释）');
+});
+
 test('blocks missing component dependencies', () => {
   const draft = baseDraft();
   draft.basic_info.builder_mode = 'component_based';
