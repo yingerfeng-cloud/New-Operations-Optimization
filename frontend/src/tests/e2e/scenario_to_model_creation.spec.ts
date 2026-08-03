@@ -7,7 +7,7 @@ test('scenario library opens explicit backend template mode with complete conten
 
   const card = page.getByTestId('scenario-card-cascade_hydro_day_ahead');
   await expect(card).toBeVisible();
-  await page.getByTestId('scenario-enter-cascade_hydro_day_ahead').click();
+  await card.locator('.scenario-model-action button').click();
 
   await expect(page).toHaveURL(/\/models\/create\?mode=template&template=cascade_hydro_dispatch/);
   await expect(page.getByText('从模板创建模型', { exact: true })).toBeVisible();

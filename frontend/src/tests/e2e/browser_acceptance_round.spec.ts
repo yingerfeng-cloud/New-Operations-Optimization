@@ -5,8 +5,9 @@ test('browser acceptance covers scenario, model, component, task and result entr
   await mockApi(page);
 
   await page.goto('/scenarios');
-  await expect(page.getByTestId('scenario-card-cascade_hydro_day_ahead')).toBeVisible();
-  await page.getByTestId('scenario-enter-cascade_hydro_day_ahead').click();
+  const scenarioCard = page.getByTestId('scenario-card-cascade_hydro_day_ahead');
+  await expect(scenarioCard).toBeVisible();
+  await scenarioCard.locator('.scenario-model-action button').click();
   await expect(page).toHaveURL(/\/models\/create/);
   await expect(page.getByText('从模板创建模型').first()).toBeVisible();
 
