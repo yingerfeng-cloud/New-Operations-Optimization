@@ -19,10 +19,10 @@ RUN micromamba run -n base python -m pip install --no-cache-dir -r /app/requirem
 
 COPY --chown=$MAMBA_USER:$MAMBA_USER . /app
 
-ENV COPT_DATA_DIR=/app/data \
-    COPT_RUNTIME_STORE=/app/data/runtime_store.json \
+ENV OPTIFORGE_DATA_DIR=/app/data \
+    OPTIFORGE_RUNTIME_STORE=/app/data/runtime_store.json \
     RUNTIME_STORE_PATH=/app/data/runtime_store.json \
-    COPT_SOLVER_MODE=docker \
+    OPTIFORGE_SOLVER_MODE=docker \
     SERVICE_MODE=combined \
     OPTIMIZATION_PLATFORM_BASE_URL=http://127.0.0.1:8000 \
     AGENT_PLATFORM_ACCESS_MODE=in_process \

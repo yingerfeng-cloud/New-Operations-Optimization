@@ -16,6 +16,17 @@ from app.storage.memory_store import STORE
 from app.utils import now_text
 
 
+STAGE_DURATION_TRACE_KEYS = {
+    "VALIDATING": "validation_seconds",
+    "BUILDING_MODEL": "model_build_seconds",
+    "SOLVING": "solve_seconds",
+    "FORMATTING_RESULT": "format_seconds",
+}
+MAX_SOLVER_PROGRESS_POINTS = 320
+MAX_SOLVER_PROGRESS_EVENTS = 80
+GAP_MILESTONES = (0.1, 0.05, 0.01, 0.001)
+
+
 class JobRunner:
     def start(self, task_id: str) -> None:
         threading.Thread(target=self.run, args=(task_id,), daemon=True).start()
@@ -55,11 +66,26 @@ class JobRunner:
                 self._update(task, status="SOLVING", progress=60)
                 solve_started = time.monotonic()
                 self._log(task, "INFO", f"开始调用路由求解器，time_limit_seconds={task.request.time_limit_seconds}")
+                declared_problem_type = self._declared_problem_type(semantic_spec)
                 problem_type = self._problem_type(semantic_spec, model)
+                task.trace["problem_type"] = problem_type
+                if declared_problem_type:
+                    task.trace["declared_problem_type"] = declared_problem_type
+                if declared_problem_type and declared_problem_type != problem_type:
+                    self._log(
+                        task,
+                        "INFO",
+                        f"运行时模型结构识别为 {problem_type}（模型声明为 {declared_problem_type}），按实际结构展示求解过程",
+                    )
                 requested_solver = runtime.get("solver")
                 route = solver_router.route(problem_type, requested_solver)
                 if not route["ok"]:
                     raise SolverRouteError(route)
+                self._initialize_solver_progress(
+                    task,
+                    solver=str(route["selected_solver"]),
+                    problem_type=str(problem_type),
+                )
                 solver_result = solver_router.solve(
                     model,
                     problem_type=problem_type,
@@ -67,8 +93,15 @@ class JobRunner:
                     mip_gap=task.request.mip_gap,
                     time_limit_seconds=task.request.time_limit_seconds,
                     threads=task.request.thread_num,
+                    progress_callback=lambda sample: self._record_solver_progress(task, sample),
                 )
                 task.trace["solve_seconds"] = round(time.monotonic() - solve_started, 4)
+                self._complete_solver_progress(
+                    task,
+                    status=solver_result.status,
+                    objective=solver_result.objective_value,
+                    gap=solver_result.mip_gap,
+                )
                 task.run_metrics.update(
                     {
                         "solver_status": solver_result.status,
@@ -172,6 +205,7 @@ class JobRunner:
                     STORE.save_runtime()
                 self._log(task, "INFO", "结果保存完成")
         except Exception as exc:
+            self._fail_solver_progress(task, str(exc))
             diagnosis = diagnose_infeasible(self._model_code(task), task.request.payload or {})
             if isinstance(exc, SolverRouteError):
                 task.result = {"status": "FAILED", "solver_route_error": exc.payload, "trace": task.trace, "logs": task.logs, "run_metrics": task.run_metrics}
@@ -203,9 +237,15 @@ class JobRunner:
         return str(semantic.get("model_code") or (task.request.payload or {}).get("model_code") or "")
 
     def _update(self, task: TaskRecord, *, status: TaskStatus, progress: int) -> None:
+        changed_at = now_text()
         with STORE.lock:
+            previous_status = task.status
+            if previous_status != status:
+                self._finish_stage(task, previous_status, changed_at)
+                self._start_stage(task, status, changed_at)
             task.status = status
             task.progress = progress
+            STORE.save_runtime()
 
     def _finish(self, task: TaskRecord, *, status: TaskStatus, error: str | None = None) -> None:
         processed_failure: dict[str, Any] | None = None
@@ -239,15 +279,237 @@ class JobRunner:
         with STORE.lock:
             if processed_failure is not None:
                 task.result = processed_failure
+            active_stage = self._active_stage(task)
             task.status = status
             task.progress = 100
             task.finished_at = now_text()
+            self._finish_stage(task, active_stage, task.finished_at)
+            self._start_stage(task, status, task.finished_at)
+            self._finish_stage(task, status, task.finished_at)
             task.error = error
             if task.started_at:
                 started = datetime.strptime(task.started_at, "%Y-%m-%d %H:%M:%S")
                 finished = datetime.strptime(task.finished_at, "%Y-%m-%d %H:%M:%S")
                 task.duration_seconds = round((finished - started).total_seconds(), 3)
             STORE.save_runtime()
+
+    @staticmethod
+    def _stage_timings(task: TaskRecord) -> dict[str, dict[str, Any]]:
+        timings = task.trace.get("stage_timings")
+        if not isinstance(timings, dict):
+            timings = {}
+            task.trace["stage_timings"] = timings
+        return timings
+
+    def _start_stage(self, task: TaskRecord, status: str, started_at: str) -> None:
+        timings = self._stage_timings(task)
+        timings[status] = {"started_at": started_at}
+
+    def _active_stage(self, task: TaskRecord) -> str:
+        """Return the stage that was running before a terminal status is stored."""
+        timings = self._stage_timings(task)
+        for status, timing in reversed(list(timings.items())):
+            if isinstance(timing, dict) and not timing.get("finished_at"):
+                return status
+        return task.status
+
+    def _finish_stage(self, task: TaskRecord, status: str, finished_at: str) -> None:
+        timings = self._stage_timings(task)
+        timing = timings.get(status)
+        if not isinstance(timing, dict):
+            timing = {"started_at": task.created_at if status == "PENDING" else task.started_at or finished_at}
+            timings[status] = timing
+        timing["finished_at"] = finished_at
+        duration_key = STAGE_DURATION_TRACE_KEYS.get(status)
+        duration = task.trace.get(duration_key) if duration_key else None
+        if isinstance(duration, (int, float)) and not isinstance(duration, bool):
+            timing["duration_seconds"] = duration
+
+    def _initialize_solver_progress(self, task: TaskRecord, *, solver: str, problem_type: str) -> None:
+        with STORE.lock:
+            task.trace["solver_progress"] = {
+                "schema_version": "1.1",
+                "solver": solver,
+                "problem_type": problem_type,
+                "search_mode": None,
+                "status": "WAITING",
+                "supported": None,
+                "message": "正在等待求解器返回真实迭代数据。",
+                "points": [],
+                "events": [{"kind": "search_started", "label": "开始搜索最优解", "elapsed_seconds": 0.0}],
+                "latest": {},
+                "gap_milestones": [],
+            }
+
+    def _record_solver_progress(self, task: TaskRecord, sample: dict[str, Any]) -> None:
+        with STORE.lock:
+            progress = task.trace.get("solver_progress")
+            if not isinstance(progress, dict):
+                return
+            kind = str(sample.get("kind") or "progress")
+            if kind == "monitoring_started":
+                progress["status"] = "RUNNING"
+                progress["supported"] = True
+                progress["search_mode"] = sample.get("search_mode") or progress.get("search_mode")
+                progress["message"] = str(sample.get("message") or "正在接收 HiGHS 返回的真实求解数据。")
+                return
+            if kind == "monitoring_unavailable":
+                progress["status"] = "UNAVAILABLE"
+                progress["supported"] = False
+                progress["message"] = str(sample.get("message") or "当前求解器未返回迭代轨迹。")
+                self._append_solver_event(progress, "monitoring_unavailable", progress["message"], 0.0)
+                return
+
+            point = {
+                "elapsed_seconds": self._finite_number(sample.get("elapsed_seconds")),
+                "incumbent_objective": self._finite_number(sample.get("incumbent_objective")),
+                "best_bound": self._finite_number(sample.get("best_bound")),
+                "gap": self._finite_number(sample.get("gap")),
+                "node_count": self._finite_integer(sample.get("node_count")),
+                "iteration_count": self._finite_integer(sample.get("iteration_count")),
+                "algorithm": str(sample.get("algorithm")) if sample.get("algorithm") else None,
+                "kind": kind,
+            }
+            if all(point.get(key) is None for key in ("incumbent_objective", "best_bound", "gap", "node_count", "iteration_count")):
+                return
+            point["elapsed_seconds"] = point["elapsed_seconds"] or 0.0
+            points = progress.setdefault("points", [])
+            if not isinstance(points, list):
+                points = []
+                progress["points"] = points
+            last = points[-1] if points and isinstance(points[-1], dict) else {}
+            value_keys = ("incumbent_objective", "best_bound", "gap", "node_count", "iteration_count", "algorithm")
+            unchanged = bool(last) and all(last.get(key) == point.get(key) for key in value_keys)
+            elapsed_delta = float(point["elapsed_seconds"]) - float(last.get("elapsed_seconds") or 0.0)
+            if kind in {"progress", "iteration"} and unchanged and elapsed_delta < 0.25:
+                return
+
+            previous_incumbent = next(
+                (item.get("incumbent_objective") for item in reversed(points) if isinstance(item, dict) and item.get("incumbent_objective") is not None),
+                None,
+            )
+            points.append(point)
+            if len(points) > MAX_SOLVER_PROGRESS_POINTS:
+                points[:] = [points[0], *points[2::2]]
+
+            latest = progress.setdefault("latest", {})
+            if not isinstance(latest, dict):
+                latest = {}
+                progress["latest"] = latest
+            for key in ("elapsed_seconds", *value_keys):
+                if point.get(key) is not None:
+                    latest[key] = point[key]
+            progress["point_count"] = len(points)
+
+            incumbent = point.get("incumbent_objective")
+            if kind == "incumbent" and incumbent is not None:
+                event_kind = "first_feasible" if previous_incumbent is None else "incumbent_improved"
+                label = "找到首个可行解" if previous_incumbent is None else "找到更优可行解"
+                self._append_solver_event(progress, event_kind, label, float(point["elapsed_seconds"]), incumbent)
+
+            gap = point.get("gap")
+            if gap is not None and gap >= 0:
+                achieved = progress.setdefault("gap_milestones", [])
+                candidates = [threshold for threshold in GAP_MILESTONES if gap <= threshold and threshold not in achieved]
+                if candidates:
+                    threshold = min(candidates)
+                    achieved.append(threshold)
+                    self._append_solver_event(
+                        progress,
+                        "gap_milestone",
+                        f"Gap 降至 {threshold * 100:g}% 以下",
+                        float(point["elapsed_seconds"]),
+                        gap,
+                    )
+
+    def _complete_solver_progress(
+        self,
+        task: TaskRecord,
+        *,
+        status: str,
+        objective: float | None,
+        gap: float | None,
+    ) -> None:
+        self._record_solver_progress(task, {
+            "kind": "final",
+            "elapsed_seconds": task.trace.get("solve_seconds"),
+            "incumbent_objective": objective,
+            "gap": gap,
+        })
+        with STORE.lock:
+            progress = task.trace.get("solver_progress")
+            if not isinstance(progress, dict):
+                return
+            normalized_status = str(status or "").lower()
+            progress["status"] = "COMPLETED"
+            progress["final_status"] = status
+            points = progress.get("points") if isinstance(progress.get("points"), list) else []
+            iteration_points = [
+                point for point in points
+                if isinstance(point, dict) and point.get("iteration_count") is not None
+            ]
+            if progress.get("supported") is True and progress.get("search_mode") == "LP_ITERATION" and len(iteration_points) < 2:
+                latest = progress.get("latest") if isinstance(progress.get("latest"), dict) else {}
+                iteration_count = latest.get("iteration_count", 0)
+                algorithm = latest.get("algorithm") or "LP 算法"
+                progress["message"] = f"该连续模型快速完成，共执行 {iteration_count} 次{algorithm}迭代；求解时间过短，未产生可绘制的分段采样轨迹。"
+            elif progress.get("supported") is True and len(points) < 2:
+                progress["message"] = "任务快速完成，未产生足够的迭代采样点。"
+            elif progress.get("supported") is True and progress.get("search_mode") == "LP_ITERATION":
+                progress["message"] = "已记录 HiGHS 返回的真实 LP 算法迭代轨迹；LP 不产生 MIP 的可行解、最优界和分支节点。"
+            elif progress.get("supported") is True:
+                progress["message"] = "已记录 HiGHS 返回的真实最优解搜索轨迹。"
+            if "optimal" in normalized_status:
+                event_kind, label = "optimality_proven", "求解器已证明当前解最优"
+            elif "infeasible" in normalized_status:
+                event_kind, label = "infeasible_proven", "求解器判定模型不可行"
+            else:
+                event_kind, label = "search_finished", "最优解搜索结束"
+            elapsed = self._finite_number(task.trace.get("solve_seconds")) or 0.0
+            self._append_solver_event(progress, event_kind, label, elapsed, objective)
+
+    def _fail_solver_progress(self, task: TaskRecord, message: str) -> None:
+        with STORE.lock:
+            progress = task.trace.get("solver_progress")
+            if not isinstance(progress, dict) or progress.get("status") in {"COMPLETED", "FAILED"}:
+                return
+            progress["status"] = "FAILED"
+            progress["message"] = "求解在完成最优解搜索前异常终止。"
+            elapsed = self._finite_number(task.trace.get("solve_seconds")) or 0.0
+            self._append_solver_event(progress, "search_failed", "最优解搜索异常终止", elapsed)
+            progress["error"] = message
+
+    @staticmethod
+    def _append_solver_event(
+        progress: dict[str, Any],
+        kind: str,
+        label: str,
+        elapsed_seconds: float,
+        value: float | None = None,
+    ) -> None:
+        events = progress.setdefault("events", [])
+        if not isinstance(events, list):
+            events = []
+            progress["events"] = events
+        event = {"kind": kind, "label": label, "elapsed_seconds": round(float(elapsed_seconds), 4)}
+        if value is not None:
+            event["value"] = value
+        events.append(event)
+        if len(events) > MAX_SOLVER_PROGRESS_EVENTS:
+            del events[1 : len(events) - MAX_SOLVER_PROGRESS_EVENTS + 1]
+
+    @staticmethod
+    def _finite_number(value: Any) -> float | None:
+        try:
+            number = float(value)
+        except (TypeError, ValueError, OverflowError):
+            return None
+        return number if number == number and abs(number) != float("inf") else None
+
+    @classmethod
+    def _finite_integer(cls, value: Any) -> int | None:
+        number = cls._finite_number(value)
+        return None if number is None or number < 0 else int(number)
 
     def _log(self, task: TaskRecord, level: str, message: str | None = None) -> None:
         if message is None:
@@ -264,14 +526,19 @@ class JobRunner:
         return {"variable_count": variable_count, "constraint_count": constraint_count}
 
     def _problem_type(self, semantic_spec: dict[str, Any], model: Any) -> str:
+        _ = semantic_spec
+        return str(solver_router.infer_problem_type_from_model(model, "LP"))
+
+    def _declared_problem_type(self, semantic_spec: dict[str, Any]) -> str | None:
         component_spec = semantic_spec.get("component_spec") or {}
         diagnosis = component_spec.get("problem_type_diagnosis") or semantic_spec.get("problem_type_diagnosis") or {}
-        return str(
-            diagnosis.get("inferred_problem_type")
+        value = (
+            semantic_spec.get("model_problem_type")
             or component_spec.get("model_problem_type")
-            or semantic_spec.get("model_problem_type")
-            or solver_router.infer_problem_type_from_model(model, "LP")
+            or diagnosis.get("effective_problem_type")
+            or diagnosis.get("inferred_problem_type")
         )
+        return str(value) if value else None
 
     @staticmethod
     def _result_capabilities(result: dict[str, Any]) -> list[str]:

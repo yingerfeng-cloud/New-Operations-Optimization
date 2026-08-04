@@ -153,7 +153,7 @@ test('@real UI authoritative artifacts preserve four boundary semantics through 
 
   const taskDetail = page.getByRole('dialog', { name: `任务 ${task.id}` });
   await expect(taskDetail).toBeVisible();
-  await expect(taskDetail.locator('.ant-tabs-tab-active')).toContainText('优化结果');
+  await expect(taskDetail.locator('.task-detail-tabs > .ant-tabs-nav .ant-tabs-tab-active')).toContainText('优化结果');
   const metricsCard = taskDetail.locator('.ant-card').filter({ hasText: '关键指标' });
   await expect(metricsCard).toContainText('目标函数值');
   await expect(metricsCard).toContainText('14');

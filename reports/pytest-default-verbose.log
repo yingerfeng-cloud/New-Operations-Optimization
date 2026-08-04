@@ -1,6 +1,6 @@
 ============================= test session starts =============================
 platform win32 -- Python 3.13.14, pytest-8.3.4, pluggy-1.6.0 -- C:\Users\45527\AppData\Local\Microsoft\WindowsApps\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\python.exe
-rootdir: C:\Users\45527\Documents\Codex\2026-04-29\copt-500
+rootdir: repository workspace
 configfile: pytest.ini
 testpaths: tests
 plugins: anyio-4.8.0

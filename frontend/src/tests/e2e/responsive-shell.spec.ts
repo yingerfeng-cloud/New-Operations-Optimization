@@ -17,7 +17,7 @@ for (const viewport of [{ width: 390, height: 844 }, { width: 768, height: 1024 
     } else {
       await expect(page.getByRole('complementary', { name: '主导航' })).toBeVisible();
       if (viewport.width < 1440) await expect(page.getByRole('button', { name: /侧栏/ })).toBeVisible();
-      else await expect(page.getByText('安全生产运筹优化平台')).toBeVisible();
+      else await expect(page.getByText('策擎', { exact: true })).toBeVisible();
     }
     const brandCopy = page.locator('.brand-copy:visible');
     if (await brandCopy.count()) {

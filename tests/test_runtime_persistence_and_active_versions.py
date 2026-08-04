@@ -53,7 +53,7 @@ def _model(
 
 def test_runtime_schema_v3_restores_models_versions_assets_tasks_and_results(tmp_path, monkeypatch) -> None:
     path = tmp_path / "runtime_store.json"
-    monkeypatch.setenv("COPT_RUNTIME_STORE", str(path))
+    monkeypatch.setenv("OPTIFORGE_RUNTIME_STORE", str(path))
     store = MemoryStore()
     user_model = _model("MODEL-USER-V2", "runtime_case", family="FAMILY-RUNTIME", version="v2.0", active=True)
     builtin = _model("MODEL-BUILTIN-V1", "runtime_case", family="builtin:runtime_case", version="v1.0", active=False, builtin=True)
@@ -110,7 +110,7 @@ def test_runtime_schema_v2_permanently_migrates_tested_model_status_to_trial(tmp
         },
         "active_model_versions": {"FAMILY-STATUS-MIGRATION": historical_model["id"]},
     }, ensure_ascii=False), encoding="utf-8")
-    monkeypatch.setenv("COPT_RUNTIME_STORE", str(path))
+    monkeypatch.setenv("OPTIFORGE_RUNTIME_STORE", str(path))
 
     restored = MemoryStore()
 
@@ -136,7 +136,7 @@ def test_runtime_schema_v3_removes_deprecated_marker_fields(tmp_path, monkeypatc
         },
         "tasks": {"TASK": {"audit": {audit_key: "legacy" + "_explicit_skill_match"}}},
     }, ensure_ascii=False), encoding="utf-8")
-    monkeypatch.setenv("COPT_RUNTIME_STORE", str(path))
+    monkeypatch.setenv("OPTIFORGE_RUNTIME_STORE", str(path))
 
     MemoryStore()
 
@@ -152,7 +152,7 @@ def test_runtime_schema_v3_removes_deprecated_marker_fields(tmp_path, monkeypatc
 def test_runtime_persistence_survives_fresh_backend_process(tmp_path) -> None:
     path = tmp_path / "runtime_store_process_restart.json"
     repository_root = Path(__file__).resolve().parents[1]
-    environment = {**os.environ, "COPT_RUNTIME_STORE": str(path), "RUNTIME_STORE_PATH": str(path)}
+    environment = {**os.environ, "OPTIFORGE_RUNTIME_STORE": str(path), "RUNTIME_STORE_PATH": str(path)}
     writer = textwrap.dedent(
         """
         from app.schemas.model import ModelView

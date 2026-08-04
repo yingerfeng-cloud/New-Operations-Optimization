@@ -2,6 +2,7 @@ import { Segmented, Tooltip } from 'antd';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { navEntries, type NavEntry, type NavGroup } from '../navigation';
 import { useAudience } from '../audience';
+import { PLATFORM_ENGLISH_NAME, PLATFORM_FORMAL_NAME, PLATFORM_SHORT_NAME } from '../brand';
 
 interface SidebarProps {
   collapsed?: boolean;
@@ -25,13 +26,17 @@ export function Sidebar({ collapsed = false, mobile = false, onNavigate }: Sideb
     onNavigate?.();
   };
 
-  const brandMark = <div className="brand-mark" aria-label="安全生产运筹优化平台">优</div>;
+  const brandMark = <div className="brand-mark" aria-label={PLATFORM_FORMAL_NAME}>{PLATFORM_SHORT_NAME}</div>;
 
   return (
     <aside className={`sidebar${collapsed ? ' sidebar-collapsed' : ''}${mobile ? ' sidebar-mobile' : ''}`} aria-label="主导航">
       <div className="brand">
-        {collapsed ? <Tooltip title="安全生产运筹优化平台" placement="right">{brandMark}</Tooltip> : brandMark}
-        {!collapsed && <div className="brand-copy">安全生产运筹优化平台<small>安全 · 高效 · 可解释</small></div>}
+        {collapsed ? <Tooltip title={`${PLATFORM_FORMAL_NAME} · ${PLATFORM_ENGLISH_NAME}`} placement="right">{brandMark}</Tooltip> : brandMark}
+        {!collapsed && <div className="brand-copy" title={PLATFORM_FORMAL_NAME}>
+          <span className="brand-wordmark" aria-label={PLATFORM_ENGLISH_NAME}>
+            <span className="brand-wordmark-main">Opti</span><span className="brand-wordmark-accent">Forge</span>
+          </span>
+        </div>}
       </div>
       {mobile && <Segmented block aria-label="平台视图" value={audience} onChange={value => setAudience(value as 'business' | 'expert')} options={[{ label: '业务视图', value: 'business' }, { label: '专家视图', value: 'expert' }]} />}
       <nav className="nav" aria-label="平台功能">

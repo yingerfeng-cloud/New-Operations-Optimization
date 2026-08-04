@@ -49,7 +49,7 @@ class MemoryStore:
         self.model_versions: dict[str, list[dict[str, Any]]] = {}
         self.active_model_versions: dict[str, str] = {}
         root = Path(__file__).resolve().parents[2]
-        runtime_store = os.getenv("COPT_RUNTIME_STORE") or os.getenv("RUNTIME_STORE_PATH") or str(root / "data" / "runtime_store.json")
+        runtime_store = os.getenv("OPTIFORGE_RUNTIME_STORE") or os.getenv("RUNTIME_STORE_PATH") or str(root / "data" / "runtime_store.json")
         self._persistence_path = Path(runtime_store)
         self._load_runtime()
 

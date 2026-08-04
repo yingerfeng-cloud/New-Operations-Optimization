@@ -147,6 +147,18 @@ def test_optimize_run_cascade_hydro_complete_chain() -> None:
     assert task["status"] == "SUCCESS", task
     assert task["recent_logs"]
     assert "solve_seconds" in task["trace"]
+    stage_timings = task["trace"]["stage_timings"]
+    assert stage_timings["VALIDATING"]["started_at"]
+    assert stage_timings["VALIDATING"]["finished_at"]
+    assert stage_timings["SOLVING"]["duration_seconds"] == task["trace"]["solve_seconds"]
+    assert stage_timings["SUCCESS"]["finished_at"] == task["finished_at"]
+    solver_progress = task["trace"]["solver_progress"]
+    assert solver_progress["status"] == "COMPLETED"
+    assert solver_progress["supported"] is True
+    assert solver_progress["search_mode"] == "LP_ITERATION"
+    assert solver_progress["latest"]["iteration_count"] >= 0
+    assert solver_progress["latest"]["algorithm"]
+    assert solver_progress["events"][0]["kind"] == "search_started"
     result = client.get(f"/api/optimize/result/{task_id}")
     assert result.status_code == 200, result.text
     body = result.json()

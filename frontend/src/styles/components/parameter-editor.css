@@ -1,5 +1,11 @@
 .parameter-toolbar { margin-bottom: 10px; padding: 6px; border: 1px solid var(--proto-line); border-radius: 6px; background: #f8fafc; }
 .parameter-toolbar-label { margin-right: 6px; color: #667085; font-size: 12px; }
+.parameter-keyvalue-actions { display: flex; align-items: center; gap: 4px; margin-bottom: 8px; }
+.parameter-keyvalue-actions .parameter-toolbar { margin: 0; padding: 3px 4px; }
+.parameter-keyvalue-actions .parameter-toolbar-label { margin-right: 2px; }
+.parameter-keyvalue-actions .ant-btn-sm { min-height: 24px; height: 24px; padding-inline: 7px; }
+.parameter-structured-editor > .ant-alert { padding: 4px 8px; border-radius: 6px; }
+.parameter-structured-editor > .ant-alert .ant-alert-message { font-size: 12px; line-height: 18px; }
 .parameter-editor-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin: 8px 0; color: #667085; font-size: 12px; }
 .parameter-scale-note { color: #175cd3; }
 .parameter-scale-note.warning { color: #b54708; }

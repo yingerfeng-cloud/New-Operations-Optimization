@@ -1,7 +1,7 @@
 import { createContext, useContext, useMemo, useState, type ReactNode } from 'react';
 
 export type PlatformAudience = 'business' | 'expert';
-const STORAGE_KEY = 'copt.platform.audience';
+const STORAGE_KEY = 'optiforge.platform.audience';
 
 const AudienceContext = createContext<{ audience: PlatformAudience; setAudience: (value: PlatformAudience) => void } | undefined>(undefined);
 

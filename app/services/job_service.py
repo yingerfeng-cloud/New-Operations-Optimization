@@ -26,7 +26,7 @@ class JobService:
         with STORE.lock:
             STORE.tasks[task_id] = record
             STORE.save_runtime()
-        if os.getenv("COPT_SYNC_JOBS") == "true" or req.async_run is False:
+        if os.getenv("OPTIFORGE_SYNC_JOBS") == "true" or req.async_run is False:
             job_runner.run(task_id)
         else:
             job_runner.start(task_id)
@@ -68,8 +68,12 @@ class JobService:
             task.started_at = None
             task.finished_at = None
             task.duration_seconds = None
+            task.trace.pop("stage_timings", None)
+            task.trace.pop("solver_progress", None)
+            for key in ("validation_seconds", "model_build_seconds", "solve_seconds", "format_seconds"):
+                task.trace.pop(key, None)
             STORE.save_runtime()
-        if os.getenv("COPT_SYNC_JOBS") == "true" or task.request.async_run is False:
+        if os.getenv("OPTIFORGE_SYNC_JOBS") == "true" or task.request.async_run is False:
             job_runner.run(task_id)
         else:
             job_runner.start(task_id)

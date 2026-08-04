@@ -16,7 +16,7 @@ interface HealthResponse { ok: boolean; service?: string; solver?: string; pyomo
 interface HeaderProps { pathname: string; mobile?: boolean; medium?: boolean; sidebarCollapsed?: boolean; onOpenMenu?: () => void; onToggleSidebar?: () => void }
 
 const taskTimestamp = (task: SolveTask) => Date.parse(String(task.created_at || '')) || 0;
-const TASK_INBOX_HANDLED_STORAGE_KEY = 'copt.task-inbox.handled.v1';
+const TASK_INBOX_HANDLED_STORAGE_KEY = 'optiforge.task-inbox.handled.v1';
 const MAX_HANDLED_TASKS = 500;
 const taskFailureReason = (task: SolveTask) => typeof task.error === 'string'
   ? task.error

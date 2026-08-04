@@ -9,14 +9,15 @@ import { parseRuntimeGrid, runtimeGridStrategy } from '../utils/runtimeParameter
 
 const displayValue = (value: unknown) => typeof value === 'string' ? value : value == null ? '' : JSON.stringify(value, null, 2);
 const objectMapped = (field: RuntimeField) => ['object', 'map', 'record', 'dictionary'].some(item => String(field.type || '').toLowerCase().includes(item));
+const isObjectMap = (value: unknown) => Boolean(value && typeof value === 'object' && !Array.isArray(value));
 
 export function getArrayDepth(value: unknown): number { if (!Array.isArray(value)) return 0; return value.length ? 1 + Math.max(...value.map(getArrayDepth)) : 1; }
 function irregularArrayWarning(value: unknown): string | undefined { if (!Array.isArray(value) || value.length < 2) return undefined; if (new Set(value.map(item => Array.isArray(item) ? item.length : -1)).size > 1) return '当前数组各分支长度不一致，请确认非规则结构符合模型契约。'; return value.map(irregularArrayWarning).find(Boolean); }
 
 export type ParameterEditorKind = 'scalar' | 'sequence' | 'keyvalue' | 'matrix' | 'structured';
-export function parameterEditorKind(field: RuntimeField): ParameterEditorKind {
+export function parameterEditorKind(field: RuntimeField, value?: unknown): ParameterEditorKind {
   if (field.editorHint === 'time_series') return 'sequence';
-  if (field.dimension.length === 1 && objectMapped(field)) return 'keyvalue';
+  if (field.dimension.length === 1 && (objectMapped(field) || isObjectMap(value) || isObjectMap(field.defaultValue) || isObjectMap(field.exampleValue))) return 'keyvalue';
   if (field.dimension.length === 1) return 'sequence';
   if (field.dimension.length === 2) return 'matrix';
   if (field.dimension.length > 2) return 'structured';
@@ -66,9 +67,11 @@ function SequenceEditor(props: Props) {
 
 function KeyValueEditor({ field, value, originalValue, onChange, onValidityChange }: Props) {
   const source = value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {};
-  const declared = field.dimensionValues?.[field.dimension[0]] || []; const rows = Object.entries(source).map(([key, item]) => ({ id: key, key, value: item }));
+  const declared = field.dimensionValues?.[field.dimension[0]] || [];
+  const keys = [...declared, ...Object.keys(source).filter(key => !declared.includes(key))];
+  const rows = keys.map(key => ({ id: key, key, value: source[key] }));
   const update = (oldKey: string, key: string, item: unknown) => { const next = { ...source }; delete next[oldKey]; if (!key.trim()) return onValidityChange?.('键不能为空'); if (key !== oldKey && Object.prototype.hasOwnProperty.call(source, key)) return onValidityChange?.(`键 ${key} 重复`); next[key] = item; onValidityChange?.(); onChange(next); };
-  return <div><ParameterToolbar kind="keyvalue" onClear={() => onChange({})} onRestore={originalValue !== undefined ? () => onChange(originalValue, 'restore-default') : undefined} /><Button size="small" onClick={() => { const key = declared.find(item => !(item in source)) || `key_${rows.length + 1}`; onChange({ ...source, [key]: 0 }); }}>新增</Button><Table size="small" pagination={false} rowKey="id" dataSource={rows} columns={[{ title: '键', render: (_v, row) => <Input value={row.key} list={`${field.code}-keys`} onChange={event => update(row.key, event.target.value, row.value)} /> }, { title: '值', render: (_v, row) => <InputNumber value={typeof row.value === 'number' ? row.value : Number(row.value)} onChange={next => update(row.key, row.key, next)} /> }, { title: '操作', width: 80, render: (_v, row) => <Button type="link" danger onClick={() => { const next = { ...source }; delete next[row.key]; onChange(next); }}>删除</Button> }]} /><datalist id={`${field.code}-keys`}>{declared.map(key => <option key={key}>{key}</option>)}</datalist></div>;
+  return <div><div className="parameter-keyvalue-actions"><ParameterToolbar kind="keyvalue" onClear={() => onChange({})} onRestore={originalValue !== undefined ? () => onChange(originalValue, 'restore-default') : undefined} /><Button size="small" onClick={() => { const key = declared.find(item => !(item in source)) || `key_${rows.length + 1}`; onChange({ ...source, [key]: 0 }); }}>新增</Button></div><Table size="small" pagination={false} rowKey="id" dataSource={rows} columns={[{ title: '键', render: (_v, row) => <Input value={row.key} list={`${field.code}-keys`} onChange={event => update(row.key, event.target.value, row.value)} /> }, { title: '值', render: (_v, row) => { const numeric = typeof row.value === 'number' ? row.value : row.value === '' || row.value == null ? undefined : Number(row.value); return <InputNumber value={typeof numeric === 'number' && Number.isFinite(numeric) ? numeric : undefined} min={field.min} max={field.max} onChange={next => update(row.key, row.key, next)} />; } }, { title: '操作', width: 80, render: (_v, row) => <Button type="link" danger onClick={() => { const next = { ...source }; delete next[row.key]; onChange(next); }}>删除</Button> }]} /><datalist id={`${field.code}-keys`}>{declared.map(key => <option key={key}>{key}</option>)}</datalist></div>;
 }
 
 function MatrixEditor(props: Props) {
@@ -88,7 +91,7 @@ function MatrixEditor(props: Props) {
 }
 
 export function ParameterEditor(props: Props) {
-  const { field, value, onChange, onValidityChange } = props; const kind = parameterEditorKind(field); const type = String(field.type || '').toLowerCase();
+  const { field, value, onChange, onValidityChange } = props; const kind = parameterEditorKind(field, value); const type = String(field.type || '').toLowerCase();
   useEffect(() => onValidityChange?.(), [field.code]);
   if (field.enumValues?.length) return <Select aria-label={field.name} value={value} onChange={next => onChange(next)} options={field.enumValues.map(item => ({ value: item, label: String(item) }))} />;
   if (type.includes('bool') || typeof field.defaultValue === 'boolean') return <Checkbox checked={Boolean(value)} onChange={event => onChange(event.target.checked)}>启用</Checkbox>;

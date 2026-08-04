@@ -16,10 +16,10 @@ Native defaults:
 Optional environment variables:
 
 ```bash
-COPT_DATA_DIR=data
-COPT_RUNTIME_STORE=data/runtime_store.json
+OPTIFORGE_DATA_DIR=data
+OPTIFORGE_RUNTIME_STORE=data/runtime_store.json
 RUNTIME_STORE_PATH=data/runtime_store.json
-COPT_SOLVER_MODE=native
+OPTIFORGE_SOLVER_MODE=native
 ```
 
 Check solver availability:

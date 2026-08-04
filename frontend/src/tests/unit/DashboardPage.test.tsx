@@ -40,6 +40,7 @@ test('dashboard renders React platform entries', async () => {
   );
 
   expect(await screen.findByText('生产运筹工作台')).toBeInTheDocument();
+  expect(screen.getByText(/让复杂约束，生成最优决策。/)).toBeInTheDocument();
   expect(screen.getByText('运行中任务')).toBeInTheDocument();
   expect(screen.getByText('失败 / 无解')).toBeInTheDocument();
   expect(screen.getByText('已发布模型')).toBeInTheDocument();

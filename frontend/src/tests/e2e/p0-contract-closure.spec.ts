@@ -168,11 +168,45 @@ test('running task opens solve process, reaches result, and stops polling', asyn
   });
   await page.route('**/api/results/LIVE', route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ task_id: 'LIVE', status: 'SUCCESS', metrics: {}, variables: {} }) }));
   await page.goto('/tasks?task=LIVE');
-  await expect(page.locator('.ant-tabs-tab-active')).toContainText('求解过程');
-  await expect(page.locator('.ant-tabs-tab-active')).toContainText('优化结果', { timeout: 12_000 });
+  const activeTaskTab = page.locator('.task-detail-tabs > .ant-tabs-nav .ant-tabs-tab-active');
+  await expect(activeTaskTab).toContainText('求解过程');
+  await expect(activeTaskTab).toContainText('优化结果', { timeout: 12_000 });
   const requestsAtTerminal = detailRequests;
   await page.waitForTimeout(5_500);
   expect(detailRequests).toBe(requestsAtTerminal);
+});
+
+test('completed MIP task renders and replays the real optimal-solution search', async ({ page }) => {
+  await mockApi(page);
+  await page.route('**/api/tasks/PROGRESS', route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({
+    id: 'PROGRESS', model: '机组组合优化', scene: '日前调度', solver: 'HiGHS', status: 'SUCCESS', progress: 100,
+    cost: 89, created_at: '2026-07-12 10:00:00', finished_at: '2026-07-12 10:00:03',
+    trace: { solver_progress: {
+      status: 'COMPLETED', supported: true, message: '已记录 HiGHS 返回的真实最优解搜索轨迹。',
+      latest: { elapsed_seconds: 2.4, incumbent_objective: 89, best_bound: 89, gap: 0, node_count: 18 },
+      points: [
+        { elapsed_seconds: 0.1, incumbent_objective: 120, best_bound: 70, gap: 0.42, node_count: 0 },
+        { elapsed_seconds: 0.6, incumbent_objective: 102, best_bound: 82, gap: 0.2, node_count: 3 },
+        { elapsed_seconds: 1.4, incumbent_objective: 91, best_bound: 88, gap: 0.033, node_count: 10 },
+        { elapsed_seconds: 2.4, incumbent_objective: 89, best_bound: 89, gap: 0, node_count: 18 },
+      ],
+      events: [
+        { kind: 'first_feasible', label: '找到首个可行解', elapsed_seconds: 0.1, value: 120 },
+        { kind: 'gap_milestone', label: 'Gap 降至 5% 以下', elapsed_seconds: 1.4, value: 0.033 },
+        { kind: 'optimality_proven', label: '求解器已证明当前解最优', elapsed_seconds: 2.4, value: 89 },
+      ],
+    } },
+  }) }));
+  await page.route('**/api/results/PROGRESS', route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ task_id: 'PROGRESS', status: 'SUCCESS', metrics: {}, variables: {} }) }));
+
+  await page.goto('/tasks?task=PROGRESS');
+  await page.getByRole('tab', { name: '求解过程' }).click();
+  await page.getByRole('tab', { name: '最优解搜索' }).click();
+  await expect(page.getByText('真实收敛轨迹')).toBeVisible();
+  await expect(page.getByText('求解器已证明当前解最优')).toBeVisible();
+  await expect(page.getByRole('img', { name: '最好可行解、理论最优界和 Gap 的真实求解收敛曲线' }).locator('canvas')).toBeVisible();
+  await page.getByRole('button', { name: '重放搜索过程' }).click();
+  await expect(page.getByRole('button', { name: '重放中…' })).toBeDisabled();
 });
 
 test('business Agent request does not carry expert Skill', async ({ page }) => {

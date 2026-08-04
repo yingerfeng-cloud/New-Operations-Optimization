@@ -25,7 +25,7 @@ export default defineConfig({
       port: 8000,
       reuseExistingServer: true,
       timeout: 120_000,
-      env: { PORT: '8000', COPT_SYNC_JOBS: 'true' },
+      env: { PORT: '8000', OPTIFORGE_SYNC_JOBS: 'true' },
     },
     {
       command: 'npx vite --host 127.0.0.1 --port 5178 --strictPort',

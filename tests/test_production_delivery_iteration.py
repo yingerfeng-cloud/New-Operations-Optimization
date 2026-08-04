@@ -73,7 +73,7 @@ def test_package_excludes_runtime_store_logs_reports_pycache() -> None:
     assert "\\\\frontend\\\\node_modules" in script
     assert '$IncludeItems' in script
 
-    output = Path(f"copt-500-test-{uuid.uuid4().hex}.zip")
+    output = Path(f"optiforge-platform-test-{uuid.uuid4().hex}.zip")
     sample_names = [
         "data/runtime_store.json",
         "data/runtime_store.example.json",

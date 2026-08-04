@@ -1,6 +1,8 @@
-# 电力业务语义驱动运筹优化平台
+# 策擎·安全生产运筹优化平台（OptiForge）
 
-本项目是面向电力优化场景的模型资产与求解平台。后端使用 FastAPI + Pyomo + HiGHS，正式前端使用 Vite + React + TypeScript，前端源码和页面入口统一位于 `frontend/`。
+> 让复杂约束，生成最优决策。
+
+策擎是面向安全生产、电力与能源优化场景的模型资产与求解平台。英文名称为 OptiForge，简称“策擎”。后端使用 FastAPI + Pyomo + HiGHS，正式前端使用 Vite + React + TypeScript，前端源码和页面入口统一位于 `frontend/`。
 
 ## 技术栈
 
@@ -299,7 +301,7 @@ docker compose exec backend bash scripts/run_nlp_tests.sh
 原生运行默认使用 `data/` 与 `localhost:8000`；Docker 默认使用 `docker-data/` 与 `localhost:18000`。更多说明见 [NLP Solver Support](docs/nlp-solver.md) 和 [Deployment](docs/deployment.md)。
 # P4 产品化演示说明
 
-平台定位：本仓库是面向电力与能源调度场景的运筹优化平台演示版，当前以 React 前端、FastAPI 后端、Pyomo 建模和可路由求解器为核心。
+平台定位：本仓库是策擎·安全生产运筹优化平台的演示版，面向电力与能源调度等复杂业务场景，当前以 React 前端、FastAPI 后端、Pyomo 建模和可路由求解器为核心。
 
 当前标杆模型清单：
 

@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import math
 import time
 from typing import Any
 
 from app.schemas.result import SolverRunResult
+from app.solvers.base import SolverProgressCallback
 
 
 class HiGHSAdapter:
@@ -15,7 +17,15 @@ class HiGHSAdapter:
 
         return bool(pyo.SolverFactory("appsi_highs").available(False))
 
-    def solve(self, model: Any, *, mip_gap: float = 0.001, time_limit_seconds: int = 300, threads: int | None = None) -> SolverRunResult:
+    def solve(
+        self,
+        model: Any,
+        *,
+        mip_gap: float = 0.001,
+        time_limit_seconds: int = 300,
+        threads: int | None = None,
+        progress_callback: SolverProgressCallback | None = None,
+    ) -> SolverRunResult:
         import pyomo.environ as pyo
 
         solver = pyo.SolverFactory("appsi_highs")
@@ -25,6 +35,10 @@ class HiGHSAdapter:
         solver.options["mip_rel_gap"] = float(mip_gap)
         if threads:
             solver.options["threads"] = int(threads)
+
+        progress_context: dict[str, Any] | None = None
+        if progress_callback is not None:
+            progress_context = self._configure_progress_callback(solver, model, progress_callback)
 
         started = time.monotonic()
         result = solver.solve(model, load_solutions=False)
@@ -47,6 +61,12 @@ class HiGHSAdapter:
         objective_value = None
         if status in {"optimal", "feasible"} and hasattr(model, "objective"):
             objective_value = float(pyo.value(model.objective))
+        if progress_callback is not None and progress_context is not None:
+            self._emit_lp_iteration_summary(
+                progress_callback,
+                progress_context,
+                elapsed_seconds=solve_time,
+            )
         return SolverRunResult(
             status=status,
             objective_value=objective_value,
@@ -61,6 +81,129 @@ class HiGHSAdapter:
             solver_available=True,
             message="模型不可行，请检查硬负荷目标、库容边界、生态流量和函数资产定义域。" if status == "infeasible" else "",
         )
+
+    def _configure_progress_callback(
+        self,
+        solver: Any,
+        model: Any,
+        callback: SolverProgressCallback,
+    ) -> dict[str, Any] | None:
+        import pyomo.environ as pyo
+
+        is_mip = any(
+            var.is_binary() or var.is_integer()
+            for component in model.component_objects(pyo.Var, active=True)
+            for var in component.values()
+        )
+        try:
+            import highspy
+
+            solver.set_instance(model)
+            raw_solver = solver._solver_model
+            callback_types = highspy.cb.HighsCallbackType
+
+            if is_mip:
+                improving_type = int(callback_types.kCallbackMipImprovingSolution)
+                logging_type = int(callback_types.kCallbackMipLogging)
+
+                def highs_callback(callback_type: Any, message: str, data_out: Any, _data_in: Any, _user_data: Any) -> None:
+                    try:
+                        normalized_type = int(callback_type)
+                        if normalized_type not in {improving_type, logging_type}:
+                            return
+                        callback({
+                            "kind": "incumbent" if normalized_type == improving_type else "progress",
+                            "elapsed_seconds": self._finite_number(getattr(data_out, "running_time", None)),
+                            "incumbent_objective": self._finite_number(getattr(data_out, "mip_primal_bound", None)),
+                            "best_bound": self._finite_number(getattr(data_out, "mip_dual_bound", None)),
+                            "gap": self._finite_number(getattr(data_out, "mip_gap", None)),
+                            "node_count": self._finite_integer(getattr(data_out, "mip_node_count", None)),
+                            "message": str(message or "").strip(),
+                        })
+                    except Exception:
+                        # Progress monitoring must never interrupt the optimization run.
+                        return
+
+                status = raw_solver.setCallback(highs_callback, None)
+                raw_solver.startCallback(callback_types.kCallbackMipImprovingSolution)
+                raw_solver.startCallback(callback_types.kCallbackMipLogging)
+                callback({
+                    "kind": "monitoring_started",
+                    "search_mode": "MIP_SEARCH",
+                    "message": "正在接收 HiGHS 返回的真实 MIP 最优解搜索数据。",
+                })
+                return {"mode": "MIP_SEARCH", "raw_solver": raw_solver, "callback_status": str(status)}
+
+            logging_type = int(callback_types.kCallbackLogging)
+
+            def highs_callback(callback_type: Any, message: str, data_out: Any, _data_in: Any, _user_data: Any) -> None:
+                try:
+                    normalized_type = int(callback_type)
+                    if normalized_type != logging_type:
+                        return
+                    # LP/QP iteration callbacks run once per algorithm iteration and can
+                    # dominate very fast solves when crossing into Python. Logging is
+                    # intentionally observed at HiGHS' native cadence; authoritative
+                    # iteration totals are read from getInfo() after solve completion.
+                    _ = (message, data_out)
+                except Exception:
+                    # Progress monitoring must never interrupt the optimization run.
+                    return
+
+            status = raw_solver.setCallback(highs_callback, None)
+            raw_solver.startCallback(callback_types.kCallbackLogging)
+            callback({
+                "kind": "monitoring_started",
+                "search_mode": "LP_ITERATION",
+                "message": "该模型实际为连续 LP/QP；完成后将展示 HiGHS 的真实算法与迭代统计。",
+            })
+            return {"mode": "LP_ITERATION", "raw_solver": raw_solver, "callback_status": str(status)}
+        except Exception as exc:
+            callback({
+                "kind": "monitoring_unavailable",
+                "message": f"当前 HiGHS 运行环境未开放迭代回调：{type(exc).__name__}",
+            })
+            return None
+
+    def _emit_lp_iteration_summary(
+        self,
+        callback: SolverProgressCallback,
+        context: dict[str, Any],
+        *,
+        elapsed_seconds: float,
+    ) -> None:
+        if context.get("mode") != "LP_ITERATION":
+            return
+        try:
+            info = context["raw_solver"].getInfo()
+            counts = [
+                ("单纯形", self._finite_integer(getattr(info, "simplex_iteration_count", None))),
+                ("内点法", self._finite_integer(getattr(info, "ipm_iteration_count", None))),
+                ("PDLP", self._finite_integer(getattr(info, "pdlp_iteration_count", None))),
+            ]
+            algorithm, iteration_count = max(counts, key=lambda item: item[1] if item[1] is not None else -1)
+            callback({
+                "kind": "iteration_final",
+                "elapsed_seconds": round(max(0.0, elapsed_seconds), 6),
+                "iteration_count": iteration_count or 0,
+                "algorithm": algorithm if iteration_count else "预处理/直接求解",
+            })
+        except Exception:
+            # Final iteration metadata is supplementary and must never affect the result.
+            return
+
+    @staticmethod
+    def _finite_number(value: Any) -> float | None:
+        try:
+            number = float(value)
+        except (TypeError, ValueError, OverflowError):
+            return None
+        return number if math.isfinite(number) else None
+
+    @classmethod
+    def _finite_integer(cls, value: Any) -> int | None:
+        number = cls._finite_number(value)
+        return None if number is None or number < 0 else int(number)
 
     def _extract_variables(self, model: Any) -> dict[str, Any]:
         import pyomo.environ as pyo

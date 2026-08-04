@@ -26,6 +26,16 @@ test('one-dimensional object uses key-value editor with collection keys', () => 
   expect(change).toHaveBeenLastCalledWith({ U1: 100, U2: 0 });
 });
 
+test('infers key-value editor from object values and renders declared empty rows', () => {
+  const field = { ...makeField(['unit'], '', { unit: ['U1', 'U2'] }), defaultValue: undefined, exampleValue: undefined };
+  expect(parameterEditorKind(field, { U1: 100 })).toBe('keyvalue');
+  const change = vi.fn();
+  render(<ParameterEditor field={field} value={{ U1: 100 }} onChange={change} />);
+  expect(screen.getByDisplayValue('U1')).toBeInTheDocument();
+  expect(screen.getByDisplayValue('U2')).toBeInTheDocument();
+  expect(screen.getByDisplayValue('100')).toBeInTheDocument();
+});
+
 test('matrix respects declared row and column dimension order', () => {
   render(<ParameterEditor field={makeField(['station', 'time'], 'number', { station: ['S1'], time: ['00:00', '01:00'] })} value={[[1, 2]]} timeSet="time" onChange={vi.fn()} />);
   expect(screen.getAllByText('S1').length).toBeGreaterThan(0); expect(screen.getAllByText('00:00').length).toBeGreaterThan(0); expect(screen.getAllByText('01:00').length).toBeGreaterThan(0);

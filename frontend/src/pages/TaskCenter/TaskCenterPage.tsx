@@ -42,7 +42,16 @@ export function TaskCenterPage() {
   const refetchInterval = import.meta.env.MODE === 'test' ? false : 5000;
   const tasks = useQuery({ queryKey: ['tasks'], queryFn: getTasks, refetchInterval });
   const models = useQuery({ queryKey: ['models'], queryFn: getModels });
-  const detail = useQuery({ queryKey: ['task', viewId], queryFn: () => getTask(viewId!), enabled: !!viewId, refetchInterval: query => viewId && shouldPollTask((query.state.data as SolveTask | undefined)?.status) ? 5000 : false });
+  const detail = useQuery({
+    queryKey: ['task', viewId],
+    queryFn: () => getTask(viewId!),
+    enabled: !!viewId,
+    refetchInterval: query => {
+      const status = normalizeTaskStatus((query.state.data as SolveTask | undefined)?.status);
+      if (!viewId || !shouldPollTask(status)) return false;
+      return status === 'SOLVING' ? 1000 : 3000;
+    },
+  });
   const result = useQuery({ queryKey: ['result', viewId], queryFn: () => getResult(viewId!), enabled: !!viewId && normalizeTaskStatus(detail.data?.status) === 'SUCCESS' });
   useEffect(() => { const task = query.get('task'); if (task) setViewId(task); if (query.get('create') === '1') setCreateOpen(true); }, []);
   const refresh = (taskId?: string) => { qc.invalidateQueries({ queryKey: ['tasks'] }); if (taskId) { qc.invalidateQueries({ queryKey: ['task', taskId] }); qc.invalidateQueries({ queryKey: ['result', taskId] }); } };
@@ -98,7 +107,7 @@ export function TaskCenterPage() {
     ]} /></Card>
     <TaskCreateWizard open={createOpen} models={models.data || []} initialModelId={initialModelId} initialScene={initialScene} submitting={create.isPending} onClose={() => setCreateOpen(false)} onSubmit={payload => create.mutateAsync(payload)} />
     <Drawer size="large" open={!!viewId} destroyOnHidden onClose={closeDetail} title={`任务 ${viewId || ''}`} footer={<Space style={{ width: '100%', justifyContent: 'flex-end' }}><Button onClick={closeDetail}>关闭</Button>{current && <Button danger disabled={!isRunningStatus(current.status)} title={!isRunningStatus(current.status) ? '仅运行中的任务可取消' : undefined} onClick={() => cancel.mutate(current.id)}>取消任务</Button>}{current && isRetryableStatus(current.status) && <Button type="primary" onClick={() => retry.mutate(current.id)}>重试任务</Button>}</Space>}>
-      <Tabs activeKey={activeTab} onChange={setActiveTab} items={[{ key: 'overview', label: '任务概览', children: <TaskOverviewPanel task={current} /> }, { key: 'timeline', label: '求解过程', children: <TaskTimelinePanel task={current} /> }, { key: 'input', label: '输入参数', children: <TaskInputPanel task={current} /> }, { key: 'logs', label: '技术日志', children: <TaskLogsPanel task={current} /> }, { key: 'result', label: '优化结果', children: <TaskResultPanel result={result.data} labelMap={resultLabelMap} /> }, { key: 'explain', label: '业务解释', children: <TaskExplanationPanel task={current} result={result.data} /> }]} />
+      <Tabs className="task-detail-tabs" activeKey={activeTab} onChange={setActiveTab} items={[{ key: 'overview', label: '任务概览', children: <TaskOverviewPanel task={current} /> }, { key: 'timeline', label: '求解过程', children: <TaskTimelinePanel task={current} /> }, { key: 'input', label: '输入参数', children: <TaskInputPanel task={current} /> }, { key: 'logs', label: '技术日志', children: <TaskLogsPanel task={current} /> }, { key: 'result', label: '优化结果', children: <TaskResultPanel result={result.data} labelMap={resultLabelMap} /> }, { key: 'explain', label: '业务解释', children: <TaskExplanationPanel task={current} result={result.data} /> }]} />
     </Drawer>
   </>;
 }

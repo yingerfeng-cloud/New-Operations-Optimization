@@ -35,7 +35,7 @@ export default defineConfig({
       env: {
         ...process.env,
         PORT: '8000',
-        COPT_SYNC_JOBS: 'true',
+        OPTIFORGE_SYNC_JOBS: 'true',
         LLM_ENABLED: 'false',
         AGENT_ALLOW_IN_PROCESS_PLATFORM_FALLBACK: 'true',
         RUNTIME_STORE_PATH: runtimeStorePath,

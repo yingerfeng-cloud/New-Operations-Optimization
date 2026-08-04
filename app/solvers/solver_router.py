@@ -6,7 +6,7 @@ import pyomo.environ as pyo
 
 from app.problem_type_diagnosis import normalize_problem_type
 from app.schemas.result import SolverRunResult
-from app.solvers.base import UnavailableSolverAdapter
+from app.solvers.base import SolverProgressCallback, UnavailableSolverAdapter
 from app.solvers.highs_adapter import HiGHSAdapter
 from app.solvers.nlp_adapter import NLPSolverAdapter
 
@@ -101,19 +101,38 @@ class SolverRouter:
         mip_gap: float = 0.001,
         time_limit_seconds: int = 300,
         threads: int | None = None,
+        progress_callback: SolverProgressCallback | None = None,
     ) -> SolverRunResult:
         route = self.route(problem_type, requested_solver)
         if not route["ok"]:
             raise SolverRouteError(route)
         self._assert_highs_can_accept_model(model, route)
         adapter = self.adapters[self._key(str(route["selected_solver"]))]
-        return adapter.solve(model, mip_gap=mip_gap, time_limit_seconds=time_limit_seconds, threads=threads)
+        return adapter.solve(
+            model,
+            mip_gap=mip_gap,
+            time_limit_seconds=time_limit_seconds,
+            threads=threads,
+            progress_callback=progress_callback,
+        )
 
     def infer_problem_type_from_model(self, model: Any, default: str = "LP") -> str:
         has_integer = any(var.is_integer() or var.is_binary() for component in model.component_objects(pyo.Var, active=True) for var in component.values())
-        nonlinear = self._model_has_nonlinearity(model)
-        if nonlinear:
+        nonlinear_constraint = any(
+            constraint.active and (constraint.body.polynomial_degree() is None or constraint.body.polynomial_degree() > 1)
+            for component in model.component_objects(pyo.Constraint, active=True)
+            for constraint in component.values()
+        )
+        objective_degrees = [
+            item.expr.polynomial_degree()
+            for objective in model.component_objects(pyo.Objective, active=True)
+            for item in objective.values()
+        ]
+        nonlinear_objective = any(degree is None or degree > 2 for degree in objective_degrees)
+        if nonlinear_constraint or nonlinear_objective:
             return "MINLP_RESERVED" if has_integer else "NLP"
+        if any(degree == 2 for degree in objective_degrees):
+            return "MIQP" if has_integer else "QP"
         return "MILP" if has_integer else default
 
     def _key(self, solver_name: str | None) -> str:

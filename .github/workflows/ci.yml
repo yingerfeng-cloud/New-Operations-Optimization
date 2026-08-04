@@ -16,7 +16,7 @@ permissions:
 
 env:
   PYTHONUNBUFFERED: '1'
-  COPT_SYNC_JOBS: 'true'
+  OPTIFORGE_SYNC_JOBS: 'true'
   LLM_ENABLED: 'false'
 
 jobs:
@@ -120,10 +120,10 @@ jobs:
         run: python scripts/verify_test_matrix.py
       - name: Build and inspect delivery package
         shell: pwsh
-        run: ./package.ps1 -OutputPath "${{ runner.temp }}/copt-500.zip"
+        run: ./package.ps1 -OutputPath "${{ runner.temp }}/optiforge-platform.zip"
       - uses: actions/upload-artifact@v4
         with:
-          name: copt-500-delivery-${{ github.run_id }}
-          path: ${{ runner.temp }}/copt-500.zip
+          name: optiforge-platform-delivery-${{ github.run_id }}
+          path: ${{ runner.temp }}/optiforge-platform.zip
           if-no-files-found: error
           retention-days: 14

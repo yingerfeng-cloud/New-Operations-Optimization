@@ -14,7 +14,7 @@ concurrency:
 
 env:
   PYTHONUNBUFFERED: '1'
-  COPT_SYNC_JOBS: 'true'
+  OPTIFORGE_SYNC_JOBS: 'true'
   LLM_ENABLED: 'false'
 
 jobs:
@@ -78,7 +78,7 @@ jobs:
     timeout-minutes: 30
     env:
       AGENT_ALLOW_IN_PROCESS_PLATFORM_FALLBACK: 'true'
-      RUNTIME_STORE_PATH: /tmp/copt-nightly-real-e2e-runtime.json
+      RUNTIME_STORE_PATH: /tmp/optiforge-nightly-real-e2e-runtime.json
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

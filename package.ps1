@@ -1,5 +1,5 @@
 param(
-  [string]$OutputPath = "copt-500.zip"
+  [string]$OutputPath = "optiforge-platform.zip"
 )
 
 $ErrorActionPreference = "Stop"
@@ -158,7 +158,7 @@ if (Test-Path -LiteralPath $OutputFullPath) {
   Remove-Item -LiteralPath $OutputFullPath -Force
 }
 
-$staging = Join-Path $env:TEMP ("copt-500-package-" + [guid]::NewGuid().ToString("N"))
+$staging = Join-Path $env:TEMP ("optiforge-platform-package-" + [guid]::NewGuid().ToString("N"))
 New-Item -ItemType Directory -Path $staging | Out-Null
 try {
   foreach ($item in $IncludeItems) {
@@ -204,7 +204,7 @@ finally {
   }
 }
 
-$verificationDir = Join-Path $env:TEMP ("copt-500-package-verify-" + [guid]::NewGuid().ToString("N"))
+$verificationDir = Join-Path $env:TEMP ("optiforge-platform-package-verify-" + [guid]::NewGuid().ToString("N"))
 New-Item -ItemType Directory -Path $verificationDir | Out-Null
 try {
   [System.IO.Compression.ZipFile]::ExtractToDirectory($OutputFullPath, $verificationDir)

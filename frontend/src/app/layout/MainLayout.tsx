@@ -4,7 +4,7 @@ import { Outlet, useLocation } from 'react-router-dom';
 import { Header } from './Header';
 import { Sidebar } from './Sidebar';
 
-const COLLAPSE_KEY = 'copt.sidebar.collapsed';
+const COLLAPSE_KEY = 'optiforge.sidebar.collapsed';
 
 function useViewport() {
   const [width, setWidth] = useState(() => typeof window === 'undefined' ? 1440 : window.innerWidth);

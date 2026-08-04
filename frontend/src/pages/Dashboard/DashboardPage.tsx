@@ -1,5 +1,6 @@
 import { Button, Card, Col, Empty, Row, Space, Tag } from 'antd';
 import { useQuery } from '@tanstack/react-query';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getModels } from '../../api/models';
 import { getTasks } from '../../api/tasks';
@@ -16,8 +17,11 @@ import type { ModelAsset } from '../../types/model';
 import type { ScenarioCatalogItem } from '../../types/scenario';
 import type { SolveTask } from '../../types/task';
 import { formatDurationSeconds } from '../../utils/formatDuration';
+import { PLATFORM_TAGLINE } from '../../app/brand';
 
 const callable = new Set(['PUBLISHED', 'ACTIVE', 'ONLINE', 'READY']);
+const TREND_WINDOWS = [7, 14, 30] as const;
+type TrendWindow = typeof TREND_WINDOWS[number];
 const timestamp = (task: SolveTask) => Date.parse(String(task.created_at || '')) || 0;
 const failureReason = (task: SolveTask) => typeof task.error === 'string' ? task.error : String((task.error as Record<string, unknown> | undefined)?.message || task.risk || '-');
 
@@ -44,6 +48,7 @@ function taskScenarioName(task: SolveTask, models: ModelAsset[], scenarios: Scen
 
 export function DashboardPage() {
   const nav = useNavigate();
+  const [trendWindow, setTrendWindow] = useState<TrendWindow>(7);
   const refetchInterval = import.meta.env.MODE === 'test' ? false : 5000;
   const models = useQuery({ queryKey: ['models'], queryFn: getModels });
   const tasks = useQuery({ queryKey: ['tasks'], queryFn: getTasks, refetchInterval });
@@ -59,10 +64,10 @@ export function DashboardPage() {
   const recentSuccess = recentSevenDays.filter(task => normalizeTaskStatus(task.status) === 'SUCCESS').length;
   const successRate = recentSevenDays.length ? `${Math.round(recentSuccess / recentSevenDays.length * 100)}%` : '-';
   const published = (models.data || []).filter(model => callable.has(String(model.status || '').toUpperCase())).length;
-  const trendDays = Array.from({ length: 7 }, (_, offset) => {
+  const trendDays = Array.from({ length: trendWindow }, (_, offset) => {
     const date = new Date();
     date.setHours(12, 0, 0, 0);
-    date.setDate(date.getDate() - (6 - offset));
+    date.setDate(date.getDate() - (trendWindow - 1 - offset));
     return { key: dateKey(date.toISOString()), label: `${date.getMonth() + 1}/${date.getDate()}` };
   });
   const trend = trendDays.map(day => {
@@ -80,23 +85,38 @@ export function DashboardPage() {
   const scenarioTotal = scenarioData.reduce((sum, item) => sum + item.value, 0);
   const scenarioPalette = ['#2b6ed2', '#27a889', '#7b72dc', '#e6a23c', '#3ba7c9', '#8595aa'];
   const peakDay = trend.reduce((peak, day) => day.total > peak.total ? day : peak, trend[0]);
-  const completedDurations = rows.map(task => Number(task.duration_seconds)).filter(value => Number.isFinite(value) && value >= 0);
+  const trendTaskCount = trend.reduce((sum, day) => sum + day.total, 0);
+  const completedTrendTasks = rows.filter(task => trend.some(day => day.key === dateKey(task.created_at)) && normalizeTaskStatus(task.status) === 'SUCCESS');
+  const completedDurations = completedTrendTasks.map(task => Number(task.duration_seconds)).filter(value => Number.isFinite(value) && value >= 0);
   const averageDuration = completedDurations.length ? completedDurations.reduce((sum, value) => sum + value, 0) / completedDurations.length : undefined;
   const trendOption = {
-    color: ['#21a179', '#ef6a61', '#7397c7', '#2b6ed2'],
-    grid: { top: 42, right: 46, bottom: 34, left: 38 },
-    tooltip: { trigger: 'axis', backgroundColor: 'rgba(11, 31, 56, .94)', borderWidth: 0, textStyle: { color: '#fff' } },
+    color: ['#21a179', '#ef6a61', '#9aaabd', '#2057a7'],
+    grid: { top: 46, right: 50, bottom: 34, left: 38 },
+    tooltip: {
+      trigger: 'axis',
+      backgroundColor: 'rgba(11, 31, 56, .94)',
+      borderWidth: 0,
+      textStyle: { color: '#fff' },
+      formatter: (params: Array<{ axisValue: string; seriesName: string; value: number | null; marker: string }>) => {
+        const day = trend.find(item => item.label === params[0]?.axisValue);
+        if (!day) return '';
+        const lines = [`<strong>${day.label}</strong>`, `${params.find(item => item.seriesName === '成功')?.marker || ''}成功：${day.success}`, `${params.find(item => item.seriesName === '异常')?.marker || ''}异常：${day.failed}`, `${params.find(item => item.seriesName === '处理中')?.marker || ''}处理中：${day.other}`];
+        if (day.successRate !== null) lines.push(`${params.find(item => item.seriesName === '成功率')?.marker || ''}成功率：${day.successRate}%（${day.success}/${day.total}）`);
+        else lines.push('<span style="color:#a9b8ca">成功率：无任务</span>');
+        return lines.join('<br/>');
+      },
+    },
     legend: { top: 4, right: 8, itemWidth: 10, itemHeight: 7, textStyle: { color: '#65758b', fontSize: 11 } },
     xAxis: { type: 'category', data: trend.map(day => day.label), axisLine: { lineStyle: { color: '#dce5f0' } }, axisTick: { show: false }, axisLabel: { color: '#7a8ba1' } },
     yAxis: [
-      { type: 'value', minInterval: 1, splitLine: { lineStyle: { color: '#eef3f8' } }, axisLabel: { color: '#7a8ba1' } },
+      { type: 'value', min: 0, max: Math.max(4, Math.ceil(Math.max(...trend.map(day => day.total), 0) * 1.25)), minInterval: 1, splitLine: { lineStyle: { color: '#eef3f8' } }, axisLabel: { color: '#7a8ba1' } },
       { type: 'value', min: 0, max: 100, axisLabel: { formatter: '{value}%', color: '#7a8ba1' }, splitLine: { show: false } },
     ],
     series: [
       { name: '成功', type: 'bar', stack: 'tasks', barMaxWidth: 22, data: trend.map(day => day.success), itemStyle: { borderRadius: [4, 4, 0, 0] } },
       { name: '异常', type: 'bar', stack: 'tasks', barMaxWidth: 22, data: trend.map(day => day.failed), itemStyle: { borderRadius: [4, 4, 0, 0] } },
       { name: '处理中', type: 'bar', stack: 'tasks', barMaxWidth: 22, data: trend.map(day => day.other), itemStyle: { borderRadius: [4, 4, 0, 0] } },
-      { name: '成功率', type: 'line', yAxisIndex: 1, smooth: true, connectNulls: false, symbolSize: 7, data: trend.map(day => day.successRate), lineStyle: { width: 3 }, areaStyle: { opacity: .06 } },
+      { name: '成功率', type: 'line', yAxisIndex: 1, smooth: 0.22, connectNulls: true, showSymbol: true, symbol: 'circle', symbolSize: 9, data: trend.map(day => day.successRate), lineStyle: { width: 2.5, color: '#2057a7', shadowColor: 'rgba(32, 87, 167, .18)', shadowBlur: 8 }, itemStyle: { color: '#2057a7', borderColor: '#fff', borderWidth: 2 }, emphasis: { scale: true, itemStyle: { borderWidth: 3 } } },
     ],
   };
   const scenarioOption = {
@@ -110,7 +130,7 @@ export function DashboardPage() {
   if (models.isError && tasks.isError) return <ErrorState title="工作台数据加载失败" description="当前无法获取模型和任务数据。" retry={() => { void models.refetch(); void tasks.refetch(); }} />;
 
   return <>
-    <PageHeader title="生产运筹工作台" description="从业务场景和运行任务出发，优先处理运行中与异常任务。" extra={<Space><Button onClick={() => nav('/scenarios')}>从业务场景开始</Button><Button type="primary" onClick={() => nav('/tasks?create=1')}>发起优化任务</Button></Space>} />
+    <PageHeader title="生产运筹工作台" description={`${PLATFORM_TAGLINE} 从业务场景和运行任务出发，优先处理运行中与异常任务。`} extra={<Space><Button onClick={() => nav('/scenarios')}>从业务场景开始</Button><Button type="primary" onClick={() => nav('/tasks?create=1')}>发起优化任务</Button></Space>} />
     <MetricGrid>
       <MetricCard title="运行中任务" value={tasks.isLoading ? '-' : running.length} description="排队、校验、建模与求解" tone="amber" onClick={() => nav('/tasks')} />
       <MetricCard title="失败 / 无解" value={tasks.isLoading ? '-' : failed.length} description="待诊断和处理" tone={failed.length ? 'red' : 'neutral'} onClick={() => nav('/tasks')} />
@@ -119,11 +139,11 @@ export function DashboardPage() {
     </MetricGrid>
     <Row gutter={[16, 16]} className="section-gap dashboard-operations-grid">
       <Col xs={24} xl={16} className="dashboard-analytics-column">
-        <Card className="dashboard-chart-card dashboard-trend-card" title="任务运行态势" extra={<Tag color="blue">近 7 天</Tag>}>
+        <Card className="dashboard-chart-card dashboard-trend-card" title="任务运行态势" extra={<Space size={8}><span className="dashboard-card-hint">统计窗口</span><div className="dashboard-trend-window" role="group" aria-label="任务运行态势统计窗口">{TREND_WINDOWS.map(window => <button key={window} type="button" className={trendWindow === window ? 'active' : ''} aria-pressed={trendWindow === window} onClick={() => setTrendWindow(window)}>近 {window} 天</button>)}</div></Space>}>
           <div className="dashboard-chart-summary">
-            <span><small>周期任务</small><strong>{recentSevenDays.length}</strong></span>
+            <span><small>近 {trendWindow} 天任务</small><strong>{trendTaskCount}</strong></span>
             <span><small>峰值日期</small><strong>{peakDay?.total ? `${peakDay.label} · ${peakDay.total}` : '-'}</strong></span>
-            <span><small>平均耗时</small><strong>{formatDurationSeconds(averageDuration)}</strong></span>
+            <span><small>已完成平均耗时</small><strong>{formatDurationSeconds(averageDuration)}</strong></span>
           </div>
           <LazyEChart style={{ height: 278, minHeight: 278 }} option={trendOption} />
         </Card>

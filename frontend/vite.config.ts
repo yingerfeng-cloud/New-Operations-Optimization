@@ -1,10 +1,9 @@
 import { defineConfig } from 'vitest/config';
 import react from '@vitejs/plugin-react';
 
-const antdEsmEntry = new URL('./node_modules/antd/es/index.js', import.meta.url)
-  .pathname.replace(/^\/([A-Za-z]:)/, '$1');
-const antdIconsEsmEntry = new URL('./node_modules/@ant-design/icons/es/index.js', import.meta.url)
-  .pathname.replace(/^\/([A-Za-z]:)/, '$1');
+const localPath = (url: URL) => decodeURIComponent(url.pathname).replace(/^\/([A-Za-z]:)/, '$1');
+const antdEsmEntry = localPath(new URL('./node_modules/antd/es/index.js', import.meta.url));
+const antdIconsEsmEntry = localPath(new URL('./node_modules/@ant-design/icons/es/index.js', import.meta.url));
 
 export default defineConfig(({ mode }) => ({
   plugins: [react()],

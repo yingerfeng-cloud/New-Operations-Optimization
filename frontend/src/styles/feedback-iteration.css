@@ -144,6 +144,48 @@ button.metric-card-v2:hover {
   box-shadow: 0 8px 20px rgba(40, 132, 226, .3) !important;
 }
 
+/* Brand lockup: the Chinese name lives in the mark; the wordmark stays English-only. */
+.sidebar .brand-copy {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  font-size: 0;
+  line-height: 1;
+}
+
+.sidebar .brand-wordmark {
+  position: relative;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0;
+  padding-bottom: 5px;
+  color: #f7fbff;
+  font-family: Inter, "Avenir Next", "Segoe UI", sans-serif;
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: -.045em;
+  white-space: nowrap;
+}
+
+.sidebar .brand-wordmark::after {
+  content: "";
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 28px;
+  height: 2px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #62c7ff, #76e2d4);
+}
+
+.sidebar .brand-wordmark-main {
+  color: #f7fbff;
+}
+
+.sidebar .brand-wordmark-accent {
+  color: #73d0f7;
+}
+
 .nav button {
   height: 46px;
   border-radius: 9px;
@@ -460,6 +502,41 @@ button.metric-card-v2:hover {
   font-variant-numeric: tabular-nums;
 }
 
+.dashboard-trend-window {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid #dce7f3;
+  border-radius: 7px;
+  background: #f4f8fc;
+}
+
+.dashboard-trend-window button {
+  height: 26px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: #71839a;
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+  transition: color .18s ease, background .18s ease, box-shadow .18s ease;
+}
+
+.dashboard-trend-window button:hover {
+  color: #2057a7;
+  background: #eaf3ff;
+}
+
+.dashboard-trend-window button.active {
+  color: #2057a7;
+  font-weight: 700;
+  background: #fff;
+  box-shadow: 0 1px 4px rgba(32, 87, 167, .14);
+}
+
 .dashboard-card-hint {
   color: #8090a5;
   font-size: 11px;
@@ -726,6 +803,94 @@ button.metric-card-v2:hover {
   font-size: 12px;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* Solve timeline: retain the stage label while making timestamps and elapsed time scannable. */
+.task-timeline-stage {
+  display: grid;
+  gap: 3px;
+}
+
+.task-stage-time {
+  color: var(--proto-muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.solver-progress-metrics {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.solver-progress-metrics > div {
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid #dfe7f1;
+  border-radius: 8px;
+  background: #f8fbff;
+}
+
+.solver-progress-metrics span,
+.solver-progress-metrics strong {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.solver-progress-metrics span {
+  margin-bottom: 4px;
+  color: var(--proto-muted);
+  font-size: 12px;
+}
+
+.solver-progress-metrics strong {
+  color: #183b61;
+  font-size: 16px;
+  font-variant-numeric: tabular-nums;
+}
+
+.solver-progress-chart .ant-card-body {
+  padding: 8px 10px 2px;
+}
+
+.solver-live-tag::before {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin-right: 5px;
+  border-radius: 50%;
+  background: currentColor;
+  content: '';
+  animation: solver-live-pulse 1.4s ease-in-out infinite;
+}
+
+.solver-progress-event {
+  display: grid;
+  gap: 2px;
+}
+
+.solver-progress-event small {
+  color: var(--proto-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+@keyframes solver-live-pulse {
+  0%, 100% { opacity: 0.35; transform: scale(0.8); }
+  50% { opacity: 1; transform: scale(1); }
+}
+
+@media (max-width: 900px) {
+  .solver-progress-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .solver-live-tag::before {
+    animation: none;
+  }
 }
 
 /* Scenario cards: keep primary actions on one row and tighten model entries. */

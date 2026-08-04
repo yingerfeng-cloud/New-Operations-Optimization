@@ -51,11 +51,71 @@ export function resolveTimeDimension(...sources: unknown[]): TimeDimensionConfig
 
 export function runtimeFieldsFromContracts(...sources: unknown[]): RuntimeField[] {
   const rows = new Map<string, RuntimeField>();
+  const authoritativeInputCodes = new Set<string>();
   const setValues: Record<string, string[]> = {};
   const explicitGroups = new Map<string, { key: string; label: string; order: number }>();
   const seen = new Set<unknown>();
+  const addField = (item: Record<string, unknown>) => {
+    const code = String(item.code || item.math_param || item.key || item.parameter || item.parameter_code || item.model_parameter || '');
+    if (!code) return;
+    const existing = rows.get(code);
+    const validation = objectValue(item.validation);
+    for (const [dimension, values] of Object.entries(objectValue(item.sets))) {
+      if (Array.isArray(values) && values.length) setValues[dimension] = values.map(String);
+    }
+    rows.set(code, {
+      code, name: String(item.name || item.label || item.display_name || existing?.name || code), required: Boolean(item.required ?? existing?.required),
+      dimension: extractDimensions(item).length ? extractDimensions(item) : existing?.dimension || [],
+      defaultValue: item.default ?? item.defaultValue ?? item.default_value ?? existing?.defaultValue,
+      exampleValue: item.example ?? item.exampleValue ?? item.sample ?? item.sample_value ?? existing?.exampleValue,
+      type: String(item.type || item.value_type || existing?.type || ''),
+      unit: String(item.unit || existing?.unit || ''), description: String(item.description || existing?.description || ''),
+      enumValues: Array.isArray(item.enum) ? item.enum : Array.isArray(validation.enum) ? validation.enum : existing?.enumValues,
+      min: item.min == null && validation.min == null ? existing?.min : Number(item.min ?? validation.min),
+      max: item.max == null && validation.max == null ? existing?.max : Number(item.max ?? validation.max),
+      groupKey: String(item.ui_group || existing?.groupKey || '') || undefined, groupLabel: String(item.ui_group_label || existing?.groupLabel || '') || undefined,
+      groupOrder: item.ui_group_order == null ? existing?.groupOrder : Number(item.ui_group_order), fieldOrder: item.ui_order == null ? existing?.fieldOrder : Number(item.ui_order),
+      editorHint: String(item.ui_editor || existing?.editorHint || '') || undefined, helpText: String(item.ui_help || existing?.helpText || '') || undefined,
+      dataSourceLabel: String(item.ui_data_source || existing?.dataSourceLabel || '') || undefined,
+    });
+  };
+  const rememberInputCodes = (value: unknown) => {
+    if (Array.isArray(value)) {
+      value.forEach(item => {
+        if (!item || typeof item !== 'object' || Array.isArray(item)) return;
+        const record = objectValue(item);
+        const code = String(record.code || record.math_param || record.key || record.parameter || record.parameter_code || record.model_parameter || '');
+        if (code) authoritativeInputCodes.add(code);
+      });
+      return;
+    }
+    const record = objectValue(value);
+    [...records(record.parameters), ...records(record.runtime_parameters), ...records(record.parameter_bindings)].forEach(item => {
+      const code = String(item.code || item.math_param || item.key || item.parameter || item.parameter_code || item.model_parameter || '');
+      if (code) authoritativeInputCodes.add(code);
+    });
+  };
+  sources.forEach(source => {
+    const record = objectValue(source);
+    rememberInputCodes(record.input_schema);
+    rememberInputCodes(record.input_contract);
+    const semantic = objectValue(record.semantic_spec);
+    rememberInputCodes(semantic.input_schema);
+    rememberInputCodes(semantic.input_contract);
+    const draft = objectValue(record.model_draft);
+    rememberInputCodes(draft.input_schema);
+    rememberInputCodes(draft.input_contract);
+  });
   const visit = (source: unknown) => {
-    if (!source || typeof source !== 'object' || Array.isArray(source) || seen.has(source)) return;
+    if (Array.isArray(source)) {
+      source.forEach(item => {
+        if (!item || typeof item !== 'object' || Array.isArray(item)) return;
+        addField(objectValue(item));
+        visit(item);
+      });
+      return;
+    }
+    if (!source || typeof source !== 'object' || seen.has(source)) return;
     seen.add(source);
     const record = objectValue(source);
     const uiMetadata = objectValue(record.ui_metadata);
@@ -72,26 +132,11 @@ export function runtimeFieldsFromContracts(...sources: unknown[]): RuntimeField[
       if (code && values.length) setValues[code] = values.map(String);
     }
     for (const [code, value] of Object.entries(objectValue(record.sets))) if (Array.isArray(value)) setValues[code] = value.map(String);
-    for (const item of [...records(record.parameters), ...records(record.runtime_parameters), ...records(record.parameter_bindings)]) {
-      const code = String(item.code || item.math_param || item.key || item.parameter || item.parameter_code || item.model_parameter || '');
-      if (!code) continue;
-      const existing = rows.get(code);
-      rows.set(code, {
-        code, name: String(item.name || item.label || item.display_name || existing?.name || code), required: Boolean(item.required ?? existing?.required),
-        dimension: extractDimensions(item).length ? extractDimensions(item) : existing?.dimension || [], defaultValue: item.default ?? item.defaultValue ?? existing?.defaultValue,
-        exampleValue: item.example ?? item.exampleValue ?? item.sample ?? existing?.exampleValue, type: String(item.type || item.value_type || existing?.type || ''),
-        unit: String(item.unit || existing?.unit || ''), description: String(item.description || existing?.description || ''), enumValues: Array.isArray(item.enum) ? item.enum : existing?.enumValues,
-        min: item.min == null ? existing?.min : Number(item.min), max: item.max == null ? existing?.max : Number(item.max),
-        groupKey: String(item.ui_group || existing?.groupKey || '') || undefined, groupLabel: String(item.ui_group_label || existing?.groupLabel || '') || undefined,
-        groupOrder: item.ui_group_order == null ? existing?.groupOrder : Number(item.ui_group_order), fieldOrder: item.ui_order == null ? existing?.fieldOrder : Number(item.ui_order),
-        editorHint: String(item.ui_editor || existing?.editorHint || '') || undefined, helpText: String(item.ui_help || existing?.helpText || '') || undefined,
-        dataSourceLabel: String(item.ui_data_source || existing?.dataSourceLabel || '') || undefined,
-      });
-    }
-    ['input_schema', 'parameter_schema', 'semantic_schema', 'input_contract', 'semantic_spec', 'component_spec'].forEach(key => visit(record[key]));
+    [...records(record.parameters), ...records(record.runtime_parameters), ...records(record.parameter_bindings)].forEach(addField);
+    ['input_schema', 'parameter_schema', 'semantic_schema', 'input_contract', 'semantic_spec', 'semantic', 'component_spec', 'model_draft'].forEach(key => visit(record[key]));
   };
   sources.forEach(visit);
-  return [...rows.values()].map(field => {
+  return [...rows.values()].filter(field => !authoritativeInputCodes.size || authoritativeInputCodes.has(field.code)).map(field => {
     const explicit = explicitGroups.get(field.code);
     return {
       ...field,

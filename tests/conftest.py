@@ -62,11 +62,11 @@ def _clear_fastapi_dependency_overrides() -> None:
 
 os.environ.setdefault(
     "RUNTIME_STORE_PATH",
-    str(Path(tempfile.gettempdir()) / f"copt_runtime_store_pytest_{uuid.uuid4().hex}.json"),
+    str(Path(tempfile.gettempdir()) / f"optiforge_runtime_store_pytest_{uuid.uuid4().hex}.json"),
 )
 os.environ.setdefault("LLM_ENABLED", "false")
 os.environ.setdefault("AGENT_ALLOW_IN_PROCESS_PLATFORM_FALLBACK", "true")
-os.environ.setdefault("COPT_SYNC_JOBS", "true")
+os.environ.setdefault("OPTIFORGE_SYNC_JOBS", "true")
 
 
 def pytest_configure(config: pytest.Config) -> None:
@@ -85,7 +85,7 @@ def pytest_configure(config: pytest.Config) -> None:
     worker_id = worker_input.get("workerid", "worker")
     os.environ["RUNTIME_STORE_PATH"] = str(
         Path(tempfile.gettempdir())
-        / f"copt_runtime_store_pytest_{worker_id}_{uuid.uuid4().hex}.json"
+        / f"optiforge_runtime_store_pytest_{worker_id}_{uuid.uuid4().hex}.json"
     )
 
 try:

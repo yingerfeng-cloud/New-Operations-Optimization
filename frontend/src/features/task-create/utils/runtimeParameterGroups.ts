@@ -27,7 +27,7 @@ function fallbackGroup(field: RuntimeField, config: TimeDimensionConfig) {
   if (kind === 'structured') return { key: 'structured', label: '高级结构', order: 60 };
   if (config.state_time_set && field.dimension.includes(config.state_time_set)) return { key: 'state-series', label: '状态序列', order: 30 };
   if (field.dimension.includes(config.time_set)) return { key: 'time-series', label: '时间序列', order: 20 };
-  if (kind === 'keyvalue') return { key: 'key-value', label: '键值参数', order: 40 };
+  if (kind === 'keyvalue') return { key: 'basic', label: '基础参数', order: 10 };
   return { key: 'basic', label: '基础参数', order: 10 };
 }
 
@@ -62,7 +62,14 @@ export function runtimeFieldIssues(
     if (message) result.push({ code: field.code, name: field.name, groupKey: group.key, groupLabel: group.label, message, fixHint: field.helpText || '请按模型参数契约补充有效值并重新检查。' });
   }));
   timeErrors.forEach(message => {
-    const field = groups.flatMap(group => group.fields.map(item => ({ group, field: item }))).find(({ field: item }) => message.includes(item.code) || message.includes(item.name));
+    const fields = groups.flatMap(group => group.fields.map(item => ({ group, field: item })));
+    const exactCodeField = fields.find(({ field: item }) => {
+      const escaped = item.code.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      return new RegExp(`(^|[^A-Za-z0-9_])${escaped}($|[^A-Za-z0-9_])`).test(message);
+    });
+    const field = exactCodeField || [...fields]
+      .sort((a, b) => b.field.name.length - a.field.name.length)
+      .find(({ field: item }) => message.includes(item.name));
     if (field && !result.some(item => item.code === field.field.code && item.message === message)) {
       result.push({ code: field.field.code, name: field.field.name, groupKey: field.group.key, groupLabel: field.group.label, message, fixHint: field.field.helpText || '请检查时间维度长度与当前 horizon 是否一致。' });
     }
@@ -90,6 +97,8 @@ export function isRuntimeValueModified(value: unknown, defaultValue: unknown) {
 export function runtimeGroupStats(group: RuntimeParameterGroup, values: Record<string, unknown>, errors: Record<string, string>, defaults: Record<string, unknown>) {
   const required = group.fields.filter(field => field.required);
   return {
+    filled: group.fields.filter(field => !isRuntimeValueEmpty(values[field.code])).length,
+    total: group.fields.length,
     completed: required.filter(field => !isRuntimeValueEmpty(values[field.code])).length,
     required: required.length,
     errors: group.fields.filter(field => Boolean(errors[field.code]) || (field.required && isRuntimeValueEmpty(values[field.code]))).length,

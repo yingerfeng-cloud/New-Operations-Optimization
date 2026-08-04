@@ -7,6 +7,7 @@ from typing import Any
 import pyomo.environ as pyo
 
 from app.schemas.result import SolverRunResult
+from app.solvers.base import SolverProgressCallback
 from app.solvers.status import IPOPT_UNAVAILABLE_MESSAGE
 
 
@@ -38,7 +39,13 @@ class NLPSolverAdapter:
         max_cpu_time: float | None = None,
         max_iter: int | None = None,
         acceptable_tol: float | None = None,
+        progress_callback: SolverProgressCallback | None = None,
     ) -> SolverRunResult:
+        if progress_callback is not None:
+            progress_callback({
+                "kind": "monitoring_unavailable",
+                "message": "当前 Ipopt 可执行文件适配器暂未接入逐迭代回调，仍会展示最终收敛诊断。",
+            })
         if self._has_integer_variables(model):
             return self._failed_result(
                 "MINLP_RESERVED",

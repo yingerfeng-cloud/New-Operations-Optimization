@@ -50,6 +50,28 @@ test('one successful contract source is an explicit compatible fallback', async 
   expect(screen.getByRole('button', { name: '下一步' })).toBeEnabled();
 });
 
+test('array input schema renders object parameters as editable key-value rows', async () => {
+  mocks.schema.mockResolvedValue({
+    ui_metadata: { time_dimension: { enabled: false, policy: 'not_applicable', time_set: 'time', state_time_set: null } },
+    input_schema: [{
+      key: 'unit_max_output', name: '机组最大出力', required: true, dimension: ['unit'], type: 'dict',
+      sample_value: { U1: 120, U2: 90 }, sets: { unit: ['U1', 'U2'] },
+    }],
+    semantic_spec: { parameters: [{ code: 'unit_max_output', name: '机组最大出力', dimension: ['unit'] }] },
+  });
+  mocks.detail.mockResolvedValue({ parameters: { unit_max_output: { U1: 120, U2: 90 } } });
+  renderWithQueryClient(<Harness />);
+  await selectModel();
+  await waitFor(() => expect(screen.getByRole('button', { name: '下一步' })).toBeEnabled());
+  fireEvent.click(screen.getByRole('button', { name: '下一步' }));
+  expect(await screen.findByText('机组最大出力')).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: /基础参数/ })).toHaveTextContent('已填 1/1');
+  expect(screen.getByDisplayValue('U1')).toBeInTheDocument();
+  expect(screen.getByDisplayValue('U2')).toBeInTheDocument();
+  expect(screen.getByDisplayValue('120')).toBeInTheDocument();
+  expect(screen.getByDisplayValue('90')).toBeInTheDocument();
+});
+
 test('closing resets model, step, and edited parameters', async () => {
   renderWithQueryClient(<Harness />);
   await selectModel();

@@ -15,7 +15,7 @@ def main() -> None:
     resolved = runtime_path.resolve()
     if temp_root not in resolved.parents:
         raise SystemExit(f"Real E2E store must be temporary, got: {resolved}")
-    if os.environ.get("COPT_SYNC_JOBS") != "true":
+    if os.environ.get("OPTIFORGE_SYNC_JOBS") != "true":
         raise SystemExit("Real E2E requires deterministic synchronous jobs")
     if os.environ.get("LLM_ENABLED", "").lower() != "false":
         raise SystemExit("Real E2E must not call an external LLM")

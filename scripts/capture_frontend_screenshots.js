@@ -189,7 +189,7 @@ async function openModelCreateStep(page, step) {
   const draft = demoModelDraft();
   await page.goto(`${base}/`);
   await page.evaluate(({ persistedDraft, persistedStep }) => {
-    localStorage.setItem('copt-model-creation-draft', JSON.stringify({
+    localStorage.setItem('optiforge-model-creation-draft', JSON.stringify({
       state: {
         draft: persistedDraft,
         modelDraft: persistedDraft,

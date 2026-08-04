@@ -2,9 +2,10 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter, useLocation } from 'react-router-dom';
 import { Sidebar } from '../../app/layout/Sidebar';
 import { AudienceProvider } from '../../app/audience';
+import { PLATFORM_FORMAL_NAME } from '../../app/brand';
 
 function Probe() { return <span data-testid="path">{useLocation().pathname}</span>; }
-const renderSidebar = (path = '/', collapsed = false, audience: 'business' | 'expert' = 'expert') => { localStorage.setItem('copt.platform.audience', audience); return render(<AudienceProvider><MemoryRouter initialEntries={[path]}><Sidebar collapsed={collapsed} /><Probe /></MemoryRouter></AudienceProvider>); };
+const renderSidebar = (path = '/', collapsed = false, audience: 'business' | 'expert' = 'expert') => { localStorage.setItem('optiforge.platform.audience', audience); return render(<AudienceProvider><MemoryRouter initialEntries={[path]}><Sidebar collapsed={collapsed} /><Probe /></MemoryRouter></AudienceProvider>); };
 
 test('renders the product information architecture and removes model creation from persistent navigation', () => {
   renderSidebar();
@@ -29,7 +30,7 @@ test('navigates and preserves semantic current state', () => {
 
 test('collapsed sidebar keeps accessible titles and hides visual labels', () => {
   renderSidebar('/', true);
-  expect(screen.getByLabelText('安全生产运筹优化平台')).toBeInTheDocument();
+  expect(screen.getByLabelText(PLATFORM_FORMAL_NAME)).toBeInTheDocument();
   expect(screen.getByTitle('求解任务')).toBeInTheDocument();
   expect(screen.queryByText('优化运行')).not.toBeInTheDocument();
 });
