@@ -41,3 +41,21 @@ test('matrix respects declared row and column dimension order', () => {
   expect(screen.getAllByText('S1').length).toBeGreaterThan(0); expect(screen.getAllByText('00:00').length).toBeGreaterThan(0); expect(screen.getAllByText('01:00').length).toBeGreaterThan(0);
   expect(screen.getByText('行：station')).toBeInTheDocument(); expect(screen.getByText('列：time')).toBeInTheDocument();
 });
+
+test('mapped matrices retain values and extend the time axis for the selected horizon', () => {
+  const change = vi.fn();
+  const field = makeField(['unit', 'time'], 'dict', { unit: ['U1', 'U2'], time: ['0', '1', '2', '3'] });
+  render(<ParameterEditor field={field} value={{ U1: [1, 0, 1, 1], U2: [1, 1, 1, 1] }} expectedLength={8} timeSet="time" onChange={change} />);
+  expect(screen.getByLabelText('运行数据 U1 0')).toHaveValue('1');
+  expect(screen.getByLabelText('运行数据 U1 7')).toBeInTheDocument();
+  expect(screen.getByText('当前 time 维度为 4，应为 8；新增时段已显示，请补充相应数值。')).toBeInTheDocument();
+  fireEvent.change(screen.getByLabelText('运行数据 U1 7'), { target: { value: '1' } });
+  expect(change).toHaveBeenLastCalledWith({ U1: [1, 0, 1, 1, '', '', '', 1], U2: [1, 1, 1, 1, '', '', '', ''] });
+});
+
+test('matrix display removes stale declared time columns after the horizon is shortened', () => {
+  const field = makeField(['unit', 'time'], 'dict', { unit: ['U1', 'U2'], time: ['0', '1', '2', '3'] });
+  render(<ParameterEditor field={field} value={{ U1: [1, 0, 1], U2: [1, 1, 1] }} expectedLength={3} timeSet="time" onChange={vi.fn()} />);
+  expect(screen.getByLabelText('运行数据 U1 2')).toHaveValue('1');
+  expect(screen.queryByLabelText('运行数据 U1 3')).not.toBeInTheDocument();
+});

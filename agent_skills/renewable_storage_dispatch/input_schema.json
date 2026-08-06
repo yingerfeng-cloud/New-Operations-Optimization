@@ -1,7 +1,7 @@
 [
   {
     "key": "renewable_forecast",
-    "name": "新能源预测",
+    "name": "新能源预测出力",
     "dimension": [
       "site",
       "time"
@@ -143,7 +143,7 @@
       110,
       90
     ],
-    "default_policy": "sample_only",
+    "default_policy": "user_required",
     "sets": {
       "time": [
         0,

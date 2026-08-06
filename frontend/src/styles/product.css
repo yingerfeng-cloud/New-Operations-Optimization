@@ -612,9 +612,94 @@ body {
 .formula-builder-head,
 .formula-builder-actions {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
+}
+
+.formula-builder-head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(300px, 360px);
+  gap: 20px;
+  align-items: stretch;
+}
+
+.formula-builder-details {
+  min-width: 0;
+}
+
+.formula-builder-meta-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  align-items: start;
+}
+
+.formula-builder-meta-grid .ant-form-item {
+  min-width: 0;
+  margin: 0;
+}
+
+.formula-builder-meta-grid .ant-form-item-control,
+.formula-builder-meta-grid .ant-form-item-control-input,
+.formula-builder-meta-grid .ant-form-item-control-input-content {
+  min-width: 0;
+}
+
+.formula-builder-config-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 18px;
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--proto-line);
+}
+
+.formula-builder-config-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 32px;
+  padding: 0 2px;
+}
+
+.formula-builder-config-row .ant-input-number {
+  width: 116px;
+}
+
+.formula-builder-controls {
+  display: grid;
+  align-content: start;
+  align-self: start;
+  gap: 16px;
+  min-width: 0;
+  padding: 14px 16px;
+  border: 1px solid #dbe8f5;
+  border-radius: 10px;
+  background: #f7fbff;
+}
+
+.formula-builder-control-section {
+  display: grid;
+  gap: 8px;
+}
+
+.formula-builder-control-section .ant-radio-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+}
+
+.formula-builder-control-section .ant-radio-wrapper {
+  margin-inline-end: 0;
+}
+
+.formula-builder-control-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
 }
 
 .formula-builder-grid {
@@ -1697,6 +1782,12 @@ button.metric-card-v2:hover {
   }
 }
 
+@media (max-width: 900px) {
+  .formula-builder-head {
+    grid-template-columns: 1fr;
+  }
+}
+
 @media (max-width: 768px) {
   .metric-grid,
   .dashboard-flow-grid,
@@ -1713,5 +1804,9 @@ button.metric-card-v2:hover {
 
   .settings-summary-item:last-child {
     grid-column: auto;
+  }
+
+  .formula-builder-meta-grid {
+    grid-template-columns: 1fr;
   }
 }

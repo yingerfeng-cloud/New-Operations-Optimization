@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { getModelAssetDetail, getModelSchema } from '../../api/models';
 import type { ModelAsset } from '../../types/model';
 import { capabilityOrFallback } from '../demo/demoCapabilities';
-import { deriveHorizon, isRuntimeValueEmpty, managedTimeFields, objectValue, resolveTimeDimension, runtimeFieldsFromContracts, stripSystemTimeParameters, timeDimensionLabel, validateRuntimeTimeDimension } from '../time-dimension';
+import { deriveHorizon, isRuntimeValueEmpty, managedTimeFields, objectValue, resolveTimeDimension, runtimeFieldsFromContracts, stripSystemTimeParameters, timeDimensionLabel, truncateRuntimeParametersForHorizon, validateRuntimeTimeDimension } from '../time-dimension';
 import { ParameterEditor, type ParameterChangeSource } from './components/ParameterEditor';
 import { RuntimeDataSummaryBar } from './components/RuntimeDataSummaryBar';
 import { RuntimeParameterGroupNav } from './components/RuntimeParameterGroupNav';
@@ -39,7 +39,7 @@ export function TaskCreateWizard({ open, models, initialModelId, initialScene, s
   const [advancedOpen, setAdvancedOpen] = useState(false); const [jsonText, setJsonText] = useState(''); const [dirty, setDirty] = useState(false);
   const [initializedModelId, setInitializedModelId] = useState(''); const [editorErrors, setEditorErrors] = useState<Record<string, string>>({}); const [submitError, setSubmitError] = useState('');
   const [submitLocked, setSubmitLocked] = useState(false); const [issuesOpen, setIssuesOpen] = useState(false); const [historyOpen, setHistoryOpen] = useState(false); const [highlightCode, setHighlightCode] = useState('');
-  const issueNavigationTimerRef = useRef<number | undefined>(undefined); const issueHighlightTimerRef = useRef<number | undefined>(undefined);
+  const issueNavigationTimerRef = useRef<number | undefined>(undefined); const issueHighlightTimerRef = useRef<number | undefined>(undefined); const pendingHorizonRef = useRef<number | undefined>(undefined);
   const selected = models.find(model => model.id === modelId);
   const schema = useQuery({ queryKey: ['model-schema', modelId], queryFn: () => getModelSchema(modelId), enabled: open && !!modelId, retry: false });
   const detail = useQuery({ queryKey: ['model-asset-detail', modelId], queryFn: () => getModelAssetDetail(modelId), enabled: open && !!modelId, retry: false });
@@ -72,6 +72,7 @@ export function TaskCreateWizard({ open, models, initialModelId, initialScene, s
   const effectiveParameterCount = Object.values(parameters).filter(value => !isRuntimeValueEmpty(value)).length;
 
   const reset = () => {
+    pendingHorizonRef.current = undefined;
     setStep(0); setModelId(''); setSolver('HiGHS'); setHorizon(undefined); setParameters({}); setDefaultValues({}); setChangeSources({}); setActiveGroup(''); setFilter('all');
     setAdvancedOpen(false); setJsonText(''); setDirty(false); setInitializedModelId(''); setEditorErrors({}); setSubmitError(''); setSubmitLocked(false); setIssuesOpen(false); setHistoryOpen(false); setHighlightCode('');
   };
@@ -94,6 +95,29 @@ export function TaskCreateWizard({ open, models, initialModelId, initialScene, s
   const applyModel = (nextId: string) => { setModelId(nextId); setStep(0); setParameters({}); setDefaultValues({}); setChangeSources({}); setHorizon(undefined); setSolver('HiGHS'); setJsonText(''); setAdvancedOpen(false); setEditorErrors({}); setSubmitError(''); setInitializedModelId(''); setDirty(false); setActiveGroup(''); setFilter('all'); };
   const selectModel = (nextId: string) => { if (!dirty || !modelId || nextId === modelId) return applyModel(nextId); modal.confirm({ title: '切换模型将清空当前已填写参数，是否继续？', okText: '继续切换', cancelText: '取消', onOk: () => applyModel(nextId) }); };
   const update = (code: string, value: unknown, source: ParameterChangeSource = 'manual') => { setDirty(true); setSubmitError(''); setParameters(current => ({ ...current, [code]: value })); setChangeSources(current => ({ ...current, [code]: source })); };
+  const changeHorizon = (next?: number) => {
+    const apply = (truncate = false) => {
+      if (truncate && next !== undefined) {
+        const timeFieldCodes = fields.filter(field => field.dimension.includes(config.time_set) || Boolean(config.state_time_set && field.dimension.includes(config.state_time_set))).map(field => field.code);
+        setParameters(current => truncateRuntimeParametersForHorizon(current, fields, config, next));
+        setChangeSources(current => ({ ...current, ...Object.fromEntries(timeFieldCodes.filter(code => code in parameters).map(code => [code, 'manual'])) }));
+      }
+      setHorizon(next); setDirty(true); setSubmitError('');
+    };
+    if (next !== undefined && effectiveHorizon !== undefined && next < effectiveHorizon) {
+      if (pendingHorizonRef.current !== undefined) return;
+      pendingHorizonRef.current = next;
+      modal.confirm({
+        title: `将调度周期缩短为 ${next} 点？`,
+        content: `系统将仅保留前 ${next} 个时段的数据，尾部时段数据会被截断；状态时点参数将保留 ${next + 1} 个值。`,
+        okText: '截断并切换', cancelText: '取消',
+        onOk: () => { pendingHorizonRef.current = undefined; apply(true); },
+        onCancel: () => { pendingHorizonRef.current = undefined; },
+      });
+      return;
+    }
+    apply();
+  };
   const importJson = () => { try { const parsed = stripSystemTimeParameters(parseTaskRuntimeJson(jsonText), config); setParameters(current => ({ ...current, ...parsed })); setChangeSources(current => ({ ...current, ...Object.fromEntries(Object.keys(parsed).map(code => [code, 'json'])) })); setDirty(true); setSubmitError(''); message.success('参数已导入，系统时间字段已自动忽略'); } catch (error) { message.error(`导入失败：${String(error)}`); } };
   const navigateIssue = (issue: typeof issues[number]) => {
     setIssuesOpen(false); setActiveGroup(issue.groupKey); setFilter('all'); setHighlightCode(issue.code);
@@ -117,7 +141,7 @@ export function TaskCreateWizard({ open, models, initialModelId, initialScene, s
     {step === 1 && <div className="wizard-step runtime-data-workspace">
       <RuntimeDataSummaryBar modelName={selected?.name || modelId} timeLabel={timeDimensionLabel(config, effectiveHorizon)} horizon={effectiveHorizon} intervalMinutes={intervalMinutes} requiredDone={requiredDone} requiredTotal={requiredFields.length} errorCount={validationErrors.length} onIssues={() => setIssuesOpen(true)} />
       <section className="runtime-setup-strip">
-        <div>{config.policy === 'not_applicable' && <span>非时序模型</span>}{config.policy === 'fixed' && <span>固定调度周期：{config.default_horizon ?? '-'} 点</span>}{config.policy === 'data_derived' && <span>{effectiveHorizon ? `已从 ${config.derive_from || '主时间序列'} 推导 ${effectiveHorizon} 点` : `由 ${config.derive_from || '主时间序列'} 自动推导 horizon`}</span>}{config.policy === 'runtime_variable' && <><label>调度周期</label>{config.allowed_horizons.length ? <Select aria-label="调度周期" value={horizon} onChange={value => { setHorizon(value); setDirty(true); }} options={config.allowed_horizons.map(value => ({ value, label: `${value} 点${config.interval_minutes_by_horizon[String(value)] ? ` · ${config.interval_minutes_by_horizon[String(value)]} 分钟` : ''}` }))} /> : <InputNumber aria-label="调度周期" value={horizon} min={config.min_horizon || 1} max={config.max_horizon} step={config.horizon_step || 1} onChange={value => { setHorizon(value ?? undefined); setDirty(true); }} />}</>}</div>
+        <div>{config.policy === 'not_applicable' && <span>非时序模型</span>}{config.policy === 'fixed' && <span>固定调度周期：{config.default_horizon ?? '-'} 点</span>}{config.policy === 'data_derived' && <span>{effectiveHorizon ? `已从 ${config.derive_from || '主时间序列'} 推导 ${effectiveHorizon} 点` : `由 ${config.derive_from || '主时间序列'} 自动推导 horizon`}</span>}{config.policy === 'runtime_variable' && <><label>调度周期</label>{config.allowed_horizons.length ? <Select aria-label="调度周期" value={horizon} onChange={changeHorizon} options={config.allowed_horizons.map(value => ({ value, label: `${value} 点${config.interval_minutes_by_horizon[String(value)] ? ` · ${config.interval_minutes_by_horizon[String(value)]} 分钟` : ''}` }))} /> : <InputNumber aria-label="调度周期" value={horizon} min={config.min_horizon || 1} max={config.max_horizon} step={config.horizon_step || 1} onChange={value => changeHorizon(value ?? undefined)} />}</>}</div>
         <div><label>求解器</label><Select aria-label="求解器" value={solver} onChange={value => { setSolver(value); setDirty(true); }} options={capability.problemType === 'NLP' ? [{ value: 'Ipopt', label: 'Ipopt' }] : [{ value: 'HiGHS', label: 'HiGHS' }]} /></div>
         <Button onClick={() => setHistoryOpen(true)}>从历史任务载入</Button>
       </section>
@@ -134,7 +158,7 @@ export function TaskCreateWizard({ open, models, initialModelId, initialScene, s
       </section>
       <section className="runtime-advanced-input"><Button type="text" onClick={() => setAdvancedOpen(value => !value)}>{advancedOpen ? '收起高级 JSON 输入' : '展开高级 JSON 输入'}</Button>{advancedOpen && <div className="section-gap-tight"><Input.TextArea aria-label="高级参数 JSON" rows={5} value={jsonText} onChange={event => setJsonText(event.target.value)} placeholder='{"load_forecast":[100,120]}' /><Button className="section-gap-tight" onClick={importJson}>导入并合并</Button></div>}</section>
     </div>}
-    {step === 2 && <div className="wizard-step"><Alert showIcon type={validationErrors.length ? 'warning' : 'success'} title={validationErrors.length ? `发现 ${validationErrors.length} 个待修正问题` : '参数检查通过，可以提交求解'} description={validationErrors.length ? validationErrors.join('；') : '模型默认值和手工填写值均已计入；系统时间字段由模型契约管理。'} />{submitError && <Alert className="section-gap" showIcon type="error" title={submitError} />}<Descriptions className="section-gap" bordered size="small" column={1} items={[{ key: 'model', label: '模型', children: selected?.name || modelId }, { key: 'time', label: '调度周期', children: timeDimensionLabel(config, effectiveHorizon) }, { key: 'solver', label: '求解器', children: solver }, { key: 'params', label: '有效业务参数', children: `${effectiveParameterCount} 项` }]} /><Card className="section-gap" size="small" title="提交内容预览"><pre className="payload-preview">{JSON.stringify(buildTaskPayload({ model_id: modelId, solver, horizon, parameters }, config), null, 2)}</pre></Card></div>}
+    {step === 2 && <div className="wizard-step"><Alert className={`task-create-validation-alert${validationErrors.length ? '' : ' compact-notice'}`} showIcon type={validationErrors.length ? 'warning' : 'success'} title={validationErrors.length ? `发现 ${validationErrors.length} 个待修正问题` : '参数检查通过，可以提交求解'} description={validationErrors.length ? validationErrors.join('；') : '模型默认值和手工填写值均已计入；系统时间字段由模型契约管理。'} />{submitError && <Alert className="section-gap" showIcon type="error" title={submitError} />}<Descriptions className="section-gap" bordered size="small" column={1} items={[{ key: 'model', label: '模型', children: selected?.name || modelId }, { key: 'time', label: '调度周期', children: timeDimensionLabel(config, effectiveHorizon) }, { key: 'solver', label: '求解器', children: solver }, { key: 'params', label: '有效业务参数', children: `${effectiveParameterCount} 项` }]} /><Card className="section-gap" size="small" title="提交内容预览"><pre className="payload-preview">{JSON.stringify(buildTaskPayload({ model_id: modelId, solver, horizon, parameters }, config), null, 2)}</pre></Card></div>}
     {issuesOpen && <RuntimeValidationDrawer open issues={issues} onClose={() => setIssuesOpen(false)} onNavigate={navigateIssue} />}
     {historyOpen && <HistoricalTaskParameterModal open modelId={modelId} modelFamily={String(selected?.model_family || selected?.template_id || '') || undefined} currentHorizon={effectiveHorizon} onCancel={() => setHistoryOpen(false)} onApply={applyHistory} />}
   </Drawer>;

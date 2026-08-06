@@ -310,75 +310,94 @@ export function FormulaBuilder({
   return (
     <div className={`formula-builder${focusMode ? ' is-focus-mode' : ''}`}>
       <div className="formula-builder-head">
-        <Space wrap>
-          <Form.Item label="公式名称" required validateStatus={formulaName ? undefined : 'error'} help={formulaName ? undefined : '请输入便于业务理解的公式名称'} style={{ margin: 0 }}>
-            <Input value={formula.name} onChange={event => commit({ ...formula, name: event.target.value })} />
-          </Form.Item>
-          <Form.Item
-            label="公式编码"
-            required
-            validateStatus={formulaCodeValid ? undefined : 'error'}
-            help={formulaCodeValid ? '新建时自动生成，可按需修改' : '请输入由字母、数字、下划线、点或连字符组成的唯一编码'}
-            style={{ margin: 0 }}
-          >
-            <Input aria-label="公式编码" value={formula.formula_id} onChange={event => commit({ ...formula, formula_id: event.target.value })} />
-          </Form.Item>
-          <Form.Item label="业务分组" style={{ margin: 0 }}>
-            <Input aria-label="业务分组" placeholder="例如：状态递推" value={formula.business_group} onChange={event => commit({ ...formula, business_group: event.target.value })} />
-          </Form.Item>
-          {lockedKind ? (
-            <Tag color={lockedKind === 'constraint' ? 'blue' : 'purple'}>
-              {lockedKind === 'constraint' ? '约束' : '目标函数'}
-            </Tag>
-          ) : (
-            <Radio.Group
-              value={formula.kind}
-              onChange={event => commit({ ...formula, kind: event.target.value })}
-              options={[{ value: 'constraint', label: '约束' }, { value: 'objective', label: '目标函数' }]}
-            />
-          )}
-          {formula.kind === 'objective' && (
-            <>
-              <Radio.Group
-                value={formula.objective_direction}
-                onChange={event => commit({ ...formula, objective_direction: event.target.value })}
-                options={[{ value: 'minimize', label: '最小化' }, { value: 'maximize', label: '最大化' }]}
-              />
-              <Form.Item label="权重" style={{ margin: 0 }}>
-                <InputNumber aria-label="目标权重" value={formula.weight} onChange={value => commit({ ...formula, weight: value === null ? undefined : value })} />
-              </Form.Item>
-              <Form.Item label="优先级" style={{ margin: 0 }}>
-                <InputNumber aria-label="目标优先级" min={1} precision={0} value={formula.priority} onChange={value => commit({ ...formula, priority: value === null ? undefined : value })} />
-              </Form.Item>
-            </>
-          )}
-          <Radio.Group
-            value={formula.solve_participation || 'solve_active'}
-            onChange={event => commit({ ...formula, solve_participation: event.target.value })}
-            options={[{ value: 'solve_active', label: '参与求解' }, { value: 'preview_only', label: '仅预览' }, { value: 'disabled', label: '停用' }]}
-          />
-          {formula.kind === 'constraint' && (
-            <Form.Item label="边界策略" style={{ margin: 0 }}>
-              <Select
-                aria-label="边界策略"
-                style={{ width: 180 }}
-                value={formula.boundary_strategy || 'strict'}
-                onChange={boundary_strategy => commit({ ...formula, boundary_strategy })}
-                options={[
-                  { value: 'strict', label: '严格校验（默认）' },
-                  { value: 'skip_first', label: '跳过首时点' },
-                  { value: 'skip_last', label: '跳过末时点' },
-                  { value: 'skip_out_of_range', label: '越界时跳过（兼容）' },
-                  { value: 'explicit_subset', label: '显式子集' },
-                ]}
-              />
+        <div className="formula-builder-details">
+          <div className="formula-builder-meta-grid">
+            <Form.Item label="公式名称" required validateStatus={formulaName ? undefined : 'error'} help={formulaName ? undefined : '请输入便于业务理解的公式名称'}>
+              <Input value={formula.name} onChange={event => commit({ ...formula, name: event.target.value })} />
             </Form.Item>
-          )}
-        </Space>
-        <Space>
-          <Button onClick={() => setFocusMode(current => !current)}>{focusMode ? '退出全屏' : '全屏聚焦'}</Button>
-          <Tag color={check.valid ? 'green' : 'red'}>{check.valid ? '校验通过' : '需要修正'}</Tag>
-        </Space>
+            <Form.Item
+              label="公式编码"
+              required
+              validateStatus={formulaCodeValid ? undefined : 'error'}
+              help={formulaCodeValid ? '新建时自动生成，可按需修改' : '请输入由字母、数字、下划线、点或连字符组成的唯一编码'}
+            >
+              <Input aria-label="公式编码" value={formula.formula_id} onChange={event => commit({ ...formula, formula_id: event.target.value })} />
+            </Form.Item>
+            <Form.Item label="业务分组">
+              <Input aria-label="业务分组" placeholder="例如：状态递推" value={formula.business_group} onChange={event => commit({ ...formula, business_group: event.target.value })} />
+            </Form.Item>
+          </div>
+
+          <div className="formula-builder-config-row">
+            <div className="formula-builder-config-item">
+              <Typography.Text type="secondary">公式类型</Typography.Text>
+              {lockedKind ? (
+                <Tag color={lockedKind === 'constraint' ? 'blue' : 'purple'}>
+                  {lockedKind === 'constraint' ? '约束' : '目标函数'}
+                </Tag>
+              ) : (
+                <Radio.Group
+                  value={formula.kind}
+                  onChange={event => commit({ ...formula, kind: event.target.value })}
+                  options={[{ value: 'constraint', label: '约束' }, { value: 'objective', label: '目标函数' }]}
+                />
+              )}
+            </div>
+            {formula.kind === 'objective' && (
+              <>
+                <div className="formula-builder-config-item">
+                  <Typography.Text type="secondary">优化方向</Typography.Text>
+                  <Radio.Group
+                    value={formula.objective_direction}
+                    onChange={event => commit({ ...formula, objective_direction: event.target.value })}
+                    options={[{ value: 'minimize', label: '最小化' }, { value: 'maximize', label: '最大化' }]}
+                  />
+                </div>
+                <div className="formula-builder-config-item">
+                  <Typography.Text type="secondary">权重</Typography.Text>
+                  <InputNumber aria-label="目标权重" value={formula.weight} onChange={value => commit({ ...formula, weight: value === null ? undefined : value })} />
+                </div>
+                <div className="formula-builder-config-item">
+                  <Typography.Text type="secondary">优先级</Typography.Text>
+                  <InputNumber aria-label="目标优先级" min={1} precision={0} value={formula.priority} onChange={value => commit({ ...formula, priority: value === null ? undefined : value })} />
+                </div>
+              </>
+            )}
+            {formula.kind === 'constraint' && (
+              <div className="formula-builder-config-item">
+                <Typography.Text type="secondary">边界策略</Typography.Text>
+                <Select
+                  aria-label="边界策略"
+                  style={{ width: 180 }}
+                  value={formula.boundary_strategy || 'strict'}
+                  onChange={boundary_strategy => commit({ ...formula, boundary_strategy })}
+                  options={[
+                    { value: 'strict', label: '严格校验（默认）' },
+                    { value: 'skip_first', label: '跳过首时点' },
+                    { value: 'skip_last', label: '跳过末时点' },
+                    { value: 'skip_out_of_range', label: '越界时跳过（兼容）' },
+                    { value: 'explicit_subset', label: '显式子集' },
+                  ]}
+                />
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="formula-builder-controls">
+          <div className="formula-builder-control-section">
+            <Typography.Text type="secondary">求解状态</Typography.Text>
+            <Radio.Group
+              value={formula.solve_participation || 'solve_active'}
+              onChange={event => commit({ ...formula, solve_participation: event.target.value })}
+              options={[{ value: 'solve_active', label: '参与求解' }, { value: 'preview_only', label: '仅预览' }, { value: 'disabled', label: '停用' }]}
+            />
+          </div>
+          <div className="formula-builder-control-actions">
+            <Button onClick={() => setFocusMode(current => !current)}>{focusMode ? '退出全屏' : '全屏聚焦'}</Button>
+            <Tag color={check.valid ? 'green' : 'red'}>{check.valid ? '校验通过' : '需要修正'}</Tag>
+          </div>
+        </div>
       </div>
 
       <div className="formula-builder-grid">

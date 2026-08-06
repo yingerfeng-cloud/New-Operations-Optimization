@@ -12,7 +12,7 @@
     },
     {
       "key": "renewable_curtailment",
-      "name": "弃风弃光量",
+      "name": "新能源弃电量",
       "dimension": [
         "site",
         "time"
@@ -47,5 +47,10 @@
       "unit": "MWh"
     }
   ],
-  "explanation": "string"
+  "explanation": "string",
+  "explanation_structured": "object",
+  "evidence_package": "object",
+  "explanation_audit": "object",
+  "execution_policy": "string",
+  "requires_human_review": "boolean"
 }

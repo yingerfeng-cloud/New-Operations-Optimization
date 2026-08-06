@@ -58,6 +58,12 @@ function parseJsonObject(value: string) {
   return parsed as Record<string, unknown>;
 }
 
+function errorMessage(value: unknown) {
+  if (value instanceof Error && value.message) return value.message;
+  if (typeof value === 'string' && value) return value;
+  return '详情暂时不可用，请检查绑定模型并重新生成 Skill 后重试。';
+}
+
 export function SkillCenterPage() {
   const qc = useQueryClient();
   const [selectedName, setSelectedName] = useState<string>();
@@ -221,7 +227,7 @@ export function SkillCenterPage() {
         />
       </Card>
       <Drawer width={760} title={detail?.display_name || detail?.skill_name || 'Skill 详情'} open={!!selectedName} onClose={() => setSelectedName(undefined)}>
-        {detail ? (
+        {selected.isLoading ? <div className="skill-detail-state">正在加载 Skill 详情…</div> : selected.isError ? <Alert showIcon type="error" title="Skill 详情加载失败" description={errorMessage(selected.error)} /> : detail ? (
           <Tabs
             items={[
               {
@@ -241,6 +247,13 @@ export function SkillCenterPage() {
                       { key: 'policy', label: 'execution_policy', children: detail.execution_policy },
                       { key: 'review', label: 'requires_human_review', children: detail.requires_human_review ? 'true' : 'false' },
                     ]} />
+                    {!detail.callable && detail.callable_reason && <Alert
+                      className="skill-detail-binding-warning"
+                      showIcon
+                      type="warning"
+                      title="当前 Skill 暂不可调用"
+                      description={detail.callable_reason.includes('fixed binding') ? '绑定模型内容已发生变化，请点击列表中的“重新生成”，按当前模型契约更新 Skill 后再使用。' : `当前 Skill 暂不可调用：${detail.callable_reason}`}
+                    />}
                     <Alert showIcon type="warning" title="本结果仅用于辅助分析，不构成自动控制指令，需经人工复核后方可用于生产调度。" />
                   </Space>
                 ),
@@ -263,6 +276,7 @@ export function SkillCenterPage() {
                 children: (
                   <Space orientation="vertical" size={12} style={{ width: '100%' }}>
                     <Alert
+                      className="compact-notice skill-definition-validation-alert"
                       showIcon
                       type={detail.definition_validation?.status === 'valid' ? 'success' : detail.generated ? 'error' : 'info'}
                       title={detail.generated ? `SkillDefinition ${detail.definition_validation?.status || '待校验'}，当前修订 r${detail.definition_revision || '-'}` : '尚未持久化完整 SkillDefinition'}
@@ -323,7 +337,7 @@ export function SkillCenterPage() {
               },
             ]}
           />
-        ) : null}
+        ) : <div className="skill-detail-state">暂无可展示的详情。</div>}
       </Drawer>
       <Modal
         width={860}

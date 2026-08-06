@@ -215,7 +215,7 @@
     "description": "",
     "default_value": null,
     "sample_value": null,
-    "default_policy": "default_allowed",
+    "default_policy": "user_required",
     "sets": {
       "unit": [
         "U1",

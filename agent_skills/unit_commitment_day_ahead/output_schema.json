@@ -29,5 +29,10 @@
       "unit": "0/1"
     }
   ],
-  "explanation": "string"
+  "explanation": "string",
+  "explanation_structured": "object",
+  "evidence_package": "object",
+  "explanation_audit": "object",
+  "execution_policy": "string",
+  "requires_human_review": "boolean"
 }

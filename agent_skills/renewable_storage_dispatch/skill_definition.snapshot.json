@@ -1,0 +1,739 @@
+{
+  "schema_version": "1.0",
+  "revision": 1,
+  "skill_name": "run_renewable_storage_dispatch",
+  "display_name": "风光储协同",
+  "description": "Execute the published model 风光储协同 for 优化新能源消纳、弃电和储能配合。 and explain the result against the declared objective: 弃电最小且收益最大.",
+  "model_binding": {
+    "policy": "fixed",
+    "model_id": "MODEL-POWER-RENEWABLE-STORAGE-DISPATCH",
+    "model_version": "v1.0",
+    "model_content_hash": "af6f6dd2fc3b5d604ba50c04dc8b6f9df03a295c000205061b01b4c50bf9fe9c"
+  },
+  "input_schema": [
+    {
+      "key": "renewable_forecast",
+      "name": "新能源预测出力",
+      "dimension": [
+        "site",
+        "time"
+      ],
+      "type": "dict",
+      "unit": "MW",
+      "required": true,
+      "description": "",
+      "default_value": null,
+      "sample_value": {
+        "PV1": [
+          20,
+          80,
+          50,
+          5
+        ],
+        "W1": [
+          35,
+          30,
+          40,
+          50
+        ]
+      },
+      "default_policy": "user_required",
+      "sets": {
+        "site": [
+          "PV1",
+          "W1"
+        ],
+        "time": [
+          0,
+          1,
+          2,
+          3
+        ]
+      },
+      "validation": {
+        "type": "dict"
+      }
+    },
+    {
+      "key": "load_forecast",
+      "name": "负荷预测",
+      "dimension": [
+        "time"
+      ],
+      "type": "array",
+      "unit": "MW",
+      "required": true,
+      "description": "",
+      "default_value": null,
+      "sample_value": [
+        60,
+        90,
+        85,
+        70
+      ],
+      "default_policy": "user_required",
+      "sets": {
+        "time": [
+          0,
+          1,
+          2,
+          3
+        ]
+      },
+      "validation": {
+        "type": "array"
+      }
+    },
+    {
+      "key": "electricity_price",
+      "name": "电价",
+      "dimension": [
+        "time"
+      ],
+      "type": "array",
+      "unit": "元/MWh",
+      "required": true,
+      "description": "",
+      "default_value": null,
+      "sample_value": [
+        260,
+        300,
+        520,
+        460
+      ],
+      "default_policy": "user_required",
+      "sets": {
+        "time": [
+          0,
+          1,
+          2,
+          3
+        ]
+      },
+      "validation": {
+        "type": "array"
+      }
+    },
+    {
+      "key": "storage_capacity",
+      "name": "储能容量",
+      "dimension": [
+        "storage"
+      ],
+      "type": "dict",
+      "unit": "MWh",
+      "required": true,
+      "description": "",
+      "default_value": null,
+      "sample_value": {
+        "B1": 80
+      },
+      "default_policy": "user_required",
+      "sets": {
+        "storage": [
+          "B1"
+        ]
+      },
+      "validation": {
+        "type": "dict"
+      }
+    },
+    {
+      "key": "grid_export_limit",
+      "name": "并网容量",
+      "dimension": [
+        "time"
+      ],
+      "type": "array",
+      "unit": "MW",
+      "required": true,
+      "description": "",
+      "default_value": null,
+      "sample_value": [
+        90,
+        110,
+        110,
+        90
+      ],
+      "default_policy": "user_required",
+      "sets": {
+        "time": [
+          0,
+          1,
+          2,
+          3
+        ]
+      },
+      "validation": {
+        "type": "array"
+      }
+    }
+  ],
+  "output_schema": {
+    "objective_value": "number",
+    "variables": [
+      {
+        "key": "renewable_used",
+        "name": "新能源利用量",
+        "dimension": [
+          "site",
+          "time"
+        ],
+        "unit": "MW"
+      },
+      {
+        "key": "renewable_curtailment",
+        "name": "新能源弃电量",
+        "dimension": [
+          "site",
+          "time"
+        ],
+        "unit": "MW"
+      },
+      {
+        "key": "storage_charge",
+        "name": "储能充电",
+        "dimension": [
+          "storage",
+          "time"
+        ],
+        "unit": "MW"
+      },
+      {
+        "key": "storage_discharge",
+        "name": "储能放电",
+        "dimension": [
+          "storage",
+          "time"
+        ],
+        "unit": "MW"
+      },
+      {
+        "key": "storage_soc",
+        "name": "储能SOC",
+        "dimension": [
+          "storage",
+          "time"
+        ],
+        "unit": "MWh"
+      }
+    ],
+    "explanation": "string",
+    "explanation_structured": "object",
+    "evidence_package": "object",
+    "explanation_audit": "object",
+    "execution_policy": "string",
+    "requires_human_review": "boolean"
+  },
+  "instructions": [
+    "Use this Skill only when the user requests execution or analysis of 风光储协同.",
+    "Collect and validate parameters exclusively against input_schema; do not invent missing business data.",
+    "Confirm required parameters: renewable_forecast, load_forecast, electricity_price, storage_capacity, grid_export_limit.",
+    "Run the bound model and report solver status before interpreting 弃电最小且收益最大.",
+    "Build explanations only from EvidencePackage references and keep facts, inferences, and recommendations separate.",
+    "Require human review before any operational use."
+  ],
+  "trigger_examples": [
+    "Run 风光储协同 with the parameters I provide and explain the result.",
+    "Use 风光储协同 to analyze 优化新能源消纳、弃电和储能配合。.",
+    "Optimize 弃电最小且收益最大 with 风光储协同 and identify binding constraints."
+  ],
+  "non_trigger_examples": [
+    "Explain the general theory behind 风光储协同 without running a model.",
+    "Execute an external operational action or approve a production decision."
+  ],
+  "parameter_questions": [
+    {
+      "parameter_key": "renewable_forecast",
+      "question": "Provide 新能源预测出力 (dimensions: site, time; unit: MW).",
+      "required": true
+    },
+    {
+      "parameter_key": "load_forecast",
+      "question": "Provide 负荷预测 (dimensions: time; unit: MW).",
+      "required": true
+    },
+    {
+      "parameter_key": "electricity_price",
+      "question": "Provide 电价 (dimensions: time; unit: 元/MWh).",
+      "required": true
+    },
+    {
+      "parameter_key": "storage_capacity",
+      "question": "Provide 储能容量 (dimensions: storage; unit: MWh).",
+      "required": true
+    },
+    {
+      "parameter_key": "grid_export_limit",
+      "question": "Provide 并网容量 (dimensions: time; unit: MW).",
+      "required": true
+    }
+  ],
+  "explanation_spec": {
+    "schema_version": "1.0",
+    "objective": {
+      "key": "curtailment_min_profit_max",
+      "name": "弃电最小且收益最大",
+      "sense": "minimize",
+      "unit": "",
+      "description": "",
+      "expression_declared": true
+    },
+    "variables": [
+      {
+        "key": "renewable_used",
+        "name": "新能源利用量",
+        "unit": "MW",
+        "dimensions": [
+          "site",
+          "time"
+        ],
+        "role": "decision_variable",
+        "summary_functions": [
+          "min_value",
+          "max_value",
+          "sum_value",
+          "non_zero_count"
+        ],
+        "description": ""
+      },
+      {
+        "key": "renewable_curtailment",
+        "name": "新能源弃电量",
+        "unit": "MW",
+        "dimensions": [
+          "site",
+          "time"
+        ],
+        "role": "decision_variable",
+        "summary_functions": [
+          "min_value",
+          "max_value",
+          "sum_value",
+          "non_zero_count"
+        ],
+        "description": ""
+      },
+      {
+        "key": "storage_charge",
+        "name": "储能充电",
+        "unit": "MW",
+        "dimensions": [
+          "storage",
+          "time"
+        ],
+        "role": "decision_variable",
+        "summary_functions": [
+          "min_value",
+          "max_value",
+          "sum_value",
+          "non_zero_count"
+        ],
+        "description": ""
+      },
+      {
+        "key": "storage_discharge",
+        "name": "储能放电",
+        "unit": "MW",
+        "dimensions": [
+          "storage",
+          "time"
+        ],
+        "role": "decision_variable",
+        "summary_functions": [
+          "min_value",
+          "max_value",
+          "sum_value",
+          "non_zero_count"
+        ],
+        "description": ""
+      },
+      {
+        "key": "storage_soc",
+        "name": "储能SOC",
+        "unit": "MWh",
+        "dimensions": [
+          "storage",
+          "time"
+        ],
+        "role": "decision_variable",
+        "summary_functions": [
+          "min_value",
+          "max_value",
+          "sum_value",
+          "non_zero_count"
+        ],
+        "description": ""
+      }
+    ],
+    "metrics": [
+      {
+        "key": "objective_value",
+        "label": "弃电最小且收益最大",
+        "source": {
+          "kind": "objective",
+          "key": null
+        },
+        "function": "identity",
+        "unit": "",
+        "description": "",
+        "parameters": {}
+      },
+      {
+        "key": "variable_renewable_used_min_value",
+        "label": "新能源利用量 · min_value",
+        "source": {
+          "kind": "variable",
+          "key": "renewable_used"
+        },
+        "function": "min_value",
+        "unit": "MW",
+        "description": "",
+        "parameters": {}
+      },
+      {
+        "key": "variable_renewable_used_max_value",
+        "label": "新能源利用量 · max_value",
+        "source": {
+          "kind": "variable",
+          "key": "renewable_used"
+        },
+        "function": "max_value",
+        "unit": "MW",
+        "description": "",
+        "parameters": {}
+      },
+      {
+        "key": "variable_renewable_used_sum_value",
+        "label": "新能源利用量 · sum_value",
+        "source": {
+          "kind": "variable",
+          "key": "renewable_used"
+        },
+        "function": "sum_value",
+        "unit": "MW",
+        "description": "",
+        "parameters": {}
+      },
+      {
+        "key": "variable_renewable_used_non_zero_count",
+        "label": "新能源利用量 · non_zero_count",
+        "source": {
+          "kind": "variable",
+          "key": "renewable_used"
+        },
+        "function": "non_zero_count",
+        "unit": "count",
+        "description": "",
+        "parameters": {}
+      },
+      {
+        "key": "variable_renewable_curtailment_min_value",
+        "label": "新能源弃电量 · min_value",
+        "source": {
+          "kind": "variable",
+          "key": "renewable_curtailment"
+        },
+        "function": "min_value",
+        "unit": "MW",
+        "description": "",
+        "parameters": {}
+      },
+      {
+        "key": "variable_renewable_curtailment_max_value",
+        "label": "新能源弃电量 · max_value",
+        "source": {
+          "kind": "variable",
+          "key": "renewable_curtailment"
+        },
+        "function": "max_value",
+        "unit": "MW",
+        "description": "",
+        "parameters": {}
+      },
+      {
+        "key": "variable_renewable_curtailment_sum_value",
+        "label": "新能源弃电量 · sum_value",
+        "source": {
+          "kind": "variable",
+          "key": "renewable_curtailment"
+        },
+        "function": "sum_value",
+        "unit": "MW",
+        "description": "",
+        "parameters": {}
+      },
+      {
+        "key": "variable_renewable_curtailment_non_zero_count",
+        "label": "新能源弃电量 · non_zero_count",
+        "source": {
+          "kind": "variable",
+          "key": "renewable_curtailment"
+        },
+        "function": "non_zero_count",
+        "unit": "count",
+        "description": "",
+        "parameters": {}
+      },
+      {
+        "key": "variable_storage_charge_min_value",
+        "label": "储能充电 · min_value",
+        "source": {
+          "kind": "variable",
+          "key": "storage_charge"
+        },
+        "function": "min_value",
+        "unit": "MW",
+        "description": "",
+        "parameters": {}
+      },
+      {
+        "key": "variable_storage_charge_max_value",
+        "label": "储能充电 · max_value",
+        "source": {
+          "kind": "variable",
+          "key": "storage_charge"
+        },
+        "function": "max_value",
+        "unit": "MW",
+        "description": "",
+        "parameters": {}
+      },
+      {
+        "key": "variable_storage_charge_sum_value",
+        "label": "储能充电 · sum_value",
+        "source": {
+          "kind": "variable",
+          "key": "storage_charge"
+        },
+        "function": "sum_value",
+        "unit": "MW",
+        "description": "",
+        "parameters": {}
+      },
+      {
+        "key": "variable_storage_charge_non_zero_count",
+        "label": "储能充电 · non_zero_count",
+        "source": {
+          "kind": "variable",
+          "key": "storage_charge"
+        },
+        "function": "non_zero_count",
+        "unit": "count",
+        "description": "",
+        "parameters": {}
+      },
+      {
+        "key": "variable_storage_discharge_min_value",
+        "label": "储能放电 · min_value",
+        "source": {
+          "kind": "variable",
+          "key": "storage_discharge"
+        },
+        "function": "min_value",
+        "unit": "MW",
+        "description": "",
+        "parameters": {}
+      },
+      {
+        "key": "variable_storage_discharge_max_value",
+        "label": "储能放电 · max_value",
+        "source": {
+          "kind": "variable",
+          "key": "storage_discharge"
+        },
+        "function": "max_value",
+        "unit": "MW",
+        "description": "",
+        "parameters": {}
+      },
+      {
+        "key": "variable_storage_discharge_sum_value",
+        "label": "储能放电 · sum_value",
+        "source": {
+          "kind": "variable",
+          "key": "storage_discharge"
+        },
+        "function": "sum_value",
+        "unit": "MW",
+        "description": "",
+        "parameters": {}
+      },
+      {
+        "key": "variable_storage_discharge_non_zero_count",
+        "label": "储能放电 · non_zero_count",
+        "source": {
+          "kind": "variable",
+          "key": "storage_discharge"
+        },
+        "function": "non_zero_count",
+        "unit": "count",
+        "description": "",
+        "parameters": {}
+      },
+      {
+        "key": "variable_storage_soc_min_value",
+        "label": "储能SOC · min_value",
+        "source": {
+          "kind": "variable",
+          "key": "storage_soc"
+        },
+        "function": "min_value",
+        "unit": "MWh",
+        "description": "",
+        "parameters": {}
+      },
+      {
+        "key": "variable_storage_soc_max_value",
+        "label": "储能SOC · max_value",
+        "source": {
+          "kind": "variable",
+          "key": "storage_soc"
+        },
+        "function": "max_value",
+        "unit": "MWh",
+        "description": "",
+        "parameters": {}
+      },
+      {
+        "key": "variable_storage_soc_sum_value",
+        "label": "储能SOC · sum_value",
+        "source": {
+          "kind": "variable",
+          "key": "storage_soc"
+        },
+        "function": "sum_value",
+        "unit": "MWh",
+        "description": "",
+        "parameters": {}
+      },
+      {
+        "key": "variable_storage_soc_non_zero_count",
+        "label": "储能SOC · non_zero_count",
+        "source": {
+          "kind": "variable",
+          "key": "storage_soc"
+        },
+        "function": "non_zero_count",
+        "unit": "count",
+        "description": "",
+        "parameters": {}
+      }
+    ],
+    "constraints": [
+      {
+        "key": "renewable_balance",
+        "name": "新能源出力平衡",
+        "description": "新能源出力平衡",
+        "hard": true,
+        "relaxable": false,
+        "review_guidance": "Verify the result evidence for 新能源出力平衡 before using the recommendation."
+      },
+      {
+        "key": "power_balance",
+        "name": "功率平衡",
+        "description": "功率平衡",
+        "hard": true,
+        "relaxable": true,
+        "review_guidance": "Verify the result evidence for 功率平衡 before using the recommendation."
+      },
+      {
+        "key": "storage_soc_balance",
+        "name": "储能SOC平衡",
+        "description": "储能SOC平衡",
+        "hard": true,
+        "relaxable": false,
+        "review_guidance": "Verify the result evidence for 储能SOC平衡 before using the recommendation."
+      },
+      {
+        "key": "grid_export_limit",
+        "name": "并网容量约束",
+        "description": "并网容量约束",
+        "hard": true,
+        "relaxable": true,
+        "review_guidance": "Verify the result evidence for 并网容量约束 before using the recommendation."
+      },
+      {
+        "key": "新能源出力平衡",
+        "name": "新能源出力平衡",
+        "description": "新能源出力平衡",
+        "hard": true,
+        "relaxable": false,
+        "review_guidance": "Verify the result evidence for 新能源出力平衡 before using the recommendation."
+      },
+      {
+        "key": "功率平衡",
+        "name": "功率平衡",
+        "description": "功率平衡",
+        "hard": true,
+        "relaxable": true,
+        "review_guidance": "Verify the result evidence for 功率平衡 before using the recommendation."
+      },
+      {
+        "key": "储能SOC平衡",
+        "name": "储能SOC平衡",
+        "description": "储能SOC平衡",
+        "hard": true,
+        "relaxable": false,
+        "review_guidance": "Verify the result evidence for 储能SOC平衡 before using the recommendation."
+      },
+      {
+        "key": "并网容量约束",
+        "name": "并网容量约束",
+        "description": "并网容量约束",
+        "hard": true,
+        "relaxable": true,
+        "review_guidance": "Verify the result evidence for 并网容量约束 before using the recommendation."
+      }
+    ],
+    "risk_rules": [],
+    "manual_review_points": [
+      "Verify input provenance, freshness, units, and dimensional completeness.",
+      "Review constraint satisfaction, violations, and binding margins against the declared model contract.",
+      "Confirm the recommendation with an authorized reviewer before operational use."
+    ],
+    "limitations": [
+      "The explanation describes the returned solver evidence and does not prove real-world causality.",
+      "The platform does not infer undeclared thresholds, business rules, or external actions."
+    ],
+    "narrative_guidance": {
+      "fact_order": [
+        "solver_status",
+        "objective",
+        "derived_metrics",
+        "variables",
+        "constraints"
+      ],
+      "separate_facts_from_inferences": true,
+      "require_evidence_references": true,
+      "prohibit_unsupported_numbers": true
+    }
+  },
+  "execution_policy": {
+    "mode": "advisory_only",
+    "requires_human_review": true,
+    "allow_external_side_effects": false
+  },
+  "generation": {
+    "mode": "deterministic_contract_compiler",
+    "generated_at": "2026-08-04 21:56:42",
+    "llm": {
+      "requested": false,
+      "attempted": false,
+      "applied": false,
+      "fallback_used": false,
+      "reason": "NOT_REQUESTED"
+    },
+    "source_contract_hash": "af6f6dd2fc3b5d604ba50c04dc8b6f9df03a295c000205061b01b4c50bf9fe9c"
+  },
+  "validation": {
+    "status": "valid",
+    "score": 100,
+    "errors": [],
+    "warnings": [],
+    "validated_at": "2026-08-04 21:56:42"
+  },
+  "created_at": "2026-08-04 21:56:42",
+  "updated_at": "2026-08-04 21:56:42",
+  "definition_hash": "e42143c62996a13cb3938d055d63fbbf795110a218039b93864552b1594378a9"
+}

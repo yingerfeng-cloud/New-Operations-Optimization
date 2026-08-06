@@ -92,6 +92,7 @@ export function ResultCenterPage() {
               { title: '模型', render: (_: unknown, result: SolveResult) => String(result.model || result.model_id || '-') },
               { title: <span title="各模型目标函数的含义由建模定义决定，不用于跨模型比较">目标函数值</span>, render: (_: unknown, result: SolveResult) => String(result.objective_value ?? result.total_cost ?? result.metrics?.objective_value ?? result.summary?.objective_value ?? '-') },
               { title: 'Gap', render: (_: unknown, result: SolveResult) => String(result.gap ?? result.metrics?.gap ?? result.summary?.gap ?? '-') },
+              { title: '完成时间', dataIndex: 'finished_at', defaultSortOrder: 'descend', sorter: (left: SolveResult, right: SolveResult) => Date.parse(String(left.finished_at || '')) - Date.parse(String(right.finished_at || '')), render: value => value ? new Date(String(value)).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false }) : '-' },
               { title: '操作', render: (_: unknown, result: SolveResult) => <Button type="link" onClick={() => setId(String(result.task_id || result.job_id || result.id))}>查看报告</Button> },
             ]}
           />

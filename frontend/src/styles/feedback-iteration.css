@@ -45,6 +45,48 @@
   margin-inline-start: 12px;
 }
 
+.skill-definition-validation-alert.ant-alert {
+  border-radius: 10px !important;
+  align-items: flex-start;
+}
+
+.skill-definition-validation-alert .ant-alert-section {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.skill-definition-validation-alert .ant-alert-title {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.45;
+}
+
+.skill-definition-validation-alert .ant-alert-description {
+  min-width: 0;
+  color: var(--proto-muted);
+  font-size: 12px;
+  line-height: 1.45;
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.skill-detail-state {
+  min-height: 160px;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  color: var(--proto-muted);
+  text-align: center;
+}
+
+.skill-detail-binding-warning {
+  margin-top: 12px;
+}
+
 /* A single, more dimensional metric-card language across every menu. */
 .metric-grid {
   gap: 16px;
@@ -161,7 +203,7 @@ button.metric-card-v2:hover {
   padding-bottom: 5px;
   color: #f7fbff;
   font-family: Inter, "Avenir Next", "Segoe UI", sans-serif;
-  font-size: 18px;
+  font-size: 22px;
   font-weight: 800;
   letter-spacing: -.045em;
   white-space: nowrap;

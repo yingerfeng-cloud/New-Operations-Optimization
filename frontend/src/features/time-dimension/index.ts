@@ -171,6 +171,36 @@ function axisLength(value: unknown, axis: number) {
   return length > 0 ? length : undefined;
 }
 
+function truncateAlongAxis(value: unknown, axis: number, length: number): unknown {
+  if (axis === 0) {
+    if (Array.isArray(value)) return value.slice(0, length);
+    const entries = Object.entries(objectValue(value));
+    return entries.length ? Object.fromEntries(entries.slice(0, length)) : value;
+  }
+  if (Array.isArray(value)) return value.map(item => truncateAlongAxis(item, axis - 1, length));
+  const record = objectValue(value);
+  return Object.keys(record).length
+    ? Object.fromEntries(Object.entries(record).map(([key, item]) => [key, truncateAlongAxis(item, axis - 1, length)]))
+    : value;
+}
+
+/**
+ * Keeps the leading time points when an editable horizon is shortened.
+ * Mapping-shaped matrices remain mappings, e.g. `{ U1: [0, 1] }`.
+ */
+export function truncateRuntimeParametersForHorizon(parameters: Record<string, unknown>, fields: RuntimeField[], config: TimeDimensionConfig, horizon: number) {
+  const next = { ...parameters };
+  for (const field of fields) {
+    if (!(field.code in parameters)) continue;
+    const stateAxis = config.state_time_set ? field.dimension.indexOf(config.state_time_set) : -1;
+    const timeAxis = field.dimension.indexOf(config.time_set);
+    const axis = stateAxis >= 0 ? stateAxis : timeAxis;
+    if (axis < 0) continue;
+    next[field.code] = truncateAlongAxis(parameters[field.code], axis, horizon + (stateAxis >= 0 ? 1 : 0));
+  }
+  return next;
+}
+
 export function isRuntimeValueEmpty(value: unknown): boolean {
   if (value === undefined || value === null) return true;
   if (typeof value === 'string') return value.trim() === '';

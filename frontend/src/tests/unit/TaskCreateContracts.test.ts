@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'vitest';
 import { buildTaskPayload } from '../../features/task-create/utils/buildTaskPayload';
 import { parseTaskRuntimeJson } from '../../features/task-create/TaskCreateWizard';
-import { deriveHorizon, managedTimeFields, validateRuntimeTimeDimension, type RuntimeField, type TimeDimensionConfig } from '../../features/time-dimension';
+import { deriveHorizon, managedTimeFields, truncateRuntimeParametersForHorizon, validateRuntimeTimeDimension, type RuntimeField, type TimeDimensionConfig } from '../../features/time-dimension';
 
 const base = (overrides: Partial<TimeDimensionConfig>): TimeDimensionConfig => ({ enabled: true, policy: 'fixed', time_set: 'time', state_time_set: null, editable: false, allowed_horizons: [], interval_minutes_by_horizon: {}, delta_t_by_horizon: {}, ...overrides });
 const series: RuntimeField = { code: 'load_forecast', name: '负荷预测', required: true, dimension: ['time'] };
@@ -98,6 +98,25 @@ describe('task create contract gate', () => {
     expect(validateRuntimeTimeDimension(config, [state], { storage_volume: [Array(25).fill(1)] })).toEqual([]);
     expect(validateRuntimeTimeDimension(config, [state], { storage_volume: [Array(24).fill(1)] })[0]).toContain('长度应为 25');
     expect(managedTimeFields(base({ state_time_set: null })).has('time_volume')).toBe(false);
+  });
+
+  test('shortening a horizon retains leading sequence, matrix, and state-time values', () => {
+    const availability: RuntimeField = { code: 'availability', name: '机组可用状态', required: true, dimension: ['unit', 'time'] };
+    const timeUnit: RuntimeField = { code: 'time_unit', name: '时序矩阵', required: true, dimension: ['time', 'unit'] };
+    const state: RuntimeField = { code: 'storage_volume', name: '库容状态', required: true, dimension: ['reservoir', 'time_volume'] };
+    const config = base({ policy: 'runtime_variable', editable: true, state_time_set: 'time_volume' });
+
+    expect(truncateRuntimeParametersForHorizon({
+      load_forecast: [380, 420, 390, 360],
+      availability: { U1: [1, 1, 1, 1], U2: [1, 0, 1, 0] },
+      time_unit: [[1, 2], [3, 4], [5, 6], [7, 8]],
+      storage_volume: { S1: [100, 101, 102, 103, 104] },
+    }, [series, availability, timeUnit, state], config, 3)).toEqual({
+      load_forecast: [380, 420, 390],
+      availability: { U1: [1, 1, 1], U2: [1, 0, 1] },
+      time_unit: [[1, 2], [3, 4], [5, 6]],
+      storage_volume: { S1: [100, 101, 102, 103] },
+    });
   });
 
   test('managed granularity is filtered only when the contract owns it', () => {

@@ -13,6 +13,7 @@ export interface PlatformSkill {
   status?: string;
   skill_status?: string;
   callable?: boolean;
+  callable_reason?: string;
   agent_enabled?: boolean;
   agent_skill_name?: string;
   has_agent_package?: boolean;

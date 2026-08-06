@@ -1,0 +1,683 @@
+{
+  "schema_version": "1.0",
+  "revision": 3,
+  "skill_name": "run_unit_commitment_day_ahead",
+  "display_name": "日前机组组合优化 Unit Commitment",
+  "description": "Execute the published model 日前机组组合优化 Unit Commitment for 日前机组组合优化，生成机组启停、启动和出力计划。 and explain the result against the declared objective: 总成本最小.",
+  "model_binding": {
+    "policy": "fixed",
+    "model_id": "MODEL-POWER-UNIT-COMMITMENT-DAY-AHEAD",
+    "model_version": "v1.0",
+    "model_content_hash": "d0fa63710efe3f6d164c3407782138bca07d71704d66bf9757d4d7e6820e9383"
+  },
+  "input_schema": [
+    {
+      "key": "load_forecast",
+      "name": "负荷预测",
+      "dimension": [
+        "time"
+      ],
+      "type": "array",
+      "unit": "MW",
+      "required": true,
+      "description": "",
+      "default_value": null,
+      "sample_value": null,
+      "default_policy": "user_required",
+      "sets": {
+        "time": [
+          0,
+          1,
+          2,
+          3
+        ]
+      },
+      "validation": {
+        "type": "array",
+        "length_ref": "horizon",
+        "min": 0
+      }
+    },
+    {
+      "key": "renewable_forecast",
+      "name": "新能源预测",
+      "dimension": [
+        "time"
+      ],
+      "type": "array",
+      "unit": "MW",
+      "required": true,
+      "description": "",
+      "default_value": null,
+      "sample_value": null,
+      "default_policy": "user_required",
+      "sets": {
+        "time": [
+          0,
+          1,
+          2,
+          3
+        ]
+      },
+      "validation": {
+        "type": "array",
+        "length_ref": "horizon",
+        "min": 0
+      }
+    },
+    {
+      "key": "unit_min_output",
+      "name": "机组最小出力",
+      "dimension": [
+        "unit"
+      ],
+      "type": "dict",
+      "unit": "MW",
+      "required": true,
+      "description": "",
+      "default_value": null,
+      "sample_value": null,
+      "default_policy": "default_allowed",
+      "sets": {
+        "unit": [
+          "U1",
+          "U2",
+          "U3"
+        ]
+      },
+      "validation": {
+        "type": "dict",
+        "min": 0
+      }
+    },
+    {
+      "key": "unit_max_output",
+      "name": "机组最大出力",
+      "dimension": [
+        "unit"
+      ],
+      "type": "dict",
+      "unit": "MW",
+      "required": true,
+      "description": "",
+      "default_value": null,
+      "sample_value": null,
+      "default_policy": "default_allowed",
+      "sets": {
+        "unit": [
+          "U1",
+          "U2",
+          "U3"
+        ]
+      },
+      "validation": {
+        "type": "dict",
+        "min": 0
+      }
+    },
+    {
+      "key": "ramp_up_limit",
+      "name": "上爬坡限制",
+      "dimension": [
+        "unit"
+      ],
+      "type": "dict",
+      "unit": "MW/h",
+      "required": true,
+      "description": "",
+      "default_value": null,
+      "sample_value": null,
+      "default_policy": "default_allowed",
+      "sets": {
+        "unit": [
+          "U1",
+          "U2",
+          "U3"
+        ]
+      },
+      "validation": {
+        "type": "dict",
+        "min": 0
+      }
+    },
+    {
+      "key": "ramp_down_limit",
+      "name": "下爬坡限制",
+      "dimension": [
+        "unit"
+      ],
+      "type": "dict",
+      "unit": "MW/h",
+      "required": true,
+      "description": "",
+      "default_value": null,
+      "sample_value": null,
+      "default_policy": "default_allowed",
+      "sets": {
+        "unit": [
+          "U1",
+          "U2",
+          "U3"
+        ]
+      },
+      "validation": {
+        "type": "dict",
+        "min": 0
+      }
+    },
+    {
+      "key": "fuel_cost",
+      "name": "燃料成本",
+      "dimension": [
+        "unit"
+      ],
+      "type": "dict",
+      "unit": "元/MWh",
+      "required": true,
+      "description": "",
+      "default_value": null,
+      "sample_value": null,
+      "default_policy": "default_allowed",
+      "sets": {
+        "unit": [
+          "U1",
+          "U2",
+          "U3"
+        ]
+      },
+      "validation": {
+        "type": "dict",
+        "min": 0
+      }
+    },
+    {
+      "key": "startup_cost",
+      "name": "启停成本",
+      "dimension": [
+        "unit"
+      ],
+      "type": "dict",
+      "unit": "元/次",
+      "required": true,
+      "description": "",
+      "default_value": null,
+      "sample_value": null,
+      "default_policy": "default_allowed",
+      "sets": {
+        "unit": [
+          "U1",
+          "U2",
+          "U3"
+        ]
+      },
+      "validation": {
+        "type": "dict",
+        "min": 0
+      }
+    },
+    {
+      "key": "initial_unit_status",
+      "name": "初始启停状态",
+      "dimension": [
+        "unit"
+      ],
+      "type": "dict",
+      "unit": "0/1",
+      "required": true,
+      "description": "",
+      "default_value": null,
+      "sample_value": null,
+      "default_policy": "user_required",
+      "sets": {
+        "unit": [
+          "U1",
+          "U2",
+          "U3"
+        ]
+      },
+      "validation": {
+        "type": "dict",
+        "binary": true
+      }
+    }
+  ],
+  "output_schema": {
+    "objective_value": "number",
+    "variables": [
+      {
+        "key": "unit_output",
+        "name": "机组出力",
+        "dimension": [
+          "unit",
+          "time"
+        ],
+        "unit": "MW"
+      },
+      {
+        "key": "unit_on",
+        "name": "机组开停机状态",
+        "dimension": [
+          "unit",
+          "time"
+        ],
+        "unit": "0/1"
+      },
+      {
+        "key": "unit_startup",
+        "name": "机组启动状态",
+        "dimension": [
+          "unit",
+          "time"
+        ],
+        "unit": "0/1"
+      }
+    ],
+    "explanation": "string",
+    "explanation_structured": "object",
+    "evidence_package": "object",
+    "explanation_audit": "object",
+    "execution_policy": "string",
+    "requires_human_review": "boolean"
+  },
+  "instructions": [
+    "Use this Skill only when the user requests execution or analysis of 日前机组组合优化 Unit Commitment.",
+    "Collect and validate parameters exclusively against input_schema; do not invent missing business data.",
+    "Confirm required parameters: load_forecast, renewable_forecast, unit_min_output, unit_max_output, ramp_up_limit, ramp_down_limit, fuel_cost, startup_cost, initial_unit_status.",
+    "Run the bound model and report solver status before interpreting 总成本最小.",
+    "Build explanations only from EvidencePackage references and keep facts, inferences, and recommendations separate.",
+    "Require human review before any operational use."
+  ],
+  "trigger_examples": [
+    "Run 日前机组组合优化 Unit Commitment with the parameters I provide and explain the result.",
+    "Use 日前机组组合优化 Unit Commitment to analyze 日前机组组合优化，生成机组启停、启动和出力计划。.",
+    "Optimize 总成本最小 with 日前机组组合优化 Unit Commitment and identify binding constraints."
+  ],
+  "non_trigger_examples": [
+    "Explain the general theory behind 日前机组组合优化 Unit Commitment without running a model.",
+    "Execute an external operational action or approve a production decision."
+  ],
+  "parameter_questions": [
+    {
+      "parameter_key": "load_forecast",
+      "question": "Provide 负荷预测 (dimensions: time; unit: MW).",
+      "required": true
+    },
+    {
+      "parameter_key": "renewable_forecast",
+      "question": "Provide 新能源预测 (dimensions: time; unit: MW).",
+      "required": true
+    },
+    {
+      "parameter_key": "unit_min_output",
+      "question": "Provide 机组最小出力 (dimensions: unit; unit: MW).",
+      "required": true
+    },
+    {
+      "parameter_key": "unit_max_output",
+      "question": "Provide 机组最大出力 (dimensions: unit; unit: MW).",
+      "required": true
+    },
+    {
+      "parameter_key": "ramp_up_limit",
+      "question": "Provide 上爬坡限制 (dimensions: unit; unit: MW/h).",
+      "required": true
+    },
+    {
+      "parameter_key": "ramp_down_limit",
+      "question": "Provide 下爬坡限制 (dimensions: unit; unit: MW/h).",
+      "required": true
+    },
+    {
+      "parameter_key": "fuel_cost",
+      "question": "Provide 燃料成本 (dimensions: unit; unit: 元/MWh).",
+      "required": true
+    },
+    {
+      "parameter_key": "startup_cost",
+      "question": "Provide 启停成本 (dimensions: unit; unit: 元/次).",
+      "required": true
+    },
+    {
+      "parameter_key": "initial_unit_status",
+      "question": "Provide 初始启停状态 (dimensions: unit; unit: 0/1).",
+      "required": true
+    }
+  ],
+  "explanation_spec": {
+    "schema_version": "1.0",
+    "objective": {
+      "key": "total_cost_min",
+      "name": "总成本最小",
+      "sense": "minimize",
+      "unit": "",
+      "description": "",
+      "expression_declared": true
+    },
+    "variables": [
+      {
+        "key": "unit_output",
+        "name": "机组出力",
+        "unit": "MW",
+        "dimensions": [
+          "unit",
+          "time"
+        ],
+        "role": "decision_variable",
+        "summary_functions": [
+          "min_value",
+          "max_value",
+          "sum_value",
+          "non_zero_count"
+        ],
+        "description": ""
+      },
+      {
+        "key": "unit_on",
+        "name": "机组开停机状态",
+        "unit": "0/1",
+        "dimensions": [
+          "unit",
+          "time"
+        ],
+        "role": "decision_variable",
+        "summary_functions": [
+          "min_value",
+          "max_value",
+          "sum_value",
+          "non_zero_count"
+        ],
+        "description": ""
+      },
+      {
+        "key": "unit_startup",
+        "name": "机组启动状态",
+        "unit": "0/1",
+        "dimensions": [
+          "unit",
+          "time"
+        ],
+        "role": "decision_variable",
+        "summary_functions": [
+          "min_value",
+          "max_value",
+          "sum_value",
+          "non_zero_count"
+        ],
+        "description": ""
+      }
+    ],
+    "metrics": [
+      {
+        "key": "objective_value",
+        "label": "总成本最小",
+        "source": {
+          "kind": "objective",
+          "key": null
+        },
+        "function": "identity",
+        "unit": "",
+        "description": "",
+        "parameters": {}
+      },
+      {
+        "key": "variable_unit_output_min_value",
+        "label": "机组出力 · min_value",
+        "source": {
+          "kind": "variable",
+          "key": "unit_output"
+        },
+        "function": "min_value",
+        "unit": "MW",
+        "description": "",
+        "parameters": {}
+      },
+      {
+        "key": "variable_unit_output_max_value",
+        "label": "机组出力 · max_value",
+        "source": {
+          "kind": "variable",
+          "key": "unit_output"
+        },
+        "function": "max_value",
+        "unit": "MW",
+        "description": "",
+        "parameters": {}
+      },
+      {
+        "key": "variable_unit_output_sum_value",
+        "label": "机组出力 · sum_value",
+        "source": {
+          "kind": "variable",
+          "key": "unit_output"
+        },
+        "function": "sum_value",
+        "unit": "MW",
+        "description": "",
+        "parameters": {}
+      },
+      {
+        "key": "variable_unit_output_non_zero_count",
+        "label": "机组出力 · non_zero_count",
+        "source": {
+          "kind": "variable",
+          "key": "unit_output"
+        },
+        "function": "non_zero_count",
+        "unit": "count",
+        "description": "",
+        "parameters": {}
+      },
+      {
+        "key": "variable_unit_on_min_value",
+        "label": "机组开停机状态 · min_value",
+        "source": {
+          "kind": "variable",
+          "key": "unit_on"
+        },
+        "function": "min_value",
+        "unit": "0/1",
+        "description": "",
+        "parameters": {}
+      },
+      {
+        "key": "variable_unit_on_max_value",
+        "label": "机组开停机状态 · max_value",
+        "source": {
+          "kind": "variable",
+          "key": "unit_on"
+        },
+        "function": "max_value",
+        "unit": "0/1",
+        "description": "",
+        "parameters": {}
+      },
+      {
+        "key": "variable_unit_on_sum_value",
+        "label": "机组开停机状态 · sum_value",
+        "source": {
+          "kind": "variable",
+          "key": "unit_on"
+        },
+        "function": "sum_value",
+        "unit": "0/1",
+        "description": "",
+        "parameters": {}
+      },
+      {
+        "key": "variable_unit_on_non_zero_count",
+        "label": "机组开停机状态 · non_zero_count",
+        "source": {
+          "kind": "variable",
+          "key": "unit_on"
+        },
+        "function": "non_zero_count",
+        "unit": "count",
+        "description": "",
+        "parameters": {}
+      },
+      {
+        "key": "variable_unit_startup_min_value",
+        "label": "机组启动状态 · min_value",
+        "source": {
+          "kind": "variable",
+          "key": "unit_startup"
+        },
+        "function": "min_value",
+        "unit": "0/1",
+        "description": "",
+        "parameters": {}
+      },
+      {
+        "key": "variable_unit_startup_max_value",
+        "label": "机组启动状态 · max_value",
+        "source": {
+          "kind": "variable",
+          "key": "unit_startup"
+        },
+        "function": "max_value",
+        "unit": "0/1",
+        "description": "",
+        "parameters": {}
+      },
+      {
+        "key": "variable_unit_startup_sum_value",
+        "label": "机组启动状态 · sum_value",
+        "source": {
+          "kind": "variable",
+          "key": "unit_startup"
+        },
+        "function": "sum_value",
+        "unit": "0/1",
+        "description": "",
+        "parameters": {}
+      },
+      {
+        "key": "variable_unit_startup_non_zero_count",
+        "label": "机组启动状态 · non_zero_count",
+        "source": {
+          "kind": "variable",
+          "key": "unit_startup"
+        },
+        "function": "non_zero_count",
+        "unit": "count",
+        "description": "",
+        "parameters": {}
+      }
+    ],
+    "constraints": [
+      {
+        "key": "power_balance",
+        "name": "功率平衡",
+        "description": "总出力加新能源预测满足系统负荷",
+        "hard": true,
+        "relaxable": false,
+        "review_guidance": "Verify the result evidence for 功率平衡 before using the recommendation."
+      },
+      {
+        "key": "ramp_limit",
+        "name": "爬坡约束",
+        "description": "相邻时段机组出力变化不能超过爬坡能力",
+        "hard": true,
+        "relaxable": true,
+        "review_guidance": "Verify the result evidence for 爬坡约束 before using the recommendation."
+      },
+      {
+        "key": "startup_logic",
+        "name": "启动逻辑",
+        "description": "停机转在线时必须触发启动变量",
+        "hard": true,
+        "relaxable": false,
+        "review_guidance": "Verify the result evidence for 启动逻辑 before using the recommendation."
+      },
+      {
+        "key": "reserve_margin",
+        "name": "备用约束",
+        "description": "在线容量满足负荷和备用要求",
+        "hard": true,
+        "relaxable": true,
+        "review_guidance": "Verify the result evidence for 备用约束 before using the recommendation."
+      },
+      {
+        "key": "功率平衡",
+        "name": "功率平衡",
+        "description": "总出力加新能源预测满足系统负荷",
+        "hard": true,
+        "relaxable": false,
+        "review_guidance": "Verify the result evidence for 功率平衡 before using the recommendation."
+      },
+      {
+        "key": "爬坡约束",
+        "name": "爬坡约束",
+        "description": "相邻时段机组出力变化不能超过爬坡能力",
+        "hard": true,
+        "relaxable": true,
+        "review_guidance": "Verify the result evidence for 爬坡约束 before using the recommendation."
+      },
+      {
+        "key": "启动逻辑",
+        "name": "启动逻辑",
+        "description": "停机转在线时必须触发启动变量",
+        "hard": true,
+        "relaxable": false,
+        "review_guidance": "Verify the result evidence for 启动逻辑 before using the recommendation."
+      },
+      {
+        "key": "备用约束",
+        "name": "备用约束",
+        "description": "在线容量满足负荷和备用要求",
+        "hard": true,
+        "relaxable": true,
+        "review_guidance": "Verify the result evidence for 备用约束 before using the recommendation."
+      }
+    ],
+    "risk_rules": [],
+    "manual_review_points": [
+      "Verify input provenance, freshness, units, and dimensional completeness.",
+      "Review constraint satisfaction, violations, and binding margins against the declared model contract.",
+      "Confirm the recommendation with an authorized reviewer before operational use."
+    ],
+    "limitations": [
+      "The explanation describes the returned solver evidence and does not prove real-world causality.",
+      "The platform does not infer undeclared thresholds, business rules, or external actions."
+    ],
+    "narrative_guidance": {
+      "fact_order": [
+        "solver_status",
+        "objective",
+        "derived_metrics",
+        "variables",
+        "constraints"
+      ],
+      "separate_facts_from_inferences": true,
+      "require_evidence_references": true,
+      "prohibit_unsupported_numbers": true
+    }
+  },
+  "execution_policy": {
+    "mode": "advisory_only",
+    "requires_human_review": true,
+    "allow_external_side_effects": false
+  },
+  "generation": {
+    "mode": "deterministic_contract_compiler",
+    "generated_at": "2026-08-04 22:02:25",
+    "llm": {
+      "requested": false,
+      "attempted": false,
+      "applied": false,
+      "fallback_used": false,
+      "reason": "NOT_REQUESTED"
+    },
+    "source_contract_hash": "d0fa63710efe3f6d164c3407782138bca07d71704d66bf9757d4d7e6820e9383"
+  },
+  "validation": {
+    "status": "valid",
+    "score": 100,
+    "errors": [],
+    "warnings": [],
+    "validated_at": "2026-08-04 22:02:25"
+  },
+  "created_at": "2026-08-04 22:02:25",
+  "updated_at": "2026-08-04 22:02:25",
+  "definition_hash": "c4b97c6c6da61a71d8aab5facc15dc5042d268e03e05f1ba5de679ccaa16dfdb"
+}

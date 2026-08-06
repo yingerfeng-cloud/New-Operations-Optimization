@@ -370,7 +370,9 @@ GET /api/solvers/status
 2. 在 Skill 详情中查看基础信息、接口信息、输入 Schema、输出 Schema、Agent 绑定和调用记录。
 3. 在线测试时可点击“填充示例参数”，确认 JSON 后点击“运行测试”。测试会真实调用 `/api/skills/{skill_name}/run`，结果仅用于辅助分析，需人工复核。
 4. 使用“启用 / 停用”调整 Skill 可调用状态；停用后 Skill 仍保留在治理列表中，但 `callable=false`。
-5. 使用“同步 Schema”刷新 Schema 版本信息；使用“生成 Agent”创建或更新对应 Agent Skill 包。
+5. 使用“同步 Schema”刷新 Schema 版本信息；使用“生成完整 Skill”按当前模型契约编译并持久化 `SkillDefinition`；使用“生成 Agent”基于当前完整定义创建或更新对应 Agent Skill 包。
 6. 进入 `/agents` 后可输入“用示例参数跑一个经济调度”。Agent 会识别 `economic_dispatch`，填入 sample_value，并进入默认值/示例值待确认状态。
 7. 点击“确认默认值”后，任务进入 `READY_TO_INVOKE`；点击“确认调用”后执行 Skill，并返回结构化结果、调用 ID 和人工复核提示。
 8. 常见错误：`PLATFORM_UNAVAILABLE` 通常表示 `SERVICE_MODE=agent` 下平台地址不可达；单体模式应使用 `SERVICE_MODE=combined` 与 `AGENT_PLATFORM_ACCESS_MODE=in_process`。
+
+说明：完整 Skill 负责把模型契约编译成输入/输出 Schema、指标、约束和证据引用；Agent Skill 负责自然语言识别、参数收集、默认值确认和 API 请求适配，不会创建新的优化模型。`definition_hash` 是 SkillDefinition 的 SHA-256 内容指纹，`model_contract_hash` 是绑定模型契约的指纹；固定绑定检测到模型契约变化时，需先重新生成完整 Skill，再同步或重新生成 Agent。

@@ -47,7 +47,7 @@ class SkillRegistry:
         with STORE.lock:
             stored = dict(STORE.skills.get(skill_name, {}))
         if stored.get("model_id"):
-            skill = self.get_skill_any_status(skill_name)
+            skill = self.get_skill_any_status(skill_name, allow_stale_binding=True)
             skill["canonical_skill_name"] = skill["skill_name"]
             skill["alias_requested"] = skill_name
             skill["candidate_skills"] = [
@@ -165,7 +165,7 @@ class SkillRegistry:
         )
 
     def list_skill_versions(self, skill_name: str) -> list[dict[str, Any]]:
-        self.get_skill_any_status(skill_name)
+        self.get_skill_any_status(skill_name, allow_stale_binding=True)
         with STORE.lock:
             versions = deepcopy((STORE.skills.get(skill_name) or {}).get("versions") or [])
         return sorted(versions, key=lambda item: int(item.get("revision") or 0), reverse=True)
@@ -283,10 +283,18 @@ class SkillRegistry:
             "agent_skill": agent_skill,
         }
 
-    def get_skill_any_status(self, skill_name: str) -> dict[str, Any]:
-        model = self._model_for_skill(skill_name, require_enabled=False)
+    def get_skill_any_status(self, skill_name: str, *, allow_stale_binding: bool = False) -> dict[str, Any]:
         with STORE.lock:
             stored = dict(STORE.skills.get(skill_name, {}))
+        try:
+            model = self._model_for_skill(skill_name, require_enabled=False)
+        except HTTPException as exc:
+            # A stale fixed binding must remain blocked for execution, but the
+            # detail endpoint still needs to expose the record so operators can
+            # inspect it and regenerate it against the current model contract.
+            if not allow_stale_binding or exc.status_code != 409 or not stored.get("model_id") or stored.get("binding_policy") != "fixed":
+                raise
+            model = model_service.get_model(str(stored["model_id"]))
         duplicate_count = sum(
             1
             for item in model_service.list_models()
@@ -407,20 +415,9 @@ class SkillRegistry:
             raise HTTPException(status_code=409, detail=f"Skill is not enabled: {skill_name}")
         if stored.get("model_id") and stored.get("binding_policy") == "fixed":
             model = model_service.get_model(str(stored["model_id"]))
-            expected_version = stored.get("model_version")
-            expected_hash = stored.get("model_content_hash")
-            if expected_version and str(model.version) != str(expected_version):
-                raise HTTPException(status_code=409, detail="Stored Skill model version no longer matches its fixed binding")
-            actual_hash = model.content_hash
-            if expected_hash and not actual_hash:
-                schema = invocation_service.model_schema(model.id)
-                actual_hash = skill_definition_service.model_contract_hash(
-                    model,
-                    schema["input_schema"],
-                    schema["output_schema"],
-                )
-            if expected_hash and str(actual_hash or "") != str(expected_hash):
-                raise HTTPException(status_code=409, detail="Stored Skill model content no longer matches its fixed binding")
+            binding_issue = self._fixed_binding_issue(model, stored)
+            if binding_issue:
+                raise HTTPException(status_code=409, detail=binding_issue)
             return model
         if self._is_builtin_default_skill(skill_name):
             return model_service.resolve_model(model_code=skill_name.removeprefix("run_"))
@@ -460,6 +457,27 @@ class SkillRegistry:
                     raise HTTPException(status_code=409, detail=f"Skill is not enabled: {skill_name}")
             return model
         raise HTTPException(status_code=404, detail=f"Skill not found: {skill_name}")
+
+    def _fixed_binding_issue(self, model: Any, stored: dict[str, Any]) -> str | None:
+        if stored.get("binding_policy") != "fixed":
+            return None
+        expected_version = stored.get("model_version")
+        if expected_version and str(model.version) != str(expected_version):
+            return "Stored Skill model version no longer matches its fixed binding"
+        expected_hash = stored.get("model_content_hash")
+        if not expected_hash:
+            return None
+        actual_hash = model.content_hash
+        if not actual_hash:
+            schema = invocation_service.model_schema(model.id)
+            actual_hash = skill_definition_service.model_contract_hash(
+                model,
+                schema["input_schema"],
+                schema["output_schema"],
+            )
+        if str(actual_hash or "") != str(expected_hash):
+            return "Stored Skill model content no longer matches its fixed binding"
+        return None
 
     def _matching_models(self, skill_name: str) -> list[Any]:
         return [
@@ -540,11 +558,14 @@ class SkillRegistry:
             sum(float(item.get("duration_seconds") or 0) * 1000 for item in completed) / len(completed),
             2,
         ) if completed else 0
+        binding_issue = self._fixed_binding_issue(model, skill_state)
         callable_reason = None
         if not model_ready:
             callable_reason = f"Model is not callable in status: {model.status}"
         elif not skill_enabled:
             callable_reason = "Skill is disabled"
+        elif binding_issue:
+            callable_reason = binding_issue
         elif not definition_ready:
             callable_reason = "Skill definition is invalid"
         return {
@@ -558,7 +579,7 @@ class SkillRegistry:
             "status": self._published_status(model.status),
             "model_status": model.status,
             "skill_status": skill_state.get("status", "enabled"),
-            "callable": bool(model_ready and skill_enabled and definition_ready),
+            "callable": bool(model_ready and skill_enabled and definition_ready and not binding_issue),
             "callable_reason": callable_reason,
             "is_default": skill_name == self._base_skill_name(model),
             "display_name": self._display_name(model),

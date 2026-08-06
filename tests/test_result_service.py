@@ -37,3 +37,27 @@ def test_result_list_remains_compatible_with_flat_historical_results() -> None:
 
     assert row["objective_value"] == -12.5
     assert row["status"] == "SUCCESS"
+
+
+def test_result_list_excludes_failed_rows_and_sorts_successes_by_finished_at() -> None:
+    with STORE.lock:
+        STORE.results.clear()
+        STORE.results.update({
+            "OPT-OLD": {
+                "summary": {"model": "旧模型", "finished_at": "2026-08-04 09:00:00"},
+                "result": {"status": "SUCCESS", "finished_at": "2026-08-04 09:00:00"},
+            },
+            "OPT-FAILED": {
+                "summary": {"model": "失败模型", "finished_at": "2026-08-06 10:00:00", "status": "FAILED"},
+                "result": {"status": "FAILED", "finished_at": "2026-08-06 10:00:00"},
+            },
+            "OPT-NEW": {
+                "summary": {"model": "新模型", "finished_at": "2026-08-06 11:00:00"},
+                "result": {"status": "SUCCESS", "finished_at": "2026-08-06 11:00:00"},
+            },
+        })
+
+    rows = result_service.list_results()
+
+    assert [row["job_id"] for row in rows] == ["OPT-NEW", "OPT-OLD"]
+    assert all(row["status"] == "SUCCESS" for row in rows)

@@ -42,11 +42,19 @@ function StructuredEditor({ field, value, onChange, onValidityChange }: EditorBa
   return <div className="parameter-structured-editor"><Alert showIcon type="info" title={`维度 [${field.dimension.join(', ')}]，请保持原始${field.dimension.length}维结构。`} /><Input.TextArea className="section-gap-tight" aria-label={`${field.name}高级结构化编辑`} rows={8} value={text} onChange={event => update(event.target.value)} placeholder={field.exampleValue !== undefined ? JSON.stringify(field.exampleValue, null, 2) : '请输入 JSON 结构'} />{warning && <Alert className="section-gap-tight" showIcon type="warning" title={warning} />}</div>;
 }
 
-function labelsFor(field: RuntimeField, dimension: string, count: number, props: Pick<Props, 'timeSet' | 'stateTimeSet' | 'intervalMinutes' | 'labelFormat'>) {
-  const declared = field.dimensionValues?.[dimension]; if (declared?.length) return declared;
+function generatedLabels(dimension: string, count: number, props: Pick<Props, 'timeSet' | 'stateTimeSet' | 'intervalMinutes' | 'labelFormat'>) {
   if (dimension === props.stateTimeSet) return Array.from({ length: count }, (_, index) => index === 0 ? '初始状态' : `时段 ${index} 后`);
   if (dimension === props.timeSet && props.labelFormat === 'HH:mm' && props.intervalMinutes) return Array.from({ length: count }, (_, index) => { const minutes = index * props.intervalMinutes!; return `${String(Math.floor(minutes / 60) % 24).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`; });
   return Array.from({ length: count }, (_, index) => dimension === props.timeSet ? `T${index + 1}` : `${dimension} ${index + 1}`);
+}
+
+function labelsFor(field: RuntimeField, dimension: string, count: number, props: Pick<Props, 'timeSet' | 'stateTimeSet' | 'intervalMinutes' | 'labelFormat'>) {
+  const declared = field.dimensionValues?.[dimension] || [];
+  if (declared.length >= count) return declared.slice(0, count);
+  const generated = generatedLabels(dimension, count, props);
+  const isZeroBasedSequence = declared.every((label, index) => label === String(index));
+  if ((dimension === props.timeSet || dimension === props.stateTimeSet) && declared.length && isZeroBasedSequence) return Array.from({ length: count }, (_, index) => String(index));
+  return [...declared, ...generated.slice(declared.length)];
 }
 
 function SequenceEditor(props: Props) {
@@ -75,18 +83,36 @@ function KeyValueEditor({ field, value, originalValue, onChange, onValidityChang
 }
 
 function MatrixEditor(props: Props) {
-  const { field, value, originalValue, onChange } = props; const matrix = Array.isArray(value) ? value.map(row => Array.isArray(row) ? row : []) : [];
+  const { field, value, originalValue, onChange, expectedLength, timeSet, stateTimeSet } = props;
   const [pasteOpen, setPasteOpen] = useState(false); const [focusOpen, setFocusOpen] = useState(false);
-  const rowCount = Math.max(matrix.length, field.dimensionValues?.[field.dimension[0]]?.length || 0); const columnCount = Math.max(1, ...matrix.map(row => row.length), field.dimensionValues?.[field.dimension[1]]?.length || 0);
-  const rowLabels = labelsFor(field, field.dimension[0], rowCount, props); const columns = labelsFor(field, field.dimension[1], columnCount, props); const strategy = runtimeGridStrategy(rowCount * columnCount);
-  const update = (r: number, c: number, next: unknown) => { const copy = Array.from({ length: rowCount }, (_, i) => Array.from({ length: columnCount }, (_x, j) => matrix[i]?.[j] ?? '')); copy[r][c] = next; onChange(copy); };
-  const importText = (text: string) => onChange(parseRuntimeGrid(text).rows, 'file');
+  const recordValue = isObjectMap(value) ? value as Record<string, unknown> : undefined;
+  const sourceRows = recordValue ? Object.values(recordValue).map(row => Array.isArray(row) ? row : []) : Array.isArray(value) ? value.map(row => Array.isArray(row) ? row : []) : [];
+  const timeAxis = field.dimension.findIndex(dimension => dimension === timeSet || dimension === stateTimeSet);
+  const expectedRows = timeAxis === 0 ? expectedLength || 0 : 0; const expectedColumns = timeAxis === 1 ? expectedLength || 0 : 0;
+  const rowCount = expectedRows || Math.max(sourceRows.length, field.dimensionValues?.[field.dimension[0]]?.length || 0);
+  const columnCount = expectedColumns || Math.max(1, ...sourceRows.map(row => row.length), field.dimensionValues?.[field.dimension[1]]?.length || 0);
+  const baseRowLabels = labelsFor(field, field.dimension[0], rowCount, props);
+  const mappedRowLabels = recordValue ? [...new Set([...(field.dimensionValues?.[field.dimension[0]] || []), ...Object.keys(recordValue)])] : [];
+  const rowLabels = recordValue ? Array.from({ length: rowCount }, (_, index) => mappedRowLabels[index] || baseRowLabels[index]) : baseRowLabels;
+  const columns = labelsFor(field, field.dimension[1], columnCount, props);
+  const matrix = Array.from({ length: rowCount }, (_, row) => {
+    const source = recordValue ? recordValue[rowLabels[row]] : sourceRows[row];
+    return Array.from({ length: columnCount }, (_, column) => Array.isArray(source) ? source[column] ?? '' : '');
+  });
+  const actualTimeLength = timeAxis === 0 ? sourceRows.length : timeAxis === 1 ? Math.max(0, ...sourceRows.map(row => row.length)) : undefined;
+  const timeLengthMismatch = expectedLength !== undefined && actualTimeLength !== undefined && actualTimeLength !== expectedLength;
+  const strategy = runtimeGridStrategy(rowCount * columnCount);
+  const serialize = (next: unknown[][]) => recordValue ? Object.fromEntries(next.map((row, index) => [rowLabels[index], row])) : next;
+  const update = (r: number, c: number, next: unknown) => { const copy = matrix.map(row => [...row]); copy[r][c] = next; onChange(serialize(copy)); };
+  const importText = (text: string) => onChange(serialize(parseRuntimeGrid(text).rows), 'file');
+  const defaultCell = typeof field.defaultValue === 'number' ? field.defaultValue : 0;
   return <div className="parameter-matrix-editor">
-    <ParameterToolbar kind="matrix" onBatchPaste={() => setPasteOpen(true)} onCsvImport={importText} onDownload={() => downloadCsv(`${field.code}.csv`, Array.from({ length: rowCount || 1 }, () => Array(columnCount).fill('')))} onClear={() => onChange([])} onFillDefault={() => onChange(Array.from({ length: rowCount }, () => Array(columnCount).fill(field.defaultValue ?? 0)))} onRestore={originalValue !== undefined ? () => onChange(originalValue, 'restore-default') : undefined} onCopyPreviousRow={rowCount > 1 ? () => onChange(matrix.map((row, index) => index === rowCount - 1 ? [...(matrix[index - 1] || [])] : row)) : undefined} onFocus={() => setFocusOpen(true)} />
+    <ParameterToolbar kind="matrix" onBatchPaste={() => setPasteOpen(true)} onCsvImport={importText} onDownload={() => downloadCsv(`${field.code}.csv`, Array.from({ length: rowCount || 1 }, () => Array(columnCount).fill('')))} onClear={() => onChange(serialize(Array.from({ length: rowCount }, () => [])))} onFillDefault={() => onChange(serialize(Array.from({ length: rowCount }, () => Array(columnCount).fill(defaultCell))))} onRestore={originalValue !== undefined ? () => onChange(originalValue, 'restore-default') : undefined} onCopyPreviousRow={rowCount > 1 ? () => onChange(serialize(matrix.map((row, index) => index === rowCount - 1 ? [...matrix[index - 1]] : row))) : undefined} onFocus={() => setFocusOpen(true)} />
     <div className="parameter-editor-meta"><span>{rowCount} 行 × {columnCount} 列</span><Tag>行：{field.dimension[0]}</Tag><Tag>列：{field.dimension[1]}</Tag>{strategy === 'focus' && <span className="parameter-scale-note">中型矩阵，建议使用聚焦编辑</span>}{strategy === 'import' && <span className="parameter-scale-note warning">超过 5,000 单元格，优先使用 CSV 导入</span>}</div>
+    {timeLengthMismatch && <Alert className="section-gap-tight" type="warning" showIcon title={actualTimeLength! < expectedLength! ? `当前 ${field.dimension[timeAxis]} 维度为 ${actualTimeLength}，应为 ${expectedLength}；新增时段已显示，请补充相应数值。` : `当前 ${field.dimension[timeAxis]} 维度为 ${actualTimeLength}，应为 ${expectedLength}；请先确认是否需要截断尾部时段数据。`} />}
     {strategy !== 'import' ? <Table size="small" sticky pagination={rowCount > 30 ? { pageSize: 20 } : false} scroll={{ x: Math.max(520, columnCount * 110) }} rowKey="key" dataSource={Array.from({ length: rowCount }, (_, index) => ({ key: `${field.code}-${index}`, index, label: rowLabels[index] }))} columns={[{ title: field.dimension[0], dataIndex: 'label', fixed: 'left', width: 130 }, ...columns.map((label, column) => ({ title: label, width: 110, render: (_v: unknown, row: { index: number }) => <InputNumber aria-label={`${field.name} ${rowLabels[row.index]} ${label}`} value={typeof matrix[row.index]?.[column] === 'number' ? matrix[row.index][column] : undefined} onChange={next => update(row.index, column, next ?? '')} /> }))]} /> : <Alert type="info" showIcon title="大矩阵已关闭内嵌完整渲染" description="请使用 CSV 导入、批量粘贴或高级 JSON；聚焦编辑仍可按需打开。" />}
-    {pasteOpen && <ParameterBatchPasteModal open title={field.name} mode="matrix" expectedRows={rowCount || undefined} expectedColumns={columnCount || undefined} onCancel={() => setPasteOpen(false)} onImport={next => { onChange(next, 'batch'); setPasteOpen(false); }} />}
-    {focusOpen && <FullscreenMatrixEditor open field={field} value={value} rowLabels={rowLabels} columnLabels={columns} onCancel={() => setFocusOpen(false)} onSave={next => { onChange(next); setFocusOpen(false); }} />}
+    {pasteOpen && <ParameterBatchPasteModal open title={field.name} mode="matrix" expectedRows={rowCount || undefined} expectedColumns={columnCount || undefined} onCancel={() => setPasteOpen(false)} onImport={next => { onChange(serialize(next as unknown[][]), 'batch'); setPasteOpen(false); }} />}
+    {focusOpen && <FullscreenMatrixEditor open field={field} value={matrix} rowLabels={rowLabels} columnLabels={columns} onCancel={() => setFocusOpen(false)} onSave={next => { onChange(serialize(next)); setFocusOpen(false); }} />}
   </div>;
 }
 
