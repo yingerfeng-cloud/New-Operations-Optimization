@@ -72,7 +72,7 @@ class AgentSkillRouter:
         explicit_switch = any(marker in compact for marker in SWITCH_MARKERS)
         if mentioned and current_agent_skill and mentioned != current_agent_skill and explicit_switch:
             return self._result("switch_skill", mentioned, skills, 0.88, False, f"检测到场景切换：{current_agent_skill} -> {mentioned}")
-        if current_agent_skill and not mentioned and any(ch.isdigit() for ch in compact):
+        if current_agent_skill and (not mentioned or mentioned == current_agent_skill) and any(ch.isdigit() for ch in compact):
             return self._result("parameter_supplement", current_agent_skill, skills, 0.78, False, "沿用当前 Agent Skill 收集参数")
         if mentioned and current_agent_skill and mentioned != current_agent_skill:
             return self._result("optimization_request", mentioned, skills, 0.86, False, "识别到新的优化场景请求")

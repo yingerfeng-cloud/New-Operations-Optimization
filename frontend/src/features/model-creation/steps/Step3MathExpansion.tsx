@@ -82,11 +82,20 @@ function functionMappingType(component: Record<string, unknown>) {
 function assetOptionLabel(asset: FunctionAsset) {
   const status = asset.validation_status || 'valid';
   const suffix = status === 'invalid' ? ` - 异常：${(asset.validation_errors || []).map(item => String(item.message || item.error || '')).filter(Boolean).join('; ') || '校验未通过'}` : '';
-  return `${asset.name || asset.function_id} (${asset.function_id}, ${status})${suffix}`;
+  const solveSuffix = asset.solve_strategy === 'display_only' ? ' - 仅展示，不可用于求解' : '';
+  return `${asset.name || asset.function_id} (${asset.function_id}, ${status})${suffix}${solveSuffix}`;
 }
 
 function invalidAssetReason(asset: FunctionAsset) {
   return (asset.validation_errors || []).map(item => String(item.message || item.error || '')).filter(Boolean).join('；') || '资产校验未通过，不能参与模型发布';
+}
+
+function isDisplayOnlyAsset(asset?: FunctionAsset) {
+  return asset?.solve_strategy === 'display_only';
+}
+
+function isSolveSelectableAsset(asset: FunctionAsset) {
+  return asset.validation_status !== 'invalid' && !isDisplayOnlyAsset(asset);
 }
 
 function formulaStatus(formula: FormulaDef) {
@@ -160,6 +169,9 @@ export function Step3MathExpansion({ draft, onChange }: { draft: ModelDraft; onC
     ? (functionAssets.data || []).filter(asset => asset.function_type === targetMappingType)
     : (functionAssets.data || []);
   const selectedConvexity = selectedAsset?.convexity || selectedAsset?.diagnostics?.convexity;
+  const legacyDisplayOnlyStrategy = selectedStrategy === 'display_only'
+    ? [{ value: 'display_only', label: 'display_only - 仅展示（不可用于求解）', disabled: true }]
+    : [];
   const symbols = {
     sets: Object.fromEntries(draft.semantic.sets.map(x => [x.code, x.name || x.code])),
     parameters: Object.fromEntries(draft.semantic.parameters.map(x => [x.code, { label: x.name || x.code, indices: x.indices || x.dimension, unit: x.unit, description: x.description }])),
@@ -193,7 +205,7 @@ export function Step3MathExpansion({ draft, onChange }: { draft: ModelDraft; onC
     const currentId = mappingForm.getFieldValue('function_asset_id');
     const current = functionAssets.data.find(asset => asset.function_id === currentId);
     if (current && current.validation_status !== 'invalid' && (!targetMappingType || current.function_type === targetMappingType)) return;
-    const firstSelectable = functionAssets.data.find(asset => (!targetMappingType || asset.function_type === targetMappingType) && asset.validation_status !== 'invalid');
+    const firstSelectable = functionAssets.data.find(asset => (!targetMappingType || asset.function_type === targetMappingType) && isSolveSelectableAsset(asset));
     mappingForm.setFieldValue('function_asset_id', firstSelectable?.function_id);
   }, [functionAssets.data, mappingForm, mappingOpen, targetMappingType]);
 
@@ -239,7 +251,12 @@ export function Step3MathExpansion({ draft, onChange }: { draft: ModelDraft; onC
   };
 
   const applyFormula = (formula: FormulaDef) => {
-    const duplicateName = draft.formulas.some(item => item.formula_id !== formula.formula_id && item.name.trim() === formula.name.trim());
+    const requiresUniqueName = formula.solve_participation !== 'preview_only';
+    const duplicateName = requiresUniqueName && draft.formulas.some(item => (
+      item.formula_id !== formula.formula_id
+      && item.solve_participation !== 'preview_only'
+      && item.name.trim() === formula.name.trim()
+    ));
     if (!formula.name.trim()) {
       message.error('公式名称不能为空');
       return;
@@ -351,19 +368,23 @@ export function Step3MathExpansion({ draft, onChange }: { draft: ModelDraft; onC
     if (is2dMapping) {
       const expressions = [values.x, values.y, values.z];
       if (expressions.some(value => !/^[A-Za-z_]\w*(\[[^\]]+\])?$/.test(value || ''))) {
-        message.error('x/y/z must be variables or indexed variable expressions, e.g. flow[t]');
+        message.error('x、y、z 必须填写变量名或带索引的变量表达式，例如 flow[t]');
         return;
       }
       if (!selectedAssetForMapping || selectedAssetForMapping.validation_status === 'invalid' || selectedAssetForMapping.function_type !== 'piecewise_2d') {
-        message.error('2D function mapping requires a valid piecewise_2d function asset.');
+        message.error('二维函数映射需要选择有效的二维函数资产（piecewise_2d）。当前选择的资产不是二维资产。');
+        return;
+      }
+      if (isDisplayOnlyAsset(selectedAssetForMapping)) {
+        message.error('当前函数资产标记为“仅展示”，不能用于建模求解，请更换为可求解资产。');
         return;
       }
       if (!hasSemanticVariable(draft, values.z)) {
-        message.error(`Output variable ${baseVariableName(values.z) || values.z} is not defined in Step2.`);
+        message.error(`输出变量 ${baseVariableName(values.z) || values.z} 未在 Step2 中定义，请先在语义模型中新增或选择已有变量。`);
         return;
       }
       if (values.solve_strategy === 'display_only') {
-        message.error('display_only cannot be published as a solve component.');
+        message.error('display_only 只能用于展示，不能作为可求解组件发布。');
         return;
       }
       const component = {
@@ -407,7 +428,11 @@ export function Step3MathExpansion({ draft, onChange }: { draft: ModelDraft; onC
     }
     const selectedAsset = (functionAssets.data || []).find(asset => asset.function_id === values.function_asset_id);
     if (!selectedAsset || selectedAsset.validation_status === 'invalid') {
-      message.error('请选择校验状态为 valid 或 warning 的函数/曲线资产');
+      message.error('请选择校验状态为“有效”或“有警告”的函数/曲线资产（valid 或 warning）。');
+      return;
+    }
+    if (isDisplayOnlyAsset(selectedAsset)) {
+      message.error('当前函数资产标记为“仅展示”，不能用于建模求解，请更换为可求解资产。');
       return;
     }
     const component = {
@@ -478,7 +503,7 @@ export function Step3MathExpansion({ draft, onChange }: { draft: ModelDraft; onC
           { key: 'asset', label: '函数资产', children: String(component.function_asset_id || '-') },
           { key: 'strategy', label: '求解策略', children: String(component.solve_strategy || '-') },
           { key: 'x', label: '输入 x', children: String(component.x || '-') },
-          { key: 'y', label: '输出 y', children: String(component.y || '-') },
+          { key: 'y', label: functionMappingType(component) === 'piecewise_2d' ? '输入 y' : '输出 y', children: String(component.y || '-') },
           { key: 'z', label: '输出 z', children: String(component.z || '-') },
           { key: 'indices', label: '索引集合', children: JSON.stringify(component.indices || []) },
           { key: 'dependencies', label: '依赖项', children: Array.isArray(component.dependencies) && component.dependencies.length ? component.dependencies.join(', ') : '-' },
@@ -548,7 +573,7 @@ export function Step3MathExpansion({ draft, onChange }: { draft: ModelDraft; onC
               <Descriptions className="section-gap" size="small" column={3} items={[
                 { key: 'asset', label: '函数资产', children: String(component.function_asset_id) },
                 { key: 'x', label: '输入 x', children: String(component.x || '-') },
-                { key: 'y', label: '输出 y', children: String(component.y || '-') },
+                { key: 'y', label: functionMappingType(component) === 'piecewise_2d' ? '输入 y' : '输出 y', children: String(component.y || '-') },
                 { key: 'strategy', label: '求解策略', children: String(component.solve_strategy || '-') },
               ]} />
             )}
@@ -625,12 +650,21 @@ export function Step3MathExpansion({ draft, onChange }: { draft: ModelDraft; onC
                 label: asset.validation_status === 'invalid'
                   ? <Tooltip title={`禁用原因：${invalidAssetReason(asset)}`}><span>{assetOptionLabel(asset)}</span></Tooltip>
                   : assetOptionLabel(asset),
-                disabled: asset.validation_status === 'invalid',
+                disabled: asset.validation_status === 'invalid' || isDisplayOnlyAsset(asset),
               }))}
               notFoundContent="暂无函数/曲线资产"
             />
           </Form.Item>
           <Descriptions size="small" column={1} items={[{ key: 'binary', label: '精确分段 MILP', children: '该策略需要二进制变量选择具体曲线分段，目前作为预留能力展示，暂不能发布为可求解模型。' }]} />
+          {isDisplayOnlyAsset(selectedAsset) && (
+            <Alert
+              className="section-gap compact-step-note"
+              type="warning"
+              showIcon
+              title="当前资产仅用于展示"
+              description="该资产不能参与模型求解，请更换为 LP 凸组合或 MILP 分段资产。"
+            />
+          )}
           <Form.Item name="mapping_type" label="函数映射类型" rules={[{ required: true }]}>
             <Select
               disabled={mappingTargetIndex !== null}
@@ -645,19 +679,22 @@ export function Step3MathExpansion({ draft, onChange }: { draft: ModelDraft; onC
             />
           </Form.Item>
           <Alert
-            className="section-gap compact-step-note"
+            className="section-gap compact-step-note function-mapping-strategy-alert"
             type="info"
             showIcon
             title="求解策略说明"
             description={(
-              <Space orientation="vertical" size={4}>
-                <span>convex_combination_lp：当前可求解，LP 凸组合近似</span>
-                <span>display_only：仅展示，不参与求解</span>
-                <span>binary_segment_milp：精确分段 MILP，预留能力，当前不可发布为可求解模型，暂不可发布</span>
-              </Space>
+              <div className="function-mapping-strategy-hints">
+                <span><strong>convex_combination_lp</strong>：当前可求解，LP 凸组合近似</span>
+                <span><strong>display_only</strong>：仅展示，不参与模型求解</span>
+                <span><strong>binary_segment_milp</strong>：精确分段 MILP，当前暂不可发布</span>
+              </div>
             )}
           />
-          {selectedStrategy === 'convex_combination_lp' && ['unknown', 'nonconvex'].includes(String(selectedConvexity || '')) && (
+          {selectedAsset?.function_type === 'piecewise_1d'
+            && effectiveMappingType === 'piecewise_1d'
+            && selectedStrategy === 'convex_combination_lp'
+            && ['unknown', 'nonconvex'].includes(String(selectedConvexity || '')) && (
             <Alert
               className="section-gap compact-step-note"
               type="warning"
@@ -675,29 +712,33 @@ export function Step3MathExpansion({ draft, onChange }: { draft: ModelDraft; onC
               description="该策略不是一般二维曲面的精确表达，只适用于凸包近似或特定凸/凹函数边界。"
             />
           )}
-          <Space style={{ width: '100%' }} size={12} align="start">
-            <Form.Item style={{ flex: 1 }} name="x_pick" label="输入变量选择">
+          <div className="function-mapping-section-heading">
+            <span className="function-mapping-section-title">变量绑定</span>
+            <span className="function-mapping-section-help">从左侧选择模型变量，再确认右侧表达式</span>
+          </div>
+          <Space className="function-mapping-field-row" style={{ width: '100%' }} size={12} align="start">
+            <Form.Item style={{ flex: 1 }} name="x_pick" label="输入变量 x">
               <Select allowClear showSearch options={variableExpressionOptions(draft)} onChange={value => value && mappingForm.setFieldValue('x', value)} />
             </Form.Item>
-            <Form.Item style={{ flex: 1 }} name="x" label="输入表达式 x" rules={[{ required: true, message: '请输入或选择输入变量 x' }]}>
+            <Form.Item style={{ flex: 1 }} name="x" label="表达式 x" rules={[{ required: true, message: '请输入或选择输入变量 x' }]}>
               <Input placeholder="例如 volume[t]" />
             </Form.Item>
           </Space>
-          <Space style={{ width: '100%' }} size={12} align="start">
-            <Form.Item style={{ flex: 1 }} name="y_pick" label="输出变量选择">
+          <Space className="function-mapping-field-row" style={{ width: '100%' }} size={12} align="start">
+            <Form.Item style={{ flex: 1 }} name="y_pick" label={effectiveMappingType === 'piecewise_2d' ? '输入变量选择 y' : '输出变量选择 y'}>
               <Select allowClear showSearch options={variableExpressionOptions(draft)} onChange={value => value && mappingForm.setFieldValue('y', value)} />
             </Form.Item>
             <Form.Item
               style={{ flex: 1 }}
               name="y"
-              label="输出表达式 y"
+              label={effectiveMappingType === 'piecewise_2d' ? '输入表达式 y' : '输出表达式 y'}
               rules={[
-                { required: true, message: '请输入或选择输出变量 y' },
+                { required: true, message: effectiveMappingType === 'piecewise_2d' ? '请输入或选择输入变量 y' : '请输入或选择输出变量 y' },
                 {
                   validator: (_, value) => {
                     if (!value || hasSemanticVariable(draft, value)) return Promise.resolve();
                     const yVar = baseVariableName(value);
-                    return Promise.reject(new Error(`输出变量 ${yVar || value} 未在语义模型变量中定义，请先在 Step2 新增该变量，或选择已有变量。`));
+                    return Promise.reject(new Error(`${effectiveMappingType === 'piecewise_2d' ? '输入变量' : '输出变量'} ${yVar || value} 未在语义模型变量中定义，请先在 Step2 新增该变量，或选择已有变量。`));
                   },
                 },
               ]}
@@ -706,20 +747,20 @@ export function Step3MathExpansion({ draft, onChange }: { draft: ModelDraft; onC
             </Form.Item>
           </Space>
           {effectiveMappingType === 'piecewise_2d' && (
-            <Space style={{ width: '100%' }} size={12} align="start">
-              <Form.Item style={{ flex: 1 }} name="z_pick" label="输出 z 变量选择">
+            <Space className="function-mapping-field-row" style={{ width: '100%' }} size={12} align="start">
+              <Form.Item style={{ flex: 1 }} name="z_pick" label="输出变量 z">
                 <Select allowClear showSearch options={variableExpressionOptions(draft)} onChange={value => value && mappingForm.setFieldValue('z', value)} />
               </Form.Item>
               <Form.Item
                 style={{ flex: 1 }}
                 name="z"
-                label="输出表达式 z"
+                label="表达式 z"
                 rules={[
                   { required: true, message: '请选择输出变量 z' },
                   {
                     validator: (_, value) => {
                       if (!value || hasSemanticVariable(draft, value)) return Promise.resolve();
-                      return Promise.reject(new Error(`Output variable ${baseVariableName(value) || value} is not defined in Step2.`));
+                      return Promise.reject(new Error(`输出变量 ${baseVariableName(value) || value} 未在 Step2 中定义，请先在语义模型中新增或选择已有变量。`));
                     },
                   },
                 ]}
@@ -738,12 +779,12 @@ export function Step3MathExpansion({ draft, onChange }: { draft: ModelDraft; onC
           </Space>
           <Form.Item name="solve_strategy" label="求解策略" rules={[{ required: true }]}>
             <Select options={effectiveMappingType === 'piecewise_2d' ? [
-              { value: 'display_only', label: 'display_only - 仅展示' },
+              ...legacyDisplayOnlyStrategy,
               { value: 'triangulated_milp_exact', label: 'triangulated_milp_exact - MILP 精确三角剖分' },
               { value: 'convex_hull_lp_approx', label: 'convex_hull_lp_approx - LP 近似，非精确' },
             ] : [
+              ...legacyDisplayOnlyStrategy,
               { value: 'convex_combination_lp', label: 'convex_combination_lp - LP 凸组合近似' },
-              { value: 'display_only', label: 'display_only - 仅展示' },
               { value: 'binary_segment_milp', label: 'binary_segment_milp - 精确分段 MILP（预留，暂不可发布）' },
             ]} />
           </Form.Item>

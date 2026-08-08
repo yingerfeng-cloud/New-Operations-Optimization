@@ -31,7 +31,6 @@ class GenericFormulaBackedComponent:
         return {
             **self.definition,
             "formula": self.formula,
-            "implemented": True,
             "domain": "通用运筹优化",
             "problem_types": ["LP"],
             "solver_capabilities": ["LP"],

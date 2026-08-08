@@ -8,7 +8,14 @@ from fastapi import APIRouter, HTTPException
 from app.model_components.dependency_graph import component_dependency_ids, component_id, component_is_available, selected_dependency_errors
 from app.model_components.formula_components import normalize_component_payload as normalize_formula_component
 from app.model_components.formula_components import validate_component_definition
-from app.model_components.registry import component_definition, list_component_catalog
+from app.model_components.lifecycle import (
+    COMPONENT_DRAFT_STATUS,
+    COMPONENT_OFFLINE_STATUS,
+    COMPONENT_PUBLISHED_STATUS,
+    component_lifecycle_status,
+    normalize_component_asset_lifecycle,
+)
+from app.model_components.registry import component_definition, get_component_builder, list_component_catalog
 from app.model_components.solver_capabilities import normalize_capabilities
 from app.services.model_service import model_service
 from app.storage.memory_store import STORE
@@ -20,7 +27,16 @@ router = APIRouter(prefix="/api/components", tags=["components"])
 @router.get("/catalog")
 def get_component_catalog() -> list[dict]:
     with STORE.lock:
-        custom = [normalize_formula_component(item) for item in STORE.custom_components.values()]
+        custom = []
+        migrated = False
+        for component_id, item in list(STORE.custom_components.items()):
+            normalized_asset = normalize_component_asset_lifecycle(item)
+            custom.append(normalize_formula_component(normalized_asset))
+            if normalized_asset != item:
+                STORE.custom_components[component_id] = normalized_asset
+                migrated = True
+        if migrated:
+            STORE.save_runtime()
     rows = {item["component_id"]: item for item in list_component_catalog()}
     for item in custom:
         rows[item["component_id"]] = item
@@ -29,7 +45,7 @@ def get_component_catalog() -> list[dict]:
 
 @router.post("/catalog")
 def create_component(payload: dict) -> dict:
-    component = _normalize_component_payload(payload, creating=True)
+    component = _normalize_component_payload(payload, creating=True, lifecycle_status=COMPONENT_DRAFT_STATUS)
     _assert_component_identity_available(component["component_id"])
     with STORE.lock:
         STORE.custom_components[component["component_id"]] = component
@@ -40,10 +56,10 @@ def create_component(payload: dict) -> dict:
 @router.post("/validate-dependencies")
 def validate_component_dependencies(payload: dict) -> dict:
     raw_components = payload.get("components") or []
-    enabled = {
+    selected = {
         _component_id_from_payload_item(item)
         for item in raw_components
-        if _component_enabled(item)
+        if _component_instance_enabled(item)
     }
     catalog = get_component_catalog()
     catalog_by_id = {item["component_id"]: item for item in catalog}
@@ -60,11 +76,11 @@ def validate_component_dependencies(payload: dict) -> dict:
             "suggestion": "请从组件库重新选择组件。",
         }
         for index, item in enumerate(raw_components)
-        if _component_enabled(item) and not _component_id_from_payload_item(item)
+        if _component_instance_enabled(item) and not _component_id_from_payload_item(item)
     ]
     errors.extend(
         selected_dependency_errors(
-            enabled,
+            selected,
             catalog_dependency_graph,
             known_ids=catalog_by_id,
             available_ids={
@@ -82,7 +98,12 @@ def get_component(component_id: str) -> dict:
     with STORE.lock:
         custom = STORE.custom_components.get(component_id)
     if custom:
-        return {**normalize_formula_component(custom), "referenced_by": _component_references(component_id)}
+        normalized_asset = normalize_component_asset_lifecycle(custom)
+        if normalized_asset != custom:
+            with STORE.lock:
+                STORE.custom_components[component_id] = normalized_asset
+                STORE.save_runtime()
+        return {**normalize_formula_component(normalized_asset), "referenced_by": _component_references(component_id)}
     try:
         return {**component_definition(component_id), "referenced_by": _component_references(component_id)}
     except RuntimeError as exc:
@@ -92,9 +113,13 @@ def get_component(component_id: str) -> dict:
 @router.put("/{component_id}")
 def update_component(component_id: str, payload: dict) -> dict:
     existing_detail = get_component(component_id)
-    if existing_detail.get("status") == "published" and _component_references(component_id):
-        raise HTTPException(status_code=409, detail="已发布且被模型引用的组件不能直接修改，请复制为新版本。")
-    component = _normalize_component_payload({**payload, "component_id": component_id}, creating=False)
+    if component_lifecycle_status(existing_detail) != COMPONENT_DRAFT_STATUS:
+        raise HTTPException(status_code=409, detail="已发布或已停用组件不可直接修改，请复制为新的草稿版本。")
+    component = _normalize_component_payload(
+        {**existing_detail, **payload, "component_id": component_id},
+        creating=False,
+        lifecycle_status=COMPONENT_DRAFT_STATUS,
+    )
     with STORE.lock:
         existing = STORE.custom_components.get(component_id)
         versions = list((existing or {}).get("versions") or [])
@@ -118,7 +143,7 @@ def delete_component(component_id: str) -> dict:
         component = STORE.custom_components.get(component_id)
     if not component:
         raise HTTPException(status_code=404, detail="Component not found")
-    if component.get("status") == "published" or _component_references(component_id):
+    if component_lifecycle_status(component) != COMPONENT_DRAFT_STATUS or _component_references(component_id):
         raise HTTPException(status_code=409, detail="已发布或已被引用组件不能物理删除，只能停用或复制新版本。")
     with STORE.lock:
         del STORE.custom_components[component_id]
@@ -137,13 +162,11 @@ def copy_component_version(component_id: str, payload: dict | None = None) -> di
         "component_id": new_component_id,
         "type": new_component_id,
         "version": next_version,
-        "status": "draft",
-        "enabled": False,
-        "implemented": False,
+        "status": COMPONENT_DRAFT_STATUS,
         "change_note": payload.get("change_note", "copy version"),
         "referenced_by": [],
     }
-    component = _normalize_component_payload(copied, creating=True)
+    component = _normalize_component_payload(copied, creating=True, lifecycle_status=COMPONENT_DRAFT_STATUS)
     _assert_component_identity_available(new_component_id)
     with STORE.lock:
         STORE.custom_components[new_component_id] = component
@@ -153,7 +176,17 @@ def copy_component_version(component_id: str, payload: dict | None = None) -> di
 
 @router.post("/{component_id}/validate")
 def validate_component(component_id: str, payload: dict | None = None) -> dict:
-    component = _normalize_component_payload({**(payload or get_component(component_id)), "component_id": component_id}, creating=False)
+    try:
+        existing = get_component(component_id)
+    except HTTPException as exc:
+        if payload is None or exc.status_code != 404:
+            raise
+        existing = {"component_id": component_id, "type": component_id, "status": COMPONENT_DRAFT_STATUS}
+    component = _normalize_component_payload(
+        {**existing, **(payload or {}), "component_id": component_id},
+        creating=False,
+        lifecycle_status=component_lifecycle_status(existing),
+    )
     return validate_component_definition(component)
 
 
@@ -163,13 +196,22 @@ def publish_component(component_id: str) -> dict:
         component = deepcopy(STORE.custom_components.get(component_id) or {})
     if not component:
         raise HTTPException(status_code=404, detail="Component not found")
-    normalized = _normalize_component_payload(component, creating=False)
+    normalized = _normalize_component_payload(
+        normalize_component_asset_lifecycle(component),
+        creating=False,
+        lifecycle_status=component_lifecycle_status(component),
+    )
     result = validate_component_definition(normalized)
-    if not result["valid"]:
-        raise HTTPException(status_code=422, detail={"message": "组件发布校验失败", "errors": result["errors"]})
-    normalized["status"] = "published"
-    normalized["implemented"] = True
-    normalized["enabled"] = True
+    if not result["valid"] or not result.get("execution_ready", False):
+        errors = result["errors"] or [
+            {
+                "field": "metadata_only",
+                "message": "仅包含元数据的组件不能发布为可求解组件",
+                "suggestion": "请配置可执行约束或目标公式后重新校验。",
+            }
+        ]
+        raise HTTPException(status_code=422, detail={"message": "组件发布校验失败", "errors": errors})
+    normalized["status"] = COMPONENT_PUBLISHED_STATUS
     normalized["published_at"] = now_text()
     normalized["updated_at"] = now_text()
     with STORE.lock:
@@ -181,10 +223,14 @@ def publish_component(component_id: str) -> dict:
 @router.post("/{component_id}/offline")
 def offline_component(component_id: str) -> dict:
     component = get_component(component_id)
-    component["status"] = "offline" if component.get("status") in {"published", "trial", "tested"} else component.get("status", "draft")
-    component["enabled"] = False
+    status = component_lifecycle_status(component)
+    if status == COMPONENT_DRAFT_STATUS:
+        raise HTTPException(status_code=409, detail="草稿组件无需停用；可以继续编辑或直接删除。")
+    if status == COMPONENT_OFFLINE_STATUS:
+        return component
+    component["status"] = COMPONENT_OFFLINE_STATUS
     component["updated_at"] = now_text()
-    normalized = _normalize_component_payload(component, creating=False)
+    normalized = _normalize_component_payload(component, creating=False, lifecycle_status=COMPONENT_OFFLINE_STATUS)
     with STORE.lock:
         STORE.custom_components[component_id] = normalized
         STORE.save_runtime()
@@ -199,13 +245,13 @@ def _component_id_from_payload_item(item: object) -> str:
     return ""
 
 
-def _component_enabled(item: object) -> bool:
+def _component_instance_enabled(item: object) -> bool:
     if isinstance(item, dict):
         return item.get("enabled", True) is not False
     return True
 
 
-def _normalize_component_payload(payload: dict, *, creating: bool) -> dict:
+def _normalize_component_payload(payload: dict, *, creating: bool, lifecycle_status: str | None = None) -> dict:
     component_id = str(payload.get("component_id") or payload.get("type") or "").strip()
     if not component_id:
         raise HTTPException(status_code=422, detail="component_id is required")
@@ -220,7 +266,17 @@ def _normalize_component_payload(payload: dict, *, creating: bool) -> dict:
             "dependencies": dependencies,
         }
     )
-    return {
+    # A component asset only declares its reusable parameter interface.  The
+    # mapping to a concrete model belongs to each model component instance.
+    normalized.pop("parameter_bindings", None)
+    normalized.pop("enabled", None)
+    normalized.pop("implemented", None)
+    try:
+        get_component_builder(component_id)
+        normalized["backend_builder"] = component_id
+    except RuntimeError:
+        normalized.pop("backend_builder", None)
+    asset = {
         **normalized,
         "component_id": component_id,
         "type": component_id,
@@ -229,9 +285,7 @@ def _normalize_component_payload(payload: dict, *, creating: bool) -> dict:
         "domain": payload.get("domain") or "通用",
         "category": payload.get("category") or "基础组件",
         "version": payload.get("version") or "1.0.0",
-        "status": payload.get("status") or "draft",
-        "implemented": bool(payload.get("implemented", False)),
-        "enabled": payload.get("enabled", True) is not False,
+        "status": lifecycle_status or COMPONENT_DRAFT_STATUS,
         "required": bool(payload.get("required", False)),
         "problem_types": normalize_capabilities(list(payload.get("problem_types") or ["LP"])),
         "solver_capabilities": normalize_capabilities(list(payload.get("solver_capabilities") or ["LP"])),
@@ -253,8 +307,9 @@ def _normalize_component_payload(payload: dict, *, creating: bool) -> dict:
         "created_at": payload.get("created_at") or timestamp,
         "updated_at": timestamp,
         "editable": True,
-        "metadata_only": not bool(normalized.get("generated_constraints")),
+        "metadata_only": bool(payload.get("metadata_only", False)),
     }
+    return normalize_component_asset_lifecycle(asset)
 
 
 def _assert_component_identity_available(component_id: str) -> None:

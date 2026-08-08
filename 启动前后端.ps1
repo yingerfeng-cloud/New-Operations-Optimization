@@ -58,8 +58,15 @@ function Assert-BackendHealth {
             $health = Invoke-RestMethod -Method Get -Uri $healthUrl -TimeoutSec 2
             $supports = @($health.api_versions.function_assets.supports)
             if ($health.ok -and $supports -contains "POST create" -and $supports -contains "POST import-csv" -and $supports -contains "piecewise_2d") {
-                Write-Host "Backend health check passed: function asset API supports create/import and piecewise_2d."
-                return
+                try {
+                    $agentStatus = Invoke-RestMethod -Method Get -Uri "http://127.0.0.1:$ApiPort/api/agent/status" -TimeoutSec 3
+                    if ($agentStatus.agent.ok) {
+                        Write-Host "Backend health check passed: platform and Agent APIs are available."
+                        return
+                    }
+                } catch {
+                    $lastError = $_.Exception.Message
+                }
             }
             Write-Error "Backend at $healthUrl is not the current project API. Stop old processes with .\停用前后端.ps1 and restart."
         } catch {
@@ -79,7 +86,9 @@ function Start-Api {
         Remove-Item -LiteralPath $ApiPidFile -Force
     }
 
-    $env:SERVICE_MODE = "platform"
+    # The React application contains both platform pages and the Agent workbench.
+    # Combined mode provides one stable API origin for local development.
+    $env:SERVICE_MODE = "combined"
     $env:PORT = "$ApiPort"
 
     $process = Start-Process -FilePath $python `

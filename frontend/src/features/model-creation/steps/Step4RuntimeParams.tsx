@@ -91,9 +91,11 @@ function RuntimeValueInput({ row, labelPrefix, onCommit }: { row: RuntimeParamet
   useEffect(() => setText(externalText), [externalText]);
   return (
     <Input
+      className="runtime-value-input"
       aria-label={`${labelPrefix}${row.code} 当前值`}
       value={text}
       placeholder={valueToText(row.defaultValue ?? row.exampleValue)}
+      style={{ width: '100%' }}
       disabled={row.disabled}
       onChange={event => setText(event.target.value)}
       onBlur={() => onCommit(parseValue(text))}
@@ -212,7 +214,7 @@ export function Step4RuntimeParams({ draft, onChange }: { draft: ModelDraft; onC
     {
       title: '当前值',
       dataIndex: 'currentValue',
-      width: 180,
+      width: 280,
       render: (_value, row) => (
         <RuntimeValueInput row={row} labelPrefix={labelPrefix} onCommit={value => updateRuntimeValue(row, value)} />
       ),
@@ -237,8 +239,8 @@ export function Step4RuntimeParams({ draft, onChange }: { draft: ModelDraft; onC
       {deprecated && replacementCode && <Alert className="compact-step-note" type="warning" showIcon title="该模板为兼容入口" description={`新建模型请使用 ${replacementCode}；旧调用将按版本治理规则解析到活动版本。`} />}
       {showDispatchModes && (
         <Card size="small" title="梯级水电求解配置" className="section-gap">
-          <Space wrap size={20}>
-            <Space orientation="vertical" size={4}>
+          <Space className="dispatch-mode-controls" wrap size={20}>
+            <Space className="dispatch-mode-field" orientation="vertical" size={4}>
               <span>水电出力关系</span>
               {hasHydroPowerMode && <Segmented
                 aria-label="水电出力关系"
@@ -247,7 +249,7 @@ export function Step4RuntimeParams({ draft, onChange }: { draft: ModelDraft; onC
                 onChange={value => updateHydroMode('hydro_power_mode', value)}
               />}
             </Space>
-            <Space orientation="vertical" size={4}>
+            <Space className="dispatch-mode-field" orientation="vertical" size={4}>
               <span>负荷跟踪模式</span>
               {hasLoadTrackingMode && <Select
                 aria-label="负荷跟踪模式"
@@ -256,6 +258,7 @@ export function Step4RuntimeParams({ draft, onChange }: { draft: ModelDraft; onC
                 options={[{ label: '关闭', value: 'disabled' }, { label: '软约束', value: 'soft' }, { label: '硬约束', value: 'hard' }]}
                 onChange={value => updateHydroMode('load_tracking_mode', value)}
               />}
+              <span className="dispatch-mode-help">关闭：不跟踪负荷；软约束：允许偏差并在目标函数中惩罚；硬约束：要求严格满足。</span>
             </Space>
             <Tag color={String(draft.runtime_parameters.hydro_power_mode || 'linear') === 'linear' ? 'blue' : 'gold'}>
               {inferModelProblemType(draft)} / {draft.basic_info.solver || 'HiGHS'}
@@ -279,16 +282,18 @@ export function Step4RuntimeParams({ draft, onChange }: { draft: ModelDraft; onC
       {functionMappings.length > 0 && (
         <Card className="section-gap" title="函数/曲线资产绑定">
           <Table
+            className="function-mapping-table"
             size="small"
             pagination={false}
             rowKey={functionMappingRowKey}
             dataSource={functionMappings}
+            scroll={{ x: 'max-content' }}
             columns={[
-              { title: '组件', render: (_, row) => String(row.type || row.component_id || '-') },
-              { title: '函数资产', render: (_, row) => String(row.function_asset_id || row.curve_asset_id || '-') },
-              { title: 'x', render: (_, row) => String(row.x || '-') },
-              { title: 'y', render: (_, row) => String(row.y || '-') },
-              { title: '求解策略', render: (_, row) => <Tag color="blue">{String(row.solve_strategy || 'convex_combination_lp')}</Tag> },
+              { title: '组件', width: 260, ellipsis: true, render: (_, row) => String(row.type || row.component_id || '-') },
+              { title: '函数资产', width: 300, ellipsis: true, render: (_, row) => String(row.function_asset_id || row.curve_asset_id || '-') },
+              { title: 'x', width: 170, ellipsis: true, render: (_, row) => String(row.x || '-') },
+              { title: 'y', width: 200, ellipsis: true, render: (_, row) => String(row.y || '-') },
+              { title: '求解策略', width: 240, render: (_, row) => <Tag color="blue">{String(row.solve_strategy || 'convex_combination_lp')}</Tag> },
             ]}
           />
         </Card>
@@ -305,13 +310,13 @@ export function Step4RuntimeParams({ draft, onChange }: { draft: ModelDraft; onC
           label: `${group.label} ${rows.filter(row => row.source === group.key).length}`,
           children: (
             <Card>
-              <Table className="runtime-parameter-table" size="small" pagination={false} rowKey="key" dataSource={rows.filter(row => row.source === group.key)} columns={columns} />
+              <Table className="runtime-parameter-table" size="small" pagination={false} rowKey="key" dataSource={rows.filter(row => row.source === group.key)} columns={columns} scroll={{ x: 'max-content' }} />
             </Card>
           ),
         }))}
       />
       <Card className="section-gap" title="时间序列参数">
-        <Table className="runtime-parameter-table" size="small" pagination={false} rowKey="key" dataSource={rows.filter(row => row.dimensions.includes('time') || row.dimensions.includes('time_volume'))} columns={buildColumns('时间序列 ')} />
+        <Table className="runtime-parameter-table" size="small" pagination={false} rowKey="key" dataSource={rows.filter(row => row.dimensions.includes('time') || row.dimensions.includes('time_volume'))} columns={buildColumns('时间序列 ')} scroll={{ x: 'max-content' }} />
       </Card>
       <Collapse
         className="section-gap"

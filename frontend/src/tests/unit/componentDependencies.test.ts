@@ -19,7 +19,6 @@ function component(id: string, dependencies: string[] = [], extra: Partial<Compo
     name: id,
     status: 'published',
     enabled: true,
-    implemented: true,
     version: '1.0.0',
     depends_on: dependencies,
     ...extra,
@@ -97,6 +96,19 @@ describe('component dependency graph', () => {
     expect(materialized).toHaveLength(3);
     expect(materialized.slice(0, 2).map(item => item.function_asset_id)).toEqual(['curve_a', 'curve_b']);
     expect(materialized.slice(0, 2).every(item => getComponentDependencyIds(item).includes('base'))).toBe(true);
+  });
+
+  test('new catalog selections discard legacy model-specific bindings from component assets', () => {
+    const definition = component('parameterized', [], {
+      parameters: [{ code: 'efficiency', name: '效率', required: true }],
+      parameter_bindings: [{ component_parameter: 'efficiency', model_parameter: 'legacy_efficiency' }],
+    });
+
+    const [materialized] = materializeComponentSelection(['parameterized'], [definition], []);
+
+    expect(materialized.parameter_bindings).toBeUndefined();
+    expect((materialized.definition as Record<string, unknown>).parameter_bindings).toBeUndefined();
+    expect(materialized.parameters).toEqual(definition.parameters);
   });
 
   test('marks every participant when a strongly connected graph has overlapping cycles', () => {

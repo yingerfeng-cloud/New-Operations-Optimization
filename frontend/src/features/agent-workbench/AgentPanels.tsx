@@ -11,6 +11,23 @@ export function valueText(value: unknown) {
   return JSON.stringify(value);
 }
 
+function parameterText(value: unknown) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return valueText(value);
+  const record = value as Record<string, unknown>;
+  const name = valueText(record.name || record.parameter || record.key || '未命名参数');
+  const key = record.key && String(record.key) !== name ? ` · ${String(record.key)}` : '';
+  const unit = record.unit ? `（${String(record.unit)}）` : '';
+  const error = record.error || record.message;
+  return `${name}${key}${unit}${error ? `：${String(error)}` : ''}`;
+}
+
+function parameterValueText(value: unknown) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return valueText(value);
+  return Object.entries(value as Record<string, unknown>)
+    .map(([key, item]) => `${key}: ${valueText(item)}`)
+    .join('，');
+}
+
 function objectRows(value?: Record<string, unknown>) {
   return Object.entries(value || {}).map(([key, item], index) => ({ key, value: item, __row_key: `${key}-${index}` }));
 }
@@ -102,8 +119,8 @@ export function AgentParameterPanel({ response }: { response?: AgentAnalyzeRespo
   const invalid = response.invalid_parameters || [];
   return (
     <>
-      {missing.length > 0 && <Alert showIcon type="warning" title="缺失必填参数" description={missing.map(valueText).join('；')} className="section-gap" />}
-      {invalid.length > 0 && <Alert showIcon type="error" title="参数校验失败" description={invalid.map(valueText).join('；')} className="section-gap" />}
+      {missing.length > 0 && <Alert showIcon type="warning" title="缺失必填参数" description={missing.map(parameterText).join('；')} className="section-gap" />}
+      {invalid.length > 0 && <Alert showIcon type="error" title="参数校验失败" description={invalid.map(parameterText).join('；')} className="section-gap" />}
       <Card size="small" title="参数草稿">
         <Descriptions size="small" bordered column={1} className="section-gap">
           <Descriptions.Item label="参数完整度">{response.parameter_completeness === undefined ? '-' : `${Math.round(response.parameter_completeness * 100)}%`}</Descriptions.Item>
@@ -124,7 +141,7 @@ export function AgentParameterPanel({ response }: { response?: AgentAnalyzeRespo
       </Card>
       {Boolean(response.can_use_default?.length) && (
         <Card size="small" title="可使用默认值" className="section-gap">
-          <Table size="small" pagination={false} rowKey="__row_key" dataSource={listRows(response.can_use_default, 'default')} columns={[{ title: '参数', render: (_, row) => valueText(row.name || row.parameter || row.item) }, { title: '默认值', render: (_, row) => valueText(row.default ?? row.value) }]} />
+          <Table size="small" pagination={false} rowKey="__row_key" dataSource={listRows(response.can_use_default, 'default')} columns={[{ title: '参数', render: (_, row) => parameterText(row.name || row.parameter || row.item || row) }, { title: '默认值', render: (_, row) => parameterValueText(row.default ?? row.value) }]} />
         </Card>
       )}
     </>

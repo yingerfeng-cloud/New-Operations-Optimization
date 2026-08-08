@@ -80,15 +80,45 @@ function functionTypeText(type?: string) {
   return type || '-';
 }
 
-function solveStrategyText(strategy?: string) {
-  const map: Record<string, string> = {
-    display_only: '仅展示',
-    convex_combination_lp: 'LP 凸组合',
-    convex_hull_lp_approx: 'LP 凸包近似',
-    binary_segment_milp: 'MILP 分段',
-    triangulated_milp_exact: 'MILP 三角剖分',
-  };
-  return map[String(strategy || '')] || String(strategy || '-');
+const solveStrategyInfo: Record<string, { label: string; description: string }> = {
+  display_only: { label: '仅展示', description: '只用于查看和诊断，不生成求解约束，也不参与模型求解。' },
+  convex_combination_lp: { label: 'LP 凸组合', description: '用连续权重对断点做凸组合，保持 LP；适合凸/凹曲线，但一般是近似表达。' },
+  segment_binary: { label: 'MILP 分段', description: '用二进制变量选择相邻分段，严格按一维 PWL 曲线求解，但会引入 MILP 二进制变量。' },
+  sos2: { label: 'SOS2 分段', description: '用 SOS2 约束选择相邻断点，保持分段表达；需要求解器支持 SOS2。' },
+  binary_segment_milp: { label: 'MILP 分段（兼容值）', description: '历史兼容编码，语义等同于 MILP 分段；新资产建议使用 segment_binary。' },
+  convex_hull_lp_approx: { label: 'LP 凸包近似', description: '对二维曲面使用 LP 凸包近似，不保证精确落在原始曲面三角片上。' },
+  triangulated_milp_exact: { label: 'MILP 三角剖分', description: '用二进制变量选择二维曲面的三角片，精确表达三角剖分 PWL，但会增加 MILP 规模。' },
+};
+
+export function solveStrategyText(strategy?: string) {
+  const raw = String(strategy || '');
+  return solveStrategyInfo[raw]?.label || raw || '-';
+}
+
+export function solveStrategyDescription(strategy?: string) {
+  const raw = String(strategy || '');
+  return solveStrategyInfo[raw]?.description || '请先选择一个求解策略。';
+}
+
+function strategyOptions(type: FunctionAsset['function_type'], current?: string) {
+  const base = type === 'piecewise_2d'
+    ? ['display_only', 'triangulated_milp_exact', 'convex_hull_lp_approx']
+    : ['display_only', 'convex_combination_lp', 'segment_binary'];
+  const values = current && !base.includes(current) ? [...base, current] : base;
+  return values.map(value => ({ value, label: solveStrategyText(value) }));
+}
+
+function StrategyHelp({ strategy }: { strategy?: string }) {
+  const raw = String(strategy || '');
+  return (
+    <Alert
+      className="compact-notice"
+      type="info"
+      showIcon
+      title={`${solveStrategyText(raw)} · ${raw || '未选择'}`}
+      description={solveStrategyDescription(raw)}
+    />
+  );
 }
 
 function validationList(items?: Array<Record<string, unknown>>) {
@@ -700,28 +730,8 @@ export function FunctionAssetsPage() {
     applyCsvText(text, type);
   };
 
-  const editingStrategyOptions = editingType === 'piecewise_2d'
-    ? [
-        { value: 'display_only', label: solveStrategyText('display_only') },
-        { value: 'triangulated_milp_exact', label: solveStrategyText('triangulated_milp_exact') },
-        { value: 'convex_hull_lp_approx', label: solveStrategyText('convex_hull_lp_approx') },
-      ]
-    : [
-        { value: 'display_only', label: solveStrategyText('display_only') },
-        { value: 'convex_combination_lp', label: solveStrategyText('convex_combination_lp') },
-        { value: 'binary_segment_milp', label: solveStrategyText('binary_segment_milp') },
-      ];
-  const importStrategyOptions = importType === 'piecewise_2d'
-    ? [
-        { value: 'display_only', label: solveStrategyText('display_only') },
-        { value: 'triangulated_milp_exact', label: solveStrategyText('triangulated_milp_exact') },
-        { value: 'convex_hull_lp_approx', label: solveStrategyText('convex_hull_lp_approx') },
-      ]
-    : [
-        { value: 'display_only', label: solveStrategyText('display_only') },
-        { value: 'convex_combination_lp', label: solveStrategyText('convex_combination_lp') },
-        { value: 'binary_segment_milp', label: solveStrategyText('binary_segment_milp') },
-      ];
+  const editingStrategyOptions = strategyOptions(editingType, String(selected?.solve_strategy || ''));
+  const importStrategyOptions = strategyOptions(importType);
 
   const surfaceDiagnostics = selected?.surface_diagnostics || selected?.diagnostics || {};
   const drawerTitle = editing ? (selected ? '编辑函数资产' : '新建函数资产') : importing ? '导入 CSV 函数资产' : selected?.name || '函数资产';
@@ -810,7 +820,14 @@ export function FunctionAssetsPage() {
                 </Form.Item>
               </Col>
               <Col span={12}><Form.Item name="name" label="资产名称" rules={[{ required: true }]}><Input /></Form.Item></Col>
-              <Col span={12}><Form.Item name="solve_strategy" label="求解策略" rules={[{ required: true }]}><Select options={editingStrategyOptions} /></Form.Item></Col>
+              <Col span={12}>
+                <Form.Item name="solve_strategy" label="求解策略" rules={[{ required: true }]}>
+                  <Select options={editingStrategyOptions} />
+                </Form.Item>
+                <Form.Item noStyle shouldUpdate={(previous, current) => previous.solve_strategy !== current.solve_strategy}>
+                  {({ getFieldValue }) => <StrategyHelp strategy={String(getFieldValue('solve_strategy') || '')} />}
+                </Form.Item>
+              </Col>
               <Col span={24}><Typography.Text strong>输入字段</Typography.Text></Col>
               <Col span={12}><Form.Item name="x_name" label="x 名称" rules={[{ required: true }]}><Input /></Form.Item></Col>
               <Col span={12}><Form.Item name="x_unit" label="x 单位"><Input /></Form.Item></Col>
@@ -878,7 +895,12 @@ export function FunctionAssetsPage() {
             <Row gutter={12}>
               <Col span={12}><Form.Item name="name" label="资产名称" rules={[{ required: true }]}><Input /></Form.Item></Col>
               <Col span={12}><Form.Item name="function_type" label="函数类型" rules={[{ required: true }]}><Select options={[{ value: 'piecewise_1d', label: '一维曲线 y=f(x)' }, { value: 'piecewise_2d', label: '二维曲面 z=f(x,y)' }]} onChange={onImportTypeChange} /></Form.Item></Col>
-              <Col span={12}><Form.Item name="solve_strategy" label="求解策略"><Select options={importStrategyOptions} /></Form.Item></Col>
+              <Col span={12}>
+                <Form.Item name="solve_strategy" label="求解策略"><Select options={importStrategyOptions} /></Form.Item>
+                <Form.Item noStyle shouldUpdate={(previous, current) => previous.solve_strategy !== current.solve_strategy}>
+                  {({ getFieldValue }) => <StrategyHelp strategy={String(getFieldValue('solve_strategy') || '')} />}
+                </Form.Item>
+              </Col>
               <Col span={importType === 'piecewise_2d' ? 8 : 12}><Form.Item name="x_field" label="x 字段" rules={[{ required: true }]}><Select allowClear showSearch options={importPreview.fields.map(field => ({ value: field, label: field }))} /></Form.Item></Col>
               <Col span={importType === 'piecewise_2d' ? 8 : 12}><Form.Item name="y_field" label="y 字段" rules={[{ required: true }]}><Select allowClear showSearch options={importPreview.fields.map(field => ({ value: field, label: field }))} /></Form.Item></Col>
               {importType === 'piecewise_2d' && <Col span={8}><Form.Item name="z_field" label="z 字段" rules={[{ required: true }]}><Select allowClear showSearch options={importPreview.fields.map(field => ({ value: field, label: field }))} /></Form.Item></Col>}

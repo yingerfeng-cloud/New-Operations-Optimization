@@ -75,8 +75,19 @@ class ConversationStore:
             if conversation_id not in STORE.conversations:
                 raise HTTPException(status_code=404, detail="Conversation not found")
             del STORE.conversations[conversation_id]
+            run_ids = [
+                run_id
+                for run_id, run in STORE.agent_runs.items()
+                if run.get("conversation_id") == conversation_id
+            ]
+            for run_id in run_ids:
+                del STORE.agent_runs[run_id]
             STORE.save_runtime()
-        return {"deleted": True, "conversation_id": conversation_id}
+        return {
+            "deleted": True,
+            "conversation_id": conversation_id,
+            "deleted_run_count": len(run_ids),
+        }
 
     def _last_message(self, record: dict[str, Any]) -> str:
         messages = record.get("messages") or []

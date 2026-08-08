@@ -7,6 +7,8 @@ import type {
   AgentConversationSummary,
   AgentDefaultsPayload,
   AgentInvokePayload,
+  AgentRun,
+  AgentRunEvent,
   AgentSkill,
   AgentStatus,
 } from '../types/agent';
@@ -40,3 +42,14 @@ export const confirmAgentInvoke = (payload: AgentInvokePayload) => unwrap<AgentA
 export const confirmAgentDefaults = (payload: AgentDefaultsPayload) => unwrap<AgentAnalyzeResponse>(apiClient.post('/api/agent/confirm-defaults', payload));
 
 export const applySampleParameters = (payload: AgentDefaultsPayload) => unwrap<AgentAnalyzeResponse>(apiClient.post('/api/agent/apply-sample-parameters', payload));
+
+export const getAgentRun = (runId: string) => unwrap<AgentRun>(apiClient.get(`/api/agent/runs/${encodeURIComponent(runId)}`));
+
+export const getAgentRunEvents = (runId: string, after = 0) => unwrap<AgentRunEvent[]>(apiClient.get(`/api/agent/runs/${encodeURIComponent(runId)}/events`, { params: { after } }));
+
+export const cancelAgentRun = (runId: string) => unwrap<AgentRun>(apiClient.post(`/api/agent/runs/${encodeURIComponent(runId)}/cancel`));
+
+export const agentRunEventStreamUrl = (runId: string, after = 0) => {
+  const base = String(apiClient.defaults.baseURL || '').replace(/\/$/, '');
+  return `${base}/api/agent/runs/${encodeURIComponent(runId)}/events/stream?after=${after}`;
+};

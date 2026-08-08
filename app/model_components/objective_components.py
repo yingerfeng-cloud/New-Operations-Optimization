@@ -25,6 +25,7 @@ DEFAULT_OBJECTIVE_WEIGHTS = {
 }
 
 SUPPORTED_OBJECTIVE_WEIGHT_KEYS = set(DEFAULT_OBJECTIVE_WEIGHTS)
+SINGLETON_OBJECTIVE_WEIGHT_KEYS = SUPPORTED_OBJECTIVE_WEIGHT_KEYS - {"piecewise_cost"}
 
 
 def build_weighted_objective(model: Any, objective_spec: dict[str, Any], context: dict[str, Any]) -> None:

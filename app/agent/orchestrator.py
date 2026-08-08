@@ -73,6 +73,7 @@ class AgentOrchestrator:
             "confirm_switch_migrate",
             "cancel_switch",
             "skill_selection_required",
+            "parameter_supplement",
             "knowledge_question",
             "safety_refusal",
         } else "unknown"
@@ -1391,6 +1392,8 @@ class AgentOrchestrator:
                 for item in explanation["risk_notes"]
             ]
             parts.append("风险提示：" + "；".join(risk_text))
+        else:
+            parts.append("风险提示：当前证据未返回明确风险项，仍需人工复核关键约束、输入质量和业务边界。")
         if explanation.get("next_actions"):
             parts.append("下一步动作：" + "；".join(str(item) for item in explanation["next_actions"]))
         if explanation.get("limitations"):

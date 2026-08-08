@@ -45,8 +45,27 @@ function componentSpecItemFromDraft(component: Record<string, unknown>) {
       else if (field in config) row[field] = config[field];
     });
   }
+  if (Array.isArray(component.parameter_bindings) && component.parameter_bindings.length) {
+    row.parameter_bindings = component.parameter_bindings
+      .filter((binding): binding is Record<string, unknown> => Boolean(binding) && typeof binding === 'object' && !Array.isArray(binding))
+      .map(binding => ({ ...binding }));
+  }
   if (Object.keys(config).length) row.config = config;
   return row;
+}
+
+export function collectModelParameterBindings(draft: ModelDraft) {
+  return draft.components.flatMap((component, componentIndex) => {
+    if (component.enabled === false || !Array.isArray(component.parameter_bindings)) return [];
+    const componentId = String(component.type || component.component_id || component.code || `component_${componentIndex + 1}`);
+    return component.parameter_bindings
+      .filter((binding): binding is Record<string, unknown> => Boolean(binding) && typeof binding === 'object' && !Array.isArray(binding))
+      .map(binding => ({
+        ...binding,
+        component_id: componentId,
+        component_index: componentIndex,
+      }));
+  });
 }
 
 export function buildComponentSpecFromDraft(normalizedDraft: ModelDraft) {
@@ -54,6 +73,7 @@ export function buildComponentSpecFromDraft(normalizedDraft: ModelDraft) {
   const enabledComponents = normalizedDraft.components
     .filter(component => component.enabled !== false)
     .map(componentSpecItemFromDraft);
+  const parameterBindings = collectModelParameterBindings(normalizedDraft);
   const objective = normalizedDraft.objective || {};
   return {
     ...current,
@@ -64,6 +84,7 @@ export function buildComponentSpecFromDraft(normalizedDraft: ModelDraft) {
     parameters: mergeByCode(normalizedDraft.semantic.parameters || current.parameters, componentItems(normalizedDraft, 'parameters')),
     variables: mergeByCode(normalizedDraft.semantic.variables || current.variables, componentItems(normalizedDraft, 'variables'), 'name'),
     components: enabledComponents,
+    parameter_bindings: parameterBindings.length ? parameterBindings : current.parameter_bindings || [],
     objective: { ...(current.objective as Record<string, unknown> | undefined), ...objective },
     ui_metadata: {
       ...((current.ui_metadata && typeof current.ui_metadata === 'object' ? current.ui_metadata : {}) as Record<string, unknown>),
@@ -106,6 +127,7 @@ export function buildModelDraftPayload(draft: ModelDraft) {
     generic_spec: genericSpec,
     component_spec: componentSpec,
     parameters: normalized.runtime_parameters,
+    parameter_bindings: collectModelParameterBindings(normalized),
     model_problem_type: inferModelProblemType(normalized),
   };
 }

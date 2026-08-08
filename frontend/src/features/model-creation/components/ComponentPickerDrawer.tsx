@@ -97,11 +97,14 @@ export function materializeComponentSelection(
       }));
     }
     if (!definition) return [];
+    const componentDefinition = { ...definition };
+    delete componentDefinition.parameter_bindings;
     return [{
-      ...definition,
+      ...componentDefinition,
       component_id: id,
       type: definition.type || id,
       enabled: true,
+      definition: componentDefinition,
       depends_on: dependencies,
       dependencies,
     }];

@@ -36,14 +36,16 @@ function componentRows(component: Record<string, unknown>, key: string) {
 }
 
 export function getComponentBindingRows(component: Record<string, unknown>): BindingRow[] {
-  const explicit = componentRows(component, 'parameter_bindings').map((binding, index) => ({
-    code: bindingCode(binding, index),
-    binding,
-    name: String(binding.name || binding.parameter_name || binding.component_parameter || bindingCode(binding, index)),
-  }));
-  if (explicit.length) return explicit;
-  return componentRows(component, 'parameters').map((parameter, index) => {
+  const explicit = componentRows(component, 'parameter_bindings');
+  const definition = component.definition && typeof component.definition === 'object' && !Array.isArray(component.definition)
+    ? component.definition as Record<string, unknown>
+    : {};
+  const parameters = componentRows(component, 'parameters').length
+    ? componentRows(component, 'parameters')
+    : componentRows(definition, 'parameters');
+  const rows: BindingRow[] = parameters.map((parameter, index) => {
     const code = String(parameter.code || parameter.parameter || parameter.component_parameter || `parameter_${index + 1}`);
+    const saved = explicit.find(binding => bindingCode(binding) === code);
     return {
       code,
       binding: {
@@ -54,10 +56,22 @@ export function getComponentBindingRows(component: Record<string, unknown>): Bin
         indices: extractDimensions(parameter),
         source_type: parameter.source_type || parameter.sourceType || parameter.source_system || 'runtime',
         type: parameter.type || parameter.data_type || parameter.value_type,
+        ...(saved || {}),
       },
-      name: String(parameter.name || code),
+      name: String(saved?.name || saved?.parameter_name || parameter.name || code),
     };
   });
+  const known = new Set(rows.map(row => row.code));
+  explicit.forEach((binding, index) => {
+    const code = bindingCode(binding, index);
+    if (known.has(code)) return;
+    rows.push({
+      code,
+      binding,
+      name: String(binding.name || binding.parameter_name || binding.component_parameter || code),
+    });
+  });
+  return rows;
 }
 
 export function getMissingBindingRows(component: Record<string, unknown>) {

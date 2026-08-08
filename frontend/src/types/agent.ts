@@ -19,6 +19,8 @@ export interface AgentConversationSummary {
   updated_at?: string;
   last_message?: string;
   status?: string;
+  active_run_id?: string;
+  active_run_status?: AgentRunStatus;
   [key: string]: unknown;
 }
 
@@ -28,6 +30,62 @@ export interface AgentConversation extends AgentConversationSummary {
   agent_skill_name?: string;
   resolved_skill_name?: string;
   parameter_draft?: Record<string, unknown>;
+  active_run?: AgentRun;
+  runs?: AgentRun[];
+}
+
+export type AgentRunStatus =
+  | 'DRAFT'
+  | 'ROUTING'
+  | 'CLARIFICATION'
+  | 'PARAMETER_REVIEW'
+  | 'APPROVAL_REQUIRED'
+  | 'READY'
+  | 'QUEUED'
+  | 'RUNNING'
+  | 'SUCCEEDED'
+  | 'FAILED'
+  | 'CANCELLED';
+
+export interface AgentRunEvent {
+  event_id: string;
+  sequence: number;
+  type: string;
+  status?: AgentRunStatus;
+  title: string;
+  detail?: string;
+  created_at?: string;
+  payload?: Record<string, unknown>;
+}
+
+export interface AgentRun {
+  run_id: string;
+  conversation_id: string;
+  title?: string;
+  status: AgentRunStatus;
+  workflow_state?: string;
+  agent_skill_name?: string;
+  api_skill_name?: string;
+  model_id?: string;
+  intent?: string;
+  response_type?: string;
+  parameter_draft?: Record<string, unknown>;
+  parameter_sources?: Record<string, unknown>;
+  missing_required?: Array<Record<string, unknown> | string>;
+  invalid_parameters?: unknown[];
+  default_candidates?: unknown[];
+  ready_to_invoke?: boolean;
+  invocation_id?: string;
+  task_id?: string;
+  result?: Record<string, unknown>;
+  objective_value?: number;
+  route_confidence?: number;
+  selection_reason?: string;
+  message?: string;
+  error?: string;
+  created_at?: string;
+  updated_at?: string;
+  events?: AgentRunEvent[];
 }
 
 export interface AgentSkill {
@@ -100,12 +158,15 @@ export interface AgentAnalyzePayload {
 
 export interface AgentInvokePayload {
   conversation_id: string;
+  run_id?: string;
+  idempotency_key?: string;
   parameters?: Record<string, unknown>;
   [key: string]: unknown;
 }
 
 export interface AgentDefaultsPayload {
   conversation_id: string;
+  run_id?: string;
   agent_skill_name?: string;
   [key: string]: unknown;
 }
@@ -142,5 +203,9 @@ export interface AgentAnalyzeResponse {
   needs_clarification?: boolean;
   clarification_question?: string;
   invocation_id?: string;
+  run_id?: string;
+  run?: AgentRun;
+  idempotent_replay?: boolean;
+  already_running?: boolean;
   [key: string]: unknown;
 }

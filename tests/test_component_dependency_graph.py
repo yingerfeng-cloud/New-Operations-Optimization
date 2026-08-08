@@ -39,13 +39,11 @@ def test_dependency_metadata_is_owned_by_the_component_definition() -> None:
     ) == ["instance_dependency", "hydro_initial_volume"]
 
 
-def test_component_availability_uses_the_canonical_lifecycle_state() -> None:
-    assert component_is_available(
-        {"status": "published", "enabled": True, "implemented": True}
-    )
-    assert not component_is_available(
-        {"status": "已发布", "enabled": True, "implemented": True}
-    )
+def test_component_availability_uses_only_the_canonical_lifecycle_state() -> None:
+    assert component_is_available({"status": "published"})
+    assert component_is_available({"status": "published", "implemented": False})
+    assert not component_is_available({"status": "published", "enabled": False})
+    assert not component_is_available({"status": "已发布"})
 
 
 def test_finalized_draft_exposes_catalog_dependencies_to_the_editor() -> None:
@@ -156,8 +154,6 @@ def test_dependency_api_rejects_unavailable_selected_component(monkeypatch, clie
             {
                 "component_id": "offline_component",
                 "status": "offline",
-                "enabled": False,
-                "implemented": True,
             }
         ],
     )
@@ -180,15 +176,11 @@ def test_dependency_api_distinguishes_unavailable_dependency_from_missing_depend
             {
                 "component_id": "owner",
                 "status": "published",
-                "enabled": True,
-                "implemented": True,
                 "depends_on": ["offline_dependency"],
             },
             {
                 "component_id": "offline_dependency",
                 "status": "offline",
-                "enabled": False,
-                "implemented": True,
             },
         ],
     )
@@ -208,7 +200,14 @@ def test_component_validation_requires_dependency_to_be_published(client) -> Non
     owner_id = "dependency_owner_gate"
     created = client.post(
         "/api/components/catalog",
-        json={"component_id": dependency_id, "name": "dependency", "status": "draft"},
+        json={
+            "component_id": dependency_id,
+            "name": "dependency",
+            "status": "draft",
+            "parameters": [{"code": "limit", "default": 0}],
+            "variables": [{"code": "x", "dimension": [], "lower_bound": 0}],
+            "generated_constraints": [{"constraint_id": "limit_constraint", "expression": "x >= limit"}],
+        },
     )
     assert created.status_code == 200, created.text
 
@@ -217,6 +216,9 @@ def test_component_validation_requires_dependency_to_be_published(client) -> Non
         "name": "owner",
         "status": "draft",
         "depends_on": [dependency_id],
+        "parameters": [{"code": "limit", "default": 0}],
+        "variables": [{"code": "x", "dimension": [], "lower_bound": 0}],
+        "generated_constraints": [{"constraint_id": "owner_constraint", "expression": "x >= limit"}],
     }
     blocked = client.post(f"/api/components/{owner_id}/validate", json=owner)
     assert blocked.status_code == 200, blocked.text

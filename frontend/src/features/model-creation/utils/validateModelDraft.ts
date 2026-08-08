@@ -1,6 +1,6 @@
 import type { ModelDraft } from '../stores/modelCreationStore';
 import { validateFormulaDef } from '../../formula-editor/formulaValidator';
-import { bindingCode, hasBindingValue, isBindingComplete } from './bindingValidation';
+import { getMissingBindingRows, hasBindingValue } from './bindingValidation';
 import { analyzeDraftNonlinear } from './nonlinearDiagnostics';
 import { systemTimeFieldCodes, validateDraftTimeDimension } from './timeDimensionDraft';
 import { dimensionFieldConflict, extractDimensions } from './modelDimensions';
@@ -20,12 +20,10 @@ function dependencyErrors(draft: ModelDraft) {
 }
 
 function parameterBindingErrors(draft: ModelDraft) {
-  return draft.components.flatMap((component, componentIndex) => {
-    const bindings = Array.isArray(component.parameter_bindings) ? component.parameter_bindings as Array<Record<string, unknown>> : [];
-    return bindings
-      .filter(binding => binding.required === true && !isBindingComplete(binding))
-      .map((binding, index) => `组件 ${componentId(component) || componentIndex + 1} 参数绑定 ${bindingCode(binding, index)} 缺失`);
-  });
+  return draft.components.flatMap((component, componentIndex) => component.enabled === false
+    ? []
+    : getMissingBindingRows(component)
+      .map(row => `组件 ${componentId(component) || componentIndex + 1} 参数绑定 ${row.code} 缺失`));
 }
 
 function runtimeParameterErrors(draft: ModelDraft) {
@@ -41,14 +39,15 @@ function runtimeParameterErrors(draft: ModelDraft) {
 function functionMappingErrors(draft: ModelDraft) {
   return draft.components.flatMap(component => {
     const id = componentId(component);
-    if (id !== 'function_mapping_2d_component') return [];
+    const is2d = id === 'function_mapping_2d_component';
+    if (!is2d && id !== 'function_mapping_component' && id !== 'piecewise_linear_curve') return [];
     const errors: string[] = [];
-    if (!component.function_asset_id) errors.push('二维函数资产未绑定');
-    if (!component.x) errors.push('二维函数输入 x 未绑定');
-    if (!component.y) errors.push('二维函数输入 y 未绑定');
-    if (!component.z) errors.push('二维函数输出 z 未绑定');
+    if (!component.function_asset_id) errors.push(is2d ? '二维函数资产未绑定' : '一维函数资产未绑定');
+    if (!component.x) errors.push(`${is2d ? '二维函数' : '一维函数'}输入 x 未绑定`);
+    if (!component.y) errors.push(`${is2d ? '二维函数' : '一维函数'}输出 y 未绑定`);
+    if (is2d && !component.z) errors.push('二维函数输出 z 未绑定');
     if (component.solve_strategy === 'display_only') errors.push('display_only 不能作为发布求解组件');
-    if (component.solve_strategy === 'triangulated_milp_exact') {
+    if (is2d && component.solve_strategy === 'triangulated_milp_exact') {
       const metadata = (component.metadata || {}) as Record<string, unknown>;
       const triangleCount = Number(metadata.triangle_count || 0);
       const indices = Array.isArray(component.indices) ? component.indices as Array<Record<string, unknown>> : [];
@@ -117,12 +116,13 @@ export function validateModelDraft(sourceDraft: ModelDraft): DraftValidation {
   d.formulas.forEach((formula, index) => {
     const code = String(formula.formula_id || '').trim();
     const name = String(formula.name || '').trim();
+    const requiresUniqueName = formula.solve_participation !== 'preview_only';
     if (!code) formulaErrors.push(`第 ${index + 1} 个公式编码必填`);
     if (!name) formulaErrors.push(`公式 ${code || `第 ${index + 1} 项`}名称必填（用于模型解释）`);
     if (code && formulaCodes.has(code)) formulaErrors.push(`公式编码必须唯一：${code}`);
-    if (name && formulaNames.has(name)) formulaErrors.push(`公式名称必须唯一：${name}`);
+    if (requiresUniqueName && name && formulaNames.has(name)) formulaErrors.push(`公式名称必须唯一：${name}`);
     if (code) formulaCodes.add(code);
-    if (name) formulaNames.add(name);
+    if (requiresUniqueName && name) formulaNames.add(name);
   });
   const activeObjectives = d.formulas.filter(f => f.kind === 'objective' && (f.solve_participation || 'solve_active') === 'solve_active');
   const objectiveMode = d.objective?.mode || (d.objective?.type === 'weighted_sum' ? 'weighted_sum' : 'single');

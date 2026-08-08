@@ -58,11 +58,67 @@ def test_component_create_validate_publish_and_catalog() -> None:
     published = client.post(f"/api/components/{component_id}/publish")
     assert published.status_code == 200, published.text
     assert published.json()["status"] == "published"
-    assert published.json()["implemented"] is True
+    assert "implemented" not in published.json()
+    assert "enabled" not in published.json()
 
     catalog = client.get("/api/components/catalog")
     assert catalog.status_code == 200
     assert any(item["component_id"] == component_id and item["status"] == "published" for item in catalog.json())
+
+
+def test_component_lifecycle_is_server_owned_and_retired_flags_are_removed() -> None:
+    component_id = f"server_owned_lifecycle_{uuid.uuid4().hex[:8]}"
+    payload = {
+        **_soc_component(component_id),
+        "status": "published",
+        "enabled": True,
+        "implemented": True,
+    }
+
+    created = client.post("/api/components/catalog", json=payload)
+
+    assert created.status_code == 200, created.text
+    assert created.json()["status"] == "draft"
+    assert "enabled" not in created.json()
+    assert "implemented" not in created.json()
+
+
+def test_published_component_must_be_copied_before_editing() -> None:
+    component_id = f"immutable_component_{uuid.uuid4().hex[:8]}"
+    assert client.post("/api/components/catalog", json=_soc_component(component_id)).status_code == 200
+    assert client.post(f"/api/components/{component_id}/publish").status_code == 200
+
+    updated = client.put(f"/api/components/{component_id}", json={**_soc_component(component_id), "description": "changed"})
+
+    assert updated.status_code == 409
+    assert "复制" in str(updated.json())
+
+
+def test_offline_is_the_only_asset_level_unavailable_state() -> None:
+    component_id = f"offline_lifecycle_{uuid.uuid4().hex[:8]}"
+    assert client.post("/api/components/catalog", json=_soc_component(component_id)).status_code == 200
+    assert client.post(f"/api/components/{component_id}/publish").status_code == 200
+
+    offline = client.post(f"/api/components/{component_id}/offline")
+
+    assert offline.status_code == 200, offline.text
+    assert offline.json()["status"] == "offline"
+    assert "enabled" not in offline.json()
+    assert "implemented" not in offline.json()
+
+
+def test_component_asset_rejects_model_specific_parameter_bindings() -> None:
+    component_id = f"component_contract_{uuid.uuid4().hex[:8]}"
+    payload = _soc_component(component_id)
+    payload["parameter_bindings"] = [
+        {"component_parameter": "eta_ch", "model_parameter": "plant_efficiency", "status": "bound"}
+    ]
+
+    created = client.post("/api/components/catalog", json=payload)
+
+    assert created.status_code == 200, created.text
+    assert "parameter_bindings" not in created.json()
+    assert any(item["code"] == "eta_ch" for item in created.json()["parameters"])
 
 
 def test_component_formula_validation_unknown_variable_blocks_publish() -> None:
@@ -131,7 +187,8 @@ def test_hydro_components_are_seeded_as_published_component_assets() -> None:
     body = response.json()
     assert body["component_id"] == "hydro_reservoir_balance"
     assert body["status"] == "published"
-    assert body["enabled"] is True
+    assert "enabled" not in body
+    assert "implemented" not in body
     assert body["domain"] == "梯级水电日前调度"
     assert body["generated_constraints"]
 

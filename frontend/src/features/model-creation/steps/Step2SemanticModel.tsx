@@ -21,6 +21,42 @@ const sourceOptions = [
   { label: '系统生成', value: 'system' },
 ];
 
+export function mergeSelectedComponentParameters(
+  current: ModelDraft['semantic']['parameters'],
+  components: ModelDraft['components'],
+): ModelDraft['semantic']['parameters'] {
+  const merged = current.map(parameter => ({ ...parameter }));
+  const known = new Set(merged.map(parameter => parameter.code));
+  components.forEach(component => {
+    const definition = component.definition && typeof component.definition === 'object' && !Array.isArray(component.definition)
+      ? component.definition as Record<string, unknown>
+      : {};
+    const rawParameters = Array.isArray(component.parameters)
+      ? component.parameters
+      : Array.isArray(definition.parameters)
+        ? definition.parameters
+        : [];
+    rawParameters.forEach(raw => {
+      if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return;
+      const parameter = raw as Record<string, unknown>;
+      const code = String(parameter.code || parameter.key || parameter.name || '').trim();
+      if (!code || known.has(code)) return;
+      const source = String(parameter.sourceType || parameter.source_type || parameter.source_system || 'runtime');
+      const sourceType = ['static', 'ledger', 'system'].includes(source) ? source : 'runtime';
+      merged.push({
+        ...parameter,
+        code,
+        name: String(parameter.name || code),
+        sourceType,
+        source_type: sourceType,
+        required: parameter.required !== false,
+      } as ModelDraft['semantic']['parameters'][number]);
+      known.add(code);
+    });
+  });
+  return merged;
+}
+
 const variableTypeOptions = [
   { label: '连续变量', value: 'continuous' },
   { label: '0-1 变量', value: 'binary' },
@@ -319,7 +355,14 @@ export function Step2SemanticModel({ draft, onChange }: { draft: ModelDraft; onC
           selectedComponents={draft.components}
           onClose={() => setComponentPickerOpen(false)}
           onConfirm={components => {
-            onChange({ ...draft, components });
+            onChange({
+              ...draft,
+              components,
+              semantic: {
+                ...draft.semantic,
+                parameters: mergeSelectedComponentParameters(draft.semantic.parameters, components),
+              },
+            });
             setComponentPickerOpen(false);
           }}
         />

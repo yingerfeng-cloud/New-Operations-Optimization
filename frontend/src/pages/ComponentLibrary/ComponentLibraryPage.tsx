@@ -24,11 +24,7 @@ import {
   isPublishedComponent,
 } from '../../utils/componentDependencies';
 
-type ValidationResult = { valid: boolean; errors?: unknown[] };
-
-function booleanPill(value: boolean | undefined) {
-  return <span className={value !== false ? 'pill green' : 'pill amber'}>{value !== false ? '是' : '否'}</span>;
-}
+type ValidationResult = { valid: boolean; execution_ready?: boolean; errors?: unknown[] };
 
 function asValidationResult(value: unknown): ValidationResult | undefined {
   if (!value || typeof value !== 'object' || !('valid' in value)) return undefined;
@@ -48,7 +44,7 @@ export function ComponentLibraryPage() {
   const [viewId, setViewId] = useState(id);
   const [editing, setEditing] = useState(false);
   const [validation, setValidation] = useState<ValidationResult | undefined>();
-  const [filters, setFilters] = useState<{ category?: string; domain?: string; status?: string; implemented?: string }>({});
+  const [filters, setFilters] = useState<{ category?: string; domain?: string; status?: string }>({});
   const list = useQuery({ queryKey: ['components'], queryFn: getComponents });
   const config = useQuery({ queryKey: ['system-config'], queryFn: getSystemConfig, retry: false });
   const detail = useQuery({ queryKey: ['component', viewId], queryFn: () => getComponent(viewId!), enabled: !!viewId });
@@ -57,10 +53,10 @@ export function ComponentLibraryPage() {
     qc.invalidateQueries({ queryKey: ['components'] });
     if (viewId) qc.invalidateQueries({ queryKey: ['component', viewId] });
   };
-  const validate = useMutation({ mutationFn: validateComponent, onSuccess: result => { setValidation(result); done(result.valid ? '组件校验通过' : '组件校验未通过'); } });
-  const publish = useMutation({ mutationFn: publishComponent, onSuccess: () => done('组件发布成功') });
-  const copy = useMutation({ mutationFn: copyComponentVersion, onSuccess: () => done('组件版本复制成功') });
-  const offline = useMutation({ mutationFn: offlineComponent, onSuccess: () => done('组件已停用') });
+  const validate = useMutation({ mutationFn: validateComponent, onSuccess: result => { setValidation(result); done(result.valid && result.execution_ready ? '组件执行校验通过' : '组件尚未达到发布条件'); } });
+  const publish = useMutation({ mutationFn: publishComponent, onSuccess: () => { done('组件发布成功'); setEditing(false); } });
+  const copy = useMutation({ mutationFn: copyComponentVersion, onSuccess: component => { done('已复制为新的草稿版本'); setViewId(component.component_id); setEditing(true); } });
+  const offline = useMutation({ mutationFn: offlineComponent, onSuccess: () => { done('组件已停用'); setEditing(false); } });
   const save = useMutation({
     mutationFn: (value: Partial<ComponentDef>) => viewId ? updateComponent(viewId, value) : createComponent(value),
     onSuccess: component => {
@@ -72,11 +68,9 @@ export function ComponentLibraryPage() {
   const allRows = list.data || [];
   const rows = allRows.filter(item => (!filters.category || item.category === filters.category)
     && (!filters.domain || item.domain === filters.domain)
-    && (!filters.status || String(item.status) === filters.status)
-    && (!filters.implemented || String(item.implemented !== false) === filters.implemented));
-  const enabledCount = rows.filter(item => item.enabled !== false).length;
-  const implementedCount = rows.filter(item => item.implemented !== false).length;
+    && (!filters.status || String(item.status) === filters.status));
   const publishedCount = rows.filter(item => String(item.status).toLowerCase() === COMPONENT_PUBLISHED_STATUS).length;
+  const draftCount = rows.filter(item => String(item.status).toLowerCase() === 'draft').length;
   const dependencyAnalysis = analyzeComponentDependencies(allRows);
   const componentById = new Map(allRows.map(item => [getComponentId(item), item]));
   const unavailableDependencyOwners = allRows.flatMap(item => (
@@ -102,21 +96,20 @@ export function ComponentLibraryPage() {
     <>
       <PageHeader
         title="组件库管理"
-        description="可复用约束组件、参数绑定、依赖校验与版本发布。"
+        description="可复用约束组件、参数接口、依赖校验与版本发布。"
         extra={<Button type="primary" onClick={() => { setViewId(undefined); setEditing(true); setValidation(undefined); }}>新建组件</Button>}
       />
       <MetricGrid>
         <MetricCard title="组件总数" value={rows.length} description="组件注册表" tone="blue" />
-        <MetricCard title="启用组件" value={enabledCount} description="参与模型装配" tone="green" />
-        <MetricCard title="已实现" value={implementedCount} description="已有后端实现" tone="amber" />
+        <MetricCard title="已发布" value={publishedCount} description="可用于新模型" tone="green" />
+        <MetricCard title="草稿" value={draftCount} description="校验发布后可用" tone="amber" />
         <MetricCard title="依赖异常" value={dependencyIssueCount} description="缺失、自依赖或循环" tone={dependencyIssueCount ? 'red' : 'neutral'} />
       </MetricGrid>
-      <Card className="content-card section-gap" title={`组件清单 · 已发布 ${publishedCount}`}>
+      <Card className="content-card section-gap" title={`组件清单 · 生命周期已发布 ${publishedCount}`}>
         <Space wrap className="full-width component-filter-bar">
           <Select allowClear placeholder="分类" style={{ width: 140 }} value={filters.category} onChange={category => setFilters({ ...filters, category })} options={optionsFromDictionary(dictionaries?.component_categories, allRows, 'category')} />
           <Select allowClear placeholder="领域" style={{ width: 140 }} value={filters.domain} onChange={domain => setFilters({ ...filters, domain })} options={optionsFromDictionary(dictionaries?.component_domains, allRows, 'domain')} />
-          <Select allowClear placeholder="状态" style={{ width: 140 }} value={filters.status} onChange={status => setFilters({ ...filters, status })} options={[...new Set(allRows.map(item => String(item.status || '')).filter(Boolean))].map(value => ({ value, label: value }))} />
-          <Select allowClear placeholder="实现状态" style={{ width: 140 }} value={filters.implemented} onChange={implemented => setFilters({ ...filters, implemented })} options={[{ value: 'true', label: '已实现' }, { value: 'false', label: '未实现' }]} />
+          <Select allowClear placeholder="生命周期状态" style={{ width: 150 }} value={filters.status} onChange={status => setFilters({ ...filters, status })} options={[...new Set(allRows.map(item => String(item.status || '')).filter(Boolean))].map(value => ({ value, label: value }))} />
         </Space>
         <DataTable<ComponentDef>
           className="component-list-table"
@@ -127,9 +120,7 @@ export function ComponentLibraryPage() {
             { title: '组件编码', dataIndex: 'component_id' },
             { title: '分类', dataIndex: 'category' },
             { title: '领域', dataIndex: 'domain' },
-            { title: '状态', dataIndex: 'status', render: (status: string) => <StatusTag status={status} /> },
-            { title: '启用', dataIndex: 'enabled', render: booleanPill },
-            { title: '已实现', dataIndex: 'implemented', render: booleanPill },
+            { title: <span title="生命周期状态：草稿、已发布或已停用">生命周期状态</span>, dataIndex: 'status', render: (status: string) => <StatusTag status={status} /> },
             { title: '版本', dataIndex: 'version' },
             {
               title: '操作',
@@ -138,15 +129,20 @@ export function ComponentLibraryPage() {
               render: (_: unknown, row: ComponentDef) => (
                 <Space className="asset-actions">
                   <Button type="link" onClick={() => { setViewId(row.component_id); setEditing(false); setValidation(undefined); }}>查看</Button>
-                  <Button type="link" onClick={() => { setViewId(row.component_id); setEditing(true); setValidation(undefined); }}>编辑</Button>
+                  <Button
+                    type="link"
+                    disabled={String(row.status).toLowerCase() !== 'draft'}
+                    title={String(row.status).toLowerCase() === 'draft' ? '编辑草稿' : '已发布或已停用组件请复制为新版本后编辑'}
+                    onClick={() => { setViewId(row.component_id); setEditing(true); setValidation(undefined); }}
+                  >编辑</Button>
                   <Dropdown
                     trigger={['click']}
                     menu={{
                       items: [
                         { key: 'validate', label: '校验组件' },
-                        { key: 'publish', label: '发布组件' },
+                        { key: 'publish', label: String(row.status).toLowerCase() === 'offline' ? '重新发布' : '发布组件', disabled: String(row.status).toLowerCase() === 'published' },
                         { key: 'copy', label: '复制版本' },
-                        { key: 'offline', label: '停用组件', danger: true },
+                        { key: 'offline', label: '停用组件', danger: true, disabled: String(row.status).toLowerCase() !== 'published' },
                       ],
                       onClick: ({ key }) => {
                         if (key === 'validate') validate.mutate(row.component_id);
@@ -180,7 +176,8 @@ export function ComponentLibraryPage() {
           <Space style={{ width: '100%', justifyContent: 'flex-end' }}>
             <Button onClick={() => { setViewId(undefined); setEditing(false); setValidation(undefined); }}>关闭</Button>
             {c && <Button onClick={() => validate.mutate(c.component_id)}>校验</Button>}
-            {c && <Button type="primary" onClick={() => publish.mutate(c.component_id)}>发布组件</Button>}
+            {c && String(c.status).toLowerCase() !== 'published' && <Button type="primary" onClick={() => publish.mutate(c.component_id)}>{String(c.status).toLowerCase() === 'offline' ? '重新发布' : '发布组件'}</Button>}
+            {c && String(c.status).toLowerCase() !== 'draft' && <Button onClick={() => copy.mutate(c.component_id)}>复制为新草稿</Button>}
           </Space>
         )}
       >
@@ -208,10 +205,13 @@ export function ComponentLibraryPage() {
                     <Descriptions.Item label="组件编码">{c.component_id}</Descriptions.Item>
                     <Descriptions.Item label="分类">{c.category || '-'}</Descriptions.Item>
                     <Descriptions.Item label="领域">{c.domain || '-'}</Descriptions.Item>
-                    <Descriptions.Item label="状态"><StatusTag status={c.status} /></Descriptions.Item>
+                    <Descriptions.Item label="生命周期状态"><StatusTag status={c.status} /></Descriptions.Item>
                     <Descriptions.Item label="版本">{c.version || '-'}</Descriptions.Item>
-                    <Descriptions.Item label="启用">{booleanPill(c.enabled)}</Descriptions.Item>
-                    <Descriptions.Item label="后端实现">{booleanPill(c.implemented)}</Descriptions.Item>
+                    <Descriptions.Item label="建模可用性">
+                      <Tag color={String(c.status).toLowerCase() === 'published' ? 'green' : 'default'}>
+                        {String(c.status).toLowerCase() === 'published' ? '可用于新模型' : '不可用于新模型'}
+                      </Tag>
+                    </Descriptions.Item>
                     <Descriptions.Item label="依赖组件" span={2}>
                       {getComponentDependencyIds(c).length ? getComponentDependencyIds(c).map(dep => <Tag key={dep}>{dep}</Tag>) : '无'}
                     </Descriptions.Item>
@@ -221,7 +221,7 @@ export function ComponentLibraryPage() {
               },
               { key: 'business', label: '业务口径', children: <ComponentBusinessView component={c} /> },
               { key: 'math', label: '数学定义', children: <ComponentMathDefinition component={c} /> },
-              { key: 'params', label: '参数绑定', children: <ParameterBindingPanel component={c} /> },
+              { key: 'params', label: '参数接口', children: <ParameterBindingPanel component={c} /> },
               { key: 'deps', label: '依赖关系', children: <ComponentDependencyPanel component={c} available={allRows} /> },
               { key: 'validation', label: '校验结果', children: <ComponentValidationPanel result={validationResult} /> },
             ]}

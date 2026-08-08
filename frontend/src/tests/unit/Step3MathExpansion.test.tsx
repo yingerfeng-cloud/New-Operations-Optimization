@@ -39,6 +39,16 @@ vi.mock('../../api/functionAssets', () => ({
       solve_strategy: 'convex_combination_lp',
     },
     {
+      function_id: 'display_only_curve',
+      name: '仅展示参考曲线',
+      function_type: 'piecewise_1d',
+      validation_status: 'valid',
+      validation_errors: [],
+      points: [[0, 0], [10, 10]],
+      domain: { x_min: 0, x_max: 10 },
+      solve_strategy: 'display_only',
+    },
+    {
       function_id: 'bad_curve',
       name: '异常曲线',
       function_type: 'piecewise_1d',
@@ -58,6 +68,7 @@ vi.mock('../../api/functionAssets', () => ({
       triangles: [[0, 1, 2], [1, 3, 2]],
       diagnostics: { triangle_count: 2 },
       surface_diagnostics: { triangle_count: 2, point_count: 4 },
+      convexity: 'nonconvex',
       solve_strategy: 'triangulated_milp_exact',
     },
   ],
@@ -203,6 +214,16 @@ test('Step3 opens Add Function Mapping modal and saves complete component config
   expect(json).toContain('"solve_strategy":"convex_combination_lp"');
 });
 
+test('Step3 disables display-only assets in the function mapping picker', async () => {
+  renderWithQueryClient(<Harness initial={componentDraft()} />);
+  fireEvent.click(screen.getByRole('button', { name: '添加函数映射' }));
+  fireEvent.mouseDown(await screen.findByLabelText('函数/曲线资产'));
+
+  const displayOnlyOption = await screen.findByText(/仅展示参考曲线/);
+  expect(displayOnlyOption.closest('.ant-select-item-option')).toHaveClass('ant-select-item-option-disabled');
+  expect(screen.getByText(/仅展示，不可用于求解/)).toBeInTheDocument();
+});
+
 test('Step3 saves 2D function mapping component with triangulated MILP strategy', async () => {
   renderWithQueryClient(<Harness initial={componentDraft2d()} />);
   fireEvent.click(screen.getByRole('button', { name: '添加函数映射' }));
@@ -211,7 +232,8 @@ test('Step3 saves 2D function mapping component with triangulated MILP strategy'
   fireEvent.mouseDown(screen.getByLabelText('函数/曲线资产'));
   fireEvent.click(await screen.findByText(/水电出力曲面/));
 
-  await waitFor(() => expect(screen.getByLabelText('输出表达式 z')).toBeInTheDocument());
+  await waitFor(() => expect(screen.getByLabelText('表达式 z')).toBeInTheDocument());
+  expect(screen.queryByText('曲线形态存在求解风险')).not.toBeInTheDocument();
   fireEvent.click(screen.getAllByRole('button', { name: /添\s*加/ }).at(-1)!);
 
   await waitFor(() => expect(screen.getByTestId('component-count')).toHaveTextContent('1'));
@@ -255,13 +277,13 @@ test('Step3 rejects 2D mapping when z variable is missing', async () => {
   fireEvent.mouseDown(await screen.findByLabelText('函数/曲线资产'));
   fireEvent.click(await screen.findByText(/水电出力曲面/));
 
-  await waitFor(() => expect(screen.getByLabelText('输出表达式 z')).toBeInTheDocument());
+  await waitFor(() => expect(screen.getByLabelText('表达式 z')).toBeInTheDocument());
   fireEvent.click(screen.getAllByRole('button', { name: /添\s*加/ }).at(-1)!);
 
   await waitFor(() => expect(screen.getByTestId('component-count')).toHaveTextContent('0'));
 });
 
-test('Step3 rejects display_only and warns for convex hull approximation', async () => {
+test('Step3 excludes display_only strategy and warns for convex hull approximation', async () => {
   renderWithQueryClient(<Harness initial={componentDraft2d()} />);
   fireEvent.click(screen.getByRole('button', { name: '添加函数映射' }));
   fireEvent.mouseDown(await screen.findByLabelText('函数/曲线资产'));
@@ -271,8 +293,5 @@ test('Step3 rejects display_only and warns for convex hull approximation', async
   fireEvent.click((await screen.findAllByText(/convex_hull_lp_approx/)).at(-1)!);
   expect(await screen.findByText('convex_hull_lp_approx 非精确近似')).toBeInTheDocument();
 
-  fireEvent.mouseDown(screen.getByLabelText('求解策略'));
-  fireEvent.click((await screen.findAllByText(/display_only/)).at(-1)!);
-  fireEvent.click(screen.getAllByRole('button', { name: /添\s*加/ }).at(-1)!);
-  await waitFor(() => expect(screen.getByTestId('component-count')).toHaveTextContent('0'));
+  expect(screen.queryByText('display_only - 仅展示')).not.toBeInTheDocument();
 });

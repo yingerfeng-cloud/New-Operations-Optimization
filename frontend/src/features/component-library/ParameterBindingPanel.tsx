@@ -1,9 +1,7 @@
-import { Table, Tag } from 'antd';
+import { Alert, Table } from 'antd';
 import type { ComponentDef, SchemaItem } from '../../types/component';
 
-type BindingRow = SchemaItem & Record<string, unknown> & {
-  binding_status: string;
-};
+type ParameterRow = SchemaItem & Record<string, unknown>;
 
 const bindingRowKeys = new WeakMap<object, string>();
 let bindingRowSeed = 0;
@@ -13,7 +11,7 @@ function text(value: unknown) {
   return typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean' ? String(value) : JSON.stringify(value);
 }
 
-function bindingRowKey(row: BindingRow) {
+function bindingRowKey(row: ParameterRow) {
   const stableId = row.id || row.parameter_id || row.binding_id;
   if (stableId) return String(stableId);
   const existing = bindingRowKeys.get(row);
@@ -24,34 +22,32 @@ function bindingRowKey(row: BindingRow) {
   return generated;
 }
 
-function sameParameter(binding: Record<string, unknown>, code: string) {
-  return binding.parameter === code || binding.parameter_code === code || binding.code === code || binding.component_parameter === code;
-}
-
 export function ParameterBindingPanel({ component }: { component: ComponentDef }) {
-  const explicit = Array.isArray(component.parameter_bindings) ? component.parameter_bindings as Array<Record<string, unknown>> : [];
-  const rows: BindingRow[] = (component.parameters || []).map(parameter => {
-    const binding = explicit.find(item => sameParameter(item, parameter.code));
-    const merged = { ...parameter, ...(binding || {}) } as BindingRow;
-    merged.binding_status = String(binding?.status || (binding || parameter.source_system || parameter.default !== undefined ? '已绑定' : '未绑定'));
-    return merged;
-  });
+  const rows = (component.parameters || []) as ParameterRow[];
   return (
-    <Table
-      rowKey={bindingRowKey}
-      pagination={false}
-      dataSource={rows}
-      columns={[
-        { title: '参数编码', dataIndex: 'code', render: (value: unknown, row: BindingRow) => text(value || row.parameter || row.component_parameter) },
-        { title: '参数名称', dataIndex: 'name', render: text },
-        { title: '数据来源', dataIndex: 'source_system', render: (value: unknown, row: BindingRow) => text(value || row.source || row.source_path || row.runtime_key) },
-        { title: '是否必填', render: (_: unknown, row: BindingRow) => row.required ? '是' : '否' },
-        { title: '默认值', dataIndex: 'default', render: text },
-        { title: '单位', dataIndex: 'unit', render: text },
-        { title: '示例值', dataIndex: 'sample_value', render: text },
-        { title: '模型参数', dataIndex: 'model_parameter', render: text },
-        { title: '绑定状态', dataIndex: 'binding_status', render: (status: string) => <Tag color={status === '已绑定' || status === 'bound' ? 'green' : 'orange'}>{status}</Tag> },
-      ]}
-    />
+    <>
+      <Alert
+        className="compact-notice"
+        showIcon
+        type="info"
+        title="这里定义组件需要哪些参数"
+        description="具体模型参数的映射在建模装配时完成，组件资产不保存模型专属绑定。"
+      />
+      <Table
+        style={{ marginTop: 12 }}
+        rowKey={bindingRowKey}
+        pagination={false}
+        dataSource={rows}
+        columns={[
+          { title: '参数编码', dataIndex: 'code', render: (value: unknown, row: ParameterRow) => text(value || row.parameter) },
+          { title: '参数名称', dataIndex: 'name', render: text },
+          { title: '建议来源', dataIndex: 'source_system', render: (value: unknown, row: ParameterRow) => text(value || row.source_type || row.sourceType) },
+          { title: '是否必填', render: (_: unknown, row: ParameterRow) => row.required !== false ? '是' : '否' },
+          { title: '默认值', dataIndex: 'default', render: (value: unknown, row: ParameterRow) => text(value ?? row.default_value ?? row.defaultValue) },
+          { title: '单位', dataIndex: 'unit', render: text },
+          { title: '示例值', dataIndex: 'sample_value', render: text },
+        ]}
+      />
+    </>
   );
 }

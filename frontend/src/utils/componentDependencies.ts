@@ -42,9 +42,7 @@ export function getComponentDependencyIds(component: ComponentLike) {
 
 export function isPublishedComponent(component: ComponentLike) {
   const status = normalizedText(component.status).toLowerCase();
-  return component.enabled !== false
-    && component.implemented !== false
-    && status === COMPONENT_PUBLISHED_STATUS;
+  return status === COMPONENT_PUBLISHED_STATUS;
 }
 
 function canonicalCycle(cycle: string[]) {

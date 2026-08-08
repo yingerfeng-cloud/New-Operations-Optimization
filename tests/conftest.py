@@ -189,6 +189,7 @@ def reset_runtime_store(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
         "invocations",
         "skills",
         "conversations",
+        "agent_runs",
         "llm_config",
         "template_status",
         "rolling_jobs",

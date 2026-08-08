@@ -20,6 +20,7 @@ from app.model_components.formula_contracts import (
     participation_fields,
     synchronize_formula_fields,
 )
+from app.model_components.lifecycle import normalize_component_asset_lifecycle
 from app.storage.memory_store import STORE
 from app.problem_type_diagnosis import component_problem_type_fields
 from app.model_components.solver_capabilities import normalize_capabilities
@@ -49,20 +50,30 @@ def validate_component_definition(component: dict[str, Any]) -> dict[str, Any]:
         errors.append(_error("component_id", "组件编码只能包含字母、数字和下划线，且不能以数字开头", "请使用 snake_case 编码。"))
 
     if errors:
-        return {"valid": False, "errors": errors}
+        return {"valid": False, "execution_ready": False, "errors": errors}
     dependency_errors = _validate_dependencies(component)
     if dependency_errors:
-        return {"valid": False, "errors": dependency_errors}
+        return {"valid": False, "execution_ready": False, "errors": dependency_errors}
     status = str(component.get("status") or "").lower()
     if component.get("metadata_only") is True or status in {"reserved", "planned"}:
         return {
             "valid": True,
             "status": status or "reserved",
             "metadata_only": True,
-            "implemented": False,
-            "enabled": False,
+            "execution_ready": False,
             "errors": [],
         }
+
+    constraints = component.get("constraints") or component.get("generated_constraints") or []
+    objective_terms = component.get("objective_terms") or component.get("generated_objective_terms") or []
+    if not constraints and not objective_terms and not component.get("backend_builder"):
+        errors.append(
+            _error(
+                "generated_constraints",
+                "组件没有可执行的约束或目标公式",
+                "请至少配置一条约束或目标公式；仅作说明的内容请标记为 metadata_only。",
+            )
+        )
 
     symbols = _symbol_table(component)
     for section, rows in (("constraints", component.get("constraints") or component.get("generated_constraints") or []), ("objective_terms", component.get("objective_terms") or component.get("generated_objective_terms") or [])):
@@ -96,7 +107,7 @@ def validate_component_definition(component: dict[str, Any]) -> dict[str, Any]:
     errors.extend(_validate_piecewise_component(component))
     if not errors and not _component_uses_only_programmatic_constraints(component):
         errors.extend(validate_component_compiles(component))
-    return {"valid": not errors, "errors": errors}
+    return {"valid": not errors, "execution_ready": not errors, "errors": errors}
 
 
 def validate_component_compiles(component: dict[str, Any]) -> list[dict[str, Any]]:
@@ -173,7 +184,7 @@ def load_library_component(component_type: str) -> dict[str, Any] | None:
         component = deepcopy(STORE.custom_components.get(component_type) or {})
     if not component:
         return None
-    return normalize_component_payload(component)
+    return normalize_component_payload(normalize_component_asset_lifecycle(component))
 
 
 def normalize_component_payload(payload: dict[str, Any]) -> dict[str, Any]:

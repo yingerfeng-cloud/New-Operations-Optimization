@@ -3,8 +3,7 @@ from __future__ import annotations
 from collections.abc import Iterable, Mapping
 from typing import Any
 
-
-PUBLISHED_COMPONENT_STATUS = "published"
+from app.model_components.lifecycle import COMPONENT_PUBLISHED_STATUS, component_lifecycle_status
 
 
 def component_id(component: Mapping[str, Any]) -> str:
@@ -37,11 +36,7 @@ def merged_component_dependency_ids(*components: Mapping[str, Any]) -> list[str]
 
 
 def component_is_available(component: Mapping[str, Any]) -> bool:
-    return (
-        str(component.get("status") or "").strip().lower() == PUBLISHED_COMPONENT_STATUS
-        and component.get("enabled", True) is not False
-        and component.get("implemented", True) is not False
-    )
+    return component_lifecycle_status(component) == COMPONENT_PUBLISHED_STATUS
 
 
 def build_dependency_graph(components: Iterable[Mapping[str, Any]]) -> dict[str, list[str]]:

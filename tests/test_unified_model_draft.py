@@ -28,12 +28,64 @@ def test_model_draft_generates_component_spec() -> None:
     assert component_spec["objective"]["terms"]
 
 
-def test_component_registry_can_describe_add_remove_enable_disable_inputs() -> None:
+def test_model_draft_persists_parameter_bindings_on_component_instances() -> None:
+    template = get_template("cascade_hydro_dispatch")
+    draft = deepcopy(template["model_draft"])
+    component = draft["components"][0]
+    component["parameter_bindings"] = [
+        {
+            "component_parameter": "initial_volume",
+            "model_parameter": "reservoir_initial_volume",
+            "required": True,
+            "status": "bound",
+        }
+    ]
+
+    component_spec = build_component_spec_from_draft(draft)
+
+    saved_component = next(item for item in component_spec["components"] if item["type"] == component["type"])
+    assert saved_component["parameter_bindings"][0]["model_parameter"] == "reservoir_initial_volume"
+    assert component_spec["parameter_bindings"][0]["component_id"] == component["type"]
+
+
+def test_model_service_validates_model_parameter_as_a_complete_instance_binding() -> None:
+    package = ModelPackage(
+        name="binding-contract",
+        scene="test",
+        build_mode="component_based",
+        component_spec={
+            "components": [{
+                "type": "efficiency_component",
+                "parameter_bindings": [{
+                    "component_parameter": "efficiency",
+                    "model_parameter": "plant_efficiency",
+                    "required": True,
+                }],
+            }],
+        },
+    )
+
+    bindings = model_service._collect_parameter_bindings(package)
+
+    assert bindings == [{
+        "component_parameter": "efficiency",
+        "model_parameter": "plant_efficiency",
+        "required": True,
+        "component_id": "efficiency_component",
+        "component_index": 0,
+    }]
+    assert model_service._validate_required_parameter_bindings(package) == []
+
+
+def test_component_registry_exposes_lifecycle_and_registered_builder() -> None:
     catalog = list_component_catalog()
     reservoir = next(item for item in catalog if item["component_id"] == "hydro_reservoir_balance")
 
     assert reservoir["version"] == "1.0.0"
-    assert reservoir["implemented"] is True
+    assert reservoir["status"] == "published"
+    assert reservoir["backend_builder"] == "hydro_reservoir_balance"
+    assert "implemented" not in reservoir
+    assert "enabled" not in reservoir
     assert "hydro_cascade_inflow_delay" in reservoir["depends_on"]
     assert reservoir["generated_constraints"][0]["type"] == "state_transition"
 
@@ -60,6 +112,36 @@ def test_objective_builder_terms_update_weights() -> None:
     saved_term = next(item for item in component_spec["objective"]["terms"] if item["weight_key"] == "load_deviation")
     assert saved_term["weight"] == 2000
     assert saved_term["enabled"] is False
+
+
+def test_cascade_hydro_objective_terms_are_unique_by_backend_weight_key() -> None:
+    template = get_template("cascade_hydro_dispatch")
+    terms = template["model_draft"]["objective"]["terms"]
+    weight_keys = [term["weight_key"] for term in terms]
+
+    assert len(terms) == 6
+    assert len(weight_keys) == len(set(weight_keys))
+    assert set(weight_keys) == {"load_deviation", "spill", "terminal_volume", "ramp", "generation", "revenue"}
+    load_term = next(term for term in terms if term["weight_key"] == "load_deviation")
+    assert load_term["term_id"] == "load_tracking_penalty"
+    assert load_term["source_component"] == "hydro_load_tracking"
+    assert load_term["supported_by_backend"] is True
+
+
+def test_multi_formula_hydro_components_have_distinct_display_names() -> None:
+    catalog = {item["component_id"]: item for item in list_component_catalog()}
+
+    for component_id in (
+        "hydro_volume_bounds",
+        "hydro_generation_flow_bounds",
+        "hydro_outflow_bounds",
+        "hydro_spill_bounds",
+        "hydro_ramp_smoothing",
+    ):
+        constraints = catalog[component_id]["generated_constraints"]
+        assert len(constraints) == 2
+        assert len({constraint["constraint_id"] for constraint in constraints}) == 2
+        assert len({constraint["name"] for constraint in constraints}) == 2
 
 
 def test_math_expansion_generated_from_draft() -> None:
@@ -163,8 +245,6 @@ def test_component_library_metadata_edit_version_and_references() -> None:
         "domain": "通用",
         "category": "基础组件",
         "version": "1.0.0",
-        "implemented": False,
-        "enabled": True,
         "depends_on": [],
         "generated_constraints": [{"constraint_id": "custom_balance", "name": "自定义平衡", "formula": "x[t] = y[t]"}],
         "generated_objective_terms": [{"term_id": "custom_penalty", "name": "自定义惩罚", "weight_key": "custom", "supported_by_backend": False}],
@@ -173,15 +253,19 @@ def test_component_library_metadata_edit_version_and_references() -> None:
     assert created.status_code == 200, created.text
     assert created.json()["component_id"] == component_id
 
-    updated = client.put(f"/api/components/{component_id}", json={**payload, "enabled": False, "version": "1.0.1", "change_note": "disable for review"})
+    updated = client.put(f"/api/components/{component_id}", json={**payload, "version": "1.0.1", "change_note": "metadata revision"})
     assert updated.status_code == 200, updated.text
-    assert updated.json()["enabled"] is False
-    assert updated.json()["versions"][-1]["change_note"] == "disable for review"
+    assert updated.json()["status"] == "draft"
+    assert "enabled" not in updated.json()
+    assert "implemented" not in updated.json()
+    assert updated.json()["versions"][-1]["change_note"] == "metadata revision"
 
     copied = client.post(f"/api/components/{component_id}/copy-version", json={"version": "1.0.2", "change_note": "copy for staging"})
     assert copied.status_code == 200, copied.text
     assert copied.json()["version"] == "1.0.2"
-    assert copied.json()["enabled"] is False
+    assert copied.json()["status"] == "draft"
+    assert "enabled" not in copied.json()
+    assert "implemented" not in copied.json()
 
     model_payload = {
         "id": f"MODEL-COMP-REF-{uuid.uuid4().hex[:8].upper()}",

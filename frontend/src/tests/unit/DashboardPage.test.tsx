@@ -9,7 +9,7 @@ vi.mock('../../api/models', () => ({
 }));
 
 vi.mock('../../api/components', () => ({
-  getComponents: async () => [{ component_id: 'power_balance', name: '功率平衡', implemented: true }],
+  getComponents: async () => [{ component_id: 'power_balance', name: '功率平衡', status: 'published' }],
 }));
 
 vi.mock('../../api/templates', () => ({

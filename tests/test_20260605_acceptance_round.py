@@ -151,25 +151,25 @@ def test_all_builtin_components_validate_without_exception(client) -> None:
         response = client.post(f"/api/components/{item['component_id']}/validate")
         assert response.status_code == 200, response.text
         body = response.json()
-        if item.get("status") == "published" and item.get("enabled") is not False and item.get("implemented") is True:
+        if item.get("status") == "published":
             assert body["valid"] is True, (item["component_id"], body)
+            assert body["execution_ready"] is True, (item["component_id"], body)
         if item.get("metadata_only") is True or item.get("status") in {"reserved", "planned"}:
             assert body["valid"] is True, (item["component_id"], body)
             assert body["metadata_only"] is True
-            assert body["implemented"] is False
-            assert body["enabled"] is False
+            assert body["execution_ready"] is False
 
 
-def test_reserved_components_not_marked_implemented(client) -> None:
+def test_published_components_do_not_expose_retired_asset_flags(client) -> None:
     catalog = {item["component_id"]: item for item in client.get("/api/components/catalog").json()}
     piecewise = catalog["piecewise_linear_curve"]
-    assert piecewise["implemented"] is True
-    assert piecewise.get("enabled", True) is not False
-    assert piecewise["status"] in {"published", "trial", "tested"}
+    assert piecewise["status"] == "published"
+    assert "implemented" not in piecewise
+    assert "enabled" not in piecewise
     head = catalog["hydro_head_calculation"]
-    assert head["implemented"] is True
-    assert head.get("enabled", True) is not False
-    assert head["status"] in {"published", "trial", "tested"}
+    assert head["status"] == "published"
+    assert "implemented" not in head
+    assert "enabled" not in head
     assert head.get("metadata_only", False) is False
 
 

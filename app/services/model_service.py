@@ -15,6 +15,11 @@ from app.generic_formula_compiler import UNSUPPORTED_FORMULA_MESSAGE, compile_ge
 from app.model_components.dependency_graph import component_dependency_ids, component_id as dependency_component_id, selected_dependency_errors
 from app.model_components.formula_components import load_library_component, validate_component_definition
 from app.model_components.formula_contracts import formula_expression, participates_in_solve
+from app.model_components.lifecycle import (
+    COMPONENT_PUBLISHED_STATUS,
+    component_lifecycle_status,
+    normalize_component_asset_lifecycle,
+)
 from app.model_draft import finalize_model_draft, normalize_component_model_package, normalize_generic_model_package
 from app.problem_type_diagnosis import (
     infer_problem_type_from_component_spec,
@@ -479,7 +484,15 @@ class ModelService:
         if parameter_bindings:
             parameter_schema["parameter_bindings"] = deepcopy(parameter_bindings)
             input_contract["parameter_bindings"] = [
-                {"parameter": item.get("parameter") or item.get("parameter_code") or item.get("code"), "required": bool(item.get("required", False))}
+                {
+                    "parameter": item.get("runtime_key")
+                    or item.get("model_parameter")
+                    or item.get("parameter")
+                    or item.get("parameter_code")
+                    or item.get("component_parameter")
+                    or item.get("code"),
+                    "required": bool(item.get("required", False)),
+                }
                 for item in parameter_bindings
             ]
         return model.model_copy(update={"objective": objective, "time_granularity": time_granularity, "ui_metadata": ui_metadata, "parameter_bindings": parameter_bindings, "parameter_schema": parameter_schema, "input_contract": input_contract})
@@ -488,16 +501,49 @@ class ModelService:
         return normalize_model_time_dimension_contract(model)
 
     def _collect_parameter_bindings(self, model: ModelPackage | ModelView) -> list[dict[str, Any]]:
-        rows = []
+        rows: list[dict[str, Any]] = []
+        seen: set[str] = set()
+
+        def append(item: Any, *, component_id: str | None = None, component_index: int | None = None) -> None:
+            if not isinstance(item, dict):
+                return
+            row = deepcopy(item)
+            if component_id:
+                row.setdefault("component_id", component_id)
+            if component_index is not None:
+                row.setdefault("component_index", component_index)
+            identity = json.dumps(
+                {key: value for key, value in row.items() if key != "component_index"},
+                ensure_ascii=False,
+                sort_keys=True,
+                default=str,
+            )
+            if identity in seen:
+                return
+            seen.add(identity)
+            rows.append(row)
+
+        component_spec = model.component_spec or ((model.semantic_spec or {}).get("component_spec") or {})
         for source in (
             model.parameter_bindings,
-            (model.component_spec or {}).get("parameter_bindings"),
+            component_spec.get("parameter_bindings"),
             (model.semantic_spec or {}).get("parameter_bindings"),
             ((model.semantic_spec or {}).get("component_spec") or {}).get("parameter_bindings"),
         ):
             for item in source or []:
-                if isinstance(item, dict):
-                    rows.append(deepcopy(item))
+                append(item)
+        for component_index, component in enumerate(component_spec.get("components") or []):
+            if not isinstance(component, dict) or component.get("enabled", True) is False:
+                continue
+            component_id = str(component.get("type") or component.get("component_id") or component.get("code") or "")
+            for item in component.get("parameter_bindings") or []:
+                append(item, component_id=component_id, component_index=component_index)
+        for component_index, component in enumerate((model.model_draft or {}).get("components") or []):
+            if not isinstance(component, dict) or component.get("enabled", True) is False:
+                continue
+            component_id = str(component.get("type") or component.get("component_id") or component.get("code") or "")
+            for item in component.get("parameter_bindings") or []:
+                append(item, component_id=component_id, component_index=component_index)
         return rows
 
     def _model_has_time_set(self, model: ModelPackage | ModelView) -> bool:
@@ -834,13 +880,22 @@ class ModelService:
         for index, binding in enumerate(self._collect_parameter_bindings(model)):
             if binding.get("required") is not True:
                 continue
-            target = binding.get("source") or binding.get("source_path") or binding.get("runtime_key") or binding.get("value")
+            target = (
+                binding.get("model_parameter")
+                or binding.get("runtime_key")
+                or binding.get("source")
+                or binding.get("source_path")
+                or binding.get("function_asset_id")
+                or binding.get("value")
+                or binding.get("default_value")
+                or binding.get("default")
+            )
             if target in (None, "", []):
                 errors.append(
                     {
                         "field": f"parameter_bindings[{index}]",
                         "error": "required parameter binding is missing",
-                        "parameter": binding.get("parameter") or binding.get("parameter_code") or binding.get("code"),
+                        "parameter": binding.get("component_parameter") or binding.get("parameter") or binding.get("parameter_code") or binding.get("code"),
                         "suggestion": "bind all required component parameters before publishing",
                     }
                 )
@@ -1065,32 +1120,27 @@ class ModelService:
             if not component_type:
                 errors.append({"field": f"component_spec.components[{index}]", "error": "component type is required"})
                 continue
-            inline_definition = component.get("definition") or {}
-            if inline_definition:
-                definition = {**inline_definition, "component_id": inline_definition.get("component_id") or component_type}
+            definition = load_library_component(component_type)
+            if definition:
+                if component_lifecycle_status(definition) != COMPONENT_PUBLISHED_STATUS:
+                    errors.append({"field": f"component_spec.components[{index}]", "error": "未发布组件不能用于发布模型", "actual": component_type, "suggestion": "请先完成组件发布校验。"})
+                    continue
                 validation = validate_component_definition(definition)
-                if not validation["valid"]:
+                if not validation["valid"] or not validation.get("execution_ready", False):
                     for item in validation["errors"]:
                         errors.append({"field": f"component_spec.components[{index}].{item['field']}", "error": item["message"], "suggestion": item.get("suggestion")})
                 continue
             try:
                 from app.model_components.registry import component_definition
 
-                component_definition(component_type)
+                definition = component_definition(component_type)
+                validation = validate_component_definition(definition)
+                if not validation["valid"] or not validation.get("execution_ready", False):
+                    for item in validation["errors"]:
+                        errors.append({"field": f"component_spec.components[{index}].{item['field']}", "error": item["message"], "suggestion": item.get("suggestion")})
                 continue
             except RuntimeError:
-                definition = load_library_component(component_type)
-            if not definition:
                 errors.append({"field": f"component_spec.components[{index}]", "error": "组件不存在", "actual": component_type, "suggestion": "请先在组件库中创建并发布该组件。"})
-                continue
-            if definition.get("status") != "published":
-                errors.append({"field": f"component_spec.components[{index}]", "error": "未发布组件不能用于发布模型", "actual": component_type, "suggestion": "请先完成组件发布校验。"})
-            if definition.get("enabled", True) is False:
-                errors.append({"field": f"component_spec.components[{index}]", "error": "停用组件不能用于发布模型", "actual": component_type, "suggestion": "请启用组件或从模型中移除。"})
-            validation = validate_component_definition(definition)
-            if not validation["valid"]:
-                for item in validation["errors"]:
-                    errors.append({"field": f"component_spec.components[{index}].{item['field']}", "error": item["message"], "suggestion": item.get("suggestion")})
         return errors
 
     def _validate_component_dependency_integrity(self, component_spec: dict[str, Any]) -> list[dict[str, Any]]:
@@ -1102,7 +1152,7 @@ class ModelService:
             if item.get("enabled", True) is not False
         }
         with STORE.lock:
-            custom_components = [deepcopy(item) for item in STORE.custom_components.values()]
+            custom_components = [normalize_component_asset_lifecycle(item) for item in STORE.custom_components.values()]
         catalog = {
             str(item.get("component_id") or item.get("type") or ""): item
             for item in [*list_component_catalog(), *custom_components]
@@ -1274,6 +1324,15 @@ class ModelService:
                 continue
             is_2d = component_type == "function_mapping_2d_component" or asset.get("function_type") == "piecewise_2d"
             strategy = str(cfg.get("solve_strategy") or asset.get("solve_strategy") or ("triangulated_milp_exact" if is_2d else "convex_combination_lp"))
+            if asset.get("solve_strategy") == "display_only":
+                errors.append(
+                    {
+                        "field": f"component_spec.components[{index}].function_asset_id",
+                        "error": "display_only function assets cannot be used by a solve-active function mapping",
+                        "actual": asset.get("function_id") or function_id,
+                        "suggestion": "Choose a function asset configured with an LP or MILP solve strategy.",
+                    }
+                )
             if not cfg.get("x"):
                 errors.append({"field": f"component_spec.components[{index}].x", "error": "x is required"})
             if not cfg.get("y"):
@@ -1325,13 +1384,13 @@ class ModelService:
                         "suggestion": "Use convex_combination_lp for the current LP approximation or display_only for diagnostics.",
                     }
                 )
-            if is_2d and strategy == "display_only":
+            if strategy == "display_only":
                 errors.append(
                     {
                         "field": f"component_spec.components[{index}].solve_strategy",
-                        "error": "display_only cannot be published as a solve-active 2D function mapping",
+                        "error": "display_only cannot be published as a solve-active function mapping",
                         "actual": strategy,
-                        "suggestion": "Use triangulated_milp_exact for exact MILP solving, or remove the mapping from the published model.",
+                        "suggestion": "Choose an LP or MILP solve strategy, or remove the mapping from the published model.",
                     }
                 )
             if is_2d and strategy == "convex_hull_lp_approx":
@@ -1873,8 +1932,6 @@ class ModelService:
                         "component_id": component_id,
                         "type": component_id,
                         "status": item.get("status") or "published",
-                        "implemented": item.get("implemented", True),
-                        "enabled": item.get("enabled", True),
                         "domain": "梯级水电日前调度",
                         "problem_types": ["LP"],
                         "solver_capabilities": ["LP"],
@@ -1888,22 +1945,23 @@ class ModelService:
         with STORE.lock:
             changed = False
             for component in defaults:
+                component = normalize_component_asset_lifecycle(component)
                 component_id = component["component_id"]
                 existing = STORE.custom_components.get(component_id)
-                if existing and existing.get("status") == "published" and existing.get("managed_default_version") == component.get("managed_default_version"):
+                if existing and existing.get("managed_default_version") == component.get("managed_default_version"):
+                    migrated = normalize_component_asset_lifecycle(existing)
+                    if migrated != existing:
+                        STORE.custom_components[component_id] = migrated
+                        changed = True
                     continue
-                implemented = bool(component.get("implemented", True))
-                enabled = component.get("enabled", True) is not False
-                status = component.get("status") or ("published" if implemented else "reserved")
+                status = component_lifecycle_status(component)
                 STORE.custom_components[component_id] = {
                     **component,
                     "type": component_id,
                     "status": status,
-                    "implemented": implemented,
-                    "enabled": enabled,
                     "created_at": existing.get("created_at") if existing else timestamp,
                     "updated_at": timestamp,
-                    "published_at": existing.get("published_at") if existing else timestamp,
+                    "published_at": (existing.get("published_at") if existing else timestamp) if status == COMPONENT_PUBLISHED_STATUS else None,
                     "editable": True,
                     "managed_default_version": component.get("managed_default_version"),
                 }
@@ -1935,7 +1993,17 @@ def _normalize_default_component(component: dict[str, Any]) -> dict[str, Any]:
 
 
 def _default_library_components() -> list[dict[str, Any]]:
-    marker = {"managed_default_version": "pv-storage-v2-components-zh-v4"}
+    # Managed defaults ship with executable formulas and are immediately
+    # available to model templates.  Their lifecycle therefore starts in the
+    # published state; user-created assets still always start as drafts.
+    marker = {
+        # Bump the managed version once so installations that were migrated to
+        # draft before lifecycle ownership was corrected are reseeded as
+        # published.  After this migration, same-version restarts preserve an
+        # administrator's explicit offline state.
+        "managed_default_version": "pv-storage-v2-components-zh-v5-lifecycle",
+        "status": COMPONENT_PUBLISHED_STATUS,
+    }
     time = [{"code": "time", "name": "调度时段"}]
     time_volume = [{"code": "time_volume", "name": "SOC时点"}]
     for item in time:

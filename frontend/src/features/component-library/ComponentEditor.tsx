@@ -7,6 +7,7 @@ import type { ComponentDef, SchemaItem } from '../../types/component';
 import type { FormulaDef } from '../../types/formula';
 import type { AuthoritativeCompileContext } from '../formula-editor/authoritativeCompilation';
 import type { DictionaryItem, SystemDictionaries } from '../../types/systemConfig';
+import { StatusTag } from '../../components/StatusTag';
 import {
   analyzeComponentDependencyCandidate,
   getComponentDependencyIds,
@@ -109,6 +110,10 @@ export function componentFormulaCompileContext(
 
 export function normalizeComponentForEditor(component?: ComponentDef): Partial<ComponentDef> | undefined {
   if (!component) return undefined;
+  const componentContract = { ...component };
+  delete componentContract.parameter_bindings;
+  delete componentContract.enabled;
+  delete componentContract.implemented;
   const componentLabel = String(component.display_name || component.name || component.component_id || '组件');
   const withFormulaNames = (rows: FormulaRow[], kind: 'constraint' | 'objective') => rows.map((row, index) => {
     const code = String(row.constraint_id || row.term_id || row.code || `${kind}_${index + 1}`);
@@ -118,7 +123,7 @@ export function normalizeComponentForEditor(component?: ComponentDef): Partial<C
   const generatedConstraints = withFormulaNames(preferredRows(component.generated_constraints, component.constraints), 'constraint');
   const generatedObjectiveTerms = withFormulaNames(preferredRows(component.generated_objective_terms, component.objective_terms), 'objective');
   return {
-    ...component,
+    ...componentContract,
     required_sets: (component.required_sets?.length ? component.required_sets : rowsFrom(component.sets)) as SchemaItem[],
     parameters: (component.parameters?.length ? component.parameters : rowsFrom(component.inputs)) as SchemaItem[],
     variables: component.variables || [],
@@ -127,12 +132,6 @@ export function normalizeComponentForEditor(component?: ComponentDef): Partial<C
     depends_on: getComponentDependencyIds(component),
   };
 }
-
-const statusOptions = [
-  { label: '草稿', value: 'draft' },
-  { label: '已发布', value: 'published' },
-  { label: '已停用', value: 'offline' },
-];
 
 function SchemaList({ name, title }: { name: 'required_sets' | 'parameters' | 'variables'; title: string }) {
   return (
@@ -392,34 +391,6 @@ function FormulaList({ name, title, form, component }: { name: 'generated_constr
   );
 }
 
-function BindingList() {
-  return (
-    <Form.List name="parameter_bindings">
-      {(fields, { add, remove }) => (
-        <Space orientation="vertical" size={12} style={{ width: '100%' }}>
-          {fields.map(field => (
-            <Card
-              key={field.key}
-              size="small"
-              title={`参数绑定 #${field.name + 1}`}
-              extra={<Button aria-label="删除参数绑定" danger type="text" icon={<DeleteOutlined />} onClick={() => remove(field.name)} />}
-            >
-              <Row gutter={12}>
-                <Col xs={24} md={8}><Form.Item name={[field.name, 'component_parameter']} label="组件参数" rules={[{ required: true }]}><Input /></Form.Item></Col>
-                <Col xs={24} md={8}><Form.Item name={[field.name, 'model_parameter']} label="模型参数"><Input /></Form.Item></Col>
-                <Col xs={24} md={8}><Form.Item name={[field.name, 'status']} label="绑定状态"><Select options={[{ label: '已绑定', value: 'bound' }, { label: '未绑定', value: 'unbound' }]} /></Form.Item></Col>
-                <Col xs={24} md={12}><Form.Item name={[field.name, 'source_system']} label="数据来源"><Input /></Form.Item></Col>
-                <Col xs={24} md={12}><Form.Item name={[field.name, 'runtime_key']} label="运行参数键"><Input /></Form.Item></Col>
-              </Row>
-            </Card>
-          ))}
-          <Button icon={<PlusOutlined />} onClick={() => add({ status: 'bound' })}>新增参数绑定</Button>
-        </Space>
-      )}
-    </Form.List>
-  );
-}
-
 function DependencyEditor({
   form,
   component,
@@ -481,10 +452,11 @@ function DependencyEditor({
         />
       </Form.Item>
       <Alert
+        className={blocksPublish ? undefined : 'compact-notice component-dependency-status'}
         showIcon
         type={blocksPublish ? 'error' : 'success'}
         title={blocksPublish ? '依赖异常将阻止发布' : '依赖校验通过'}
-        description={blocksPublish ? errorDescriptions.join('；') : '当前依赖均存在，且没有自依赖或循环依赖。'}
+        description={blocksPublish ? errorDescriptions.join('；') : '依赖均存在，无自依赖或循环依赖。'}
       />
       <div className="dependency-list">
         {deps.length ? deps.map(dep => (
@@ -522,22 +494,21 @@ export function ComponentEditor({ component, availableComponents = [], dictionar
       : dictionaries?.component_categories,
     selectedCategory,
   );
-  const isImplemented = component ? component.implemented !== false : false;
-  const implementationStatus = isImplemented
-    ? '已实现，可参与后端求解'
-    : component?.status === 'reserved' || component?.status === 'planned'
-      ? '预留/仅展示'
-      : '草稿保存后需校验并发布，发布成功后自动标记为已实现';
   const handleSave = (value: Partial<ComponentDef>) => {
-    const deps = getComponentDependencyIds(value as Record<string, unknown>);
-    const generatedConstraints = rowsFrom(value.generated_constraints).map(row => ({
+    const componentContract = { ...value };
+    delete componentContract.parameter_bindings;
+    delete componentContract.status;
+    delete componentContract.enabled;
+    delete componentContract.implemented;
+    const deps = getComponentDependencyIds(componentContract as Record<string, unknown>);
+    const generatedConstraints = rowsFrom(componentContract.generated_constraints).map(row => ({
       ...normalizeFormulaRowForSave(row),
       boundary_strategy: normalizeBoundaryStrategy(row.boundary_strategy),
     }));
-    const generatedObjectiveTerms = rowsFrom(value.generated_objective_terms).map(normalizeFormulaRowForSave);
-    const currentId = String(value.component_id || component?.component_id || '');
+    const generatedObjectiveTerms = rowsFrom(componentContract.generated_objective_terms).map(normalizeFormulaRowForSave);
+    const currentId = String(componentContract.component_id || component?.component_id || '');
     const candidate = {
-      ...value,
+      ...componentContract,
       component_id: currentId,
       type: currentId,
       enabled: true,
@@ -552,8 +523,7 @@ export function ComponentEditor({ component, availableComponents = [], dictionar
       ...cycles.map(cycle => ({ field: 'depends_on', message: `组件存在循环依赖：${cycle.join(' → ')}` })),
     ];
     onSave({
-      ...value,
-      implemented: value.implemented ?? component?.implemented ?? false,
+      ...componentContract,
       constraints: generatedConstraints,
       generated_constraints: generatedConstraints,
       objective_terms: generatedObjectiveTerms,
@@ -578,20 +548,26 @@ export function ComponentEditor({ component, availableComponents = [], dictionar
           <Col xs={24} md={12}><Form.Item name="version" label="版本"><Input /></Form.Item></Col>
           <Col xs={24} md={8}><Form.Item name="category" label="分类"><Select showSearch options={categoryOptions} placeholder="选择分类" /></Form.Item></Col>
           <Col xs={24} md={8}><Form.Item name="domain" label="领域"><Select showSearch options={domainOptions} placeholder="选择领域" onChange={() => form.setFieldValue('category', undefined)} /></Form.Item></Col>
-          <Col xs={24} md={8}><Form.Item name="status" label="状态"><Select options={statusOptions} /></Form.Item></Col>
-          <Col xs={24} md={8}><Form.Item name="enabled" label="启用" valuePropName="checked"><Switch /></Form.Item></Col>
-          <Form.Item name="implemented" valuePropName="checked" hidden><Switch /></Form.Item>
-          <Col xs={24} md={16}><Form.Item label="实现状态"><Tag color={isImplemented ? 'green' : 'orange'}>{implementationStatus}</Tag></Form.Item></Col>
-          <Col span={24}><Form.Item name="description" label="组件说明"><Input.TextArea autoSize={{ minRows: 2, maxRows: 5 }} /></Form.Item></Col>
+          <Col xs={24} md={8}>
+            <Form.Item
+              label="生命周期状态"
+              tooltip="生命周期由保存草稿、发布和停用操作自动维护，不能在编辑器中直接修改。"
+            >
+              <Space size={8}>
+                <StatusTag status={component?.status || 'draft'} />
+                <Typography.Text type="secondary">由系统维护</Typography.Text>
+              </Space>
+            </Form.Item>
+          </Col>
+           <Col span={24}><Form.Item name="description" label="组件说明"><Input.TextArea autoSize={{ minRows: 2, maxRows: 5 }} /></Form.Item></Col>
         </Row>
       ),
     },
     { key: 'sets', label: '集合配置', children: <SchemaList name="required_sets" title="集合" /> },
-    { key: 'params', label: '参数配置', children: <SchemaList name="parameters" title="参数" /> },
+    { key: 'params', label: '参数接口', children: <SchemaList name="parameters" title="参数接口" /> },
     { key: 'vars', label: '变量配置', children: <SchemaList name="variables" title="变量" /> },
     { key: 'constraints', label: '约束公式', children: <FormulaList form={form} component={component} name="generated_constraints" title="约束公式" /> },
     { key: 'objective', label: '目标项', children: <FormulaList form={form} component={component} name="generated_objective_terms" title="目标项" /> },
-    { key: 'binding', label: '参数绑定', children: <BindingList /> },
     {
       key: 'dependencies',
       label: '依赖关系',
@@ -606,7 +582,7 @@ export function ComponentEditor({ component, availableComponents = [], dictionar
   ];
   const currentSection = sections.find(section => section.key === activeSection) || sections[0];
   return (
-    <Form id="component-editor-form" form={form} layout="vertical" initialValues={normalizedComponent || { enabled: true, implemented: false, status: 'draft', version: '1.0.0' }} onFinish={handleSave}>
+    <Form id="component-editor-form" form={form} layout="vertical" initialValues={normalizedComponent || { version: '1.0.0' }} onFinish={handleSave}>
       <div className="component-editor-layout">
         <nav className="component-editor-nav" aria-label="组件编辑分区">
           {sections.map(section => (

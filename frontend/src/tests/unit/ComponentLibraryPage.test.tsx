@@ -16,9 +16,7 @@ const componentSample: ComponentDef = {
   display_name: '储能 SOC 约束',
   category: 'storage',
   domain: 'power',
-  status: 'published',
-  enabled: true,
-  implemented: true,
+  status: 'draft',
   version: '1.0.0',
   description: '储能状态递推与边界约束',
   required_sets: [{ code: 'time', name: '时段', dimension: ['t'], required: true }],
@@ -53,6 +51,8 @@ test('renders component library list and structured detail drawer', async () => 
   renderPage();
   expect(screen.getByText('组件库管理')).toBeInTheDocument();
   expect(await screen.findByText('储能 SOC 约束')).toBeInTheDocument();
+  expect(screen.queryByText('装配启用')).not.toBeInTheDocument();
+  expect(screen.queryByText('后端实现')).not.toBeInTheDocument();
 
   fireEvent.click(screen.getByRole('button', { name: '查看' }));
 
@@ -89,6 +89,7 @@ test('legacy formula fields are normalized for editing and synchronized on save'
   const normalized = normalizeComponentForEditor(legacyComponent);
   expect(normalized?.generated_constraints).toHaveLength(1);
   expect(normalized?.generated_objective_terms).toHaveLength(1);
+  expect(normalized?.parameter_bindings).toBeUndefined();
 
   const { container } = render(<ComponentEditor component={legacyComponent} availableComponents={[legacyComponent]} onSave={onSave} />);
   fireEvent.click(screen.getByRole('button', { name: '约束公式' }));
@@ -102,6 +103,18 @@ test('legacy formula fields are normalized for editing and synchronized on save'
   const payload = onSave.mock.calls[0][0];
   expect(payload.constraints).toEqual(payload.generated_constraints);
   expect(payload.objective_terms).toEqual(payload.generated_objective_terms);
+  expect(payload.parameter_bindings).toBeUndefined();
+  expect(payload.status).toBeUndefined();
+  expect(payload.enabled).toBeUndefined();
+  expect(payload.implemented).toBeUndefined();
+});
+
+test('editor removes retired asset flags from legacy component data', () => {
+  const legacyComponent = { ...componentSample, enabled: false, implemented: false } as ComponentDef;
+  const normalized = normalizeComponentForEditor(legacyComponent);
+
+  expect(normalized).not.toHaveProperty('enabled');
+  expect(normalized).not.toHaveProperty('implemented');
 });
 
 test('objective rows retain direction, weight, priority and participation metadata', () => {
@@ -157,7 +170,7 @@ test('confirming deletion removes the selected formula from the component draft'
   expect(screen.queryByText('SOC 递推', { exact: true })).not.toBeInTheDocument();
 });
 
-test('renders component schema, math, binding and dependency panels', () => {
+test('renders component schema, math, parameter interface and dependency panels', () => {
   render(<ComponentBusinessView component={componentSample} />);
   expect(screen.getByText('required_sets')).toBeInTheDocument();
   expect(screen.getByText('soc_initial')).toBeInTheDocument();
@@ -168,16 +181,41 @@ test('renders component schema, math, binding and dependency panels', () => {
   expect(screen.getByText('sum(cost[t])')).toBeInTheDocument();
 
   render(<ParameterBindingPanel component={componentSample} />);
-  expect(screen.getByText('soc0')).toBeInTheDocument();
-  expect(screen.getByText('bound')).toBeInTheDocument();
+  expect(screen.getByText('这里定义组件需要哪些参数')).toBeInTheDocument();
+  expect(screen.queryByText('soc0')).not.toBeInTheDocument();
+  expect(screen.queryByText('bound')).not.toBeInTheDocument();
 
   render(<ComponentDependencyPanel
     component={componentSample}
     available={[
       componentSample,
-      { component_id: 'power_balance', name: '功率平衡', status: 'published', enabled: true, implemented: true, version: '1' },
+      { component_id: 'power_balance', name: '功率平衡', status: 'published', version: '1' },
     ]}
   />);
   expect(screen.getAllByText('missing_component').length).toBeGreaterThan(0);
   expect(screen.getByText('异常')).toBeInTheDocument();
 }, 30000);
+
+test('new component opens a system-owned draft lifecycle editor', async () => {
+  const user = userEvent.setup();
+  renderPage();
+  await screen.findByText('储能 SOC 约束');
+
+  await user.click(screen.getByRole('button', { name: '新建组件' }));
+
+  expect(await screen.findByText('组件编辑器')).toBeInTheDocument();
+  expect(screen.getByText('由系统维护')).toBeInTheDocument();
+  expect(screen.getAllByText('草稿').length).toBeGreaterThan(1);
+  expect(screen.queryByText('装配启用')).not.toBeInTheDocument();
+  expect(screen.queryByText('后端实现')).not.toBeInTheDocument();
+}, 30000);
+
+test('keeps model-specific parameter binding out of the component editor', async () => {
+  render(<ComponentEditor component={componentSample} availableComponents={[componentSample]} onSave={vi.fn()} />);
+
+  expect(screen.queryByRole('button', { name: '参数绑定' })).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: '参数接口' }));
+
+  expect(await screen.findByText('参数接口 #1')).toBeInTheDocument();
+  expect(screen.getByDisplayValue('soc_initial')).toBeInTheDocument();
+});

@@ -58,8 +58,8 @@ describe('component formula compatibility contract', () => {
   });
 
   test('component switching derives isolated editor state', () => {
-    const componentA = { component_id: 'a', name: 'A', status: 'draft', enabled: true, implemented: true, version: '1', generated_constraints: [{ expression: 'a >= 1' }], parameters: [{ code: 'a_limit' }] } satisfies ComponentDef;
-    const componentB = { component_id: 'b', name: 'B', status: 'draft', enabled: true, implemented: true, version: '1', generated_constraints: [{ expression: 'b >= 2' }], parameters: [{ code: 'b_limit' }] } satisfies ComponentDef;
+    const componentA = { component_id: 'a', name: 'A', status: 'draft', version: '1', generated_constraints: [{ expression: 'a >= 1' }], parameters: [{ code: 'a_limit' }] } satisfies ComponentDef;
+    const componentB = { component_id: 'b', name: 'B', status: 'draft', version: '1', generated_constraints: [{ expression: 'b >= 2' }], parameters: [{ code: 'b_limit' }] } satisfies ComponentDef;
     expect(normalizeComponentForEditor(componentA)?.generated_constraints).toEqual([{ expression: 'a >= 1', name: 'A' }]);
     expect(normalizeComponentForEditor(componentB)?.generated_constraints).toEqual([{ expression: 'b >= 2', name: 'B' }]);
     expect(normalizeComponentForEditor(componentB)?.parameters).toEqual([{ code: 'b_limit' }]);

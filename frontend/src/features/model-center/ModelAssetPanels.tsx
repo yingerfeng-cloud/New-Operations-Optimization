@@ -1,4 +1,4 @@
-import { Alert, Card, Descriptions, Empty, Space, Table, Tag } from 'antd';
+import { Alert, Card, Descriptions, Empty, Space, Table, Tag, Tooltip } from 'antd';
 import type { ReactNode } from 'react';
 import { JsonViewer } from '../../components/JsonViewer';
 import { StatusTag } from '../../components/StatusTag';
@@ -60,9 +60,17 @@ function withKeys(rows: Row[], prefix: string) {
   return rows.map((row, index) => ({ ...row, __row_key: String(row.id || row.code || row.key || row.name || row.component_id || `${prefix}-${index}`) }));
 }
 
+function TableCellValue({ value }: { value: string | number }) {
+  const content = String(value);
+  const isLong = content.length > 96;
+  const cell = <span className={`model-detail-cell-value${isLong ? ' is-long' : ''}`}>{content}</span>;
+  return isLong ? <Tooltip title={content} placement="topLeft">{cell}</Tooltip> : cell;
+}
+
 function SmallTable({ rows, columns, empty }: { rows: Row[]; columns: Array<{ title: string; dataIndex?: string; render?: (value: unknown, row: Row) => ReactNode }>; empty: string }) {
   return (
     <Table
+      className={`model-detail-table${columns.length === 2 ? ' is-key-value' : ''}`}
       size="small"
       pagination={false}
       rowKey="__row_key"
@@ -70,7 +78,10 @@ function SmallTable({ rows, columns, empty }: { rows: Row[]; columns: Array<{ ti
       locale={{ emptyText: <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={empty} /> }}
       columns={columns.map(column => ({
         ...column,
-        render: column.render || ((value: unknown) => text(value)),
+        render: (value: unknown, row: Row) => {
+          const rendered = column.render ? column.render(value, row) : text(value);
+          return typeof rendered === 'string' || typeof rendered === 'number' ? <TableCellValue value={rendered} /> : rendered;
+        },
       }))}
     />
   );

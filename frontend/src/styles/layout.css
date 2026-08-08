@@ -40,9 +40,16 @@
   .global-search { width: min(34vw, 360px); }
 }
 
+@media (max-width: 1180px) and (min-width: 1024px) {
+  .global-search { width: 38px; min-width: 38px; justify-content: center; padding-inline: 0; }
+  .global-search span:nth-child(2),
+  .global-search kbd { display: none; }
+}
+
 @media (max-width: 1023px) {
-  .top-header { padding-inline: 12px; }
-  .top-search-area { flex: 1; }
+  .top-header { align-items: center; flex-direction: row; padding-inline: 12px; }
+  .top-search-area { width: auto; flex: 1; flex-direction: row; align-items: center; }
+  .top-actions { width: auto; flex-direction: row; align-items: center; }
   .current-page-chip { max-width: 30vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .global-search { width: auto; min-width: 42px; margin-left: auto; }
   .main-content.content { padding: 18px 14px 28px; }

@@ -12,6 +12,8 @@ from app.model_components.formula_contracts import (
     participation_fields,
     synchronize_formula_fields,
 )
+from app.model_components.objective_components import SINGLETON_OBJECTIVE_WEIGHT_KEYS
+from app.model_components.lifecycle import COMPONENT_DRAFT_STATUS, normalize_component_asset_lifecycle
 from app.model_components.registry import component_definition, list_component_catalog
 from app.problem_type_diagnosis import infer_problem_type_from_draft, normalize_problem_type
 from app.storage.memory_store import STORE
@@ -60,6 +62,7 @@ def create_model_draft_from_template(template: dict[str, Any]) -> dict[str, Any]
             "dependencies": list(dependencies),
             "generated_constraints": deepcopy(definition.get("generated_constraints") or []),
             "generated_objective_terms": deepcopy(definition.get("generated_objective_terms") or []),
+            "parameter_bindings": deepcopy(item.get("parameter_bindings") or []),
         }
         if component_type in COMPONENT_CONFIG_COMPONENTS:
             for field in COMPONENT_CONFIG_FIELDS:
@@ -109,11 +112,10 @@ def _component_definition_or_metadata(component_type: str) -> dict[str, Any]:
     with STORE.lock:
         custom = deepcopy(STORE.custom_components.get(component_type) or {})
     if custom:
-        custom = normalize_component_payload(custom)
+        custom = normalize_component_payload(normalize_component_asset_lifecycle(custom))
         custom.setdefault("component_id", component_type)
         custom.setdefault("type", component_type)
         custom.setdefault("name", component_type)
-        custom.setdefault("implemented", custom.get("status") == "published")
         custom.setdefault("generated_constraints", [])
         custom.setdefault("generated_objective_terms", [])
         return custom
@@ -124,8 +126,7 @@ def _component_definition_or_metadata(component_type: str) -> dict[str, Any]:
             "component_id": component_type,
             "type": component_type,
             "name": component_type,
-            "implemented": False,
-            "enabled": False,
+            "status": COMPONENT_DRAFT_STATUS,
             "metadata_only": True,
             "generated_constraints": [],
             "generated_objective_terms": [],
@@ -448,6 +449,14 @@ def build_component_spec_from_draft(draft: dict[str, Any]) -> dict[str, Any]:
     advanced = draft.get("advanced") or {}
     current = deepcopy(advanced.get("component_spec") or {})
     enabled_components = [_component_spec_item_from_draft(item) for item in draft.get("components", []) or [] if item.get("enabled", True)]
+    parameter_bindings = []
+    for component_index, component in enumerate(draft.get("components", []) or []):
+        if component.get("enabled", True) is False:
+            continue
+        component_type = str(component.get("type") or component.get("component_id") or component.get("code") or f"component_{component_index + 1}")
+        for binding in component.get("parameter_bindings") or []:
+            if isinstance(binding, dict):
+                parameter_bindings.append({**deepcopy(binding), "component_id": component_type, "component_index": component_index})
     for item in enabled_components:
         if "config" in item and not item["config"]:
             item.pop("config", None)
@@ -471,6 +480,7 @@ def build_component_spec_from_draft(draft: dict[str, Any]) -> dict[str, Any]:
         "parameters": merged_parameters,
         "variables": merged_variables,
         "components": enabled_components,
+        "parameter_bindings": parameter_bindings or deepcopy(current.get("parameter_bindings") or []),
         "objective": {"type": "weighted_sum", "sense": objective.get("sense", "minimize"), "terms": objective.get("terms", [])},
         "objective_strategy": deepcopy(draft.get("objective_strategy") or generate_objective_strategy(objective)),
         "additional_custom_constraints": deepcopy(draft.get("constraints") or []),
@@ -489,6 +499,8 @@ def _component_spec_item_from_draft(item: dict[str, Any]) -> dict[str, Any]:
         row["generated_constraints"] = deepcopy(item["generated_constraints"])
     if item.get("generated_objective_terms"):
         row["generated_objective_terms"] = deepcopy(item["generated_objective_terms"])
+    if item.get("parameter_bindings"):
+        row["parameter_bindings"] = deepcopy(item["parameter_bindings"])
     if component_type in COMPONENT_CONFIG_COMPONENTS:
         for field in COMPONENT_CONFIG_FIELDS:
             if field == "config":
@@ -796,6 +808,7 @@ def _draft_components_from_component_spec(component_spec: dict[str, Any]) -> lis
             "dependencies": list(dependencies),
             "generated_constraints": deepcopy(item.get("generated_constraints") or definition.get("generated_constraints") or []),
             "generated_objective_terms": deepcopy(item.get("generated_objective_terms") or definition.get("generated_objective_terms") or []),
+            "parameter_bindings": deepcopy(item.get("parameter_bindings") or []),
         }
         if component_type in COMPONENT_CONFIG_COMPONENTS:
             for field in COMPONENT_CONFIG_FIELDS:
@@ -873,23 +886,62 @@ def normalize_generic_model_package(model_data: dict[str, Any]) -> dict[str, Any
 
 def _objective_from_components(components: list[dict[str, Any]], objective_spec: dict[str, Any]) -> dict[str, Any]:
     terms: list[dict[str, Any]] = []
+    term_indexes: dict[tuple[str, str], int] = {}
     weights = objective_spec.get("weights") or {}
+
+    def identities(item: dict[str, Any]) -> list[tuple[str, str]]:
+        result: list[tuple[str, str]] = []
+        weight_key = str(item.get("weight_key") or "").strip()
+        if weight_key in SINGLETON_OBJECTIVE_WEIGHT_KEYS:
+            result.append(("weight_key", weight_key))
+        term_id = str(item.get("term_id") or "").strip()
+        if term_id:
+            result.append(("term_id", term_id))
+        return result
+
+    def append_component_term(item: dict[str, Any]) -> None:
+        item_identities = identities(item)
+        existing_index = next((term_indexes[value] for value in item_identities if value in term_indexes), None)
+        if existing_index is not None:
+            for value in item_identities:
+                term_indexes[value] = existing_index
+            return
+        terms.append(item)
+        for value in item_identities:
+            term_indexes[value] = len(terms) - 1
+
+    def merge_explicit_term(item: dict[str, Any]) -> None:
+        item_identities = identities(item)
+        existing_index = next((term_indexes[value] for value in item_identities if value in term_indexes), None)
+        if existing_index is None:
+            terms.append(item)
+            for value in item_identities:
+                term_indexes[value] = len(terms) - 1
+            return
+        existing = terms[existing_index]
+        canonical_term_id = existing.get("term_id")
+        source_component = existing.get("source_component")
+        existing.update(item)
+        if canonical_term_id:
+            existing["term_id"] = canonical_term_id
+        if source_component and not item.get("source_component"):
+            existing["source_component"] = source_component
+        for value in {*identities(existing), *item_identities}:
+            term_indexes[value] = existing_index
+
     for component in components:
         for term in component.get("generated_objective_terms") or []:
             item = _normalize_objective_term(term, source_component=component.get("component_id") or component.get("type"))
             key = item.get("weight_key")
             if key in weights:
                 item["weight"] = weights[key]
-            terms.append(item)
-    existing_ids = {str(item.get("term_id") or item.get("weight_key") or "") for item in terms}
+            append_component_term(item)
     for term in objective_spec.get("terms") or []:
-        term_id = str(term.get("term_id") or term.get("weight_key") or "")
-        if term_id and term_id in existing_ids:
-            for item in terms:
-                if str(item.get("term_id") or item.get("weight_key") or "") == term_id:
-                    item.update(deepcopy(term))
-            continue
-        terms.append(_normalize_objective_term(term))
+        item = _normalize_objective_term(term)
+        key = item.get("weight_key")
+        if key in weights and item.get("weight") is None:
+            item["weight"] = weights[key]
+        merge_explicit_term(item)
     return {"sense": objective_spec.get("sense", "minimize"), "terms": terms}
 
 

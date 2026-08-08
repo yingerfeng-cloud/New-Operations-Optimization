@@ -56,12 +56,14 @@ class ComponentModelBuilder:
             for component in list(model_spec.get("components", []))
             if self._component_enabled(component, runtime_parameters)
         ]
+        prepared_components = []
         for component in components:
             builder = self._component_builder(component)
-            builder.validate(component, context)
-        for component in components:
-            builder = self._component_builder(component)
-            builder.build(model, component, context)
+            component_context = self._component_context(component, context)
+            builder.validate(component, component_context)
+            prepared_components.append((component, builder, component_context))
+        for component, builder, component_context in prepared_components:
+            builder.build(model, component, component_context)
 
         self._build_pv_storage_capacity_guards(model, context)
         self._build_additional_custom_constraints(model, model_spec)
@@ -75,6 +77,71 @@ class ComponentModelBuilder:
             "context": context,
             **context,
         }
+
+    def _component_context(self, component: dict[str, Any] | str, context: dict[str, Any]) -> dict[str, Any]:
+        if not isinstance(component, dict):
+            return context
+        bindings = component.get("parameter_bindings") or []
+        if not bindings:
+            return context
+        runtime = dict(context.get("runtime_parameters") or {})
+        for binding in bindings:
+            if not isinstance(binding, dict):
+                continue
+            parameter = str(
+                binding.get("component_parameter")
+                or binding.get("parameter")
+                or binding.get("parameter_code")
+                or binding.get("code")
+                or ""
+            ).strip()
+            if not parameter:
+                continue
+            found, value = self._binding_value(binding, context)
+            if found:
+                runtime[parameter] = value
+        return {**context, "runtime_parameters": runtime}
+
+    def _binding_value(self, binding: dict[str, Any], context: dict[str, Any]) -> tuple[bool, Any]:
+        runtime = context.get("runtime_parameters") or {}
+        model_spec = context.get("model_spec") or {}
+        for field in ("model_parameter", "runtime_key"):
+            source = str(binding.get(field) or "").strip()
+            if source:
+                found, value = self._runtime_value(source, runtime, model_spec)
+                if found:
+                    return True, value
+        source_path = str(binding.get("source_path") or binding.get("source") or "").strip()
+        if source_path:
+            found, value = self._runtime_value(source_path, runtime, model_spec)
+            if found:
+                return True, value
+        for field in ("value", "default_value", "defaultValue", "default"):
+            if field in binding and binding.get(field) not in (None, ""):
+                return True, binding.get(field)
+        return False, None
+
+    def _runtime_value(self, path: str, runtime: dict[str, Any], model_spec: dict[str, Any]) -> tuple[bool, Any]:
+        if path in runtime:
+            return True, runtime[path]
+        current: Any = runtime
+        for part in path.split("."):
+            if not isinstance(current, dict) or part not in current:
+                current = None
+                break
+            current = current[part]
+        if current is not None:
+            return True, current
+        for parameter in model_spec.get("parameters") or []:
+            if not isinstance(parameter, dict):
+                continue
+            code = str(parameter.get("code") or parameter.get("name") or parameter.get("key") or "")
+            if code != path:
+                continue
+            for field in ("default", "default_value", "defaultValue"):
+                if field in parameter and parameter.get(field) not in (None, ""):
+                    return True, parameter.get(field)
+        return False, None
 
     def _component_enabled(self, component: dict[str, Any] | str, runtime_parameters: dict[str, Any]) -> bool:
         if not isinstance(component, dict):
@@ -113,10 +180,8 @@ class ComponentModelBuilder:
                 if definition:
                     return DynamicFormulaComponent(definition)
             definition = load_library_component(component_type)
-            if not definition or definition.get("status") not in {"published", "trial", "tested"}:
+            if not definition or definition.get("status") != "published":
                 raise RuntimeError(f"组件 {component_type} 未发布或不存在，不能参与模型 dry-run。")
-            if definition.get("enabled", True) is False:
-                raise RuntimeError(f"组件 {component_type} 已停用，不能参与模型 dry-run。")
             return DynamicFormulaComponent(definition)
 
     def _build_sets(self, model: Any, model_spec: dict[str, Any], runtime_parameters: dict[str, Any], context: dict[str, Any]) -> None:

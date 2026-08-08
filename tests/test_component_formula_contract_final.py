@@ -102,6 +102,51 @@ def test_preview_and_disabled_objectives_do_not_enter_real_highs_solve() -> None
     assert pyo.value(model.objective) == pytest.approx(0.0)
 
 
+def test_component_parameter_binding_maps_model_parameter_during_solve() -> None:
+    definition = {
+        "component_id": "mapped_limit_component",
+        "parameters": [{"code": "component_limit", "required": True}],
+        "variables": [{"code": "x", "dimension": []}],
+        "constraints": [
+            {"constraint_id": "lower", "dsl_formula": "x >= 0", "solve_participation": "solve_active"},
+            {"constraint_id": "upper", "dsl_formula": "x <= component_limit", "solve_participation": "solve_active"},
+        ],
+    }
+    spec = {
+        "model_code": "parameter_binding_contract",
+        "required_solver_capabilities": ["LP"],
+        "sets": [],
+        "parameters": [{"code": "plant_limit", "required": True}],
+        "variables": [{"code": "x", "indices": [], "domain": "Reals"}],
+        "components": [{
+            "type": "mapped_limit_component",
+            "definition": definition,
+            "parameter_bindings": [{
+                "component_parameter": "component_limit",
+                "model_parameter": "plant_limit",
+                "required": True,
+                "status": "bound",
+            }],
+        }],
+        "objective": {
+            "sense": "maximize",
+            "terms": [{
+                "term_id": "max_x",
+                "dsl_formula": "x",
+                "weight_key": "custom_x",
+                "supported_by_backend": True,
+                "solve_participation": "solve_active",
+            }],
+        },
+    }
+
+    model, _ = ComponentModelBuilder().build(spec, {"solver": "highs", "plant_limit": 7})
+    result = HiGHSAdapter().solve(model, time_limit_seconds=10)
+
+    assert result.status == "optimal"
+    assert pyo.value(model.x) == pytest.approx(7.0)
+
+
 def test_non_solve_formulas_do_not_change_component_problem_type() -> None:
     fields = component_problem_type_fields(
         {

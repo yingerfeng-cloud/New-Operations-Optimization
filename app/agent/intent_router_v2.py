@@ -27,7 +27,7 @@ EXECUTION_MARKERS = (
 WORKFLOW_INTENTS = {
     "how_to_use", "explain_required_parameters", "parameter_example", "skill_availability_query",
     "switch_skill", "confirm_defaults", "confirm_invoke", "confirm_switch_clear",
-    "confirm_switch_migrate", "cancel_switch", "parameter_supplement",
+    "confirm_switch_migrate", "cancel_switch", "parameter_supplement", "result_explanation",
 }
 
 

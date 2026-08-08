@@ -55,6 +55,30 @@
 .runtime-validation-list .runtime-issue-message { color: #b42318; }
 
 .runtime-parameter-table .ant-table-cell {
-  white-space: normal;
-  overflow-wrap: anywhere;
+  white-space: nowrap;
+  word-break: keep-all;
+  overflow-wrap: normal;
+  max-width: 280px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.runtime-parameter-table .ant-table-content {
+  overflow-x: auto !important;
+}
+.runtime-parameter-table .runtime-value-input {
+  min-width: 236px;
+  max-width: none;
+}
+.runtime-parameter-table .ant-table-cell:has(.runtime-value-input) {
+  overflow: visible;
+  text-overflow: clip;
+}
+.dispatch-mode-field {
+  min-width: 180px;
+}
+.dispatch-mode-help {
+  max-width: 360px;
+  color: #667085;
+  font-size: 12px;
+  line-height: 1.5;
 }

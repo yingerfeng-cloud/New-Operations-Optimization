@@ -4,7 +4,7 @@ import { ComponentDependencyPanel } from '../../features/component-library/Compo
 test('missing dependency blocks publish visibly', () => {
   render(
     <ComponentDependencyPanel
-      component={{ component_id: 'a', name: 'A', status: 'draft', enabled: true, implemented: false, version: '1', depends_on: ['b'] }}
+      component={{ component_id: 'a', name: 'A', status: 'draft', version: '1', depends_on: ['b'] }}
       available={[]}
     />,
   );
@@ -13,8 +13,8 @@ test('missing dependency blocks publish visibly', () => {
 });
 
 test('cyclic dependency blocks publish visibly', () => {
-  const componentA = { component_id: 'a', name: 'A', status: 'draft', enabled: true, implemented: false, version: '1', depends_on: ['b'] };
-  const componentB = { component_id: 'b', name: 'B', status: 'published', enabled: true, implemented: true, version: '1', depends_on: ['a'] };
+  const componentA = { component_id: 'a', name: 'A', status: 'draft', version: '1', depends_on: ['b'] };
+  const componentB = { component_id: 'b', name: 'B', status: 'published', version: '1', depends_on: ['a'] };
   render(<ComponentDependencyPanel component={componentA} available={[componentA, componentB]} />);
   expect(screen.getByText('依赖异常将阻止发布')).toBeInTheDocument();
   expect(screen.getByText(/循环依赖：a → b → a/)).toBeInTheDocument();

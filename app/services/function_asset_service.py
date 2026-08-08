@@ -419,7 +419,10 @@ def validate_function_asset(asset: dict[str, Any]) -> dict[str, Any]:
     warnings: list[dict[str, Any]] = []
     function_type = str(asset.get("function_type") or "piecewise_1d")
     interpolation = str(asset.get("interpolation") or "linear").lower()
-    interpolation_mode = str(asset.get("interpolation_mode") or asset.get("solve_strategy") or "segment_binary").lower()
+    interpolation_mode_value = asset.get("interpolation_mode")
+    if not interpolation_mode_value and asset.get("solve_strategy") == "display_only":
+        interpolation_mode_value = "segment_binary"
+    interpolation_mode = str(interpolation_mode_value or asset.get("solve_strategy") or "segment_binary").lower()
     out_of_domain_policy = str(asset.get("out_of_domain_policy") or "reject").lower()
     if function_type == "piecewise_2d":
         return _validate_piecewise_2d(asset)

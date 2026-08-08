@@ -5,15 +5,12 @@ const componentSample = {
   name: '功率平衡',
   display_name: '功率平衡',
   status: 'published',
-  enabled: true,
-  implemented: true,
   version: '1.0',
   required_sets: [{ code: 'time', name: '时段', dimension: ['time'] }],
   parameters: [{ code: 'load', name: '负荷', dimension: ['time'], unit: 'MW' }],
   variables: [{ code: 'p_grid', name: '电网功率', dimension: ['time'], unit: 'MW' }],
   generated_constraints: [{ constraint_id: 'balance', name: '负荷平衡', formula: 'p_grid[t] >= load[t]', display_formula: '电网功率[t] ≥ 负荷[t]' }],
   generated_objective_terms: [{ term_id: 'cost', name: '运行成本', formula: 'p_grid[t]', display_formula: '电网功率[t]' }],
-  parameter_bindings: [{ component_parameter: 'load', model_parameter: 'load', status: 'bound' }],
   depends_on: [],
 };
 

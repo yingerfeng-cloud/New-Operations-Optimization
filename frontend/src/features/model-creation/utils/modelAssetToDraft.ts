@@ -17,6 +17,111 @@ function hasKeys(value: Record<string, unknown>) {
   return Object.keys(value).length > 0;
 }
 
+const SINGLETON_OBJECTIVE_WEIGHT_KEYS = new Set([
+  'load_deviation',
+  'spill',
+  'ramp',
+  'terminal_volume',
+  'investment',
+  'curtailment',
+  'deviation',
+  'deviation_penalty_cost',
+  'storage_cycle',
+  'battery_degradation',
+  'energy_revenue',
+  'terminal_soc',
+  'generation',
+  'revenue',
+]);
+
+function objectiveTermIdentities(term: Record<string, unknown>) {
+  const identities: string[] = [];
+  const weightKey = String(term.weight_key || '').trim();
+  if (SINGLETON_OBJECTIVE_WEIGHT_KEYS.has(weightKey)) identities.push(`weight_key:${weightKey}`);
+  const termId = String(term.term_id || '').trim();
+  if (termId) identities.push(`term_id:${termId}`);
+  return identities;
+}
+
+function mergeObjectiveTerms(existing: Record<string, unknown>, incoming: Record<string, unknown>) {
+  const existingIsComponentTerm = Boolean(existing.source_component);
+  const incomingIsComponentTerm = Boolean(incoming.source_component);
+  const canonical = existingIsComponentTerm ? existing : incomingIsComponentTerm ? incoming : existing;
+  const override = existingIsComponentTerm && !incomingIsComponentTerm
+    ? incoming
+    : !existingIsComponentTerm && incomingIsComponentTerm
+      ? existing
+      : incoming;
+  return {
+    ...canonical,
+    ...override,
+    term_id: canonical.term_id || override.term_id,
+    source_component: canonical.source_component || override.source_component,
+  };
+}
+
+function normalizeObjectiveTerms(value: unknown) {
+  const terms: Array<Record<string, unknown>> = [];
+  const indexes = new Map<string, number>();
+  arrayValue(value).forEach(term => {
+    const identities = objectiveTermIdentities(term);
+    const existingIndex = identities.map(identity => indexes.get(identity)).find(index => index !== undefined);
+    if (existingIndex !== undefined) {
+      terms[existingIndex] = mergeObjectiveTerms(terms[existingIndex], term);
+      objectiveTermIdentities(terms[existingIndex]).forEach(identity => indexes.set(identity, existingIndex));
+      identities.forEach(identity => indexes.set(identity, existingIndex));
+      return;
+    }
+    terms.push({ ...term });
+    identities.forEach(identity => indexes.set(identity, terms.length - 1));
+  });
+  return terms;
+}
+
+function normalizeObjectiveSpec(value: unknown): Record<string, unknown> {
+  const objective = objectValue(value);
+  return { ...objective, terms: normalizeObjectiveTerms(objective.terms) };
+}
+
+function normalizeSavedFormulas(formulas: ModelDraft['formulas']) {
+  const previewObjectives = new Set<string>();
+  return formulas.filter(formula => {
+    if (formula.kind !== 'objective' || formula.solve_participation !== 'preview_only') return true;
+    const identity = `${formula.name.trim()}\u0000${formula.dsl_formula.trim()}`;
+    if (previewObjectives.has(identity)) return false;
+    previewObjectives.add(identity);
+    return true;
+  });
+}
+
+const GENERATED_CONSTRAINT_NAMES_BY_COMPONENT: Record<string, string[]> = {
+  hydro_volume_bounds: ['库容下限约束', '库容上限约束'],
+  hydro_generation_flow_bounds: ['发电流量下限约束', '发电流量上限约束'],
+  hydro_outflow_bounds: ['下泄流量下限约束', '下泄流量上限约束'],
+  hydro_spill_bounds: ['弃水非负约束', '弃水上限约束'],
+  hydro_ramp_smoothing: ['出力上爬坡约束', '出力下爬坡约束'],
+};
+
+function normalizeGeneratedConstraintNames(value: unknown) {
+  const constraints = arrayValue(value);
+  const nameCounts = new Map<string, number>();
+  constraints.forEach(constraint => {
+    const name = formulaName(constraint, '');
+    nameCounts.set(name, (nameCounts.get(name) || 0) + 1);
+  });
+  const componentIndexes = new Map<string, number>();
+  return constraints.map(constraint => {
+    const name = formulaName(constraint, '');
+    if ((nameCounts.get(name) || 0) < 2) return constraint;
+    const sourceComponent = String(constraint.source_component || '');
+    const generatedNames = GENERATED_CONSTRAINT_NAMES_BY_COMPONENT[sourceComponent];
+    if (!generatedNames) return constraint;
+    const componentIndex = componentIndexes.get(sourceComponent) || 0;
+    componentIndexes.set(sourceComponent, componentIndex + 1);
+    return { ...constraint, name: generatedNames[componentIndex] || name };
+  });
+}
+
 function asBuildMode(value: unknown): ModelDraft['basic_info']['builder_mode'] {
   return value === 'component_based' || value === 'template_based' || value === 'domain_builder' ? value : 'generic_linear';
 }
@@ -156,24 +261,25 @@ function formulasFromGenericSpec(genericSpec: Record<string, unknown>): FormulaD
 }
 
 function formulasFromTemplateDraft(savedDraft: Record<string, unknown>, mathematicalExpansion: Record<string, unknown>): FormulaDef[] {
-  const objective = objectValue(savedDraft.objective || mathematicalExpansion.objective);
+  const objective = normalizeObjectiveSpec(savedDraft.objective || mathematicalExpansion.objective);
   const objectiveTerms = arrayValue(objective.terms);
-  const constraints = arrayValue(savedDraft.constraints).length
+  const constraintSource = arrayValue(savedDraft.constraints).length
     ? arrayValue(savedDraft.constraints)
     : arrayValue(mathematicalExpansion.sections).filter(section => String(section.type || 'constraint') === 'constraint');
+  const constraints = normalizeGeneratedConstraintNames(constraintSource);
   return [
     ...objectiveTerms.map((term, index) => formulaDef(
       'objective',
       formulaName(term, `目标项 ${index + 1}`),
       formulaText(term),
-      `asset-template-objective-${index}`,
+      `asset-template-objective-${String(term.term_id || index)}`,
       'preview_only',
     )),
     ...constraints.map((constraint, index) => formulaDef(
       'constraint',
       formulaName(constraint, `约束 ${index + 1}`),
       formulaText(constraint),
-      `asset-template-constraint-${index}`,
+      `asset-template-constraint-${String(constraint.constraint_id || index)}`,
       'preview_only',
     )),
   ];
@@ -232,11 +338,20 @@ export function modelAssetToDraft(asset: ModelAsset): ModelDraft {
   const runtimeFromAsset = objectValue(asset.parameters);
   const semanticSource = hasKeys(savedSemantic) ? savedSemantic : semanticSpec;
   const componentSemanticFallback = hasKeys(componentSpec) ? componentSpec : {};
+  const objectiveSource = hasKeys(objectValue(savedDraft.objective))
+    ? savedDraft.objective
+    : hasKeys(objectValue(componentSpec.objective))
+      ? componentSpec.objective
+      : mathematicalExpansion.objective;
+  const normalizedObjective = normalizeObjectiveSpec(objectiveSource);
+  const normalizedComponentSpec = hasKeys(componentSpec)
+    ? { ...componentSpec, objective: normalizeObjectiveSpec(componentSpec.objective) }
+    : componentSpec;
   const savedComponents = componentsFrom(savedDraft.components);
-  const specComponents = componentsFromSpec(componentSpec, mathematicalExpansion);
-  const savedFormulas = Array.isArray(savedDraft.formulas) ? savedDraft.formulas as ModelDraft['formulas'] : [];
+  const specComponents = componentsFromSpec(normalizedComponentSpec, mathematicalExpansion);
+  const savedFormulas = normalizeSavedFormulas(Array.isArray(savedDraft.formulas) ? savedDraft.formulas as ModelDraft['formulas'] : []);
   const fallbackGenericFormulas = formulasFromGenericSpec(hasKeys(genericSpec) ? genericSpec : savedGenericSpec);
-  const fallbackTemplateFormulas = formulasFromTemplateDraft(savedDraft, mathematicalExpansion);
+  const fallbackTemplateFormulas = formulasFromTemplateDraft({ ...savedDraft, objective: normalizedObjective }, mathematicalExpansion);
 
   const candidate = {
     ...base,
@@ -258,7 +373,7 @@ export function modelAssetToDraft(asset: ModelAsset): ModelDraft {
       variables: normalizeVariables(semanticSource.variables || componentSemanticFallback.variables || []),
     },
     components: savedComponents.length ? savedComponents : specComponents,
-    objective: objectValue(savedDraft.objective || componentSpec.objective),
+    objective: normalizedObjective,
     formulas: savedFormulas.length ? savedFormulas : fallbackGenericFormulas.length ? fallbackGenericFormulas : fallbackTemplateFormulas,
     runtime_parameters: hasKeys(runtimeFromDraft) ? runtimeFromDraft : { ...runtimeFromAsset },
     parameter_groups: hasKeys(objectValue(savedDraft.parameter_groups)) ? objectValue(savedDraft.parameter_groups) as ModelDraft['parameter_groups'] : base.parameter_groups,
@@ -268,7 +383,7 @@ export function modelAssetToDraft(asset: ModelAsset): ModelDraft {
       description: String(savedAdvanced.description || objectValue(asset.ui_metadata).description || semanticSpec.description || ''),
       ui_metadata: { ...objectValue(asset.ui_metadata), ...objectValue(savedAdvanced.ui_metadata) },
       generic_spec: hasKeys(genericSpec) ? genericSpec : hasKeys(savedGenericSpec) ? savedGenericSpec : undefined,
-      component_spec: hasKeys(componentSpec) ? componentSpec : hasKeys(savedComponentSpec) ? savedComponentSpec : undefined,
+      component_spec: hasKeys(normalizedComponentSpec) ? normalizedComponentSpec : hasKeys(savedComponentSpec) ? savedComponentSpec : undefined,
     },
   } as ModelDraft;
   const explicitTimeDimension = objectValue(asset.ui_metadata).time_dimension

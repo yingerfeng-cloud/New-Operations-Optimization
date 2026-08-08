@@ -18,7 +18,7 @@ export interface FunctionAsset {
   surface_diagnostics?: Record<string, unknown>;
   monotonicity?: string | null;
   convexity?: string | null;
-  solve_strategy?: 'display_only' | 'convex_combination_lp' | 'binary_segment_milp' | 'triangulated_milp_exact' | 'convex_hull_lp_approx';
+  solve_strategy?: 'display_only' | 'convex_combination_lp' | 'segment_binary' | 'sos2' | 'binary_segment_milp' | 'triangulated_milp_exact' | 'convex_hull_lp_approx';
   status?: string;
   description?: string;
   metadata?: Record<string, unknown>;

@@ -169,23 +169,23 @@ HYDRO_PARAMETERS: list[dict[str, Any]] = [
 HYDRO_CONSTRAINT_OVERRIDES: dict[str, list[dict[str, Any]]] = {
     "hydro_initial_volume": [{"expression": "volume[s,0] == initial_volume[s]"}],
     "hydro_volume_bounds": [
-        {"constraint_id": "hydro_volume_min", "expression": "volume[s,t] >= volume_min[s]", "indices": ["station", "time_volume"]},
-        {"constraint_id": "hydro_volume_max", "expression": "volume[s,t] <= volume_max[s]", "indices": ["station", "time_volume"]},
+        {"constraint_id": "hydro_volume_min", "name": "库容下限约束", "expression": "volume[s,t] >= volume_min[s]", "indices": ["station", "time_volume"]},
+        {"constraint_id": "hydro_volume_max", "name": "库容上限约束", "expression": "volume[s,t] <= volume_max[s]", "indices": ["station", "time_volume"]},
     ],
     "hydro_station_available_capacity": [{"expression": "station_power[s,t] <= station_pmax[s,t]"}],
     "hydro_power_flow_conversion": [{"expression": "station_power[s,t] == power_conversion[s] * q_gen[s,t]"}],
     "hydro_generation_flow_bounds": [
-        {"constraint_id": "hydro_gen_flow_min", "expression": "q_gen[s,t] >= gen_flow_min[s]"},
-        {"constraint_id": "hydro_gen_flow_max", "expression": "q_gen[s,t] <= gen_flow_max[s]"},
+        {"constraint_id": "hydro_gen_flow_min", "name": "发电流量下限约束", "expression": "q_gen[s,t] >= gen_flow_min[s]"},
+        {"constraint_id": "hydro_gen_flow_max", "name": "发电流量上限约束", "expression": "q_gen[s,t] <= gen_flow_max[s]"},
     ],
     "hydro_outflow_balance": [{"expression": "q_out[s,t] == q_gen[s,t] + q_spill[s,t]"}],
     "hydro_outflow_bounds": [
-        {"constraint_id": "hydro_outflow_min", "expression": "q_out[s,t] >= outflow_min[s]"},
-        {"constraint_id": "hydro_outflow_max", "expression": "q_out[s,t] <= outflow_max[s]"},
+        {"constraint_id": "hydro_outflow_min", "name": "下泄流量下限约束", "expression": "q_out[s,t] >= outflow_min[s]"},
+        {"constraint_id": "hydro_outflow_max", "name": "下泄流量上限约束", "expression": "q_out[s,t] <= outflow_max[s]"},
     ],
     "hydro_spill_bounds": [
-        {"constraint_id": "hydro_spill_min", "expression": "q_spill[s,t] >= 0"},
-        {"constraint_id": "hydro_spill_max", "expression": "q_spill[s,t] <= spill_max[s]"},
+        {"constraint_id": "hydro_spill_min", "name": "弃水非负约束", "expression": "q_spill[s,t] >= 0"},
+        {"constraint_id": "hydro_spill_max", "name": "弃水上限约束", "expression": "q_spill[s,t] <= spill_max[s]"},
     ],
     "hydro_ecological_flow": [{"expression": "q_out[s,t] >= ecological_flow_min[s]"}],
     "hydro_head_calculation": [{"expression": "head[s,t] == forebay_level[s,t] - tailwater_level[s,t] - head_loss[s]"}],
@@ -194,8 +194,8 @@ HYDRO_CONSTRAINT_OVERRIDES: dict[str, list[dict[str, Any]]] = {
     "hydro_load_tracking": [{"expression": "sum(station_power[s,t] for s in station) - load_forecast[t] == load_dev_pos[t] - load_dev_neg[t]"}],
     "hydro_terminal_volume": [{"expression": "volume[s,2] - target_terminal_volume[s] == terminal_dev_pos[s] - terminal_dev_neg[s]"}],
     "hydro_ramp_smoothing": [
-        {"constraint_id": "hydro_ramp_up", "expression": "ramp_abs[s,t] >= station_power[s,t] - station_power[s,t-1]", "boundary_strategy": "skip_first"},
-        {"constraint_id": "hydro_ramp_down", "expression": "ramp_abs[s,t] >= station_power[s,t-1] - station_power[s,t]", "boundary_strategy": "skip_first"},
+        {"constraint_id": "hydro_ramp_up", "name": "出力上爬坡约束", "expression": "ramp_abs[s,t] >= station_power[s,t] - station_power[s,t-1]", "boundary_strategy": "skip_first"},
+        {"constraint_id": "hydro_ramp_down", "name": "出力下爬坡约束", "expression": "ramp_abs[s,t] >= station_power[s,t-1] - station_power[s,t]", "boundary_strategy": "skip_first"},
     ],
 }
 
@@ -295,8 +295,8 @@ def component_definition(component_type: str, builder: Any | None = None) -> dic
         "domain": "水电调度" if component_type.startswith("hydro_") else "通用建模",
         "category": getattr(builder, "category", "未分类"),
         "version": "1.0.0",
-        "implemented": True,
         "status": "published",
+        "backend_builder": component_type,
         "required": component_type in {"hydro_power_flow_conversion", "hydro_outflow_balance"},
         "depends_on": list(getattr(builder, "depends_on", [])),
         "inputs": list(getattr(builder, "required_parameters", [])),

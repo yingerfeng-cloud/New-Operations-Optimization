@@ -148,10 +148,22 @@ class ParameterExtractor:
         for key, labels in scalar_patterns:
             if key not in keys:
                 continue
-            value = self._number_after_storage_label(text, labels)
+            value = self._value_after_storage_label(text, labels)
             if value is not None:
                 result[key] = value
         return result
+
+    def _value_after_storage_label(self, text: str, labels: list[str]) -> float | int | dict[str, float | int] | None:
+        for label in labels:
+            match = re.search(
+                rf"{re.escape(label)}\s*(B\d+)?\s*(?:改成|设为|设置为|调整为|[是为:=：])?\s*([0-9]+(?:\.[0-9]+)?)",
+                text,
+                re.IGNORECASE,
+            )
+            if match:
+                value = self._num(match.group(2))
+                return {match.group(1).upper(): value} if match.group(1) else value
+        return None
 
     def _numbers_after_label(self, text: str, labels: list[str], stop_labels: list[str] | None = None) -> list[float | int]:
         for label in labels:

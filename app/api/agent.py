@@ -1,12 +1,26 @@
 from __future__ import annotations
 
-from fastapi import APIRouter
+import asyncio
+import json
+
+from fastapi import APIRouter, Query
+from fastapi.responses import StreamingResponse
 
 from app.agent.conversation_store import conversation_store
 from app.agent.orchestrator import agent_orchestrator
 from app.agent.platform_client import platform_client
 from app.agent.platform_gateway import service_mode
+from app.schemas.agent import (
+    AgentAnalyzeRequest,
+    AgentApplySampleParametersRequest,
+    AgentConfirmDefaultsRequest,
+    AgentConfirmInvokeRequest,
+    AgentConversationCreateRequest,
+    AgentConversationUpdateRequest,
+    AgentExplainResultRequest,
+)
 from app.services.agent_service import AgentOptimizeRequest
+from app.services.agent_runtime_service import agent_runtime_service
 from app.services.agent_skill_service import agent_skill_service
 from app.services.llm_service import llm_service
 
@@ -19,53 +33,89 @@ def agent_optimize(req: AgentOptimizeRequest) -> dict:
 
 
 @router.post("/analyze")
-def agent_analyze(body: dict) -> dict:
-    return agent_orchestrator.analyze(body)
+def agent_analyze(body: AgentAnalyzeRequest) -> dict:
+    return agent_runtime_service.analyze(body.to_payload())
 
 
 @router.post("/confirm-invoke")
-def agent_confirm_invoke(body: dict) -> dict:
-    return agent_orchestrator.confirm_invoke(body)
+def agent_confirm_invoke(body: AgentConfirmInvokeRequest) -> dict:
+    return agent_runtime_service.confirm_invoke(body.to_payload())
 
 
 @router.post("/confirm-defaults")
-def agent_confirm_defaults(body: dict) -> dict:
-    return agent_orchestrator.confirm_defaults(body)
+def agent_confirm_defaults(body: AgentConfirmDefaultsRequest) -> dict:
+    return agent_runtime_service.confirm_defaults(body.to_payload())
 
 
 @router.post("/apply-sample-parameters")
-def agent_apply_sample_parameters(body: dict) -> dict:
-    return agent_orchestrator.apply_sample_parameters(body)
+def agent_apply_sample_parameters(body: AgentApplySampleParametersRequest) -> dict:
+    return agent_runtime_service.apply_sample_parameters(body.to_payload())
 
 
 @router.post("/explain-result")
-def agent_explain_result(body: dict) -> dict:
-    return agent_orchestrator.explain_result(body)
+def agent_explain_result(body: AgentExplainResultRequest) -> dict:
+    return agent_runtime_service.explain_result(body.to_payload())
 
 
 @router.post("/conversations")
-def agent_create_conversation(body: dict | None = None) -> dict:
-    return conversation_store.create((body or {}).get("title"))
+def agent_create_conversation(body: AgentConversationCreateRequest | None = None) -> dict:
+    return conversation_store.create(body.title if body else None)
 
 
 @router.get("/conversations")
 def agent_list_conversations() -> list[dict]:
-    return conversation_store.list()
+    return agent_runtime_service.conversation_list()
 
 
 @router.get("/conversations/{conversation_id}")
 def agent_get_conversation(conversation_id: str) -> dict:
-    return conversation_store.get(conversation_id)
+    return agent_runtime_service.conversation_detail(conversation_id)
 
 
 @router.patch("/conversations/{conversation_id}")
-def agent_rename_conversation(conversation_id: str, body: dict) -> dict:
-    return conversation_store.rename(conversation_id, body.get("title") or "")
+def agent_rename_conversation(conversation_id: str, body: AgentConversationUpdateRequest) -> dict:
+    return conversation_store.rename(conversation_id, body.title)
 
 
 @router.delete("/conversations/{conversation_id}")
 def agent_delete_conversation(conversation_id: str) -> dict:
     return conversation_store.delete(conversation_id)
+
+
+@router.get("/runs/{run_id}")
+def agent_get_run(run_id: str) -> dict:
+    return agent_runtime_service.get_run(run_id)
+
+
+@router.get("/runs/{run_id}/events")
+def agent_get_run_events(run_id: str, after: int = Query(default=0, ge=0)) -> list[dict]:
+    return agent_runtime_service.get_run_events(run_id, after)
+
+
+@router.get("/runs/{run_id}/events/stream")
+async def agent_stream_run_events(run_id: str, after: int = Query(default=0, ge=0)) -> StreamingResponse:
+    async def stream():
+        cursor = after
+        idle_rounds = 0
+        while idle_rounds < 60:
+            events = agent_runtime_service.get_run_events(run_id, cursor)
+            if events:
+                idle_rounds = 0
+                for event in events:
+                    cursor = max(cursor, int(event.get("sequence") or 0))
+                    yield f"id: {cursor}\nevent: run-event\ndata: {json.dumps(event, ensure_ascii=False, default=str)}\n\n"
+            else:
+                idle_rounds += 1
+                if idle_rounds % 10 == 0:
+                    yield ": heartbeat\n\n"
+            await asyncio.sleep(0.5)
+
+    return StreamingResponse(stream(), media_type="text/event-stream", headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+
+
+@router.post("/runs/{run_id}/cancel")
+def agent_cancel_run(run_id: str) -> dict:
+    return agent_runtime_service.cancel_run(run_id)
 
 
 @router.get("/skills")

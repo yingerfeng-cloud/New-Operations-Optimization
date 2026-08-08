@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { useState } from 'react';
 import { vi } from 'vitest';
-import { Step2SemanticModel } from '../../features/model-creation/steps/Step2SemanticModel';
+import { mergeSelectedComponentParameters, Step2SemanticModel } from '../../features/model-creation/steps/Step2SemanticModel';
 import { createInitialDraft, type ModelDraft } from '../../features/model-creation/stores/modelCreationStore';
 import { renderWithQueryClient } from '../testUtils';
 
@@ -12,8 +12,6 @@ const componentApi = vi.hoisted(() => ({
       type: 'power_balance',
       name: '功率平衡组件',
       status: 'published',
-      enabled: true,
-      implemented: true,
       version: '1.0.0',
       domain: '电力优化',
       category: '平衡约束',
@@ -24,14 +22,23 @@ const componentApi = vi.hoisted(() => ({
       type: 'capacity_bounds',
       name: '容量边界组件',
       status: 'published',
-      enabled: true,
-      implemented: true,
       version: '1.0.0',
       domain: '通用运筹优化',
       category: '边界约束',
     },
   ]),
 }));
+
+test('selected component parameter interfaces become selectable model parameters', () => {
+  const parameters = mergeSelectedComponentParameters([], [{
+    component_id: 'storage_limit',
+    parameters: [{ code: 'capacity', name: '容量', unit: 'MWh', required: true }],
+  }]);
+
+  expect(parameters).toEqual([
+    expect.objectContaining({ code: 'capacity', name: '容量', unit: 'MWh', sourceType: 'runtime', required: true }),
+  ]);
+});
 
 vi.mock('../../api/components', () => ({ getComponents: componentApi.getComponents }));
 
@@ -198,8 +205,6 @@ test('blocks applying a component selection that contains a dependency cycle', a
       type: 'cycle_a',
       name: '循环组件 A',
       status: 'published',
-      enabled: true,
-      implemented: true,
       version: '1.0.0',
       domain: '测试',
       category: '循环依赖',
@@ -210,8 +215,6 @@ test('blocks applying a component selection that contains a dependency cycle', a
       type: 'cycle_b',
       name: '循环组件 B',
       status: 'published',
-      enabled: true,
-      implemented: true,
       version: '1.0.0',
       domain: '测试',
       category: '循环依赖',

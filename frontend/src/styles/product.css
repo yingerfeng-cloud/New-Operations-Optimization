@@ -485,6 +485,41 @@ body {
   margin-inline-end: 0;
 }
 
+.model-detail-table .ant-table {
+  width: 100%;
+  table-layout: fixed;
+}
+
+.model-detail-table .ant-table-cell {
+  min-width: 0;
+  vertical-align: top;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.model-detail-table.is-key-value .ant-table-thead > tr > th:first-child,
+.model-detail-table.is-key-value .ant-table-tbody > tr > td:first-child {
+  width: 34%;
+}
+
+.model-detail-cell-value {
+  display: -webkit-box;
+  max-width: 100%;
+  overflow: hidden;
+  color: inherit;
+  line-height: 1.45;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+
+.model-detail-cell-value.is-long {
+  cursor: help;
+}
+
 .function-surface-diagnostics .ant-descriptions-item-content {
   min-width: 0;
   white-space: normal;

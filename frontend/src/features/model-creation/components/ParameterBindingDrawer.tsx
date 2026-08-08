@@ -70,6 +70,9 @@ export function ParameterBindingDrawer({
     value: parameter.code,
     label: parameter.name ? `${parameter.name} (${parameter.code})` : parameter.code,
   }));
+  if (binding?.model_parameter && !modelParameterOptions.some(option => option.value === binding.model_parameter)) {
+    modelParameterOptions.unshift({ value: String(binding.model_parameter), label: String(binding.model_parameter) });
+  }
   const setOptions = draft.semantic.sets.map(set => ({
     value: set.code,
     label: set.name ? `${set.name} (${set.code})` : set.code,
@@ -173,11 +176,24 @@ export function ParameterBindingDrawer({
         <Form form={form} layout="vertical">
           <section className="drawer-form-section">
             <Typography.Title level={5}>模型参数映射</Typography.Title>
-            <Form.Item name="model_parameter" label="映射到模型参数" tooltip="优先选择 Step2 已定义的模型参数。">
-              <Select allowClear showSearch options={modelParameterOptions} placeholder="请选择模型参数" />
+            <Form.Item name="model_parameter" label="映射到模型参数" tooltip="从当前模型已定义的参数中选择；与运行参数键二选一。">
+              <Select
+                allowClear
+                showSearch
+                options={modelParameterOptions}
+                placeholder="请选择模型参数"
+                onChange={value => {
+                  if (value) form.setFieldValue('runtime_key', undefined);
+                }}
+              />
             </Form.Item>
-            <Form.Item name="runtime_key" label="运行参数键">
-              <Input placeholder="例如 startup_cost" />
+            <Form.Item name="runtime_key" label="运行参数键" help="不映射模型参数时，可填写任务运行时传入的键。">
+              <Input
+                placeholder="例如 startup_cost"
+                onChange={event => {
+                  if (event.target.value.trim()) form.setFieldValue('model_parameter', undefined);
+                }}
+              />
             </Form.Item>
             {sourceType === 'function_asset' && (
               <Form.Item name="function_asset_id" label="函数资产" tooltip="函数资产类型参数必须选择函数/曲线资产。">

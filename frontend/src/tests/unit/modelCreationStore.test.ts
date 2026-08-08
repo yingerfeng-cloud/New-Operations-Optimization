@@ -5,6 +5,7 @@ import { inferModelProblemType } from '../../features/model-creation/utils/infer
 import { modelAssetToDraft } from '../../features/model-creation/utils/modelAssetToDraft';
 import { normalizeModelDraft } from '../../features/model-creation/utils/normalizeModelDraft';
 import { buildModelDraftPayload, saveModelDraftAsset } from '../../features/model-creation/utils/saveModelDraftAsset';
+import { validateModelDraft } from '../../features/model-creation/utils/validateModelDraft';
 
 beforeEach(() => useModelCreationStore.getState().reset());
 
@@ -258,6 +259,54 @@ test('model asset edit falls back to component spec and mathematical expansion f
   ]));
 });
 
+test('model asset edit normalizes duplicate built-in objectives without dropping distinct generated constraints', () => {
+  const restored = modelAssetToDraft({
+    id: 'MODEL-HYDRO-LEGACY',
+    name: '梯级水电旧版本',
+    scene: '梯级水电日前调度',
+    version: 'v1',
+    status: 'published',
+    solver: 'HiGHS',
+    problem_type: 'LP',
+    build_mode: 'component_based',
+    updated_at: '2026-07-07',
+    template_id: 'cascade_hydro_dispatch',
+    model_draft: {
+      basic_info: { name: '梯级水电旧版本', model_code: 'cascade_hydro_dispatch', scenario: '梯级水电日前调度', builder_mode: 'component_based', solver: 'HiGHS' },
+      semantic: { sets: [], parameters: [], variables: [] },
+      components: [{ component_id: 'hydro_volume_bounds', enabled: true }],
+      constraints: [],
+      objective: {
+        sense: 'minimize',
+        terms: [
+          { term_id: 'load_tracking_penalty', name: '负荷偏差惩罚', expression: 'sum(load_dev_pos[t] + load_dev_neg[t] for t in time)', weight_key: 'load_deviation', source_component: 'hydro_load_tracking' },
+          { term_id: 'hydro_load_deviation_penalty', name: '负荷偏差惩罚', expression: 'sum(load_dev_pos[t] + load_dev_neg[t] for t in time)', weight_key: 'load_deviation' },
+        ],
+      },
+      formulas: [],
+      runtime_parameters: {},
+      parameter_groups: {},
+      advanced: {},
+    },
+    mathematical_expansion: {
+      sections: [
+        { type: 'constraint', constraint_id: 'hydro_volume_min', title: '库容上下限组件', formula: 'volume[s,t] >= volume_min[s]', source_component: 'hydro_volume_bounds' },
+        { type: 'constraint', constraint_id: 'hydro_volume_max', title: '库容上下限组件', formula: 'volume[s,t] <= volume_max[s]', source_component: 'hydro_volume_bounds' },
+      ],
+    },
+  });
+
+  const objectives = restored.formulas.filter(formula => formula.kind === 'objective');
+  const constraints = restored.formulas.filter(formula => formula.kind === 'constraint');
+  expect(objectives).toHaveLength(1);
+  expect(objectives[0]).toEqual(expect.objectContaining({ name: '负荷偏差惩罚', formula_id: 'asset-template-objective-load_tracking_penalty' }));
+  expect((restored.objective?.terms as Array<Record<string, unknown>>)).toHaveLength(1);
+  expect(constraints).toHaveLength(2);
+  expect(new Set(constraints.map(formula => formula.formula_id)).size).toBe(2);
+  expect(constraints.map(formula => formula.name)).toEqual(['库容下限约束', '库容上限约束']);
+  expect(validateModelDraft(restored).sections.formula.errors.filter(error => error.startsWith('公式名称必须唯一'))).toEqual([]);
+});
+
 test('unit commitment template asset restores Step3 formulas from template draft', () => {
   const restored = modelAssetToDraft({
     id: 'MODEL-POWER-UNIT-COMMITMENT-DAY-AHEAD',
@@ -364,4 +413,33 @@ test('buildModelDraftPayload keeps Step3 function mapping components from templa
       solve_strategy: 'convex_combination_lp',
     }),
   ]));
+});
+
+test('buildModelDraftPayload persists parameter bindings on the model instance', () => {
+  const draft = normalizeModelDraft({
+    ...initialDraft,
+    basic_info: { ...initialDraft.basic_info, name: '绑定模型', model_code: 'binding_model', builder_mode: 'component_based' },
+    components: [{
+      component_id: 'efficiency_component',
+      type: 'efficiency_component',
+      enabled: true,
+      parameter_bindings: [{
+        component_parameter: 'efficiency',
+        parameter: 'efficiency',
+        model_parameter: 'plant_efficiency',
+        required: true,
+        status: 'bound',
+      }],
+    }],
+  });
+
+  const payload = buildModelDraftPayload(draft);
+  const components = payload.component_spec.components as Array<Record<string, unknown>>;
+
+  expect(payload.parameter_bindings).toEqual([
+    expect.objectContaining({ component_id: 'efficiency_component', component_parameter: 'efficiency', model_parameter: 'plant_efficiency' }),
+  ]);
+  expect(components[0].parameter_bindings).toEqual([
+    expect.objectContaining({ component_parameter: 'efficiency', model_parameter: 'plant_efficiency' }),
+  ]);
 });

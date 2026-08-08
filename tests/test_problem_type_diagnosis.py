@@ -109,7 +109,6 @@ def _binary_component(component_id: str) -> dict:
         "category": "基础组件",
         "version": "1.0.0",
         "status": "published",
-        "implemented": True,
         "enabled": True,
         "sets": [{"code": "time"}],
         "parameters": [{"code": "limit", "dimension": ["time"], "default": [10, 10, 10]}],

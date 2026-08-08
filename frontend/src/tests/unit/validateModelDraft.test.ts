@@ -47,6 +47,25 @@ test('requires semantic and formula names for explainability', () => {
   expect(result.sections.formula.errors).toContain('公式 obj名称必填（用于模型解释）');
 });
 
+test('requires unique names for user-authored formulas', () => {
+  const draft = baseDraft();
+  draft.formulas.push({ ...draft.formulas[0], formula_id: 'obj-copy' });
+
+  expect(validateModelDraft(draft).sections.formula.errors).toContain('公式名称必须唯一：目标');
+});
+
+test('allows generated preview formulas to share a display name when their ids differ', () => {
+  const draft = baseDraft();
+  draft.basic_info.builder_mode = 'component_based';
+  draft.components = [{ component_id: 'hydro_volume_bounds' }];
+  draft.formulas = [
+    { ...draft.formulas[0], formula_id: 'hydro_volume_min', name: '库容上下限组件', kind: 'constraint', solve_participation: 'preview_only' },
+    { ...draft.formulas[0], formula_id: 'hydro_volume_max', name: '库容上下限组件', kind: 'constraint', solve_participation: 'preview_only' },
+  ];
+
+  expect(validateModelDraft(draft).sections.formula.errors).not.toContain('公式名称必须唯一：库容上下限组件');
+});
+
 test('blocks missing component dependencies', () => {
   const draft = baseDraft();
   draft.basic_info.builder_mode = 'component_based';
@@ -75,7 +94,34 @@ test('blocks self and cyclic component dependencies without duplicate messages',
 test('disabled components do not introduce dependency blockers', () => {
   const draft = baseDraft();
   draft.basic_info.builder_mode = 'component_based';
-  draft.components = [{ component_id: 'disabled_component', enabled: false, depends_on: ['not_selected'] }];
+  draft.components = [{
+    component_id: 'disabled_component',
+    enabled: false,
+    depends_on: ['not_selected'],
+    parameters: [{ code: 'disabled_parameter', required: true }],
+  }];
 
   expect(validateModelDraft(draft).sections.component_dependencies.errors).toEqual([]);
+  expect(validateModelDraft(draft).sections.parameter_bindings.errors).toEqual([]);
+});
+
+test('requires model-stage bindings for required component parameter interfaces', () => {
+  const draft = baseDraft();
+  draft.basic_info.builder_mode = 'component_based';
+  draft.components = [{
+    component_id: 'efficiency_component',
+    parameters: [{ code: 'efficiency', name: '效率', required: true }],
+  }];
+
+  expect(validateModelDraft(draft).sections.parameter_bindings.errors).toContain(
+    '组件 efficiency_component 参数绑定 efficiency 缺失',
+  );
+
+  draft.components[0].parameter_bindings = [{
+    component_parameter: 'efficiency',
+    model_parameter: 'load',
+    required: true,
+    status: 'bound',
+  }];
+  expect(validateModelDraft(draft).sections.parameter_bindings.errors).toEqual([]);
 });

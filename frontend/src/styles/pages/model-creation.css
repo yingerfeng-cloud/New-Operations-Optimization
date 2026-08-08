@@ -245,6 +245,83 @@
   margin-inline-start: 8px;
 }
 
+.function-mapping-strategy-hints {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 3px;
+  min-width: 0;
+  overflow: visible;
+  white-space: normal;
+}
+
+.function-mapping-strategy-hints span {
+  min-width: min(260px, 100%);
+  white-space: normal;
+}
+
+.function-mapping-strategy-alert.ant-alert-with-description .ant-alert-content,
+.function-mapping-strategy-alert.ant-alert-with-description .ant-alert-section {
+  display: block;
+}
+
+.function-mapping-strategy-alert .ant-alert-message,
+.function-mapping-strategy-alert .ant-alert-title {
+  margin-bottom: 4px;
+}
+
+.function-mapping-strategy-alert .ant-alert-description {
+  overflow: visible;
+  white-space: normal;
+}
+
+.function-mapping-strategy-hints strong {
+  color: var(--proto-ink, #172033);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-weight: 600;
+}
+
+.function-mapping-section-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 16px 0 8px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--proto-border, #e5e7eb);
+}
+
+.function-mapping-section-title {
+  color: var(--proto-ink, #172033);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.function-mapping-section-help {
+  color: var(--proto-muted, #667085);
+  font-size: 12px;
+}
+
+.function-mapping-field-row {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+}
+
+.function-mapping-field-row .ant-space-item {
+  min-width: 0;
+  width: 100%;
+}
+
+.function-mapping-field-row .ant-form-item {
+  margin-bottom: 12px;
+}
+
+.function-mapping-field-row .ant-select,
+.function-mapping-field-row .ant-input {
+  width: 100%;
+}
+
 .model-diagnostic-details {
   width: min(480px, 70vw);
   display: grid;
@@ -638,6 +715,19 @@
   overflow-wrap: anywhere;
 }
 
+.function-mapping-table .ant-table-content {
+  overflow-x: auto !important;
+}
+
+.function-mapping-table .ant-table-cell {
+  white-space: nowrap;
+  word-break: normal;
+}
+
+.function-mapping-table .ant-tag {
+  white-space: nowrap;
+}
+
 @media (max-width: 900px) {
   .model-strategy-compact-grid {
     grid-template-columns: 1fr;
@@ -699,5 +789,18 @@
   .component-picker-footer {
     align-items: flex-start;
     flex-direction: column;
+  }
+}
+
+@media (max-width: 640px) {
+  .function-mapping-section-heading {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .function-mapping-field-row {
+    grid-template-columns: 1fr;
+    gap: 0;
   }
 }

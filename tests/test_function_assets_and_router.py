@@ -10,6 +10,7 @@ import pytest
 from app.builders.component_model_builder import ComponentModelBuilder
 from app.model_draft import build_component_spec_from_draft, create_model_draft_from_template
 from app.problem_type_diagnosis import infer_problem_type_from_component_spec
+from app.services.model_service import model_service
 from app.solvers.solver_router import SolverRouteError, solver_router
 from app.storage.memory_store import STORE
 from app.templates.power_templates import get_template
@@ -204,6 +205,40 @@ def test_function_mapping_component_uses_asset_and_solves_lp() -> None:
     assert math.isclose(result.variable_values["level"]["level[0]"], 100.0, abs_tol=1e-5)
     assert math.isclose(result.variable_values["level"]["level[1]"], 260.0, abs_tol=1e-5)
     assert context["metadata"]["function_assets_used"][0]["function_asset_id"] == "mapping_curve"
+
+
+def test_model_validation_rejects_display_only_function_asset(client) -> None:
+    asset_id = f"display_only_curve_{uuid.uuid4().hex[:8]}"
+    created = client.post(
+        "/api/function-assets",
+        json={
+            "function_id": asset_id,
+            "name": "Display-only curve",
+            "function_type": "piecewise_1d",
+            "points": [[0, 0], [10, 10]],
+            "solve_strategy": "display_only",
+        },
+    )
+    assert created.status_code == 200, created.text
+
+    errors, _ = model_service._validate_function_asset_bindings(
+        {
+            "variables": [
+                {"name": "volume", "indices": ["time"], "lower_bound": 0, "upper_bound": 10},
+                {"name": "level", "indices": ["time"], "lower_bound": 0},
+            ],
+            "components": [
+                {
+                    "type": "function_mapping_component",
+                    "function_asset_id": asset_id,
+                    "x": "volume[t]",
+                    "y": "level[t]",
+                    "solve_strategy": "convex_combination_lp",
+                }
+            ],
+        }
+    )
+    assert any("display_only function assets cannot be used" in str(error) for error in errors), errors
 
 
 def test_function_mapping_config_shape_uses_asset_and_solves_lp() -> None:

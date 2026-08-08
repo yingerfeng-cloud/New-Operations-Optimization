@@ -1,7 +1,7 @@
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, vi } from 'vitest';
-import { FunctionAssetsPage } from '../../pages/FunctionAssets/FunctionAssetsPage';
+import { FunctionAssetsPage, solveStrategyDescription, solveStrategyText } from '../../pages/FunctionAssets/FunctionAssetsPage';
 import { renderWithQueryClient } from '../testUtils';
 import type { FunctionAsset } from '../../types/functionAsset';
 
@@ -201,6 +201,12 @@ function currentDrawer() {
   if (!drawer) throw new Error('Function asset drawer is not open');
   return within(drawer);
 }
+
+test('explains the canonical 1D solve strategies and renders legacy aliases clearly', () => {
+  expect(solveStrategyText('segment_binary')).toBe('MILP 分段');
+  expect(solveStrategyDescription('segment_binary')).toContain('二进制变量');
+  expect(solveStrategyText('binary_segment_milp')).toContain('MILP 分段');
+});
 
 test('uses one create entry and opens a blank new function asset drawer', async () => {
   renderPage();

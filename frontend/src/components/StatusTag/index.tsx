@@ -14,6 +14,7 @@ const statusMap: Record<string, { color: string; label: string }> = {
   TIMEOUT: { color: 'red', label: '超时' },
   CANCELLED: { color: 'gold', label: '已取消' },
   published: { color: 'green', label: '已发布' },
+  draft: { color: 'gold', label: '草稿' },
   trial: { color: 'blue', label: '试运行' },
   developing: { color: 'gold', label: '草稿' },
   offline: { color: 'default', label: '已下线' },

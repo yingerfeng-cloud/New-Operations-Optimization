@@ -14,7 +14,7 @@ from app.schemas.solve import TaskRecord, TaskRecordState
 
 
 LOGGER = logging.getLogger(__name__)
-RUNTIME_SCHEMA_VERSION = 4
+RUNTIME_SCHEMA_VERSION = 5
 INTERRUPTED_TASK_STATUSES = {"PENDING", "QUEUED", "VALIDATING", "BUILDING_MODEL", "SOLVING", "FORMATTING_RESULT", "RUNNING"}
 MODEL_STATUS_MIGRATIONS = {
     "draft": "developing",
@@ -40,6 +40,7 @@ class MemoryStore:
         self.invocations: dict[str, dict[str, Any]] = {}
         self.skills: dict[str, dict[str, Any]] = {}
         self.conversations: dict[str, dict[str, Any]] = {}
+        self.agent_runs: dict[str, dict[str, Any]] = {}
         self.llm_config: dict[str, Any] = {}
         self.system_config: dict[str, Any] = {}
         self.template_status: dict[str, str] = {}
@@ -87,6 +88,7 @@ class MemoryStore:
                 "invocations": self.invocations,
                 "skills": self.skills,
                 "conversations": self.conversations,
+                "agent_runs": self.agent_runs,
                 "llm_config": llm_config,
                 "system_config": self.system_config,
                 "custom_components": self.custom_components,
@@ -120,7 +122,7 @@ class MemoryStore:
             payload = self._migrate_payload(payload)
             section_names = (
                 "models", "model_versions", "active_model_versions", "assets", "tasks", "results",
-                "invocations", "skills", "conversations", "llm_config", "system_config",
+                "invocations", "skills", "conversations", "agent_runs", "llm_config", "system_config",
                 "custom_components", "function_assets",
             )
             sections: dict[str, dict[str, Any]] = {}
@@ -144,11 +146,14 @@ class MemoryStore:
             self.invocations.update(sections["invocations"])
             self.skills.update(sections["skills"])
             self.conversations.update(sections["conversations"])
+            self.agent_runs.update(sections["agent_runs"])
             self.llm_config.update(sections["llm_config"])
             self.system_config.update(sections["system_config"])
             self.custom_components.update(sections["custom_components"])
             self.function_assets.update(sections["function_assets"])
-            if loaded_schema_version < RUNTIME_SCHEMA_VERSION or self._interrupt_recovered_tasks():
+            tasks_interrupted = self._interrupt_recovered_tasks()
+            agent_runs_interrupted = self._interrupt_recovered_agent_runs()
+            if loaded_schema_version < RUNTIME_SCHEMA_VERSION or tasks_interrupted or agent_runs_interrupted:
                 self.save_runtime()
         except Exception:
             timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
@@ -189,6 +194,7 @@ class MemoryStore:
             version = 3
         if version == 3:
             LOGGER.info("Normalized runtime store records to the current data contract")
+        migrated.setdefault("agent_runs", {})
         migrated = self._normalize_deprecated_markers(migrated)
         migrated["schema_version"] = RUNTIME_SCHEMA_VERSION
         return migrated
@@ -228,6 +234,18 @@ class MemoryStore:
             task.finished_at = task.finished_at or datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             task.error = "服务重启导致任务中断，请重新提交"
             task.logs.append("ERROR 服务重启导致任务中断，请重新提交")
+        return interrupted
+
+    def _interrupt_recovered_agent_runs(self) -> bool:
+        interrupted = False
+        for run in self.agent_runs.values():
+            if str(run.get("status") or "").upper() not in {"QUEUED", "RUNNING"}:
+                continue
+            interrupted = True
+            run["status"] = "FAILED"
+            run["workflow_state"] = "FAILED"
+            run["error"] = "服务重启导致运行中断，请重试"
+            run["updated_at"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         return interrupted
 
     @classmethod
