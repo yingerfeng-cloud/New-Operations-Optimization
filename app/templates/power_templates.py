@@ -5,6 +5,11 @@ from typing import Any
 
 from app.builders.unit_commitment_builder import unit_commitment_template
 from app.model_draft import build_constraints_from_draft, create_model_draft_from_template
+from app.model_components.compute_power_components import (
+    COMPUTE_POWER_PARAMETERS,
+    COMPUTE_POWER_SETS,
+    COMPUTE_POWER_VARIABLES,
+)
 from app.model_components.registry import list_component_catalog
 
 
@@ -25,6 +30,7 @@ TEMPLATE_DISPLAY_NAMES = {
     "nonlinear_hydro_power_demo": ("非线性水电出力 NLP 试点", "连续变量 NLP 样例：power[t] = k * flow[t] * head[t]，用于验证 Ipopt 接入和局部最优风险提示。"),
     "contract_spot_exposure_v1": ("中长期合约分解与现货暴露控制模型", "面向售电公司和用电侧主体，生成中长期合约分解与现货暴露控制建议。"),
     "retail_da_spot_bidding_v1": ("售电公司日前现货申报优化模型", "面向售电公司日前现货场景，生成可解释、可审批、可复盘的申报策略建议。"),
+    "compute_power_coordination_day_ahead_v1": ("智算园区日前算电协同联合优化模型", "在单次 MILP 求解中联合生成算力任务、GPU 集群、光伏、储能和电网购电计划。"),
 }
 
 # These built-in models have enabled Agent Skill packages and are part of the
@@ -53,6 +59,7 @@ def power_template_library() -> dict[str, dict[str, Any]]:
         "nonlinear_hydro_power_demo": _nonlinear_hydro_power_demo(),
         "contract_spot_exposure_v1": _contract_spot_exposure_v1(),
         "retail_da_spot_bidding_v1": _retail_da_spot_bidding_v1(),
+        "compute_power_coordination_day_ahead_v1": _compute_power_coordination_day_ahead_v1(),
     }
     for code, template in templates.items():
         template.setdefault("code", code)
@@ -1797,5 +1804,409 @@ def _with_pv_storage_v2_parameters(code: str, sample: dict[str, Any], params: li
         },
     ]
     return [*params, *[item for item in additions if item["code"] not in existing]]
+
+
+def _compute_power_coordination_day_ahead_v1() -> dict[str, Any]:
+    code = "compute_power_coordination_day_ahead_v1"
+    horizon = 24
+    time = list(range(horizon))
+    time_volume = list(range(horizon + 1))
+    workload = ["inference", "urgent_training", "flexible_training", "batch_processing"]
+    cluster = ["realtime_gpu", "training_gpu_a", "training_gpu_b"]
+    inference_arrival = [220, 210, 205, 200, 200, 210, 230, 260, 290, 320, 340, 350, 345, 340, 335, 340, 360, 390, 420, 440, 410, 360, 300, 250]
+    sample = {
+        "horizon": horizon,
+        "time": time,
+        "time_volume": time_volume,
+        "time_labels": [f"{hour:02d}:00" for hour in time],
+        "workload": workload,
+        "cluster": cluster,
+        "delta_t": 1.0,
+        "work_arrival": {
+            "inference": inference_arrival,
+            "urgent_training": [0 for _ in time],
+            "flexible_training": [0 for _ in time],
+            "batch_processing": [0 for _ in time],
+        },
+        "initial_backlog": {
+            "inference": 0,
+            "urgent_training": 1200,
+            "flexible_training": 3000,
+            "batch_processing": 1400,
+        },
+        "allowed_backlog": {
+            "inference": [0 for _ in time_volume],
+            "urgent_training": [1200 for _ in range(17)] + [0 for _ in range(8)],
+            "flexible_training": [3000 for _ in range(23)] + [1500, 0],
+            "batch_processing": [1400 for _ in range(24)] + [0],
+        },
+        "slack_limit": {
+            "inference": [0 for _ in time_volume],
+            "urgent_training": [200 for _ in time_volume],
+            "flexible_training": [300 for _ in time_volume],
+            "batch_processing": [300 for _ in time_volume],
+        },
+        "sla_penalty": {
+            "inference": 1_000_000,
+            "urgent_training": 5000,
+            "flexible_training": 1200,
+            "batch_processing": 800,
+        },
+        "cluster_compatibility": {
+            "inference": {"realtime_gpu": 1, "training_gpu_a": 1, "training_gpu_b": 0},
+            "urgent_training": {"realtime_gpu": 0, "training_gpu_a": 1, "training_gpu_b": 1},
+            "flexible_training": {"realtime_gpu": 0, "training_gpu_a": 1, "training_gpu_b": 1},
+            "batch_processing": {"realtime_gpu": 0, "training_gpu_a": 1, "training_gpu_b": 1},
+        },
+        "execution_cost": {
+            "inference": {"realtime_gpu": 0.8, "training_gpu_a": 1.4, "training_gpu_b": 2.0},
+            "urgent_training": {"realtime_gpu": 0, "training_gpu_a": 0.7, "training_gpu_b": 0.9},
+            "flexible_training": {"realtime_gpu": 0, "training_gpu_a": 0.5, "training_gpu_b": 0.65},
+            "batch_processing": {"realtime_gpu": 0, "training_gpu_a": 0.35, "training_gpu_b": 0.45},
+        },
+        "gpu_capacity": {
+            "realtime_gpu": [500 for _ in time],
+            "training_gpu_a": [800 for _ in time],
+            "training_gpu_b": [650 for _ in time],
+        },
+        "idle_power": {"realtime_gpu": 0.12, "training_gpu_a": 0.18, "training_gpu_b": 0.15},
+        "gpu_dynamic_power": {"realtime_gpu": 0.00075, "training_gpu_a": 0.00072, "training_gpu_b": 0.00078},
+        "pue": {
+            "realtime_gpu": [1.24 for _ in time],
+            "training_gpu_a": [1.28 for _ in time],
+            "training_gpu_b": [1.30 for _ in time],
+        },
+        "initial_cluster_status": {"realtime_gpu": 1, "training_gpu_a": 0, "training_gpu_b": 0},
+        "cluster_start_cost": {"realtime_gpu": 30, "training_gpu_a": 60, "training_gpu_b": 50},
+        "facility_aux_load": [0.35 for _ in time],
+        "pv_forecast": [0, 0, 0, 0, 0, 0, 0.05, 0.2, 0.5, 0.9, 1.25, 1.55, 1.7, 1.6, 1.35, 0.95, 0.55, 0.2, 0.05, 0, 0, 0, 0, 0],
+        "electricity_price": [270, 250, 240, 235, 240, 260, 310, 380, 460, 520, 480, 430, 390, 370, 410, 480, 560, 680, 760, 720, 610, 500, 400, 320],
+        "grid_carbon_factor": [0.58, 0.58, 0.57, 0.57, 0.56, 0.55, 0.53, 0.50, 0.47, 0.43, 0.40, 0.38, 0.36, 0.35, 0.36, 0.39, 0.43, 0.48, 0.52, 0.55, 0.57, 0.58, 0.59, 0.59],
+        "grid_power_limit": [4.0 for _ in time],
+        "carbon_price": 80,
+        "demand_charge_price": 120,
+        "curtailment_penalty": 100,
+        "storage_power_capacity": 1.0,
+        "storage_energy_capacity": 3.0,
+        "initial_soc": 1.5,
+        "soc_min": 0.3,
+        "soc_max": 2.7,
+        "terminal_soc_target": 1.5,
+        "charge_efficiency": 0.95,
+        "discharge_efficiency": 0.93,
+        "storage_degradation_cost": 25,
+        "terminal_soc_penalty": 500,
+        "weights": {
+            "grid_energy_cost": 1,
+            "demand_charge": 1,
+            "carbon_cost": 1,
+            "storage_degradation": 1,
+            "cluster_start": 1,
+            "compute_execution": 1,
+            "sla_violation": 1,
+            "pv_curtailment": 1,
+            "compute_terminal_soc": 1,
+        },
+    }
+
+    set_definitions = []
+    for item in COMPUTE_POWER_SETS:
+        values = sample.get(item["code"], [])
+        set_definitions.append({**deepcopy(item), "values": deepcopy(values)})
+
+    parameter_meta = {item["code"]: item for item in COMPUTE_POWER_PARAMETERS}
+    parameter_order = [
+        "horizon",
+        "time",
+        "time_volume",
+        "time_labels",
+        "workload",
+        "cluster",
+        "delta_t",
+        "work_arrival",
+        "initial_backlog",
+        "allowed_backlog",
+        "slack_limit",
+        "sla_penalty",
+        "cluster_compatibility",
+        "execution_cost",
+        "gpu_capacity",
+        "idle_power",
+        "gpu_dynamic_power",
+        "pue",
+        "initial_cluster_status",
+        "cluster_start_cost",
+        "facility_aux_load",
+        "pv_forecast",
+        "electricity_price",
+        "grid_carbon_factor",
+        "grid_power_limit",
+        "carbon_price",
+        "demand_charge_price",
+        "curtailment_penalty",
+        "storage_power_capacity",
+        "storage_energy_capacity",
+        "initial_soc",
+        "soc_min",
+        "soc_max",
+        "terminal_soc_target",
+        "charge_efficiency",
+        "discharge_efficiency",
+        "storage_degradation_cost",
+        "terminal_soc_penalty",
+        "weights",
+    ]
+    extra_meta = {
+        "time": {"name": "调度时段", "unit": "", "dimension": ["time"], "source": "dispatch_plan", "validation": {"type": "array"}},
+        "time_volume": {"name": "状态时点", "unit": "", "dimension": ["time_volume"], "source": "dispatch_plan", "validation": {"type": "array"}},
+        "time_labels": {"name": "时段标签", "unit": "", "dimension": ["time"], "source": "dispatch_plan", "validation": {"type": "array"}},
+        "workload": {"name": "算力任务池", "unit": "", "dimension": ["workload"], "source": "scheduler", "validation": {"type": "array"}},
+        "cluster": {"name": "GPU 集群", "unit": "", "dimension": ["cluster"], "source": "resource_manager", "validation": {"type": "array"}},
+        "weights": {"name": "目标权重", "unit": "", "dimension": [], "source": "decision_policy", "validation": {"type": "dict"}},
+    }
+    source_by_code = {
+        "work_arrival": "scheduler",
+        "initial_backlog": "scheduler",
+        "allowed_backlog": "scheduler",
+        "slack_limit": "scheduler",
+        "sla_penalty": "sla_policy",
+        "cluster_compatibility": "resource_manager",
+        "execution_cost": "cost_system",
+        "gpu_capacity": "resource_manager",
+        "idle_power": "dcim",
+        "gpu_dynamic_power": "dcim",
+        "pue": "dcim",
+        "initial_cluster_status": "resource_manager",
+        "cluster_start_cost": "cost_system",
+        "facility_aux_load": "dcim",
+        "pv_forecast": "forecast",
+        "electricity_price": "market",
+        "grid_carbon_factor": "carbon_data",
+        "grid_power_limit": "grid",
+        "initial_soc": "bms",
+        "soc_min": "bms",
+        "soc_max": "bms",
+        "terminal_soc_target": "dispatch_plan",
+        "charge_efficiency": "bms",
+        "discharge_efficiency": "bms",
+    }
+    parameters = []
+    for parameter_code in parameter_order:
+        if parameter_code in extra_meta:
+            meta = extra_meta[parameter_code]
+        else:
+            definition = parameter_meta[parameter_code]
+            meta = {
+                "name": definition["name"],
+                "unit": definition.get("unit", ""),
+                "dimension": definition.get("dimension", []),
+                "source": source_by_code.get(parameter_code, "decision_policy"),
+                "validation": {"type": "dict" if isinstance(sample[parameter_code], dict) else "array" if isinstance(sample[parameter_code], list) else "number"},
+            }
+            if parameter_code == "horizon":
+                meta["validation"] = {"type": "integer", "min": 1}
+            elif parameter_code in {"charge_efficiency", "discharge_efficiency"}:
+                meta["validation"] = {"type": "number", "min": 0.000001, "max": 1}
+            elif parameter_code not in {"electricity_price"} and meta["validation"]["type"] == "number":
+                meta["validation"]["min"] = 0
+        parameters.append(
+            _param(
+                parameter_code,
+                meta["name"],
+                meta["unit"],
+                list(meta["dimension"]),
+                meta["source"],
+                sample[parameter_code],
+                meta["validation"],
+            )
+        )
+
+    objective_terms = [
+        {"term_id": "grid_energy_cost", "name": "购电成本", "expression": "sum(electricity_price[t] * grid_buy[t] * delta_t for t in time)", "weight_key": "grid_energy_cost", "weight": 1, "solve_participation": "solve_active", "supported_by_backend": True},
+        {"term_id": "demand_charge_cost", "name": "最大需量成本", "expression": "demand_charge_price * grid_peak", "weight_key": "demand_charge", "weight": 1, "solve_participation": "solve_active", "supported_by_backend": True},
+        {"term_id": "carbon_cost", "name": "碳排成本", "expression": "sum(grid_carbon_factor[t] * carbon_price * grid_buy[t] * delta_t for t in time)", "weight_key": "carbon_cost", "weight": 1, "solve_participation": "solve_active", "supported_by_backend": True},
+        {"term_id": "storage_degradation_cost", "name": "储能损耗成本", "expression": "storage_degradation_cost * sum((charge[t] + discharge[t]) * delta_t for t in time)", "weight_key": "storage_degradation", "weight": 1, "solve_participation": "solve_active", "supported_by_backend": True},
+        {"term_id": "cluster_start_cost", "name": "集群启动成本", "expression": "sum(cluster_start_cost[c] * cluster_start[c,t] for c in cluster for t in time)", "weight_key": "cluster_start", "weight": 1, "solve_participation": "solve_active", "supported_by_backend": True},
+        {"term_id": "compute_execution_cost", "name": "算力执行成本", "expression": "sum(execution_cost[w,c] * work_execute[w,c,t] for w in workload for c in cluster for t in time)", "weight_key": "compute_execution", "weight": 1, "solve_participation": "solve_active", "supported_by_backend": True},
+        {"term_id": "sla_violation_cost", "name": "SLA 违约成本", "expression": "sum(sla_penalty[w] * sla_slack[w,tv] for w in workload for tv in time_volume)", "weight_key": "sla_violation", "weight": 1, "solve_participation": "solve_active", "supported_by_backend": True},
+        {"term_id": "pv_curtailment_cost", "name": "弃光成本", "expression": "curtailment_penalty * sum(pv_curtail[t] * delta_t for t in time)", "weight_key": "pv_curtailment", "weight": 1, "solve_participation": "solve_active", "supported_by_backend": True},
+        {"term_id": "terminal_soc_cost", "name": "期末 SOC 偏差成本", "expression": "terminal_soc_penalty * (terminal_soc_dev_pos + terminal_soc_dev_neg)", "weight_key": "compute_terminal_soc", "weight": 1, "solve_participation": "solve_active", "supported_by_backend": True},
+    ]
+
+    output_contract = {
+        "series_index_set": "time",
+        "execution_policy": "advisory_only",
+        "requires_human_review": True,
+        "series_fields": [
+            {"key": "time_label", "expression": "time_labels[t]"},
+            {"key": "compute_executed", "expression": "sum(sum(work_execute[w,c,t] for w in workload) for c in cluster)"},
+            {"key": "total_backlog", "expression": "sum(backlog[w,t] for w in workload)"},
+            {"key": "gpu_used", "expression": "sum(cluster_gpu_used[c,t] for c in cluster)"},
+            {"key": "gpu_capacity", "expression": "sum(gpu_capacity[c,t] for c in cluster)"},
+            {"key": "dc_power", "expression": "dc_power[t]"},
+            {"key": "facility_load", "expression": "dc_power[t] + facility_aux_load[t]"},
+            {"key": "grid_buy", "expression": "grid_buy[t]"},
+            {"key": "pv_used", "expression": "pv_used[t]"},
+            {"key": "pv_curtail", "expression": "pv_curtail[t]"},
+            {"key": "charge", "expression": "charge[t]"},
+            {"key": "discharge", "expression": "discharge[t]"},
+            {"key": "soc", "expression": "soc[t]"},
+            {"key": "electricity_price", "expression": "electricity_price[t]"},
+            {"key": "grid_carbon_factor", "expression": "grid_carbon_factor[t]"},
+        ],
+        "curves": [
+            {"key": "compute_schedule_curve", "fields": {"compute_executed": "sum(sum(work_execute[w,c,t] for w in workload) for c in cluster)", "total_backlog": "sum(backlog[w,t] for w in workload)", "gpu_used": "sum(cluster_gpu_used[c,t] for c in cluster)"}},
+            {"key": "power_supply_curve", "fields": {"facility_load": "dc_power[t] + facility_aux_load[t]", "grid_buy": "grid_buy[t]", "pv_used": "pv_used[t]", "pv_curtail": "pv_curtail[t]"}},
+            {"key": "storage_curve", "fields": {"charge": "charge[t]", "discharge": "discharge[t]", "soc": "soc[t]"}},
+        ],
+        "chart_fields": ["compute_executed", "total_backlog", "gpu_used", "facility_load", "grid_buy", "pv_used", "charge", "discharge", "soc"],
+        "static_business_output": {
+            "single_model_joint_optimization": True,
+            "model_scope": "算力任务、GPU 集群、光伏、储能和电网购电在同一次 MILP 求解中联合决策。",
+        },
+    }
+
+    metric_definitions = [
+        {"key": "total_operating_cost", "name": "总运营成本", "expression": "objective_value"},
+        {"key": "grid_energy_cost", "name": "购电成本", "expression": "sum(electricity_price[t] * grid_buy[t] * delta_t for t in time)"},
+        {"key": "demand_charge_cost", "name": "最大需量成本", "expression": "demand_charge_price * grid_peak"},
+        {"key": "carbon_emission", "name": "碳排放量", "expression": "sum(grid_carbon_factor[t] * grid_buy[t] * delta_t for t in time)"},
+        {"key": "carbon_cost", "name": "碳成本", "expression": "carbon_price * carbon_emission"},
+        {"key": "storage_degradation_cost_total", "name": "储能损耗成本", "expression": "storage_degradation_cost * sum((charge[t] + discharge[t]) * delta_t for t in time)"},
+        {"key": "compute_execution_cost", "name": "算力执行成本", "expression": "sum(sum(sum(execution_cost[w,c] * work_execute[w,c,t] for t in time) for c in cluster) for w in workload)"},
+        {"key": "cluster_start_cost_total", "name": "集群启动成本", "expression": "sum(sum(cluster_start_cost[c] * cluster_start[c,t] for t in time) for c in cluster)"},
+        {"key": "sla_penalty_cost", "name": "SLA 违约成本", "expression": "sum(sum(sla_penalty[w] * sla_slack[w,tv] for tv in time_volume) for w in workload)"},
+        {"key": "curtailment_cost", "name": "弃光成本", "expression": "curtailment_penalty * sum(pv_curtail[t] * delta_t for t in time)"},
+        {"key": "terminal_soc_penalty_cost", "name": "期末 SOC 偏差成本", "expression": "terminal_soc_penalty * (terminal_soc_dev_pos + terminal_soc_dev_neg)"},
+        {"key": "total_grid_energy", "name": "电网购电量", "expression": "sum(grid_buy[t] * delta_t for t in time)"},
+        {"key": "grid_peak", "name": "最大购电功率", "expression": "grid_peak"},
+        {"key": "total_compute_executed", "name": "总计算执行量", "expression": "sum(sum(sum(work_execute[w,c,t] for t in time) for c in cluster) for w in workload)"},
+        {"key": "terminal_backlog", "name": "日终任务积压", "expression": "sum(backlog[w,horizon] for w in workload)"},
+        {"key": "total_sla_slack", "name": "SLA 松弛总量", "expression": "sum(sum(sla_slack[w,tv] for tv in time_volume) for w in workload)"},
+        {"key": "inference_sla_violation", "name": "在线推理 SLA 违约量", "expression": "sum(sla_slack['inference',tv] for tv in time_volume)"},
+        {"key": "average_gpu_utilization", "name": "GPU 平均利用率", "expression": "sum(sum(cluster_gpu_used[c,t] for c in cluster) for t in time) / sum(sum(gpu_capacity[c,t] for c in cluster) for t in time)"},
+        {"key": "total_pv_forecast_energy", "name": "可用光伏电量", "expression": "sum(pv_forecast[t] * delta_t for t in time)"},
+        {"key": "total_pv_used_energy", "name": "光伏消纳电量", "expression": "sum(pv_used[t] * delta_t for t in time)"},
+        {"key": "total_pv_curtailment", "name": "弃光电量", "expression": "sum(pv_curtail[t] * delta_t for t in time)"},
+        {"key": "pv_utilization_rate", "name": "光伏消纳率", "expression": "total_pv_used_energy / total_pv_forecast_energy"},
+        {"key": "total_facility_energy", "name": "园区用电量", "expression": "sum((dc_power[t] + facility_aux_load[t]) * delta_t for t in time)"},
+        {"key": "green_energy_share", "name": "绿电用能占比", "expression": "total_pv_used_energy / total_facility_energy"},
+        {"key": "soc_min_actual", "name": "实际最低 SOC", "expression": "min(soc[tv] for tv in time_volume)"},
+        {"key": "soc_max_actual", "name": "实际最高 SOC", "expression": "max(soc[tv] for tv in time_volume)"},
+        {"key": "terminal_soc_gap", "name": "期末 SOC 偏差", "expression": "abs(soc[horizon] - terminal_soc_target)"},
+        {"key": "charge_discharge_conflict_count", "name": "充放电冲突次数", "expression": "sum(charge[t] > 0.000001 and discharge[t] > 0.000001 for t in time)"},
+        {"key": "cluster_start_count", "name": "集群启动次数", "expression": "sum(sum(cluster_start[c,t] for t in time) for c in cluster)"},
+    ]
+    business_metrics = [item["key"] for item in metric_definitions]
+    metrics_config = {
+        "metrics": metric_definitions,
+        "business_metrics": business_metrics,
+        "lists": [
+            {"key": "high_gpu_utilization_periods", "foreach": "time", "where": "sum(cluster_gpu_used[c,t] for c in cluster) / sum(gpu_capacity[c,t] for c in cluster) >= 0.95", "fields": {"gpu_used": "sum(cluster_gpu_used[c,t] for c in cluster)", "gpu_capacity": "sum(gpu_capacity[c,t] for c in cluster)"}},
+            {"key": "grid_limit_binding_periods", "foreach": "time", "where": "grid_buy[t] >= grid_power_limit[t] - 0.000001", "fields": {"grid_buy": "grid_buy[t]", "grid_power_limit": "grid_power_limit[t]"}},
+            {"key": "soc_boundary_periods", "foreach": "time", "where": "soc[t] <= soc_min + 0.000001 or soc[t] >= soc_max - 0.000001", "fields": {"soc": "soc[t]"}},
+            {"key": "curtailment_periods", "foreach": "time", "where": "pv_curtail[t] > 0.000001", "fields": {"pv_curtail": "pv_curtail[t]", "pv_forecast": "pv_forecast[t]"}},
+        ],
+        "objects": [
+            {"key": "dispatch_plan", "source": "series"},
+            {"key": "cost_breakdown", "source": "cost_breakdown", "fields": ["grid_energy_cost", "demand_charge_cost", "carbon_cost", "storage_degradation_cost_total", "compute_execution_cost", "cluster_start_cost_total", "sla_penalty_cost", "curtailment_cost", "terminal_soc_penalty_cost", "total_operating_cost"]},
+            {"key": "risk_summary", "source": "risk_summary", "metric_fields": ["terminal_backlog", "inference_sla_violation", "grid_peak", "soc_min_actual", "soc_max_actual"], "static": {"advisory_only": True}},
+        ],
+    }
+    constraint_check_config = {
+        "tolerance": 1e-5,
+        "include_metrics": ["terminal_backlog", "inference_sla_violation", "charge_discharge_conflict_count", "terminal_soc_gap", "soc_min_actual", "soc_max_actual"],
+        "checks": [
+            {"key": "terminal_backlog_cleared", "expression": "terminal_backlog <= tolerance"},
+            {"key": "inference_sla_satisfied", "expression": "inference_sla_violation <= tolerance"},
+            {"key": "charge_discharge_exclusive", "expression": "charge_discharge_conflict_count <= tolerance"},
+            {"key": "soc_within_bounds", "expression": "soc_min_actual >= soc_min - tolerance and soc_max_actual <= soc_max + tolerance"},
+            {"key": "terminal_soc_satisfied", "expression": "terminal_soc_gap <= tolerance"},
+        ],
+    }
+    explanation_config = {
+        "summary": "智算园区日前算电协同联合优化已完成，结果包含算力任务、GPU 集群、光伏、储能和电网购电的一体化计划。",
+        "advisory": "平台输出为辅助决策建议，不自动下发 GPU 调度、储能控制或购电指令。",
+        "execution_policy": "advisory_only",
+        "requires_human_review": True,
+        "strategy_templates": [
+            "本次联合优化执行计算量 {total_compute_executed} GPU·h，日终任务积压 {terminal_backlog} GPU·h。",
+            "电网购电量 {total_grid_energy} MWh，最大购电功率 {grid_peak} MW，光伏消纳率 {pv_utilization_rate}。",
+            "总运营成本 {total_operating_cost} 元，其中购电成本 {grid_energy_cost} 元、碳成本 {carbon_cost} 元、SLA 违约成本 {sla_penalty_cost} 元。",
+        ],
+        "approval_items": [
+            "复核任务到达量、允许积压曲线和 SLA 罚值是否对应真实业务规则。",
+            "复核 GPU 容量、兼容性、PUE 与单 GPU 功耗参数。",
+            "复核光伏、电价、碳因子、储能 SOC 和电网接入边界。",
+            "确认结果仅作为辅助决策建议，经人工审批后再由外部系统执行。",
+        ],
+    }
+
+    component_spec = {
+        "model_code": code,
+        "build_mode": "component_based",
+        "name": "智算园区日前算电协同联合优化模型",
+        "model_problem_type": "MILP",
+        "required_solver_capabilities": ["MILP"],
+        "sets": deepcopy(set_definitions),
+        "parameters": deepcopy(parameters),
+        "variables": deepcopy(COMPUTE_POWER_VARIABLES),
+        "components": [{"type": "compute_power_coordination_core", "version": "1.0.0"}],
+        "objective": {"type": "weighted_sum", "sense": "minimize", "terms": objective_terms, "weights": sample["weights"]},
+        "output_contract": output_contract,
+        "metrics_config": metrics_config,
+        "constraint_check_config": constraint_check_config,
+        "explanation_config": explanation_config,
+        "ui_language": "zh-CN",
+    }
+
+    return {
+        "model_code": code,
+        "code": code,
+        "name": "智算园区日前算电协同联合优化模型",
+        "scenario": "单园区算力任务、GPU 集群、光伏、储能和电网购电联合优化。",
+        "description": "通过单次 MILP 求解生成 24 小时算力排程、集群启停、用电、光伏消纳和储能计划。",
+        "version": "v1.0",
+        "status": "published",
+        "solver": "HiGHS",
+        "build_mode": "component_based",
+        "problem_type": "MILP",
+        "model_problem_type": "MILP",
+        "required_solver_capabilities": ["MILP"],
+        "tags": ["compute_power", "data_center", "pv", "storage", "MILP", "HiGHS", "component_based"],
+        "business_objects": [
+            {"code": "workload", "name": "算力任务池", "object_type": "compute_workload", "source_system": "scheduler"},
+            {"code": "cluster", "name": "GPU 集群", "object_type": "compute_cluster", "source_system": "resource_manager"},
+            {"code": "storage", "name": "园区储能", "object_type": "storage", "source_system": "bms"},
+            {"code": "grid", "name": "电网接入点", "object_type": "grid_connection", "source_system": "grid"},
+            {"code": "time", "name": "调度时段", "object_type": "time", "source_system": "dispatch_plan"},
+        ],
+        "sets": set_definitions,
+        "parameters": parameters,
+        "variables": deepcopy(COMPUTE_POWER_VARIABLES),
+        "constraints": [
+            _constraint("workload_balance", "任务到达、执行与积压递推", "backlog[w,t+1] = backlog[w,t] + arrival[w,t] - executed[w,t]", ["workload", "time"]),
+            _constraint("sla_deadline", "SLA 与截止时间", "backlog[w,tv] <= allowed_backlog[w,tv] + sla_slack[w,tv]", ["workload", "time_volume"]),
+            _constraint("cluster_capacity", "GPU 容量和兼容性", "executed <= compatible capacity", ["workload", "cluster", "time"]),
+            _constraint("compute_power", "算力功率转换", "cluster_power = PUE * (idle_power + gpu_dynamic_power)", ["cluster", "time"]),
+            _constraint("pv_storage", "光伏与储能状态", "PV balance and SOC transition", ["time"]),
+            _constraint("facility_balance", "园区功率平衡", "grid + PV + discharge = compute + auxiliary + charge", ["time"]),
+        ],
+        "objectives": [_objective("compute_power_joint_cost_min", "算电协同综合成本最小", "minimize", "购电、需量、碳排、储能、集群启停、算力执行、SLA 与弃光成本")],
+        "sample_runtime_parameters": sample,
+        "component_spec": component_spec,
+        "output_contract": output_contract,
+        "metrics_config": metrics_config,
+        "constraint_check_config": constraint_check_config,
+        "explanation_config": explanation_config,
+        "ui_metadata": {
+            "component_spec_collapsed": True,
+            "recommended_component_source": "component_library",
+            "single_model_joint_optimization": True,
+            "execution_policy": "advisory_only",
+            "requires_human_review": True,
+            "capability_boundary": "当前模板面向单园区聚合任务池的日前联合优化，不包含跨园区迁移和自动控制下发。",
+        },
+    }
 
 

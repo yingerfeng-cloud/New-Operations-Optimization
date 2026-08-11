@@ -59,9 +59,12 @@ class ParameterExtractor:
         params: dict[str, Any] = {}
         params.update(self._extract_json_object(message, input_schema))
         units = self._units(message)
-        load = self._extract_load_values(message)
+        load, time_labels = self._extract_load_series(message)
         if load and "load_forecast" not in params and self._schema_item(input_schema, "load_forecast"):
             params["load_forecast"] = self._time_value(input_schema, "load_forecast", load)
+            params["horizon"] = len(load)
+            if time_labels:
+                params["time"] = time_labels
 
         storage_params = self._extract_storage_dispatch(message, input_schema)
         if storage_params:
@@ -79,6 +82,24 @@ class ParameterExtractor:
             params["unit_max_output"] = unit_max
         if fuel_cost and self._schema_item(input_schema, "fuel_cost"):
             params["fuel_cost"] = fuel_cost
+
+        if units:
+            ordered_fields = {
+                "unit_min_output": ["机组最小出力", "最小出力", "出力下限"],
+                "unit_max_output": ["机组最大出力", "最大出力", "出力上限"],
+                "fuel_cost": ["燃料成本", "发电成本", "单位成本"],
+                "ramp_up_limit": ["上爬坡限制", "爬坡上限", "最大上爬坡"],
+                "ramp_down_limit": ["下爬坡限制", "爬坡下限", "最大下爬坡"],
+            }
+            for key, labels in ordered_fields.items():
+                # Explicit clauses such as "U1...，U2..." are more precise
+                # than a positional list.  Never overwrite those values by
+                # re-reading unit labels (the digit in U2 is not a value).
+                if key in params or not self._schema_item(input_schema, key):
+                    continue
+                values = self._extract_ordered_values(message, labels, len(units))
+                if values:
+                    params[key] = {unit: values[index] for index, unit in enumerate(units)}
 
         # Global-scalar fallback: user said "机组最大出力500" without unit labels.
         # Extract a single scalar; the orchestrator will broadcast it to per-unit dict.
@@ -189,9 +210,41 @@ class ParameterExtractor:
 
     def _units(self, message: str) -> list[str]:
         units = sorted(set(re.findall(r"(?<![A-Za-z0-9])U\d+(?![A-Za-z0-9])", message, re.IGNORECASE)), key=lambda item: int(re.findall(r"\d+", item)[0]))
-        return [unit.upper() for unit in units]
+        if units:
+            return [unit.upper() for unit in units]
+        count_match = re.search(
+            r"([0-9]{1,3}|[一二两三四五六七八九十百]+)\s*(?:台|个)\s*(?:发电)?机组",
+            str(message or ""),
+        )
+        if not count_match:
+            return []
+        count = self._unit_count(count_match.group(1))
+        if count is None or not 1 <= count <= 100:
+            return []
+        return [f"U{index}" for index in range(1, count + 1)]
+
+    @staticmethod
+    def _unit_count(value: str) -> int | None:
+        if value.isdigit():
+            return int(value)
+        digits = {"一": 1, "二": 2, "两": 2, "三": 3, "四": 4, "五": 5, "六": 6, "七": 7, "八": 8, "九": 9}
+        if value == "十":
+            return 10
+        if "百" in value:
+            left, _, right = value.partition("百")
+            hundreds = digits.get(left, 1) * 100
+            remainder = ParameterExtractor._unit_count(right) if right else 0
+            return hundreds + remainder if remainder is not None else None
+        if "十" in value:
+            left, _, right = value.partition("十")
+            tens = digits.get(left, 1) * 10
+            return tens + digits.get(right, 0)
+        return digits.get(value)
 
     def _extract_load_values(self, message: str) -> list[float]:
+        return self._extract_load_series(message)[0]
+
+    def _extract_load_series(self, message: str) -> tuple[list[float | int], list[str]]:
         lowered = message.lower()
         for marker in LOAD_MARKERS:
             pos = lowered.find(marker.lower())
@@ -199,9 +252,46 @@ class ParameterExtractor:
                 continue
             segment = message[pos + len(marker) :]
             segment = self._truncate_load_segment(segment)
-            nums = re.findall(r"(?<![A-Za-z])\d+(?:\.\d+)?", segment)
+            pairs = re.findall(
+                r"(?<!\d)([01]?\d|2[0-3]):([0-5]\d)(?:\s*(?:→|->|=>|=|为|：)\s*|\s+)(-?\d+(?:\.\d+)?)",
+                segment,
+            )
+            if pairs:
+                labels = [f"{int(hour):02d}:{minute}" for hour, minute, _ in pairs]
+                return [self._num(value) for _, _, value in pairs], labels
+            # Clock components describe the index and must never be counted as
+            # forecast values (the former parser turned 24 values into 72+).
+            value_segment = re.sub(r"(?<!\d)(?:[01]?\d|2[0-3]):[0-5]\d(?!\d)", " ", segment)
+            nums = re.findall(r"(?<![A-Za-z])-?\d+(?:\.\d+)?", value_segment)
             if nums:
-                return [self._num(item) for item in nums]
+                return [self._num(item) for item in nums], []
+        return [], []
+
+    def _extract_ordered_values(
+        self,
+        message: str,
+        labels: list[str],
+        expected_count: int,
+    ) -> list[float | int]:
+        all_labels = [
+            "机组最小出力", "最小出力", "出力下限", "机组最大出力", "最大出力", "出力上限",
+            "燃料成本", "发电成本", "单位成本", "上爬坡限制", "爬坡上限", "最大上爬坡",
+            "下爬坡限制", "爬坡下限", "最大下爬坡", "负荷预测", "负荷",
+        ]
+        for label in labels:
+            match = re.search(rf"{re.escape(label)}\s*(?:分别)?\s*(?:为|是|[:：=])?\s*", message, re.IGNORECASE)
+            if not match:
+                continue
+            segment = message[match.end():]
+            stop = len(segment)
+            for other in all_labels:
+                other_match = re.search(re.escape(other), segment, re.IGNORECASE)
+                if other_match:
+                    stop = min(stop, other_match.start())
+            segment = segment[:stop]
+            numbers = re.findall(r"-?\d+(?:\.\d+)?", segment)
+            if len(numbers) >= expected_count:
+                return [self._num(value) for value in numbers[:expected_count]]
         return []
 
     def _truncate_load_segment(self, segment: str) -> str:

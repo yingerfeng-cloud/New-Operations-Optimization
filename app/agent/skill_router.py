@@ -42,7 +42,7 @@ class AgentSkillRouter:
         if current_agent_skill not in available_names:
             current_agent_skill = None
         current_api_skill = state.get("resolved_skill_name") or state.get("selected_skill")
-        mentioned = self._match_skill(text, skills)
+        mentioned, match_evidence = self._match_skill_with_evidence(text, skills)
 
         if state.get("pending_switch"):
             pending = state.get("pending_switch") or {}
@@ -75,13 +75,27 @@ class AgentSkillRouter:
         if current_agent_skill and (not mentioned or mentioned == current_agent_skill) and any(ch.isdigit() for ch in compact):
             return self._result("parameter_supplement", current_agent_skill, skills, 0.78, False, "沿用当前 Agent Skill 收集参数")
         if mentioned and current_agent_skill and mentioned != current_agent_skill:
-            return self._result("optimization_request", mentioned, skills, 0.86, False, "识别到新的优化场景请求")
+            return {
+                **self._result("optimization_request", mentioned, skills, 0.86, False, "识别到新的优化场景请求"),
+                **match_evidence,
+            }
         if mentioned:
             if self._optimization_intent(compact):
-                return self._result("optimization_request", mentioned, skills, 0.86, False, "识别到优化请求和场景")
+                return {
+                    **self._result("optimization_request", mentioned, skills, 0.86, False, "识别到优化请求和场景"),
+                    **match_evidence,
+                }
             return self._result("casual_chat", mentioned, skills, 0.45, False, "提到场景但未明确要求执行")
         if self._optimization_intent(compact):
-            return {"intent": "skill_selection_required", "agent_skill_name": None, "api_skill_name": None, "confidence": 0.4, "should_invoke": False, "reason": "识别到优化意图但无法确定 Agent Skill"}
+            return {
+                "intent": "skill_selection_required",
+                "agent_skill_name": None,
+                "api_skill_name": None,
+                "confidence": 0.4,
+                "should_invoke": False,
+                "reason": "识别到优化意图但无法确定 Agent Skill",
+                **match_evidence,
+            }
         return {"intent": "casual_chat", "agent_skill_name": current_agent_skill, "api_skill_name": current_api_skill, "confidence": 0.5, "should_invoke": False, "reason": "未识别到优化调用意图"}
 
     def _result(self, intent: str, agent_skill_name: str | None, skills: list[dict[str, Any]], confidence: float, should_invoke: bool, reason: str) -> dict[str, Any]:
@@ -96,13 +110,37 @@ class AgentSkillRouter:
         }
 
     def _match_skill(self, message: str, skills: list[dict[str, Any]]) -> str | None:
+        name, _ = self._match_skill_with_evidence(message, skills)
+        return name
+
+    def _match_skill_with_evidence(self, message: str, skills: list[dict[str, Any]]) -> tuple[str | None, dict[str, Any]]:
         text = message.lower()
+        matches: list[tuple[int, str, str]] = []
         for skill in skills:
             names = [skill.get("name", ""), skill.get("display_name", "")]
             names += list(skill.get("scenario_tags") or [])
             names += list(skill.get("trigger_intents") or [])
-            if any(str(item).lower() and str(item).lower() in text for item in names):
-                return skill.get("name")
+            matched_phrases = [str(item).lower() for item in names if str(item).strip() and str(item).lower() in text]
+            if matched_phrases:
+                phrase = max(matched_phrases, key=len)
+                matches.append((len(phrase), str(skill.get("name") or ""), phrase))
+        if matches:
+            matches.sort(reverse=True)
+            top_length = matches[0][0]
+            leaders = [item for item in matches if item[0] == top_length]
+            leader_names = {item[1] for item in leaders if item[1]}
+            if len(leader_names) == 1:
+                _, name, phrase = leaders[0]
+                return name, {
+                    "match_type": "exact_phrase",
+                    "matched_phrase": phrase,
+                    "match_ambiguous": False,
+                }
+            return None, {
+                "match_type": "ambiguous_phrase",
+                "matched_phrase": leaders[0][2],
+                "match_ambiguous": True,
+            }
         aliases = [
             ("retail_da_spot_bidding_v1", ["售电公司日前现货申报", "售电日前现货申报", "日前现货申报", "日前现货", "申报优化", "retail da", "spot bidding"]),
             ("contract_spot_exposure_v1", ["合约现货暴露控制", "合约现货暴露", "现货暴露控制", "中长期合约分解", "contract spot exposure"]),
@@ -160,8 +198,13 @@ class AgentSkillRouter:
         }
         for name, markers in aliases:
             if name in available and any(marker in text for marker in markers):
-                return name
-        return None
+                matched = max((marker for marker in markers if marker in text), key=len)
+                return name, {
+                    "match_type": "alias_phrase",
+                    "matched_phrase": matched,
+                    "match_ambiguous": False,
+                }
+        return None, {"match_type": "none", "match_ambiguous": False}
 
     def _agent_skill_from_api(self, api_skill_name: str | None, skills: list[dict[str, Any]]) -> str | None:
         for skill in skills:

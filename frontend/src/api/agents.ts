@@ -11,6 +11,10 @@ import type {
   AgentRunEvent,
   AgentSkill,
   AgentStatus,
+  AgentV3Event,
+  AgentV3ApprovalResolution,
+  AgentV3Task,
+  AgentV3TurnResponse,
 } from '../types/agent';
 
 export const getAgentStatus = () => unwrap<AgentStatus>(apiClient.get('/api/agent/status'));
@@ -31,11 +35,33 @@ export const getAgentConversation = (conversationId: string) => unwrap<AgentConv
 
 export const updateAgentConversation = (conversationId: string, payload: AgentConversationPayload) => unwrap<AgentConversation>(apiClient.patch(`/api/agent/conversations/${encodeURIComponent(conversationId)}`, payload));
 
-export const deleteAgentConversation = (conversationId: string) => unwrap<{ ok?: boolean }>(apiClient.delete(`/api/agent/conversations/${encodeURIComponent(conversationId)}`));
+export const deleteAgentConversation = (conversationId: string) => unwrap<{ deleted?: boolean; conversation_id?: string; deleted_run_count?: number }>(apiClient.delete(`/api/agent/conversations/${encodeURIComponent(conversationId)}`));
 
 export const analyzeAgentMessage = (payload: AgentAnalyzePayload) => unwrap<AgentAnalyzeResponse>(apiClient.post('/api/agent/analyze', payload));
 
 export const sendAgentMessage = analyzeAgentMessage;
+
+export const createAgentTurn = (conversationId: string, message: string, metadata: Record<string, unknown> = {}, clientTurnId?: string) =>
+  unwrap<AgentV3TurnResponse>(apiClient.post(
+    `/api/agent/v3/conversations/${encodeURIComponent(conversationId)}/turns`,
+    { message, metadata, client_turn_id: clientTurnId },
+    { timeout: 180_000, suppressErrorToast: true },
+  ));
+
+export const getAgentConversationEvents = (conversationId: string, after = 0) =>
+  unwrap<AgentV3Event[]>(apiClient.get(`/api/agent/v3/conversations/${encodeURIComponent(conversationId)}/events`, { params: { after } }));
+
+export const getAgentTask = (taskId: string) => unwrap<AgentV3Task>(apiClient.get(`/api/agent/v3/tasks/${encodeURIComponent(taskId)}`));
+
+export const cancelAgentTask = (taskId: string) => unwrap<AgentV3Task>(apiClient.post(`/api/agent/v3/tasks/${encodeURIComponent(taskId)}/cancel`));
+
+export const resolveAgentApproval = (approvalId: string, decision: 'approve' | 'reject', comment?: string) =>
+  unwrap<AgentV3ApprovalResolution>(apiClient.post(`/api/agent/v3/approvals/${encodeURIComponent(approvalId)}/resolve`, { decision, comment }));
+
+export const agentConversationEventStreamUrl = (conversationId: string, after = 0) => {
+  const base = String(apiClient.defaults.baseURL || '').replace(/\/$/, '');
+  return `${base}/api/agent/v3/conversations/${encodeURIComponent(conversationId)}/events/stream?after=${after}`;
+};
 
 export const confirmAgentInvoke = (payload: AgentInvokePayload) => unwrap<AgentAnalyzeResponse>(apiClient.post('/api/agent/confirm-invoke', payload));
 

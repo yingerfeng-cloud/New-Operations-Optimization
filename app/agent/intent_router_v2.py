@@ -131,6 +131,67 @@ class IntentRouterV2:
         candidates.sort(key=lambda item: item["final_score"], reverse=True)
         top = candidates[0] if candidates else None
         second = candidates[1] if len(candidates) > 1 else None
+        requested_candidate = next(
+            (
+                item
+                for item in candidates
+                if requested_skill
+                and requested_skill in {
+                    item.get("agent_skill_name"),
+                    item.get("platform_skill_name"),
+                }
+            ),
+            None,
+        )
+        if requested_candidate:
+            audit["guards"].append("EXPLICIT_SKILL_SELECTION")
+            return self._decision(
+                "optimization_request",
+                requested_candidate,
+                candidates,
+                False,
+                False,
+                None,
+                audit,
+                llm_parse,
+                routing_hint,
+            )
+        deterministic_hint = (
+            str((routing_hint or {}).get("intent") or "") == "optimization_request"
+            and str((routing_hint or {}).get("match_type") or "") in {"exact_phrase", "alias_phrase"}
+            and not bool((routing_hint or {}).get("match_ambiguous"))
+            and float((routing_hint or {}).get("confidence") or 0.0) >= 0.85
+        )
+        if deterministic_hint:
+            hint_name = str(
+                (routing_hint or {}).get("agent_skill_name")
+                or (routing_hint or {}).get("platform_skill_name")
+                or ""
+            )
+            hinted_candidate = next(
+                (
+                    item
+                    for item in candidates
+                    if hint_name in {
+                        item.get("agent_skill_name"),
+                        item.get("platform_skill_name"),
+                    }
+                ),
+                None,
+            )
+            if hinted_candidate:
+                audit["guards"].append("DETERMINISTIC_SKILL_MATCH")
+                return self._decision(
+                    "optimization_request",
+                    hinted_candidate,
+                    candidates,
+                    False,
+                    False,
+                    None,
+                    audit,
+                    llm_parse,
+                    routing_hint,
+                )
         if not top or top["final_score"] < 0.60:
             question = "请说明要优化的业务场景、目标和时间范围。"
             return self._decision(
@@ -351,7 +412,16 @@ class IntentRouterV2:
     def _sanitized_routing_hint(self, signal: dict[str, Any] | None) -> dict[str, Any]:
         return {
             key: (signal or {}).get(key)
-            for key in ("intent", "agent_skill_name", "platform_skill_name", "reason")
+            for key in (
+                "intent",
+                "agent_skill_name",
+                "platform_skill_name",
+                "reason",
+                "confidence",
+                "match_type",
+                "matched_phrase",
+                "match_ambiguous",
+            )
             if (signal or {}).get(key) is not None
         }
 

@@ -281,7 +281,10 @@ class AgentSkillRegistry:
 
         skill = self.load_skill(name)
         message = str(body.get("message") or "")
-        route = agent_skill_router.route(message, {"agent_skill_name": name, "resolved_skill_name": skill.get("canonical_api_skill_name")}, self.list_skills())
+        # A dry-run dialog is a fresh routing evaluation, not a continuation
+        # of a hidden task.  Seeding active-task state here used to turn every
+        # numeric request into ``parameter_supplement``.
+        route = agent_skill_router.route(message, {}, self.list_skills())
         extracted = parameter_extractor.extract(message, skill.get("input_schema", []))
         analysis = platform_client.analyze_input(skill.get("canonical_api_skill_name"), extracted)
         request_preview = self.dry_run_request(name, {"parameters": analysis.get("normalized_parameters", extracted)})

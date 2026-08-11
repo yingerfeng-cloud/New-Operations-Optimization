@@ -26,7 +26,7 @@ app/                            FastAPI 后端
   builders/                     Pyomo、Generic Linear、组件化 Builder
   model_components/             组件注册表与运行时校验
   services/                     模型、模板、任务、结果、Agent 服务
-  templates/                    12 个内置模板
+  templates/                    17 个内置模板
 tests/                          后端回归测试
 server.py                      后端启动入口
 ```
@@ -153,7 +153,7 @@ React 客户端路由支持直接刷新。
 
 ## 内置资产
 
-当前内置 12 个模型模板：
+当前内置 17 个模型模板：
 
 - `unit_commitment_day_ahead`
 - `economic_dispatch`
@@ -161,14 +161,19 @@ React 客户端路由支持直接刷新。
 - `renewable_storage_dispatch`
 - `chp_dispatch`
 - `cascade_hydro_dispatch`
+- `cascade_hydro_dispatch_v1`
 - `pv_storage_capacity_planning`
 - `pv_storage_day_ahead_dispatch`
 - `pv_storage_intraday_dispatch`
 - `pv_storage_dispatch_v2`
 - `pv_storage_day_ahead_dispatch_v2`
 - `pv_storage_intraday_dispatch_v2`
+- `nonlinear_hydro_power_demo`
+- `contract_spot_exposure_v1`
+- `retail_da_spot_bidding_v1`
+- `compute_power_coordination_day_ahead_v1`
 
-组件库包含 24 个内置组件。模板与组件仍由原后端注册表和服务管理，前端改造未重写求解核心。
+组件库包含 27 个内置组件。模板与组件仍由原后端注册表和服务管理，前端改造未重写求解核心。
 
 ## 常用 API
 

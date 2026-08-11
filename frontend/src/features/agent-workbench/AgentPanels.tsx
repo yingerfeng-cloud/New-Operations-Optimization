@@ -17,7 +17,7 @@ function parameterText(value: unknown) {
   const name = valueText(record.name || record.parameter || record.key || '未命名参数');
   const key = record.key && String(record.key) !== name ? ` · ${String(record.key)}` : '';
   const unit = record.unit ? `（${String(record.unit)}）` : '';
-  const error = record.error || record.message;
+  const error = record.message || record.error;
   return `${name}${key}${unit}${error ? `：${String(error)}` : ''}`;
 }
 
@@ -123,8 +123,9 @@ export function AgentParameterPanel({ response }: { response?: AgentAnalyzeRespo
       {invalid.length > 0 && <Alert showIcon type="error" title="参数校验失败" description={invalid.map(parameterText).join('；')} className="section-gap" />}
       <Card size="small" title="参数草稿">
         <Descriptions size="small" bordered column={1} className="section-gap">
-          <Descriptions.Item label="参数完整度">{response.parameter_completeness === undefined ? '-' : `${Math.round(response.parameter_completeness * 100)}%`}</Descriptions.Item>
-          <Descriptions.Item label="Schema 适配度">{response.schema_fit_score === undefined ? '-' : `${Math.round(response.schema_fit_score * 100)}%`}</Descriptions.Item>
+          <Descriptions.Item label="字段完整性">{response.parameter_completeness === undefined ? '-' : `${Math.round(response.parameter_completeness * 100)}%`}</Descriptions.Item>
+          <Descriptions.Item label="业务可行性"><Tag color={response.business_feasible === undefined ? 'default' : response.business_feasible ? 'green' : 'red'}>{response.business_feasible === undefined ? '待检查' : response.business_feasible ? '通过' : '不通过'}</Tag></Descriptions.Item>
+          <Descriptions.Item label="契约适配度">{response.schema_fit_score === undefined ? '-' : `${Math.round(response.schema_fit_score * 100)}%`}</Descriptions.Item>
         </Descriptions>
         <Table
           size="small"

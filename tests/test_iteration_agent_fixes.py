@@ -7,11 +7,13 @@ import uuid
 from copy import deepcopy
 
 import pytest
+import httpx
+from fastapi import HTTPException
 from fastapi.testclient import TestClient
 
 from app.agent.platform_client import OptimizationPlatformClient
 from app.main import app
-from app.services.llm_service import LLMService
+from app.services.llm_service import LLMService, OpenAICompatibleAdapter, VolcengineArkAdapter
 from app.storage.memory_store import STORE
 from app.utils import has_highspy, has_pyomo
 from tests.test_model_skill_invocation import minimal_dispatch_payload
@@ -19,6 +21,184 @@ from tests.test_helpers import test_and_publish_model
 
 
 client = TestClient(app)
+
+
+def test_llm_tool_timeout_has_a_retryable_structured_error(monkeypatch) -> None:
+    class TimeoutClient:
+        def __init__(self, *args, **kwargs) -> None:
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args) -> None:
+            return None
+
+        def post(self, *args, **kwargs):
+            raise httpx.ReadTimeout("slow provider")
+
+    monkeypatch.setattr("app.services.llm_service.httpx.Client", TimeoutClient)
+    adapter = OpenAICompatibleAdapter(
+        {
+            "provider": "openai_compatible",
+            "base_url": "https://llm.example.test/v1",
+            "model": "test-model",
+            "temperature": 0.2,
+            "max_tokens": 100,
+            "timeout_seconds": 60,
+        },
+        "secret-key",
+    )
+
+    with pytest.raises(HTTPException) as raised:
+        adapter.chat_with_tools([{"role": "user", "content": "hello"}], [])
+
+    assert raised.value.status_code == 504
+    assert raised.value.detail == {
+        "code": "LLM_TIMEOUT",
+        "message": "LLM response timed out",
+        "retryable": True,
+    }
+
+
+def test_llm_tool_transport_interruption_retries_once(monkeypatch) -> None:
+    calls = 0
+
+    class FlakyClient:
+        def __init__(self, *args, **kwargs) -> None:
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args) -> None:
+            return None
+
+        def post(self, url: str, *args, **kwargs):
+            nonlocal calls
+            calls += 1
+            if calls == 1:
+                raise httpx.ReadError("SSL EOF")
+            return httpx.Response(
+                200,
+                request=httpx.Request("POST", url),
+                json={"id": "response-1", "choices": [{"message": {"content": "recovered"}}]},
+            )
+
+    monkeypatch.setattr("app.services.llm_service.httpx.Client", FlakyClient)
+    adapter = OpenAICompatibleAdapter(
+        {
+            "provider": "openai_compatible",
+            "base_url": "https://llm.example.test/v1",
+            "model": "test-model",
+            "temperature": 0.2,
+            "max_tokens": 100,
+            "timeout_seconds": 60,
+        },
+        "secret-key",
+    )
+
+    response = adapter.chat_with_tools([{"role": "user", "content": "hello"}], [])
+
+    assert calls == 2
+    assert response["content"] == "recovered"
+
+
+def test_volcengine_tool_call_uses_responses_protocol(monkeypatch) -> None:
+    captured: dict[str, object] = {}
+    adapter = VolcengineArkAdapter(
+        {
+            "provider": "volcengine_ark",
+            "base_url": "https://ark.example.test/api/v3",
+            "model": "doubao-seed-2-0-lite",
+            "temperature": 0.2,
+            "max_tokens": 100,
+            "timeout_seconds": 60,
+        },
+        "secret-key",
+    )
+
+    def fake_post(url: str, body: dict):
+        captured.update({"url": url, "body": body})
+        return httpx.Response(
+            200,
+            request=httpx.Request("POST", url),
+            json={
+                "id": "resp-1",
+                "output": [
+                    {
+                        "type": "function_call",
+                        "call_id": "call-1",
+                        "name": "optimization_create_or_continue",
+                        "arguments": '{"request":"dispatch"}',
+                    }
+                ],
+            },
+        )
+
+    monkeypatch.setattr(adapter, "_post", fake_post)
+    response = adapter.chat_with_tools(
+        [
+            {"role": "system", "content": "Use the optimization Skill."},
+            {"role": "user", "content": "Create a dispatch task."},
+        ],
+        [
+            {
+                "type": "function",
+                "function": {
+                    "name": "optimization_create_or_continue",
+                    "description": "Create task",
+                    "parameters": {"type": "object", "properties": {"request": {"type": "string"}}},
+                    "strict": True,
+                },
+            }
+        ],
+    )
+
+    body = captured["body"]
+    assert captured["url"] == "https://ark.example.test/api/v3/responses"
+    assert body["instructions"] == "Use the optimization Skill."
+    assert body["input"] == [{"type": "message", "role": "user", "content": "Create a dispatch task."}]
+    assert body["tools"][0]["name"] == "optimization_create_or_continue"
+    assert "function" not in body["tools"][0]
+    assert response["tool_calls"][0]["function"]["name"] == "optimization_create_or_continue"
+
+
+def test_volcengine_responses_input_preserves_function_call_outputs() -> None:
+    instructions, items = VolcengineArkAdapter._responses_input(
+        [
+            {"role": "system", "content": "system"},
+            {
+                "role": "assistant",
+                "content": "",
+                "tool_calls": [
+                    {
+                        "id": "call-1",
+                        "function": {
+                            "name": "optimization_create_or_continue",
+                            "arguments": '{"request":"dispatch"}',
+                        },
+                    }
+                ],
+            },
+            {"role": "tool", "tool_call_id": "call-1", "content": '{"status":"WAITING_INPUT"}'},
+        ]
+    )
+
+    assert instructions == "system"
+    assert items == [
+        {
+            "type": "function_call",
+            "call_id": "call-1",
+            "name": "optimization_create_or_continue",
+            "arguments": '{"request":"dispatch"}',
+        },
+        {
+            "type": "function_call_output",
+            "call_id": "call-1",
+            "output": '{"status":"WAITING_INPUT"}',
+        },
+    ]
 
 
 def test_llm_config_save_and_reload(monkeypatch) -> None:
@@ -74,7 +254,8 @@ def test_agent_multiturn_parameter_merge() -> None:
     assert first.status_code == 200, first.text
     first_body = first.json()
     assert first_body["ready_to_invoke"] is False
-    assert first_body["requires_default_confirmation"] is True
+    assert first_body["requires_default_confirmation"] is False
+    assert {item["key"] for item in first_body["missing_required"]} >= {"unit_max_output", "fuel_cost"}
     assert first_body["parameter_draft"]["load_forecast"] == {"T1": 100, "T2": 120, "T3": 90}
 
     second = client.post(
@@ -96,7 +277,7 @@ def test_agent_multiturn_parameter_merge() -> None:
     assert float(result["result"]["objective_value"]) == pytest.approx(3800.0)
 
 
-def test_agent_default_requires_confirmation() -> None:
+def test_agent_sample_values_are_not_treated_as_defaults() -> None:
     payload = minimal_dispatch_payload()
     payload["id"] = f"MODEL-DEFAULT-{uuid.uuid4().hex[:8].upper()}"
     created = client.post("/api/models", json=payload)
@@ -112,8 +293,9 @@ def test_agent_default_requires_confirmation() -> None:
     assert analyzed.status_code == 200, analyzed.text
     body = analyzed.json()
     assert body["ready_to_invoke"] is False
-    assert body["requires_default_confirmation"] is True
-    assert {item["key"] for item in body["can_use_default"]} >= {"unit_max_output", "fuel_cost"}
+    assert body["requires_default_confirmation"] is False
+    assert body["can_use_default"] == []
+    assert {item["key"] for item in body["missing_required"]} >= {"unit_max_output", "fuel_cost"}
 
 
 def test_template_model_offline_then_republish() -> None:

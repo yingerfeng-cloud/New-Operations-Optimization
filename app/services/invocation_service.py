@@ -17,6 +17,7 @@ from app.solvers.status import ipopt_unavailable_explanation
 from app.storage.memory_store import STORE
 from app.utils import now_text
 from app.explainers.base import ADVISORY_DISCLAIMER
+from app.agent.schema_parameter_analyzer import schema_parameter_analyzer
 
 
 class InvocationService:
@@ -231,46 +232,7 @@ class InvocationService:
         return self._refresh_record(dict(record))
 
     def analyze_parameters(self, input_schema: list[dict[str, Any]], partial_parameters: dict[str, Any]) -> dict[str, Any]:
-        partial_parameters = partial_parameters or {}
-        missing_required = []
-        invalid_parameters = []
-        can_use_default = []
-        questions = []
-        normalized_parameters = dict(partial_parameters)
-        parameter_sources = {key: "USER_INPUT" for key in partial_parameters.keys()}
-        for item in input_schema or []:
-            key = item.get("key")
-            if not key:
-                continue
-            if (item.get("default_policy") or "sample_only") == "derived":
-                continue
-            has_value = key in partial_parameters and partial_parameters.get(key) not in (None, "")
-            if not has_value:
-                default_policy = item.get("default_policy") or "sample_only"
-                fallback = item.get("default_value") if default_policy == "default_allowed" else None
-                source = "DEFAULT_VALUE"
-                if fallback is not None:
-                    can_use_default.append({"key": key, "name": item.get("name") or key, "value": fallback, "source": source})
-                    normalized_parameters.setdefault(key, fallback)
-                    parameter_sources.setdefault(key, source)
-                elif item.get("required", True):
-                    missing_required.append({"key": key, "name": item.get("name") or key, "dimension": item.get("dimension") or [], "unit": item.get("unit", "")})
-                    questions.append(self._question_for_parameter(item))
-                continue
-            error = self._validate_parameter_shape(item, partial_parameters.get(key))
-            if error:
-                invalid_parameters.append(error)
-        requires_default_confirmation = bool(can_use_default)
-        return {
-            "ready": not missing_required and not invalid_parameters and not requires_default_confirmation,
-            "missing_required": missing_required,
-            "invalid_parameters": invalid_parameters,
-            "can_use_default": can_use_default,
-            "requires_default_confirmation": requires_default_confirmation,
-            "questions": questions,
-            "normalized_parameters": normalized_parameters,
-            "parameter_sources": parameter_sources,
-        }
+        return schema_parameter_analyzer.analyze(input_schema, partial_parameters)
 
     def _save(self, record: dict[str, Any]) -> None:
         with STORE.lock:

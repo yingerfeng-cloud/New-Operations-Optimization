@@ -1,4 +1,6 @@
 export interface AgentMessage {
+  message_id?: string;
+  turn_id?: string;
   role?: string;
   text?: string;
   content?: string;
@@ -21,6 +23,8 @@ export interface AgentConversationSummary {
   status?: string;
   active_run_id?: string;
   active_run_status?: AgentRunStatus;
+  active_task_id?: string;
+  active_task_status?: AgentV3TaskStatus;
   [key: string]: unknown;
 }
 
@@ -32,12 +36,76 @@ export interface AgentConversation extends AgentConversationSummary {
   parameter_draft?: Record<string, unknown>;
   active_run?: AgentRun;
   runs?: AgentRun[];
+  agent_tasks?: AgentV3Task[];
+  pending_approvals?: AgentV3Approval[];
+}
+
+export type AgentV3TaskStatus = 'PENDING' | 'RUNNING' | 'WAITING_INPUT' | 'APPROVAL_REQUIRED' | 'SUCCEEDED' | 'FAILED' | 'CANCELLED';
+
+export interface AgentV3Task {
+  task_id: string;
+  conversation_id: string;
+  turn_id: string;
+  title: string;
+  tool_name: string;
+  status: AgentV3TaskStatus;
+  revision?: number;
+  result?: AgentAnalyzeResponse | Record<string, unknown> | null;
+  error?: string | null;
+  optimization_run_id?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface AgentV3Event {
+  event_id: string;
+  sequence: number;
+  type: string;
+  conversation_id: string;
+  turn_id?: string;
+  task_id?: string;
+  created_at?: string;
+  payload?: Record<string, unknown>;
+}
+
+export interface AgentV3TurnResponse {
+  conversation_id: string;
+  turn_id: string;
+  message: AgentMessage;
+  tasks: AgentV3Task[];
+  approvals: AgentV3Approval[];
+  event_cursor: number;
+  conversation: AgentConversation;
+  idempotent_replay?: boolean;
+}
+
+export interface AgentV3Approval {
+  approval_id: string;
+  conversation_id: string;
+  turn_id: string;
+  task_id: string;
+  task_revision?: number;
+  status: 'PENDING' | 'EXECUTING' | 'FAILED' | 'APPROVED' | 'REJECTED' | 'SUPERSEDED';
+  prompt: string;
+  payload?: { action?: 'confirm_defaults' | 'confirm_invoke'; optimization_run_id?: string; [key: string]: unknown };
+  decision?: 'approve' | 'reject' | null;
+  comment?: string | null;
+  error?: string | null;
+}
+
+export interface AgentV3ApprovalResolution {
+  approval: AgentV3Approval;
+  task: AgentV3Task;
+  result?: AgentAnalyzeResponse | null;
+  next_approval?: AgentV3Approval | null;
 }
 
 export type AgentRunStatus =
+  | 'PENDING'
   | 'DRAFT'
   | 'ROUTING'
   | 'CLARIFICATION'
+  | 'WAITING_INPUT'
   | 'PARAMETER_REVIEW'
   | 'APPROVAL_REQUIRED'
   | 'READY'
@@ -187,6 +255,7 @@ export interface AgentAnalyzeResponse {
   parameter_sources?: Record<string, unknown>;
   parameter_completeness?: number;
   schema_fit_score?: number;
+  business_feasible?: boolean;
   parameter_confidence?: Record<string, number>;
   missing_required?: Array<Record<string, unknown> | string>;
   invalid_parameters?: unknown[];

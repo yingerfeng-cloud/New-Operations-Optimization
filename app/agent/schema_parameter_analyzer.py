@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 from app.agent.default_value_resolver import default_value_resolver
+from app.agent.parameter_contract import infer_parameter_dimensions, validate_business_semantics
 
 
 class SchemaParameterAnalyzer:
@@ -17,7 +18,7 @@ class SchemaParameterAnalyzer:
         input_schema: list[dict[str, Any]],
         partial_parameters: dict[str, Any] | None,
     ) -> dict[str, Any]:
-        supplied = dict(partial_parameters or {})
+        supplied = infer_parameter_dimensions(partial_parameters)
         normalized = dict(supplied)
         missing: list[dict[str, Any]] = []
         invalid: list[dict[str, Any]] = []
@@ -31,7 +32,7 @@ class SchemaParameterAnalyzer:
                 continue
             has_value = key in supplied and supplied.get(key) not in (None, "")
             if has_value:
-                error = self._validate_shape(item, supplied[key])
+                error = self._validate_shape(item, supplied[key], supplied)
                 if error:
                     invalid.append(error)
                 continue
@@ -58,6 +59,13 @@ class SchemaParameterAnalyzer:
                 )
                 questions.append(self._question(item))
 
+        semantic_invalid = validate_business_semantics(normalized)
+        invalid.extend(semantic_invalid)
+        questions.extend(
+            str(item.get("message"))
+            for item in semantic_invalid
+            if item.get("message")
+        )
         requires_confirmation = bool(defaults)
         return {
             "ready": not missing and not invalid and not requires_confirmation,
@@ -70,7 +78,12 @@ class SchemaParameterAnalyzer:
             "parameter_sources": sources,
         }
 
-    def _validate_shape(self, item: dict[str, Any], value: Any) -> dict[str, Any] | None:
+    def _validate_shape(
+        self,
+        item: dict[str, Any],
+        value: Any,
+        supplied: dict[str, Any],
+    ) -> dict[str, Any] | None:
         key = item.get("key")
         dimensions = list(item.get("dimension") or [])
         expected_type = str(item.get("type") or "").lower()
@@ -86,7 +99,7 @@ class SchemaParameterAnalyzer:
                 return self._type_error(key, "dict", value)
             if expected_type == "array" and not isinstance(value, list):
                 return self._type_error(key, "array", value)
-            expected_length = self._expected_length(item)
+            expected_length = self._expected_length(item, supplied)
             if isinstance(value, list) and expected_length is not None and len(value) != expected_length:
                 return {
                     "key": key,
@@ -94,7 +107,7 @@ class SchemaParameterAnalyzer:
                     "expected": expected_length,
                     "actual": len(value),
                 }
-            expected_keys = self._expected_keys(item) if isinstance(value, dict) else []
+            expected_keys = self._expected_keys(item, supplied) if isinstance(value, dict) else []
             if expected_keys:
                 actual = set(map(str, value.keys()))
                 unknown = sorted(actual - set(expected_keys))
@@ -121,11 +134,16 @@ class SchemaParameterAnalyzer:
             return self._type_error(key, expected_type, value)
         return None
 
-    def _expected_length(self, item: dict[str, Any]) -> int | None:
+    def _expected_length(self, item: dict[str, Any], supplied: dict[str, Any]) -> int | None:
         dimensions = list(item.get("dimension") or [])
         if len(dimensions) != 1:
             return None
         dimension = str(dimensions[0])
+        dynamic_values = supplied.get(dimension)
+        if isinstance(dynamic_values, list) and dynamic_values:
+            return len(dynamic_values)
+        if dimension == "time" and isinstance(supplied.get("horizon"), int):
+            return int(supplied["horizon"])
         values = (item.get("sets") or {}).get(dimension)
         if values:
             return len(values)
@@ -135,11 +153,14 @@ class SchemaParameterAnalyzer:
                 return len(value)
         return None
 
-    def _expected_keys(self, item: dict[str, Any]) -> list[str]:
+    def _expected_keys(self, item: dict[str, Any], supplied: dict[str, Any]) -> list[str]:
         dimensions = list(item.get("dimension") or [])
         if len(dimensions) != 1:
             return []
         dimension = str(dimensions[0])
+        dynamic_values = supplied.get(dimension)
+        if isinstance(dynamic_values, list) and dynamic_values:
+            return [str(value) for value in dynamic_values]
         values = (item.get("sets") or {}).get(dimension)
         if values:
             return [str(value) for value in values]

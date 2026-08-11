@@ -520,7 +520,9 @@ class SkillRegistry:
             dimensions = list(param.get("dimension") or [])
             if not code or not isinstance(value, dict) or len(dimensions) != 1:
                 continue
-            expected = sets.get(str(dimensions[0]))
+            dimension = str(dimensions[0])
+            runtime_set = parameters.get(dimension)
+            expected = set(map(str, runtime_set)) if isinstance(runtime_set, list) and runtime_set else sets.get(dimension)
             if expected and not set(map(str, value.keys())).issubset(expected):
                 return False
         return True

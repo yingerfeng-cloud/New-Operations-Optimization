@@ -1,4 +1,5 @@
 from app.agent.intent_router_v2 import intent_router_v2
+from app.agent.skill_router import agent_skill_router
 
 
 def _skill(name, display, examples, *, state="enabled"):
@@ -83,3 +84,33 @@ def test_v2_decision_exposes_auditable_contract():
             "candidate_skills",
         )
     ) <= result.keys()
+
+
+def test_exact_business_phrase_is_authoritative_over_semantic_neighbors():
+    unit_commitment = _skill(
+        "unit_commitment_day_ahead",
+        "日前机组组合",
+        ["帮我做日前机组组合"],
+    )
+    unit_commitment["trigger_intents"] = ["日前机组组合", "机组启停"]
+    economic_dispatch = _skill(
+        "economic_dispatch",
+        "经济调度",
+        ["按负荷预测分配机组出力"],
+    )
+    retail_bidding = _skill(
+        "retail_da_spot_bidding_v1",
+        "售电公司日前现货申报",
+        ["生成明日申报曲线"],
+    )
+    skills = [economic_dispatch, retail_bidding, unit_commitment]
+    message = "请帮我创建一个明日的日前机组组合优化任务"
+
+    hint = agent_skill_router.route(message, {}, skills)
+    result = intent_router_v2.route(message, {}, skills, routing_hint=hint)
+
+    assert hint["match_type"] == "exact_phrase"
+    assert result["agent_skill_name"] == "unit_commitment_day_ahead"
+    assert result["api_skill_name"] == "run_unit_commitment_day_ahead"
+    assert result["need_clarification"] is False
+    assert "DETERMINISTIC_SKILL_MATCH" in result["decision_reasons"]

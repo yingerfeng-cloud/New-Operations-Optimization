@@ -6,6 +6,8 @@ const statusMeta: Record<string, { label: string; color: string; step: number }>
   DRAFT: { label: '草稿', color: 'default', step: 0 },
   ROUTING: { label: '识别场景', color: 'processing', step: 0 },
   CLARIFICATION: { label: '等待补充', color: 'warning', step: 0 },
+  WAITING_INPUT: { label: '等待补充', color: 'warning', step: 1 },
+  PENDING: { label: '待处理', color: 'default', step: 0 },
   PARAMETER_REVIEW: { label: '检查参数', color: 'processing', step: 1 },
   APPROVAL_REQUIRED: { label: '等待确认', color: 'warning', step: 2 },
   READY: { label: '可以提交', color: 'cyan', step: 2 },

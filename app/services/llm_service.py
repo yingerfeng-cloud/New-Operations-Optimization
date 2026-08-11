@@ -5,7 +5,9 @@ import os
 import base64
 import hashlib
 import getpass
+import logging
 import socket
+import time
 from datetime import datetime, timezone
 from typing import Any
 
@@ -16,6 +18,7 @@ from app.storage.memory_store import STORE
 
 
 SUPPORTED_PROVIDERS = {"volcengine_ark", "openai_compatible", "disabled"}
+logger = logging.getLogger(__name__)
 
 
 class BaseLLMAdapter:
@@ -26,9 +29,63 @@ class BaseLLMAdapter:
     def chat_json(self, messages: list[dict[str, str]], parser: Any) -> dict[str, Any]:
         raise NotImplementedError
 
+    def chat_with_tools(self, messages: list[dict[str, Any]], tools: list[dict[str, Any]]) -> dict[str, Any]:
+        raise NotImplementedError
+
 
 class OpenAICompatibleAdapter(BaseLLMAdapter):
     missing_detail = "API Key and Model are required when LLM_ENABLED=true"
+
+    def _post(self, url: str, body: dict[str, Any]) -> httpx.Response:
+        for attempt in range(2):
+            try:
+                with httpx.Client(timeout=self.config["timeout_seconds"]) as client:
+                    return client.post(
+                        url,
+                        headers={"Authorization": f"Bearer {self.api_key}", "Content-Type": "application/json"},
+                        json=body,
+                    )
+            except (httpx.ConnectError, httpx.ReadError, httpx.RemoteProtocolError) as exc:
+                if attempt:
+                    raise HTTPException(
+                        status_code=502,
+                        detail={
+                            "code": "LLM_TRANSPORT_ERROR",
+                            "message": "LLM connection interrupted",
+                            "retryable": True,
+                        },
+                    ) from exc
+                logger.warning(
+                    "LLM transport interrupted; retrying once provider=%s model=%s error=%s",
+                    self.config.get("provider"),
+                    self.config.get("model"),
+                    type(exc).__name__,
+                )
+                time.sleep(0.35)
+        raise RuntimeError("unreachable")
+
+    def _provider_http_error(self, exc: httpx.HTTPStatusError, protocol: str) -> HTTPException:
+        response = exc.response
+        try:
+            provider_detail: Any = response.json()
+        except Exception:
+            provider_detail = (response.text or "")[:2_000]
+        # Provider diagnostics are useful for capability/configuration errors,
+        # but cap their size and never include request headers or credentials.
+        serialized = json.dumps(provider_detail, ensure_ascii=False, default=str)
+        if len(serialized) > 4_000:
+            provider_detail = {"truncated": True, "preview": serialized[:4_000]}
+        return HTTPException(
+            status_code=502,
+            detail={
+                "code": "LLM_PROVIDER_REJECTED",
+                "message": "模型服务拒绝了请求，请检查模型能力与协议配置。",
+                "provider_status": response.status_code,
+                "protocol": protocol,
+                "retryable": response.status_code == 429 or response.status_code >= 500,
+                "provider_error": provider_detail,
+            },
+        )
 
     def chat_json(self, messages: list[dict[str, str]], parser: Any) -> dict[str, Any]:
         model = self.config["model"]
@@ -43,25 +100,208 @@ class OpenAICompatibleAdapter(BaseLLMAdapter):
             "response_format": {"type": "json_object"},
         }
         try:
-            with httpx.Client(timeout=self.config["timeout_seconds"]) as client:
-                response = client.post(url, headers={"Authorization": f"Bearer {self.api_key}", "Content-Type": "application/json"}, json=body)
+            response = self._post(url, body)
             response.raise_for_status()
             data = response.json()
             content = data["choices"][0]["message"]["content"]
             return parser(content)
         except HTTPException:
             raise
+        except httpx.HTTPStatusError as exc:
+            raise self._provider_http_error(exc, "chat_completions") from exc
+        except httpx.TimeoutException as exc:
+            logger.warning(
+                "LLM request timed out provider=%s model=%s timeout_seconds=%s",
+                self.config.get("provider"),
+                model,
+                self.config.get("timeout_seconds"),
+            )
+            raise HTTPException(
+                status_code=504,
+                detail={
+                    "code": "LLM_TIMEOUT",
+                    "message": "LLM response timed out",
+                    "retryable": True,
+                },
+            ) from exc
         except Exception as exc:
             raise HTTPException(status_code=502, detail={"message": "LLM request failed", "error": str(exc)}) from exc
+
+    def chat_with_tools(self, messages: list[dict[str, Any]], tools: list[dict[str, Any]]) -> dict[str, Any]:
+        model = self.config["model"]
+        if not self.api_key or not model:
+            raise HTTPException(status_code=422, detail=self.missing_detail)
+        body: dict[str, Any] = {
+            "model": model,
+            "messages": messages,
+            "temperature": self.config["temperature"],
+            "max_tokens": self.config["max_tokens"],
+        }
+        if tools:
+            body["tools"] = tools
+            body["tool_choice"] = "auto"
+            body["parallel_tool_calls"] = False
+        try:
+            response = self._post(f"{self.config['base_url']}/chat/completions", body)
+            response.raise_for_status()
+            data = response.json()
+            message = data["choices"][0]["message"]
+            return {
+                "response_id": data.get("id"),
+                "content": message.get("content") or "",
+                "tool_calls": message.get("tool_calls") or [],
+            }
+        except HTTPException:
+            raise
+        except httpx.HTTPStatusError as exc:
+            raise self._provider_http_error(exc, "chat_completions") from exc
+        except httpx.TimeoutException as exc:
+            logger.warning(
+                "LLM tool request timed out provider=%s model=%s timeout_seconds=%s",
+                self.config.get("provider"),
+                model,
+                self.config.get("timeout_seconds"),
+            )
+            raise HTTPException(
+                status_code=504,
+                detail={
+                    "code": "LLM_TIMEOUT",
+                    "message": "LLM response timed out",
+                    "retryable": True,
+                },
+            ) from exc
+        except Exception as exc:
+            raise HTTPException(status_code=502, detail={"message": "LLM tool request failed", "error": str(exc)}) from exc
 
 
 class VolcengineArkAdapter(OpenAICompatibleAdapter):
     missing_detail = "API Key and Model / Endpoint ID are required when LLM_ENABLED=true"
 
+    @staticmethod
+    def _responses_input(messages: list[dict[str, Any]]) -> tuple[str, list[dict[str, Any]]]:
+        instructions: list[str] = []
+        input_items: list[dict[str, Any]] = []
+        for message in messages:
+            role = str(message.get("role") or "")
+            content = str(message.get("content") or "")
+            if role == "system":
+                if content:
+                    instructions.append(content)
+                continue
+            if role == "tool":
+                input_items.append(
+                    {
+                        "type": "function_call_output",
+                        "call_id": str(message.get("tool_call_id") or ""),
+                        "output": content,
+                    }
+                )
+                continue
+            if role == "assistant" and message.get("tool_calls"):
+                if content:
+                    input_items.append({"type": "message", "role": "assistant", "content": content})
+                for call in message.get("tool_calls") or []:
+                    function = call.get("function") or {}
+                    input_items.append(
+                        {
+                            "type": "function_call",
+                            "call_id": str(call.get("id") or ""),
+                            "name": str(function.get("name") or ""),
+                            "arguments": str(function.get("arguments") or "{}"),
+                        }
+                    )
+                continue
+            if role in {"user", "assistant"}:
+                input_items.append({"type": "message", "role": role, "content": content})
+        return "\n\n".join(instructions), input_items
+
+    @staticmethod
+    def _responses_tools(tools: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        result: list[dict[str, Any]] = []
+        for item in tools:
+            function = item.get("function") or {}
+            result.append(
+                {
+                    "type": "function",
+                    "name": function.get("name"),
+                    "description": function.get("description"),
+                    "parameters": function.get("parameters") or {"type": "object", "properties": {}},
+                }
+            )
+        return result
+
+    def chat_with_tools(self, messages: list[dict[str, Any]], tools: list[dict[str, Any]]) -> dict[str, Any]:
+        model = self.config["model"]
+        if not self.api_key or not model:
+            raise HTTPException(status_code=422, detail=self.missing_detail)
+        instructions, input_items = self._responses_input(messages)
+        body: dict[str, Any] = {
+            "model": model,
+            "input": input_items,
+            "instructions": instructions,
+            "temperature": self.config["temperature"],
+            "max_output_tokens": self.config["max_tokens"],
+            "store": False,
+        }
+        response_tools = self._responses_tools(tools)
+        if response_tools:
+            body["tools"] = response_tools
+            body["tool_choice"] = "auto"
+        try:
+            response = self._post(f"{self.config['base_url']}/responses", body)
+            response.raise_for_status()
+            data = response.json()
+            content_parts: list[str] = []
+            tool_calls: list[dict[str, Any]] = []
+            for item in data.get("output") or []:
+                if item.get("type") == "function_call":
+                    tool_calls.append(
+                        {
+                            "id": item.get("call_id"),
+                            "type": "function",
+                            "function": {
+                                "name": item.get("name"),
+                                "arguments": item.get("arguments") or "{}",
+                            },
+                        }
+                    )
+                elif item.get("type") == "message":
+                    for part in item.get("content") or []:
+                        if part.get("type") in {"output_text", "text"} and part.get("text"):
+                            content_parts.append(str(part["text"]))
+            return {
+                "response_id": data.get("id"),
+                "content": "\n".join(content_parts),
+                "tool_calls": tool_calls,
+            }
+        except HTTPException:
+            raise
+        except httpx.HTTPStatusError as exc:
+            raise self._provider_http_error(exc, "responses") from exc
+        except httpx.TimeoutException as exc:
+            logger.warning(
+                "LLM Responses tool request timed out provider=%s model=%s timeout_seconds=%s",
+                self.config.get("provider"),
+                model,
+                self.config.get("timeout_seconds"),
+            )
+            raise HTTPException(
+                status_code=504,
+                detail={"code": "LLM_TIMEOUT", "message": "LLM response timed out", "retryable": True},
+            ) from exc
+        except Exception as exc:
+            raise HTTPException(
+                status_code=502,
+                detail={"code": "LLM_REQUEST_FAILED", "message": "LLM tool request failed", "retryable": False},
+            ) from exc
+
 
 class DisabledFallbackAdapter(BaseLLMAdapter):
     def chat_json(self, messages: list[dict[str, str]], parser: Any) -> dict[str, Any]:
         return {}
+
+    def chat_with_tools(self, messages: list[dict[str, Any]], tools: list[dict[str, Any]]) -> dict[str, Any]:
+        return {"content": "", "tool_calls": []}
 
 
 class LLMService:
@@ -85,7 +325,7 @@ class LLMService:
             "provider": provider,
             "base_url": str(self._override("base_url", os.getenv("LLM_BASE_URL", os.getenv("ARK_BASE_URL", "https://ark.cn-beijing.volces.com/api/v3")))).rstrip("/"),
             "model": self._override("model", os.getenv("LLM_MODEL", os.getenv("ARK_MODEL", ""))),
-            "timeout_seconds": float(self._override("timeout_seconds", os.getenv("LLM_TIMEOUT_SECONDS", "8"))),
+            "timeout_seconds": float(self._override("timeout_seconds", os.getenv("LLM_TIMEOUT_SECONDS", "60"))),
             "temperature": float(self._override("temperature", os.getenv("LLM_TEMPERATURE", "0.2"))),
             "max_tokens": int(self._override("max_tokens", os.getenv("LLM_MAX_TOKENS", "4096"))),
             "enabled": enabled,
@@ -236,6 +476,23 @@ class LLMService:
     def chat_json(self, messages: list[dict[str, str]]) -> dict[str, Any]:
         config = self.config()
         return self._adapter(config).chat_json(messages, self._parse_json)
+
+    def chat_with_tools(self, messages: list[dict[str, Any]], tools: list[dict[str, Any]]) -> dict[str, Any]:
+        config = self.config()
+        return self._adapter(config).chat_with_tools(messages, tools)
+
+    def parse_tool_arguments(self, value: Any) -> dict[str, Any]:
+        if isinstance(value, dict):
+            return value
+        if value in {None, ""}:
+            return {}
+        try:
+            parsed = json.loads(str(value))
+        except Exception as exc:
+            raise HTTPException(status_code=502, detail="LLM tool arguments must be valid JSON") from exc
+        if not isinstance(parsed, dict):
+            raise HTTPException(status_code=502, detail="LLM tool arguments must be a JSON object")
+        return parsed
 
     def _adapter(self, config: dict[str, Any]) -> BaseLLMAdapter:
         if not config["enabled"] or config["provider"] == "disabled":

@@ -174,8 +174,20 @@ class AgentOrchestrator:
                 skill_name = self._resolve_api_skill_name(skill_name, prefer_custom=prefer_custom)
                 skill = platform_client.get_skill(skill_name)
                 timing["platform_skill_ms"] = self._elapsed_ms(platform_started)
-            except HTTPException:
+            except HTTPException as exc:
                 timing["platform_skill_ms"] = self._elapsed_ms(platform_started)
+                if exc.status_code in {404, 409, 422}:
+                    return self._finalize_analyze_response(
+                        self._skill_unavailable_response(
+                            conversation_id,
+                            existing,
+                            message,
+                            skill_name,
+                            router_result.get("agent_skill_name"),
+                        ),
+                        timing,
+                        started_at,
+                    )
                 return self._finalize_analyze_response(self._platform_unavailable_response(conversation_id, existing, message, skill_name, router_result.get("agent_skill_name")), timing, started_at)
             resolved_skill_name = skill.get("canonical_skill_name") or skill.get("skill_name") or skill_name
             input_schema = skill.get("input_schema") or []
@@ -231,7 +243,7 @@ class AgentOrchestrator:
         if requires_default:
             ready = False
         workflow_state = self._workflow_state(ready, analysis, default_confirmed)
-        agent_text = self._workflow_message(workflow_state, default_confirmed)
+        agent_text = self._workflow_message(workflow_state, default_confirmed, analysis)
         conversation = conversation_store.upsert(
             conversation_id,
             {
@@ -276,8 +288,9 @@ class AgentOrchestrator:
             "default_candidates": analysis.get("can_use_default", []),
             "requires_default_confirmation": requires_default,
             "questions": analysis.get("questions", []),
-            "parameter_completeness": round(1 - len(analysis.get("missing_required", [])) / max(1, len([item for item in input_schema if item.get("required", True) is not False])), 4),
+            "parameter_completeness": self._parameter_completeness(input_schema, analysis),
             "schema_fit_score": extract_meta.get("schema_fit_score", 0.0),
+            "business_feasible": not bool(analysis.get("invalid_parameters")),
             "parameter_confidence": extract_meta.get("parameter_confidence", {}),
             "ready_to_invoke": ready,
             "llm_enabled": llm_service.enabled(),
@@ -683,14 +696,45 @@ class AgentOrchestrator:
             return "DEFAULT_CONFIRMING"
         return "PARAM_COLLECTING"
 
-    def _workflow_message(self, workflow_state: str, default_confirmed: bool) -> str:
+    def _workflow_message(
+        self,
+        workflow_state: str,
+        default_confirmed: bool,
+        analysis: dict[str, Any] | None = None,
+    ) -> str:
+        analysis = analysis or {}
         if workflow_state == "READY_TO_INVOKE":
             return "默认值已确认，参数已就绪，可以确认调用。" if default_confirmed else "参数已就绪，可以确认调用。"
         if workflow_state == "DEFAULT_CONFIRMING":
             return "已识别到优化任务，但部分参数需要确认是否使用默认值。"
-        if default_confirmed:
-            return "已识别到优化任务，但参数还不完整，请继续补充。"
-        return "已识别到优化任务，但参数还不完整，请继续补充。"
+        invalid = analysis.get("invalid_parameters") or []
+        if invalid:
+            first = invalid[0] if isinstance(invalid[0], dict) else {}
+            message = str(first.get("message") or first.get("error") or "参数之间存在冲突")
+            return f"参数已收到，但当前不能进入求解：{message}"
+        missing = analysis.get("missing_required") or []
+        if missing:
+            names = [str(item.get("name") or item.get("key")) for item in missing[:3] if isinstance(item, dict)]
+            suffix = f"，还需要：{'、'.join(names)}" if names else ""
+            return f"优化任务已建立{suffix}。"
+        return "优化任务已建立，请继续提供运行参数。"
+
+    def _parameter_completeness(
+        self,
+        input_schema: list[dict[str, Any]],
+        analysis: dict[str, Any],
+    ) -> float:
+        required = {
+            str(item.get("key"))
+            for item in input_schema
+            if item.get("key") and item.get("required", True) is not False and item.get("default_policy") != "derived"
+        }
+        incomplete = {
+            str(item.get("key"))
+            for item in [*(analysis.get("missing_required") or []), *(analysis.get("invalid_parameters") or [])]
+            if isinstance(item, dict) and item.get("key") in required
+        }
+        return round(max(0.0, (len(required) - len(incomplete)) / max(1, len(required))), 4)
 
     def _normalize_analysis_labels(self, analysis: dict[str, Any], input_schema: list[dict[str, Any]]) -> dict[str, Any]:
         labels = {
@@ -1110,6 +1154,34 @@ class AgentOrchestrator:
         )
         response = self._chat_response(conversation, agent_text, preserve_task=bool(agent_skill_name or api_skill_name))
         response.update({"response_type": "platform_unavailable", "intent": "optimization_request", "agent_skill_name": agent_skill_name, "api_skill_name": api_skill_name, "workflow_state": "PLATFORM_UNAVAILABLE", "status": "PLATFORM_UNAVAILABLE"})
+        return response
+
+    def _skill_unavailable_response(self, conversation_id: str | None, existing: dict[str, Any], message: str, api_skill_name: str | None = None, agent_skill_name: str | None = None) -> dict[str, Any]:
+        agent_skill_name = agent_skill_name or self._agent_skill_for_api(api_skill_name)
+        display_name = self._display_name_for_agent_skill(agent_skill_name) or "该优化场景"
+        agent_text = f"已识别为{display_name}，但当前没有可调用的对应 Skill。请先在模型服务中发布并启用该模型，然后重试。"
+        conversation = conversation_store.upsert(
+            conversation_id,
+            {
+                "agent_skill_name": agent_skill_name or existing.get("agent_skill_name"),
+                "selected_skill": None,
+                "resolved_skill_name": None,
+                "status": "SKILL_UNAVAILABLE",
+                "messages": self._append_messages(existing.get("messages") or [], message, agent_text, False),
+                "recent_turns": self._recent_turns(existing, message, "optimization_request", "skill_unavailable", agent_text),
+            },
+        )
+        response = self._chat_response(conversation, agent_text, preserve_task=bool(agent_skill_name))
+        response.update(
+            {
+                "response_type": "skill_unavailable",
+                "intent": "optimization_request",
+                "agent_skill_name": agent_skill_name,
+                "api_skill_name": api_skill_name,
+                "workflow_state": "SKILL_UNAVAILABLE",
+                "status": "SKILL_UNAVAILABLE",
+            }
+        )
         return response
 
     def _rule_chat_reply(self, message: str) -> str:

@@ -146,6 +146,8 @@ class AgentRunStore:
                 raise HTTPException(status_code=404, detail="Agent run not found")
             if record.get("idempotency_key") == idempotency_key and record.get("last_response"):
                 return False, copy.deepcopy(record), copy.deepcopy(record.get("last_response"))
+            if record.get("status") in {AgentRunStatus.SUCCEEDED.value, AgentRunStatus.CANCELLED.value}:
+                raise HTTPException(status_code=409, detail="终态运行不能重新启动，请创建新的优化任务")
             if record.get("status") in {AgentRunStatus.QUEUED.value, AgentRunStatus.RUNNING.value}:
                 return False, copy.deepcopy(record), None
             record["idempotency_key"] = idempotency_key

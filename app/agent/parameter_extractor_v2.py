@@ -5,6 +5,7 @@ import re
 from typing import Any
 
 from app.agent.parameter_extractor import parameter_extractor
+from app.agent.parameter_contract import infer_parameter_dimensions
 from app.agent.schema_parameter_analyzer import schema_parameter_analyzer
 
 
@@ -41,20 +42,29 @@ class SchemaDrivenParameterExtractorV2:
         updates = dict(meta.get("parameters") or {})
         for key in removed:
             updates.pop(key, None)
-        parameters = {**existing, **imported, **updates}
+        parameters = infer_parameter_dimensions({**existing, **imported, **updates})
+        for key in ("horizon", "time", "unit", "initial_unit_output"):
+            if key in parameters and existing.get(key) != parameters.get(key):
+                updates[key] = parameters[key]
         analysis = schema_parameter_analyzer.analyze(input_schema, parameters)
         sources: dict[str, str] = {key: ParameterSource.PREVIOUS_CONTEXT.value for key in existing}
         sources.update({key: ParameterSource.FILE_IMPORT.value for key in imported})
         extracted_source = ParameterSource.LLM_EXTRACTED if meta.get("llm_attempted") and not meta.get("llm_timeout") else ParameterSource.RULE_EXTRACTED
         sources.update({key: extracted_source.value for key in updates})
+        for key in ("horizon", "time", "unit", "initial_unit_output"):
+            if key in parameters and key not in sources:
+                sources[key] = ParameterSource.SYSTEM_INFERRED.value
         for item in analysis.get("can_use_default") or []:
             if item.get("key") not in parameters:
                 sources[str(item.get("key"))] = ParameterSource.DEFAULT_VALUE.value
 
         schema_keys = {str(item.get("key")) for item in input_schema if item.get("key")}
-        valid_count = len([key for key in parameters if key in schema_keys])
+        invalid_keys = {str(item.get("key")) for item in analysis.get("invalid_parameters") or [] if item.get("key")}
+        valid_count = len([key for key in parameters if key in schema_keys and key not in invalid_keys])
         required = [item for item in input_schema if item.get("required", True) is not False and item.get("default_policy") != "derived"]
-        complete_required = len(required) - len(analysis.get("missing_required") or [])
+        required_keys = {str(item.get("key")) for item in required}
+        invalid_required = len(required_keys & invalid_keys)
+        complete_required = len(required) - len(analysis.get("missing_required") or []) - invalid_required
         schema_fit = (0.6 * valid_count / max(1, len(schema_keys))) + (0.4 * complete_required / max(1, len(required)))
         policy = parameter_policy or {}
         default_candidates = list(analysis.get("can_use_default") or []) if policy.get("allow_defaults", True) else []
@@ -69,6 +79,8 @@ class SchemaDrivenParameterExtractorV2:
             "parameter_sources": sources,
             "parameter_confidence": {key: (0.85 if sources.get(key) == ParameterSource.RULE_EXTRACTED.value else 0.72 if sources.get(key) == ParameterSource.LLM_EXTRACTED.value else 1.0) for key in parameters},
             "schema_fit_score": round(min(1.0, schema_fit), 4),
+            "field_completeness": round(max(0.0, complete_required / max(1, len(required))), 4),
+            "business_feasible": not bool(analysis.get("invalid_parameters")),
             "needs_user_confirmation": needs_confirmation,
             "questions": analysis.get("questions") or [],
             "llm_timeout": bool(meta.get("llm_timeout")),
