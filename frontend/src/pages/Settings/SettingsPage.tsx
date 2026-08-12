@@ -118,18 +118,22 @@ function StatusOverview({ endpointStatus, endpointDesc, apiBase, solverStatus, s
   );
 }
 
-function dictionaryColumns(remove: (index: number | number[]) => void, parentOptions?: Array<{ value: string; label: string }>): TableProps<DictionaryField>['columns'] {
+function dictionaryColumns(remove: (index: number | number[]) => void, parentOptions?: Array<{ value: string; label: string }>, scenario = false): TableProps<DictionaryField>['columns'] {
   return [
     { title: '编码', width: 180, render: (_: unknown, row: DictionaryField) => <Form.Item name={[row.name, 'code']} rules={[{ required: true }]}><Input placeholder="code" /></Form.Item> },
     { title: '名称', width: 180, render: (_: unknown, row: DictionaryField) => <Form.Item name={[row.name, 'label']} rules={[{ required: true }]}><Input placeholder="显示名称" /></Form.Item> },
     ...(parentOptions ? [{ title: '所属领域', width: 180, render: (_: unknown, row: DictionaryField) => <Form.Item name={[row.name, 'parent_code']}><Select allowClear options={parentOptions} placeholder="选择领域" /></Form.Item> }] : []),
+    ...(scenario ? [
+      { title: '说明', width: 280, render: (_: unknown, row: DictionaryField) => <Form.Item name={[row.name, 'description']}><Input placeholder="场景业务边界与用途" /></Form.Item> },
+      { title: '状态', width: 130, render: (_: unknown, row: DictionaryField) => <Form.Item name={[row.name, 'status']} rules={[{ required: true }]}><Select options={[{ value: 'draft', label: '草稿' }, { value: 'trial', label: '试运行' }, { value: 'published', label: '已发布' }, { value: 'offline', label: '已下线' }]} /></Form.Item> },
+    ] : []),
     { title: '启用', width: 90, render: (_: unknown, row: DictionaryField) => <Form.Item name={[row.name, 'enabled']} valuePropName="checked"><Switch /></Form.Item> },
     { title: '排序', width: 100, render: (_: unknown, row: DictionaryField) => <Form.Item name={[row.name, 'sort_order']}><InputNumber min={0} precision={0} /></Form.Item> },
     { title: '操作', width: 80, render: (_: unknown, row: DictionaryField) => <Button danger type="text" icon={<DeleteOutlined />} onClick={() => remove(row.name)} /> },
   ];
 }
 
-function DictionaryTable({ name, addLabel, parentOptions }: { name: keyof SystemDictionaries; addLabel: string; parentOptions?: Array<{ value: string; label: string }> }) {
+function DictionaryTable({ name, addLabel, parentOptions, scenario = false }: { name: keyof SystemDictionaries; addLabel: string; parentOptions?: Array<{ value: string; label: string }>; scenario?: boolean }) {
   return (
     <Form.List name={name}>
       {(fields, { add, remove }) => (
@@ -139,10 +143,10 @@ function DictionaryTable({ name, addLabel, parentOptions }: { name: keyof System
             pagination={false}
             rowKey="key"
             dataSource={fields as DictionaryField[]}
-            columns={dictionaryColumns(remove, parentOptions)}
-            scroll={{ x: parentOptions ? 820 : 660 }}
+            columns={dictionaryColumns(remove, parentOptions, scenario)}
+            scroll={{ x: scenario ? 1100 : parentOptions ? 820 : 660 }}
           />
-          <div className="settings-table-actions"><Button icon={<PlusOutlined />} onClick={() => add({ code: '', label: '', parent_code: parentOptions?.[0]?.value || '', enabled: true, sort_order: (fields.length + 1) * 10 })}>{addLabel}</Button></div>
+          <div className="settings-table-actions"><Button icon={<PlusOutlined />} onClick={() => add({ code: '', label: '', description: '', status: scenario ? 'draft' : undefined, parent_code: parentOptions?.[0]?.value || '', enabled: true, sort_order: (fields.length + 1) * 10 })}>{addLabel}</Button></div>
         </div>
       )}
     </Form.List>
@@ -175,7 +179,7 @@ function DictionaryConfigPanel({ dictionaries, loading }: { dictionaries?: Syste
   return (
     <Form form={form} layout="vertical" onFinish={save.mutate} initialValues={dictionaries}>
       <Card className="content-card settings-table-card" title="业务场景字典" extra={<Button icon={<ReloadOutlined />} onClick={() => reset.mutate()} loading={reset.isPending}>恢复默认</Button>}>
-        <DictionaryTable name="business_scenarios" addLabel="新增业务场景" />
+        <DictionaryTable name="business_scenarios" addLabel="新增业务场景" scenario />
       </Card>
       <Card className="content-card section-gap settings-table-card" title="组件领域字典">
         <DictionaryTable name="component_domains" addLabel="新增领域" />

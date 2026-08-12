@@ -5,6 +5,7 @@ from typing import Any
 
 from fastapi import APIRouter, HTTPException
 
+from app.business_scenarios import SCENARIO_STATUSES, public_business_scenarios
 from app.storage.memory_store import STORE
 from app.utils import now_text
 
@@ -13,16 +14,7 @@ router = APIRouter(prefix="/api/system-config", tags=["system-config"])
 
 DEFAULT_SYSTEM_CONFIG: dict[str, Any] = {
     "dictionaries": {
-        "business_scenarios": [
-            {"code": "day_ahead_unit_commitment", "label": "日前机组组合优化", "enabled": True, "sort_order": 10},
-            {"code": "economic_dispatch", "label": "经济负荷分配", "enabled": True, "sort_order": 20},
-            {"code": "storage_charge_discharge", "label": "储能充放电优化", "enabled": True, "sort_order": 30},
-            {"code": "renewable_storage_coordination", "label": "风光储协同优化", "enabled": True, "sort_order": 40},
-            {"code": "cascade_hydro_day_ahead", "label": "梯级水电日前调度", "enabled": True, "sort_order": 50},
-            {"code": "chp_coordination", "label": "热电协同优化", "enabled": True, "sort_order": 60},
-            {"code": "power_market_trading", "label": "电力市场交易", "enabled": True, "sort_order": 70},
-            {"code": "carbon_emission_optimization", "label": "碳排放优化", "enabled": True, "sort_order": 80},
-        ],
+        "business_scenarios": public_business_scenarios(),
         "component_domains": [
             {"code": "general_or", "label": "通用运筹优化", "enabled": True, "sort_order": 10},
             {"code": "general_modeling", "label": "通用建模", "enabled": True, "sort_order": 20},
@@ -51,7 +43,10 @@ DEFAULT_SYSTEM_CONFIG: dict[str, Any] = {
 def get_system_config() -> dict[str, Any]:
     config = _merged_config()
     with STORE.lock:
-        if STORE.system_config.get("dictionaries") != config.get("dictionaries"):
+        if (
+            STORE.system_config.get("dictionaries") != config.get("dictionaries")
+            or STORE.system_config.get("version") != config.get("version")
+        ):
             STORE.system_config.clear()
             STORE.system_config.update(config)
             STORE.save_runtime()
@@ -62,7 +57,7 @@ def get_system_config() -> dict[str, Any]:
 def update_system_config(payload: dict[str, Any]) -> dict[str, Any]:
     current = _merged_config()
     if "dictionaries" in payload:
-        current["dictionaries"] = _merge_dictionaries(payload.get("dictionaries") or {})
+        current["dictionaries"] = _merge_dictionaries(payload.get("dictionaries") or {}, migrate_scenarios=False)
     current["updated_at"] = now_text()
     with STORE.lock:
         STORE.system_config.clear()
@@ -75,7 +70,7 @@ def update_system_config(payload: dict[str, Any]) -> dict[str, Any]:
 def update_dictionaries(payload: dict[str, Any]) -> dict[str, Any]:
     current = _merged_config()
     dictionaries = payload.get("dictionaries") if "dictionaries" in payload else payload
-    current["dictionaries"] = _merge_dictionaries(dictionaries or {})
+    current["dictionaries"] = _merge_dictionaries(dictionaries or {}, migrate_scenarios=False)
     current["updated_at"] = now_text()
     with STORE.lock:
         STORE.system_config.clear()
@@ -100,15 +95,19 @@ def _merged_config() -> dict[str, Any]:
         saved = deepcopy(STORE.system_config)
     saved_dictionaries = saved.get("dictionaries") if isinstance(saved.get("dictionaries"), dict) else {}
     if saved_dictionaries:
-        config["dictionaries"] = _merge_dictionaries(saved_dictionaries)
+        config["dictionaries"] = _merge_dictionaries(
+            saved_dictionaries,
+            migrate_scenarios=str(saved.get("version") or "1.0") != "2.0",
+        )
     for key, value in saved.items():
-        if key != "dictionaries":
+        if key not in {"dictionaries", "version"}:
             config[key] = value
+    config["version"] = "2.0"
     return config
 
 
 def _with_metadata(config: dict[str, Any]) -> dict[str, Any]:
-    config.setdefault("version", "1.0")
+    config.setdefault("version", "2.0")
     config.setdefault("updated_at", None)
     return config
 
@@ -117,19 +116,75 @@ def _normalize_dictionaries(value: dict[str, Any]) -> dict[str, list[dict[str, A
     if not isinstance(value, dict):
         raise HTTPException(status_code=422, detail="dictionaries must be an object")
     return {
-        "business_scenarios": _normalize_items(value.get("business_scenarios") or []),
+        "business_scenarios": _normalize_scenario_items(value.get("business_scenarios") or []),
         "component_domains": _normalize_items(value.get("component_domains") or []),
         "component_categories": _normalize_items(value.get("component_categories") or [], with_parent=True),
     }
 
 
-def _merge_dictionaries(saved: dict[str, Any]) -> dict[str, list[dict[str, Any]]]:
+def _merge_dictionaries(saved: dict[str, Any], *, migrate_scenarios: bool = False) -> dict[str, list[dict[str, Any]]]:
     defaults = deepcopy(DEFAULT_SYSTEM_CONFIG["dictionaries"])
     merged: dict[str, Any] = {}
     for key, default_items in defaults.items():
         saved_items = saved.get(key)
+        if key == "business_scenarios" and migrate_scenarios and isinstance(saved_items, list):
+            saved_items = _migrate_scenario_items(saved_items, default_items)
         merged[key] = saved_items if isinstance(saved_items, list) and saved_items else default_items
     return _normalize_dictionaries(merged)
+
+
+def _normalize_scenario_items(items: list[Any]) -> list[dict[str, Any]]:
+    normalized = _normalize_items(items)
+    source_by_code = {str(item.get("code") or "").strip(): item for item in items if isinstance(item, dict)}
+    for row in normalized:
+        source = source_by_code[row["code"]]
+        status = str(source.get("status") or "draft").strip().lower()
+        if status not in SCENARIO_STATUSES:
+            raise HTTPException(status_code=422, detail=f"invalid business scenario status: {status}")
+        row["description"] = str(source.get("description") or "").strip()
+        row["status"] = status
+    return normalized
+
+
+def _migrate_scenario_items(saved_items: list[Any], default_items: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Upgrade pre-v2 rows by identity, falling back to a unique normalized label.
+
+    Label matching is intentionally generic: it repairs renamed/invalid legacy codes
+    without introducing a scenario-specific branch.
+    """
+    defaults_by_code = {str(item["code"]): item for item in default_items}
+    defaults_by_label: dict[str, list[dict[str, Any]]] = {}
+    for item in default_items:
+        defaults_by_label.setdefault(_normalized_label(item.get("label")), []).append(item)
+    migrated: list[dict[str, Any]] = []
+    represented_defaults: set[str] = set()
+    for item in saved_items:
+        if not isinstance(item, dict):
+            migrated.append(item)
+            continue
+        source = deepcopy(item)
+        matched = defaults_by_code.get(str(source.get("code") or "").strip())
+        if matched is None:
+            label_matches = defaults_by_label.get(_normalized_label(source.get("label")), [])
+            matched = label_matches[0] if len(label_matches) == 1 else None
+        if matched:
+            represented_defaults.add(str(matched["code"]))
+            source["code"] = matched["code"]
+            source.setdefault("label", matched["label"])
+            source.setdefault("description", matched.get("description", ""))
+            source.setdefault("status", matched.get("status", "draft"))
+        else:
+            source.setdefault("description", "")
+            source.setdefault("status", "draft")
+        migrated.append(source)
+    for item in default_items:
+        if str(item["code"]) not in represented_defaults:
+            migrated.append(deepcopy(item))
+    return migrated
+
+
+def _normalized_label(value: Any) -> str:
+    return "".join(str(value or "").split()).casefold()
 
 
 def _normalize_items(items: list[Any], *, with_parent: bool = False) -> list[dict[str, Any]]:

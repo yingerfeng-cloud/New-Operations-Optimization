@@ -28,10 +28,6 @@
 .command-search-group button.active { background: #edf5ff; }
 .command-search-group button span:first-child { min-width: 0; display: grid; gap: 2px; }
 .command-search-group button small { overflow: hidden; color: var(--proto-muted); text-overflow: ellipsis; white-space: nowrap; }
-.agent-empty-prompts { min-height: 260px; display: grid; align-content: center; justify-items: center; text-align: center; }
-.agent-empty-prompts > div { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; width: min(100%, 560px); }
-.agent-empty-prompts button { min-height: 48px; padding: 10px 12px; border: 1px solid var(--proto-line); border-radius: 8px; background: #fff; color: var(--proto-text); text-align: left; }
-.agent-empty-prompts button:hover { border-color: #2f7ed8; background: #f4f8fd; }
 .agent-business-context { display: grid; gap: 10px; }
 .agent-business-context > div { display: grid; gap: 4px; padding: 12px; border: 1px solid var(--proto-line); border-radius: 8px; background: #fbfdff; }
 .agent-business-context > div > span { color: var(--proto-muted); font-size: 12px; }
@@ -63,5 +59,4 @@
   .current-page-chip { max-width: 34vw; font-size: 13px; }
   .top-actions .ant-btn-primary { width: 40px; padding-inline: 0; }
   .command-search-modal { max-width: calc(100vw - 16px); margin: 8px auto; top: 0; }
-  .agent-empty-prompts > div { grid-template-columns: 1fr; }
 }

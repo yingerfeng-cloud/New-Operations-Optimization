@@ -466,7 +466,7 @@ function DependencyEditor({
               {invalidDependencies.has(dep) ? '异常' : '可用'}
             </Tag>
           </div>
-        )) : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="无组件依赖" />}
+        )) : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="无上游组件依赖" />}
       </div>
       <Typography.Text type={blocksPublish ? 'danger' : 'secondary'}>
         发布阻断：{blocksPublish ? '是' : '否'}

@@ -185,6 +185,8 @@ test('loads agent status, skills and sends a V3 Agent turn', async () => {
   expect(screen.getByText('Agent 工作台')).toBeInTheDocument();
   expect(await screen.findByText('智能体可用')).toBeInTheDocument();
   expect(screen.getByText('默认自动识别 Skill')).toBeInTheDocument();
+  expect(screen.getByText('可以直接聊天、分析问题，或让 Agent 调用运筹优化 Skill 完成复杂任务。')).toHaveClass('agent-empty-prompts-copy');
+  expect(screen.getByText('帮我梳理今天的工作').parentElement).toHaveClass('agent-empty-prompts-actions');
 
   fireEvent.change(screen.getByPlaceholderText('给 Agent 发消息'), { target: { value: '请创建日前调度模型' } });
   fireEvent.click(screen.getByRole('button', { name: '发送' }));

@@ -4,6 +4,7 @@ import { createInitialDraft, type ModelDraft } from '../stores/modelCreationStor
 import { normalizeModelDraft } from './normalizeModelDraft';
 import { inferTimeDimensionConfig, normalizeTimeDimensionConfig } from './timeDimensionDraft';
 import { extractDimensions } from './modelDimensions';
+import { reconcileComponentParameterBindings } from './componentParameterBindings';
 
 function objectValue(value: unknown): Record<string, unknown> {
   return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {};
@@ -361,6 +362,7 @@ export function modelAssetToDraft(asset: ModelAsset): ModelDraft {
       ...savedBasic,
       name: String(asset.name || savedBasic.name || base.basic_info.name),
       model_code: String(asset.template_id || savedBasic.model_code || semanticSpec.model_code || semanticSpec.code || asset.id),
+      scenario_id: String(asset.scenario_id || savedBasic.scenario_id || semanticSpec.scenario_id || '') || undefined,
       scenario: String(asset.scene || savedBasic.scenario || semanticSpec.scenario || base.basic_info.scenario),
       builder_mode: asBuildMode(asset.build_mode || savedBasic.builder_mode || semanticSpec.build_mode || componentSpec.build_mode),
       solver: String(asset.solver || savedBasic.solver || 'HiGHS'),
@@ -395,5 +397,6 @@ export function modelAssetToDraft(asset: ModelAsset): ModelDraft {
   candidate.time_dimension = explicitTimeDimension
     ? normalizeTimeDimensionConfig(explicitTimeDimension, candidate.semantic.sets.map(item => item.code))
     : inferTimeDimensionConfig(candidate);
+  candidate.components = reconcileComponentParameterBindings(candidate.semantic.parameters, candidate.components);
   return normalizeModelDraft(candidate);
 }

@@ -1,6 +1,8 @@
 export interface DictionaryItem {
   code: string;
   label: string;
+  description?: string;
+  status?: 'draft' | 'trial' | 'published' | 'offline';
   parent_code?: string;
   enabled: boolean;
   sort_order: number;

@@ -6,8 +6,9 @@ import { getComponents } from '../../api/components';
 import { getFunctionAssets } from '../../api/functionAssets';
 import { getModels } from '../../api/models';
 import { getResults } from '../../api/results';
+import { getSystemConfig } from '../../api/systemConfig';
 import { getTasks } from '../../api/tasks';
-import { scenarioCatalog } from '../../features/model-creation/data/scenarioCatalog';
+import { scenariosFromDictionary } from '../../features/model-creation/data/scenarioCatalog';
 
 type SearchKind = '模型' | '业务场景' | '组件' | '函数资产' | '任务' | '结果报告';
 interface SearchItem { id: string; name: string; kind: SearchKind; status?: string; summary?: string; href: string }
@@ -41,15 +42,20 @@ export function CommandSearch({ open, onClose }: { open: boolean; onClose: () =>
     let live = true;
     setLoading(true);
     const sources: Array<[SearchKind, Promise<unknown>]> = [
-      ['模型', getModels()], ['组件', getComponents()], ['函数资产', getFunctionAssets()], ['任务', getTasks()], ['结果报告', getResults()],
+      ['模型', getModels()], ['业务场景', getSystemConfig()], ['组件', getComponents()], ['函数资产', getFunctionAssets()], ['任务', getTasks()], ['结果报告', getResults()],
     ];
     Promise.allSettled(sources.map(([, promise]) => promise)).then(results => {
       if (!live) return;
-      const next: SearchItem[] = scenarioCatalog.map(scene => ({ id: scene.id, name: scene.name, kind: '业务场景', status: scene.status, summary: scene.description, href: `/scenarios?scene=${encodeURIComponent(scene.id)}` }));
+      const next: SearchItem[] = [];
       const failed: SearchKind[] = [];
       results.forEach((result, index) => {
         const kind = sources[index][0];
         if (result.status === 'rejected') { failed.push(kind); return; }
+        if (kind === '业务场景') {
+          const config = result.value as { dictionaries?: { business_scenarios?: Parameters<typeof scenariosFromDictionary>[0] } };
+          scenariosFromDictionary(config.dictionaries?.business_scenarios).forEach(scene => next.push({ id: scene.id, name: scene.name, kind, status: scene.status, summary: scene.description, href: `/scenarios?scene=${encodeURIComponent(scene.id)}` }));
+          return;
+        }
         const rows = Array.isArray(result.value) ? result.value as Array<Record<string, unknown>> : [];
         rows.forEach(row => {
           if (kind === '模型') next.push({ id: String(row.id), name: String(row.name || row.id), kind, status: String(row.status || ''), summary: String(row.scene || row.problem_type || ''), href: `/models/${row.id}` });

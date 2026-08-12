@@ -2,6 +2,7 @@ import type { ModelTemplate } from '../../../types/template';
 import type { ModelDraft } from '../stores/modelCreationStore';
 import { normalizeModelDraft } from './normalizeModelDraft';
 import { inferTimeDimensionConfig, normalizeTimeDimensionConfig } from './timeDimensionDraft';
+import { reconcileComponentParameterBindings } from './componentParameterBindings';
 
 function objectValue(value: unknown): Record<string, unknown> {
   return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {};
@@ -16,6 +17,7 @@ export function applyTemplateToDraft(draft: ModelDraft, template: ModelTemplate,
       ...draft.basic_info,
       name: template.name,
       model_code: template.code,
+      scenario_id: template.scenario_id || draft.basic_info.scenario_id,
       scenario: scenarioName || draft.basic_info.scenario,
       builder_mode: (template.build_mode as ModelDraft['basic_info']['builder_mode']) || draft.basic_info.builder_mode,
       template_code: template.code,
@@ -32,5 +34,6 @@ export function applyTemplateToDraft(draft: ModelDraft, template: ModelTemplate,
     || objectValue(objectValue(source.advanced).ui_metadata).time_dimension
     || objectValue(objectValue(source.semantic).ui_metadata).time_dimension;
   candidate.time_dimension = templateConfig ? normalizeTimeDimensionConfig(templateConfig, candidate.semantic.sets.map(item => item.code)) : inferTimeDimensionConfig(candidate);
+  candidate.components = reconcileComponentParameterBindings(candidate.semantic.parameters, candidate.components);
   return normalizeModelDraft(candidate);
 }

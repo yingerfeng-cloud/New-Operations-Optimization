@@ -100,6 +100,7 @@ export function buildModelDraftPayload(draft: ModelDraft) {
   const description = String(normalized.advanced.description || existingUiMetadata.description || '').trim();
   const semanticSpec = {
     ...normalized.semantic,
+    scenario_id: normalized.basic_info.scenario_id,
     ui_metadata: { ...(normalized.semantic.ui_metadata || {}), time_dimension: normalized.time_dimension },
   };
   const currentGenericSpec = normalized.advanced.generic_spec || {};
@@ -113,6 +114,7 @@ export function buildModelDraftPayload(draft: ModelDraft) {
   return {
     name: normalized.basic_info.name,
     scene: normalized.basic_info.scenario,
+    scenario_id: normalized.basic_info.scenario_id,
     template_id: normalized.basic_info.model_code,
     build_mode: normalized.basic_info.builder_mode,
     solver: normalized.basic_info.solver,

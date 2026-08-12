@@ -124,7 +124,7 @@ test('renders component builder writeback without raw JSON block', () => {
   fireEvent.click(screen.getByText('组件生成内容预览'));
   expect(screen.getByText('储能 SOC 组件')).toBeInTheDocument();
   expect(screen.getAllByText('time_volume').length).toBeGreaterThan(0);
-  fireEvent.click(screen.getByText('组件依赖'));
+  fireEvent.click(screen.getByText('上游组件依赖'));
   expect(screen.getByText('storage_power_limit')).toBeInTheDocument();
   expect(screen.getByText(/缺少依赖 storage_power_limit/)).toBeInTheDocument();
   expect(screen.queryByText(/依赖 time_volume/)).not.toBeInTheDocument();

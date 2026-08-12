@@ -1,5 +1,4 @@
 import type { ModelAsset } from '../../../types/model';
-import { getScenarioById, getScenarioModelById } from '../data/scenarioCatalog';
 import { createBlankDraft, type ModelDraft, type ModelWorkspaceMode } from '../stores/modelCreationStore';
 import { modelAssetToDraft } from './modelAssetToDraft';
 
@@ -10,6 +9,7 @@ export interface WorkspaceRequest {
   mode: ModelWorkspaceMode;
   sourceModelId?: string;
   templateCode?: string;
+  scenarioId?: string;
   legacySource: boolean;
 }
 
@@ -24,22 +24,14 @@ export function parseWorkspaceRequest(searchParams: URLSearchParams, routeModelI
       mode: explicitMode,
       sourceModelId,
       templateCode: searchParams.get('template') || undefined,
+      scenarioId: searchParams.get('scenario') || undefined,
       legacySource: false,
     };
   }
 
   if (sourceModelId) return { mode: 'edit', sourceModelId, legacySource: true };
 
-  // Compatibility for old scenario-catalog URLs: the catalog only recommends a
-  // backend template and never becomes a model-content source itself.
-  const scenarioId = searchParams.get('scenarioId');
-  const catalogModelId = searchParams.get('modelId');
-  if (scenarioId && catalogModelId) {
-    const templateCode = getScenarioModelById(scenarioId, catalogModelId)?.templateCode;
-    if (templateCode) return { mode: 'template', templateCode, legacySource: false };
-  }
-
-  return { mode: 'new', legacySource: false };
+  return { mode: 'new', scenarioId: searchParams.get('scenario') || undefined, legacySource: false };
 }
 
 export function effectiveAssetMode(mode: ModelWorkspaceMode, asset: ModelAsset): ModelWorkspaceMode {
@@ -82,10 +74,6 @@ export function assetToWorkspaceDraft(asset: ModelAsset, mode: ModelWorkspaceMod
   }
 
   return source;
-}
-
-export function scenarioNameForDraft(scenarioId: string) {
-  return getScenarioById(scenarioId)?.name || '';
 }
 
 export const workspaceTitles: Record<ModelWorkspaceMode, string> = {

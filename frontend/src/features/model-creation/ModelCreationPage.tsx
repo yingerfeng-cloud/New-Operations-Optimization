@@ -10,7 +10,7 @@ import { PageHeader } from '../../components/PageHeader';
 import { ErrorState, PageLoading } from '../../components/PageStates';
 import { ActionFooter, PageShell, StepBody } from '../../components/LayoutPrimitives';
 import { createBlankDraft, useModelCreationStore, type ModelDraft } from './stores/modelCreationStore';
-import { scenarioCatalog, scenariosFromDictionary } from './data/scenarioCatalog';
+import { scenariosFromDictionary } from './data/scenarioCatalog';
 import { applyTemplateToDraft } from './utils/applyTemplateToDraft';
 import { normalizeModelDraft } from './utils/normalizeModelDraft';
 import { saveModelDraftAsset } from './utils/saveModelDraftAsset';
@@ -97,8 +97,8 @@ export function ModelCreationPage() {
   const scenarioDictionary = systemConfig.data?.dictionaries?.business_scenarios;
   const configuredScenarios = useMemo(() => scenariosFromDictionary(scenarioDictionary), [scenarioDictionary]);
   const availableScenarios = useMemo(
-    () => systemConfig.isError ? scenarioCatalog : scenarioDictionary === undefined ? [] : configuredScenarios,
-    [configuredScenarios, scenarioDictionary, systemConfig.isError],
+    () => scenarioDictionary === undefined ? [] : configuredScenarios,
+    [configuredScenarios, scenarioDictionary],
   );
   const request = useMemo(() => parseWorkspaceRequest(searchParams, routeModelId), [routeModelId, searchParams]);
   const sourceModel = useQuery({
@@ -114,7 +114,7 @@ export function ModelCreationPage() {
     retry: false,
   });
   const resolvedMode = sourceModel.data ? effectiveAssetMode(request.mode, sourceModel.data) : request.mode;
-  const requestKey = `${resolvedMode}:${request.sourceModelId || ''}:${request.templateCode || ''}`;
+  const requestKey = `${resolvedMode}:${request.sourceModelId || ''}:${request.templateCode || ''}:${request.scenarioId || ''}`;
 
   useEffect(() => {
     setMainScrollContainer(document.querySelector<HTMLElement>('.main-content'));
@@ -146,12 +146,14 @@ export function ModelCreationPage() {
     if (systemConfig.isPending) return () => { active = false; };
     if (resolvedMode === 'new') {
       const blank = createBlankDraft();
+      const requestedScenario = availableScenarios.find(item => item.id === request.scenarioId);
+      if (requestedScenario) blank.basic_info = { ...blank.basic_info, scenario_id: requestedScenario.id, scenario: requestedScenario.name };
       initializedKeyRef.current = requestKey;
       initializeWorkspace({ mode: 'new', sessionId: requestKey }, blank);
       return () => { active = false; };
     }
     if (resolvedMode === 'template' && templateDetail.data) {
-      const templateScenario = availableScenarios.find(item => item.id === templateDetail.data.scenario || item.name === templateDetail.data.scenario);
+      const templateScenario = availableScenarios.find(item => item.id === templateDetail.data.scenario_id || item.id === templateDetail.data.scenario || item.name === templateDetail.data.scenario);
       const blank = createBlankDraft();
       const next = applyTemplateToDraft(blank, templateDetail.data, templateScenario?.name || templateDetail.data.scenario || '');
       next.basic_info.scenario_id = templateScenario?.id;
@@ -170,9 +172,11 @@ export function ModelCreationPage() {
     }
     if (request.sourceModelId && sourceModel.data) {
       const next = assetToWorkspaceDraft(sourceModel.data, resolvedMode);
-      const scenario = availableScenarios.find(item => item.id === next.basic_info.scenario || item.name === next.basic_info.scenario);
-      const disabledScenario = scenarioDictionary?.find(item => item.enabled === false && (item.code === next.basic_info.scenario || item.label === next.basic_info.scenario));
-      next.basic_info.scenario_id = scenario?.id || disabledScenario?.code || next.basic_info.scenario || undefined;
+      const sourceScenarioId = sourceModel.data.scenario_id || next.basic_info.scenario_id;
+      const scenario = availableScenarios.find(item => item.id === sourceScenarioId || item.id === next.basic_info.scenario || item.name === next.basic_info.scenario);
+      const disabledScenario = scenarioDictionary?.find(item => item.enabled === false && (item.code === sourceScenarioId || item.code === next.basic_info.scenario || item.label === next.basic_info.scenario));
+      next.basic_info.scenario_id = scenario?.id || disabledScenario?.code || sourceScenarioId || next.basic_info.scenario || undefined;
+      if (scenario) next.basic_info.scenario = scenario.name;
       const currentAssetId = resolvedMode === 'edit' ? sourceModel.data.id : undefined;
       if (active) {
         initializedKeyRef.current = requestKey;
@@ -186,7 +190,7 @@ export function ModelCreationPage() {
       }
     }
     return () => { active = false; };
-  }, [availableScenarios, initializeWorkspace, request.legacySource, request.sourceModelId, request.templateCode, requestKey, resolvedMode, scenarioDictionary, setLoadedTemplate, setWorkspace, sourceModel.data, systemConfig.isPending, templateDetail.data]);
+  }, [availableScenarios, initializeWorkspace, request.legacySource, request.scenarioId, request.sourceModelId, request.templateCode, requestKey, resolvedMode, scenarioDictionary, setLoadedTemplate, setWorkspace, sourceModel.data, systemConfig.isPending, templateDetail.data]);
 
   useEffect(() => {
     const onBeforeUnload = (event: BeforeUnloadEvent) => {

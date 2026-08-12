@@ -1,17 +1,23 @@
-import { fireEvent, screen } from '@testing-library/react';
+import { fireEvent, screen, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, vi } from 'vitest';
 import { ScenarioLibraryPage } from '../../pages/ScenarioLibrary/ScenarioLibraryPage';
-import { scenarioCatalog } from '../../features/model-creation/data/scenarioCatalog';
 import { renderWithQueryClient } from '../testUtils';
+
+const defaultScenarioItems = [
+  { code: 'day_ahead_unit_commitment', label: '日前机组组合优化', description: '日前计划', status: 'published', enabled: true, sort_order: 10 },
+  { code: 'cascade_hydro_day_ahead', label: '梯级水电日前调度', description: '梯级水库调度', status: 'published', enabled: true, sort_order: 20 },
+  { code: 'power_market_trading', label: '电力市场交易', description: '市场交易', status: 'published', enabled: true, sort_order: 30 },
+  { code: 'carbon_emission_optimization', label: '碳排放优化', description: '低碳调度', status: 'trial', enabled: true, sort_order: 40 },
+] as const;
 
 const navigate = vi.hoisted(() => vi.fn());
 const testState = vi.hoisted(() => ({
   models: [
-    { id: 'm1', name: '日前模型', scene: '日前机组组合优化', status: 'published', template_id: 'unit_commitment_day_ahead' },
-    { id: 'm2', name: '水电模型', scene: '梯级水电日前调度', status: 'trial', template_id: 'cascade_hydro_dispatch' },
+    { id: 'm1', name: '日前模型', scenario_id: 'day_ahead_unit_commitment', scene: '日前机组组合优化', status: 'published', is_active_version: true, template_id: 'unit_commitment_day_ahead', build_mode: 'generic_linear' },
+    { id: 'm2', name: '水电模型', scenario_id: 'cascade_hydro_day_ahead', scene: '梯级水电日前调度', status: 'trial', template_id: 'cascade_hydro_dispatch', build_mode: 'component_based' },
   ] as Array<Record<string, unknown>>,
-  scenarioItems: undefined as undefined | Array<{ code: string; label: string; enabled: boolean; sort_order: number }>,
+  scenarioItems: [] as Array<{ code: string; label: string; description?: string; status?: string; enabled: boolean; sort_order: number }>,
 }));
 
 vi.mock('react-router-dom', async () => {
@@ -38,31 +44,34 @@ function renderPage() {
 beforeEach(() => {
   navigate.mockReset();
   testState.models = [
-    { id: 'm1', name: '日前模型', scene: '日前机组组合优化', status: 'published', template_id: 'unit_commitment_day_ahead' },
-    { id: 'm2', name: '水电模型', scene: '梯级水电日前调度', status: 'trial', template_id: 'cascade_hydro_dispatch' },
+    { id: 'm1', name: '日前模型', scenario_id: 'day_ahead_unit_commitment', scene: '日前机组组合优化', status: 'published', is_active_version: true, template_id: 'unit_commitment_day_ahead', build_mode: 'generic_linear' },
+    { id: 'm2', name: '水电模型', scenario_id: 'cascade_hydro_day_ahead', scene: '梯级水电日前调度', status: 'trial', template_id: 'cascade_hydro_dispatch', build_mode: 'component_based' },
   ];
-  testState.scenarioItems = undefined;
+  testState.scenarioItems = defaultScenarioItems.map(item => ({ ...item }));
 });
 
-test('renders React scenario library and navigates to an explicit backend-template mode', async () => {
+test('renders configured scenarios and opens the actual model asset', async () => {
   renderPage();
   expect(screen.getByText('业务场景库')).toBeInTheDocument();
-  expect(screen.getAllByText('日前机组组合优化').length).toBeGreaterThan(0);
+  expect((await screen.findAllByText('日前机组组合优化')).length).toBeGreaterThan(0);
   expect(screen.getAllByText('梯级水电日前调度').length).toBeGreaterThan(0);
   expect(screen.getAllByText('电力市场交易').length).toBeGreaterThan(0);
   expect(screen.getAllByText('碳排放优化').length).toBeGreaterThan(0);
 
   fireEvent.click(screen.getAllByText('梯级水电日前调度')[0]);
-  expect(screen.queryByText('日前机组组合优化模型')).not.toBeInTheDocument();
-  expect(screen.getByText('梯级水电日前调度模型')).toBeInTheDocument();
+  expect(screen.queryByText('日前模型')).not.toBeInTheDocument();
+  expect(screen.getByText('水电模型')).toBeInTheDocument();
 
-  fireEvent.click(screen.getAllByRole('button', { name: '进入建模' })[1]);
-  expect(navigate).toHaveBeenCalledWith('/models/create?mode=template&template=cascade_hydro_dispatch');
+  const card = screen.getByTestId('scenario-card-cascade_hydro_day_ahead');
+  fireEvent.click(within(card).getByRole('button', { name: '进入建模' }));
+  expect(navigate).toHaveBeenCalledWith('/models/create?mode=version&source=m2');
 });
 
-test('page-level modeling entry starts blank instead of silently selecting the first scenario template', () => {
+test('page-level modeling entry starts blank instead of silently selecting the first scenario template', async () => {
   renderPage();
-  fireEvent.click(screen.getAllByRole('button', { name: '进入建模' })[0]);
+  await screen.findByTestId('scenario-card-day_ahead_unit_commitment');
+  const button = screen.getAllByRole('button', { name: '进入建模' })[0];
+  fireEvent.click(button);
   expect(navigate).toHaveBeenCalledWith('/models/create?mode=new');
 });
 
@@ -72,11 +81,12 @@ test('shows real published count zero without static fallback', async () => {
   expect(await screen.findAllByText('已发布模型')).not.toHaveLength(0);
   expect(screen.getAllByText('0').length).toBeGreaterThan(0);
   expect(screen.getAllByText(/推荐模型/).length).toBeGreaterThan(0);
+  expect(screen.getAllByText('推荐模型 0').length).toBeGreaterThan(0);
 });
 
 test('all disabled scenarios render a safe configuration state', async () => {
   testState.models = [];
-  testState.scenarioItems = scenarioCatalog.map((scenario, index) => ({ code: scenario.id, label: scenario.name, enabled: false, sort_order: index }));
+  testState.scenarioItems = defaultScenarioItems.map((scenario, index) => ({ ...scenario, enabled: false, sort_order: index }));
   renderPage();
   expect(await screen.findByText('暂无可用业务场景')).toBeInTheDocument();
   expect(screen.getByRole('button', { name: '进入建模' })).toBeDisabled();

@@ -418,8 +418,8 @@ export function AgentWorkbenchPage() {
               ) : (
                 <div className="agent-empty-prompts">
                   <Typography.Title level={4}>今天想完成什么？</Typography.Title>
-                  <Typography.Paragraph type="secondary">可以直接聊天、分析问题，或让 Agent 调用运筹优化 Skill 完成复杂任务。</Typography.Paragraph>
-                  <div>{examples.map(example => <button key={example} type="button" onClick={() => setText(example)}>{example}</button>)}</div>
+                  <Typography.Paragraph className="agent-empty-prompts-copy" type="secondary">可以直接聊天、分析问题，或让 Agent 调用运筹优化 Skill 完成复杂任务。</Typography.Paragraph>
+                  <div className="agent-empty-prompts-actions">{examples.map(example => <button key={example} type="button" onClick={() => setText(example)}>{example}</button>)}</div>
                 </div>
               )}
               {analyze.isPending && (

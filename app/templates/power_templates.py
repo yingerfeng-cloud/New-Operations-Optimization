@@ -3,6 +3,7 @@
 from copy import deepcopy
 from typing import Any
 
+from app.business_scenarios import business_scenario_by_id, scenario_id_for_template
 from app.builders.unit_commitment_builder import unit_commitment_template
 from app.model_draft import build_constraints_from_draft, create_model_draft_from_template
 from app.model_components.compute_power_components import (
@@ -64,6 +65,9 @@ def power_template_library() -> dict[str, dict[str, Any]]:
     for code, template in templates.items():
         template.setdefault("code", code)
         template.setdefault("model_code", code)
+        template["scenario_id"] = scenario_id_for_template(code)
+        scenario = business_scenario_by_id(template["scenario_id"])
+        template["scenario_name"] = scenario.get("label") if scenario else ""
         if code in TEMPLATE_DISPLAY_NAMES:
             name, description = TEMPLATE_DISPLAY_NAMES[code]
             template["name"] = name
@@ -77,6 +81,7 @@ def power_template_library() -> dict[str, dict[str, Any]]:
             )
             template.setdefault("ui_metadata", {})["capability_boundary"] = template["description"]
         template.setdefault("ui_metadata", {})["description"] = template.get("description", template.get("scenario", ""))
+        template["ui_metadata"]["scenario_id"] = template.get("scenario_id")
         template["ui_metadata"]["documentation_source"] = "template_definition"
         if code == "pv_storage_capacity_planning":
             _normalize_pv_storage_capacity_template(template)

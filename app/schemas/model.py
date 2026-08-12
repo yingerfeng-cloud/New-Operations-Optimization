@@ -111,6 +111,7 @@ class ModelPackage(BaseModel):
 
     id: str | None = None
     template_id: str | None = None
+    scenario_id: str | None = None
     name: str
     scene: str
     version: str = "v0.1"

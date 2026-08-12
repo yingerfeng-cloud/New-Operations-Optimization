@@ -593,6 +593,7 @@ class ModelService:
             mode="json",
             exclude={
                 "id", "status", "model_family_id", "supersedes_model_id", "is_active_version",
+                "scenario_id",
                 "published_by", "published_at", "tested_at", "created_at", "updated_at",
                 "validation_warnings", "dry_run_result", "content_hash", "tested_content_hash", "tested_model_id",
             },
@@ -691,6 +692,7 @@ class ModelService:
             "basic_info": {
                 "id": model.id,
                 "name": model.name,
+                "scenario_id": model.scenario_id,
                 "scene": model.scene,
                 "version": model.version,
                 "status": model.status,
@@ -1736,8 +1738,9 @@ class ModelService:
                     model_family_id=f"builtin:{code}",
                     is_active_version=is_published,
                     template_id=code,
+                    scenario_id=template.get("scenario_id"),
                     name=template["name"],
-                    scene=template.get("scenario", template["name"]),
+                    scene=template.get("scenario_name") or template.get("scenario", template["name"]),
                     version=template.get("version", "v1.0"),
                     status=lifecycle_status,
                     solver="HiGHS",
@@ -1861,19 +1864,21 @@ class ModelService:
                 template = templates[code]
                 if model:
                     lifecycle_status = str(template.get("status") or "published")
-                    if (
-                        self._is_managed_default(model)
-                        and lifecycle_status == "published"
-                        and model.status != "published"
-                    ):
-                        STORE.models[model_id] = model.model_copy(
-                            update={
-                                "status": "published",
-                                "is_active_version": True,
-                                "published_at": model.published_at or timestamp,
-                                "updated_at": timestamp,
-                            }
-                        )
+                    updates: dict[str, Any] = {}
+                    if self._is_managed_default(model) and model.scenario_id != template.get("scenario_id"):
+                        updates["scenario_id"] = template.get("scenario_id")
+                    canonical_scene = template.get("scenario_name") or template.get("scenario", template["name"])
+                    if self._is_managed_default(model) and model.scene != canonical_scene:
+                        updates["scene"] = canonical_scene
+                    if self._is_managed_default(model) and lifecycle_status == "published" and model.status != "published":
+                        updates.update({
+                            "status": "published",
+                            "is_active_version": True,
+                            "published_at": model.published_at or timestamp,
+                        })
+                    if updates:
+                        updates["updated_at"] = timestamp
+                        STORE.models[model_id] = model.model_copy(update=updates)
                         changed = True
                     continue
                 else:
@@ -1884,8 +1889,9 @@ class ModelService:
                         model_family_id=f"builtin:{code}",
                         is_active_version=is_published,
                         template_id=code,
+                        scenario_id=template.get("scenario_id"),
                         name=template["name"],
-                        scene=template.get("scenario", template["name"]),
+                        scene=template.get("scenario_name") or template.get("scenario", template["name"]),
                         version=template.get("version", "v1.0"),
                         status=lifecycle_status,
                         solver=template.get("solver", "HiGHS"),

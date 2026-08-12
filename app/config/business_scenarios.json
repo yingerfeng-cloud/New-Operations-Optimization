@@ -1,0 +1,91 @@
+[
+  {
+    "code": "day_ahead_unit_commitment",
+    "label": "日前机组组合优化",
+    "description": "面向日前计划的机组启停、出力和备用协同优化。",
+    "status": "published",
+    "enabled": true,
+    "sort_order": 10,
+    "template_codes": ["unit_commitment_day_ahead"]
+  },
+  {
+    "code": "economic_dispatch",
+    "label": "经济负荷分配",
+    "description": "在满足负荷平衡的前提下进行机组经济出力分配。",
+    "status": "published",
+    "enabled": true,
+    "sort_order": 20,
+    "template_codes": ["economic_dispatch"]
+  },
+  {
+    "code": "storage_charge_discharge",
+    "label": "储能充放电优化",
+    "description": "协调储能充放电功率、SOC 和收益成本。",
+    "status": "published",
+    "enabled": true,
+    "sort_order": 30,
+    "template_codes": ["storage_dispatch"]
+  },
+  {
+    "code": "renewable_storage_coordination",
+    "label": "风光储协同优化",
+    "description": "联合新能源出力、弃电和储能响应。",
+    "status": "published",
+    "enabled": true,
+    "sort_order": 40,
+    "template_codes": [
+      "renewable_storage_dispatch",
+      "pv_storage_capacity_planning",
+      "pv_storage_day_ahead_dispatch",
+      "pv_storage_intraday_dispatch",
+      "pv_storage_dispatch_v2",
+      "pv_storage_day_ahead_dispatch_v2",
+      "pv_storage_intraday_dispatch_v2"
+    ]
+  },
+  {
+    "code": "cascade_hydro_day_ahead",
+    "label": "梯级水电日前调度",
+    "description": "面向梯级水库的水量平衡、出力和库容协同优化。",
+    "status": "published",
+    "enabled": true,
+    "sort_order": 50,
+    "template_codes": ["cascade_hydro_dispatch", "cascade_hydro_dispatch_v1", "nonlinear_hydro_power_demo"]
+  },
+  {
+    "code": "chp_coordination",
+    "label": "热电协同优化",
+    "description": "协调热电联产机组的电功率、热功率和燃料消耗。",
+    "status": "published",
+    "enabled": true,
+    "sort_order": 60,
+    "template_codes": ["chp_dispatch"]
+  },
+  {
+    "code": "power_market_trading",
+    "label": "电力市场交易",
+    "description": "面向市场报价、成交电量和偏差结算的交易优化。",
+    "status": "trial",
+    "enabled": true,
+    "sort_order": 70,
+    "template_codes": ["contract_spot_exposure_v1", "retail_da_spot_bidding_v1"]
+  },
+  {
+    "code": "carbon_emission_optimization",
+    "label": "碳排放优化",
+    "description": "面向碳配额、碳成本和低碳调度的优化场景。",
+    "status": "trial",
+    "enabled": true,
+    "sort_order": 80,
+    "template_codes": []
+  },
+  {
+    "code": "compute_power_coordination",
+    "label": "算电协同",
+    "description": "联合优化算力任务、GPU 集群、可再生能源、储能和电网购电计划。",
+    "status": "published",
+    "enabled": true,
+    "sort_order": 90,
+    "template_codes": ["compute_power_coordination_day_ahead_v1"]
+  }
+]

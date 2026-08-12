@@ -1,4 +1,4 @@
-import { Button, Card, Segmented, Space, Tag, Typography } from 'antd';
+import { Button, Card, Segmented, Space, Tag, Tooltip, Typography } from 'antd';
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
@@ -8,20 +8,19 @@ import { PageHeader } from '../../components/PageHeader';
 import { ConfigurationMissingState } from '../../components/PageStates';
 import { StatusTag } from '../../components/StatusTag';
 import { FilterBar, MetricCard, MetricGrid } from '../../components/WorkspaceUI';
-import { modelBelongsToScenario, scenarioCatalog, scenariosFromDictionary } from '../../features/model-creation/data/scenarioCatalog';
+import { modelBelongsToScenario, recommendScenarioModels, scenariosFromDictionary } from '../../features/model-creation/data/scenarioCatalog';
 
-const statusOptions = ['全部', '已发布', '试运行'];
+const statusOptions = ['全部', '草稿', '试运行', '已发布', '已下线'];
 
 function statusLabel(status: string) {
-  return status === 'trial' ? '试运行' : status === 'published' ? '已发布' : status;
-}
-
-function publishedStatus(status: unknown) {
-  return String(status || '') === 'published';
+  return ({ draft: '草稿', trial: '试运行', published: '已发布', offline: '已下线' } as Record<string, string>)[status] || status;
 }
 
 function builderText(value: unknown) {
-  return value === 'component_based' ? '组件化 Builder' : '通用线性 Builder';
+  if (value === 'component_based') return '组件化 Builder';
+  if (value === 'domain_builder') return '领域 Builder';
+  if (value === 'template_based') return '模板 Builder';
+  return '通用线性 Builder';
 }
 
 export function ScenarioLibraryPage() {
@@ -36,85 +35,83 @@ export function ScenarioLibraryPage() {
     const statusMatched = statusFilter === '全部' || statusLabel(item.status) === statusFilter;
     return sceneMatched && statusMatched;
   });
-
   const rows = useMemo(() => visible.map(scenario => {
     const ownedModels = (models.data || []).filter(model => modelBelongsToScenario(model, scenario));
+    const recommendedModels = recommendScenarioModels(models.data || [], scenario);
     return {
       ...scenario,
+      ownedModels,
       ownedModelCount: ownedModels.length,
-      publishedModelCount: ownedModels.filter(model => publishedStatus(model.status)).length,
-      trialModelCount: ownedModels.filter(model => String(model.status || '') === 'trial').length,
-      recommendedModelCount: scenario.models.length,
-      recommendedModelId: ownedModels.find(model => publishedStatus(model.status))?.id,
+      publishedModelCount: ownedModels.filter(model => model.status === 'published').length,
+      trialModelCount: ownedModels.filter(model => model.status === 'trial').length,
+      recommendedModels,
+      recommendedModelId: recommendedModels[0]?.id,
     };
   }), [models.data, visible]);
 
-  const openModelCreation = (scenarioId: string, modelId: string) => {
-    const templateCode = scenarios.find(item => item.id === scenarioId)?.models.find(model => model.id === modelId)?.templateCode;
-    nav(templateCode ? `/models/create?mode=template&template=${encodeURIComponent(templateCode)}` : '/models/create?mode=new');
-  };
   return (
     <>
       <PageHeader
         title="业务场景库"
-        description="按业务场景组织模型模板和建模入口，支持快速进入建模或发起求解。"
-        extra={<Button type="primary" disabled={!scenarios.length} title="进入空白建模流程后再选择业务场景或模板" onClick={() => nav('/models/create?mode=new')}>进入建模</Button>}
+        description="业务场景状态来自系统配置；推荐结果来自该场景下实际可运行的已发布模型。"
+        extra={<Button type="primary" disabled={!scenarios.length} onClick={() => nav('/models/create?mode=new')}>进入建模</Button>}
       />
-      {!scenarios.length && (
+      {!config.isPending && !scenarios.length && (
         <ConfigurationMissingState
           title="暂无可用业务场景"
-          description="所有业务场景均已禁用，无法进入建模。请先检查系统字典配置。"
+          description="尚未配置或所有业务场景均已禁用。请先检查系统字典配置。"
           action={<Button onClick={() => nav('/settings')}>查看系统配置</Button>}
         />
       )}
       {!!scenarios.length && <>
-      <Card className="content-card">
-        <FilterBar onReset={() => { setFilter('全部'); setStatusFilter('全部'); }}>
-          <Segmented value={filter} onChange={value => setFilter(String(value))} options={['全部', ...scenarios.map(item => item.name)]} />
-          <Segmented value={statusFilter} onChange={value => setStatusFilter(String(value))} options={statusOptions} />
-        </FilterBar>
-      </Card>
+        <Card className="content-card">
+          <FilterBar onReset={() => { setFilter('全部'); setStatusFilter('全部'); }}>
+            <Segmented value={filter} onChange={value => setFilter(String(value))} options={['全部', ...scenarios.map(item => item.name)]} />
+            <Segmented value={statusFilter} onChange={value => setStatusFilter(String(value))} options={statusOptions} />
+          </FilterBar>
+        </Card>
 
-      <div className="dashboard-insight-grid section-gap">
-        {rows.map(scenario => (
-          <Card
-            data-testid={`scenario-card-${scenario.id}`}
-            key={scenario.id}
-            className="content-card"
-            title={<Space><span>{scenario.name}</span><StatusTag status={scenario.status} /></Space>}
-            extra={<Tag color="blue">推荐模型 {scenario.recommendedModelCount}</Tag>}
-          >
-            <Typography.Paragraph>{scenario.description}</Typography.Paragraph>
-            <MetricGrid columns={3}>
-              <MetricCard title="模型资产" value={scenario.ownedModelCount} tone="blue" />
-              <MetricCard title="已发布模型" value={scenario.publishedModelCount} tone="green" />
-              <MetricCard title="试运行模型" value={scenario.trialModelCount} tone="purple" />
-            </MetricGrid>
-            <div className="scenario-primary-actions section-gap">
-              <Button type="primary" disabled={!scenario.recommendedModelId} title={!scenario.recommendedModelId ? '暂无已发布模型' : undefined} onClick={() => nav(`/tasks?create=1&scene=${encodeURIComponent(scenario.name)}&model=${encodeURIComponent(scenario.recommendedModelId || '')}`)}>使用推荐模型发起任务</Button>
-              <Button onClick={() => nav('/models/create?mode=new')}>创建空白模型</Button>
-            </div>
-            <div className="scenario-model-list">
-              {scenario.models.map(model => (
-                <div className="scenario-model-item" key={model.id}>
-                  <div className="scenario-model-main">
-                    <strong>{model.name}</strong>
-                    <span className="scenario-model-code">{model.code}</span>
-                    <div className="scenario-model-action">
-                      <Button size="small" onClick={() => openModelCreation(scenario.id, model.id)}>进入建模</Button>
+        <div className="dashboard-insight-grid section-gap">
+          {rows.map(scenario => (
+            <Card
+              data-testid={`scenario-card-${scenario.id}`}
+              key={scenario.id}
+              className="content-card"
+              title={<Space><span>{scenario.name}</span><StatusTag status={scenario.status} /></Space>}
+              extra={<Tooltip title="按场景关联筛选已发布且处于活动版本的模型，再按配置优先级和发布时间排序"><Tag color="blue">推荐模型 {scenario.recommendedModels.length}</Tag></Tooltip>}
+            >
+              <Typography.Paragraph>{scenario.description || '暂无场景说明'}</Typography.Paragraph>
+              <MetricGrid columns={3}>
+                <MetricCard title="模型资产" value={scenario.ownedModelCount} tone="blue" />
+                <MetricCard title="已发布模型" value={scenario.publishedModelCount} tone="green" />
+                <MetricCard title="试运行模型" value={scenario.trialModelCount} tone="purple" />
+              </MetricGrid>
+              <div className="scenario-primary-actions section-gap">
+                <Button type="primary" disabled={!scenario.recommendedModelId} title={!scenario.recommendedModelId ? '该场景下暂无活动的已发布模型' : undefined} onClick={() => nav(`/tasks?create=1&scene=${encodeURIComponent(scenario.name)}&model=${encodeURIComponent(scenario.recommendedModelId || '')}`)}>使用推荐模型发起任务</Button>
+                <Button onClick={() => nav(`/models/create?mode=new&scenario=${encodeURIComponent(scenario.id)}`)}>创建空白模型</Button>
+              </div>
+              <div className="scenario-model-list">
+                {scenario.ownedModels.map(model => (
+                  <div className="scenario-model-item" key={model.id}>
+                    <div className="scenario-model-main">
+                      <strong>{model.name}</strong>
+                      <span className="scenario-model-code">{String(model.template_id || model.id)}</span>
+                      <div className="scenario-model-action">
+                        <Button size="small" onClick={() => nav(`/models/create?mode=${model.status === 'developing' ? 'edit' : 'version'}&source=${encodeURIComponent(model.id)}`)}>进入建模</Button>
+                      </div>
+                    </div>
+                    <div className="scenario-model-meta">
+                      <StatusTag status={model.status} />
+                      <Tag color="geekblue">{builderText(model.build_mode)}</Tag>
+                      <Tag color="purple">{model.model_problem_type || model.problem_type}</Tag>
                     </div>
                   </div>
-                  <div className="scenario-model-meta">
-                    <StatusTag status={scenario.status} />
-                    <Tag color="geekblue">{builderText(model.builderMode)}</Tag>
-                    <Tag color="purple">{model.problemType}</Tag>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </Card>
-        ))}
-      </div>
+                ))}
+                {!scenario.ownedModels.length && <Typography.Text type="secondary">该场景尚未关联模型资产</Typography.Text>}
+              </div>
+            </Card>
+          ))}
+        </div>
       </>}
     </>
   );

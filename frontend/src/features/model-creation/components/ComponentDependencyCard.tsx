@@ -39,7 +39,7 @@ export function ComponentDependencyCard({
       <div className="card-title-row">
         <div>
           <Typography.Title level={5}>组件与依赖</Typography.Title>
-          <Typography.Paragraph>查看组件依赖、参数绑定状态和缺失项，点击缺失参数进入绑定面板。</Typography.Paragraph>
+          <Typography.Paragraph>上游组件依赖与参数绑定是两类独立关系；可确定的同名同维参数会自动绑定，其余项进入绑定面板。</Typography.Paragraph>
         </div>
         <Space wrap>
           <Tag color={draft.components.length ? 'blue' : 'default'}>{draft.components.length} 个组件</Tag>
@@ -96,7 +96,7 @@ export function ComponentDependencyCard({
                       {selfDependency ? '自依赖' : missing ? '缺少依赖' : '依赖'} {label}{label !== item ? `（${item}）` : ''}
                     </Tag>
                   );
-                }) : <Tag>无组件依赖</Tag>}
+                }) : <Tag>无上游组件依赖</Tag>}
                 {componentCycles.map(cycle => (
                   <Tag color="red" icon={<WarningOutlined />} key={cycle.join('>')}>
                     循环：{cycle.join(' → ')}

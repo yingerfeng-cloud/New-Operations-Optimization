@@ -76,12 +76,14 @@ def create_model_draft_from_template(template: dict[str, Any]) -> dict[str, Any]
     draft = {
         "basic_info": {
             "name": template.get("name", ""),
-            "scenario": template.get("scenario", ""),
+            "scenario": template.get("scenario_name") or template.get("scenario", ""),
+            "scenario_id": template.get("scenario_id"),
             "model_code": template.get("model_code") or template.get("code", ""),
             "builder_mode": template.get("build_mode", "component_based"),
             "solver": template.get("solver", "HiGHS"),
         },
         "semantic": {
+            "scenario_id": template.get("scenario_id"),
             "objects": deepcopy(template.get("business_objects") or []),
             "sets": deepcopy(component_spec.get("sets") or template.get("sets") or []),
             "parameters": deepcopy(template.get("parameters") or []),
@@ -150,12 +152,14 @@ def create_generic_model_draft_from_template(template: dict[str, Any]) -> dict[s
     draft = {
         "basic_info": {
             "name": template.get("name", ""),
-            "scenario": template.get("scenario", ""),
+            "scenario": template.get("scenario_name") or template.get("scenario", ""),
+            "scenario_id": template.get("scenario_id"),
             "model_code": template.get("model_code") or template.get("code", ""),
             "builder_mode": template.get("build_mode", "template_based"),
             "solver": template.get("solver", "HiGHS"),
         },
         "semantic": {
+            "scenario_id": template.get("scenario_id"),
             "objects": deepcopy(template.get("business_objects") or []),
             "sets": deepcopy(template.get("sets") or []),
             "parameters": deepcopy(template.get("parameters") or []),

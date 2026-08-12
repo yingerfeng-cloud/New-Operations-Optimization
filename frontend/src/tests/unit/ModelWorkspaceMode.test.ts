@@ -44,9 +44,9 @@ describe('model workspace route contract', () => {
     expect(effectiveAssetMode('edit', asset({ status: 'offline' }))).toBe('version');
   });
 
-  test('old scenario links only resolve a recommended backend template', () => {
-    expect(parseWorkspaceRequest(new URLSearchParams('scenarioId=cascade_hydro_day_ahead&modelId=cascade_hydro_dispatch_lp')))
-      .toEqual(expect.objectContaining({ mode: 'template', templateCode: 'cascade_hydro_dispatch' }));
+  test('blank modeling can explicitly preselect a configured scenario', () => {
+    expect(parseWorkspaceRequest(new URLSearchParams('mode=new&scenario=cascade_hydro_day_ahead')))
+      .toEqual(expect.objectContaining({ mode: 'new', scenarioId: 'cascade_hydro_day_ahead' }));
   });
 });
 

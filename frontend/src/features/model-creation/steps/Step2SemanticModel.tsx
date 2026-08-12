@@ -7,6 +7,7 @@ import { ComponentDependencyCard, type BindingTarget } from '../components/Compo
 import { ComponentPickerDrawer } from '../components/ComponentPickerDrawer';
 import { ParameterBindingDrawer } from '../components/ParameterBindingDrawer';
 import { TimeDimensionConfigCard } from '../components/TimeDimensionConfigCard';
+import { reconcileComponentParameterBindings } from '../utils/componentParameterBindings';
 
 type SemanticKind = 'sets' | 'parameters' | 'variables';
 type SetRow = ModelDraft['semantic']['sets'][number];
@@ -288,7 +289,7 @@ export function Step2SemanticModel({ draft, onChange }: { draft: ModelDraft; onC
                             { key: 'required_sets', label: '必需集合', children: <Table size="small" pagination={false} rowKey={stableRowKey} dataSource={getComponentRows(component, 'required_sets')} columns={[{ title: '编码', dataIndex: 'code' }, { title: '名称', dataIndex: 'name' }, { title: '维度', dataIndex: 'dimension', render: value => formatList(value) }]} /> },
                             { key: 'parameters', label: '组件参数', children: <Table size="small" pagination={false} rowKey={stableRowKey} dataSource={getComponentRows(component, 'parameters')} columns={[{ title: '编码', dataIndex: 'code' }, { title: '名称', dataIndex: 'name' }, { title: '单位', dataIndex: 'unit' }, { title: '来源', dataIndex: 'source_system' }]} /> },
                             { key: 'variables', label: '生成变量', children: <Table size="small" pagination={false} rowKey={stableRowKey} dataSource={getComponentRows(component, 'variables')} columns={[{ title: '编码', dataIndex: 'code' }, { title: '名称', dataIndex: 'name' }, { title: '维度', dataIndex: 'dimension', render: value => formatList(value) }]} /> },
-                            { key: 'dependencies', label: '组件依赖', children: dependencies.length ? <Space wrap>{dependencies.map((item, depIndex) => <Tag key={`${item}-${depIndex}`}>{item}</Tag>)}</Space> : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="无组件依赖" /> },
+                            { key: 'dependencies', label: '上游组件依赖', children: dependencies.length ? <Space wrap>{dependencies.map((item, depIndex) => <Tag key={`${item}-${depIndex}`}>{item}</Tag>)}</Space> : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="无上游组件依赖" /> },
                           ]}
                         />
                       </Card>
@@ -355,12 +356,13 @@ export function Step2SemanticModel({ draft, onChange }: { draft: ModelDraft; onC
           selectedComponents={draft.components}
           onClose={() => setComponentPickerOpen(false)}
           onConfirm={components => {
+            const parameters = mergeSelectedComponentParameters(draft.semantic.parameters, components);
             onChange({
               ...draft,
-              components,
+              components: reconcileComponentParameterBindings(parameters, components),
               semantic: {
                 ...draft.semantic,
-                parameters: mergeSelectedComponentParameters(draft.semantic.parameters, components),
+                parameters,
               },
             });
             setComponentPickerOpen(false);

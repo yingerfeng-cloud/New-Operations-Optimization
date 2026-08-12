@@ -513,6 +513,11 @@
 }
 
 .agent-empty-prompts {
+  display: grid;
+  min-height: 260px;
+  box-sizing: border-box;
+  align-content: center;
+  justify-items: center;
   width: min(100%, 720px);
   margin: auto;
   padding: 54px 12px 28px;
@@ -520,21 +525,31 @@
 }
 
 .agent-empty-prompts h4 {
-  margin-bottom: 8px;
+  margin: 0 0 8px;
   color: #202123;
   font-size: 24px;
   font-weight: 650;
   letter-spacing: -0.025em;
 }
 
-.agent-empty-prompts > div:last-child {
+.agent-empty-prompts-copy {
+  display: block !important;
+  width: 100%;
+  max-width: 560px;
+  margin: 0 0 14px !important;
+  text-align: center;
+  line-height: 1.6;
+}
+
+.agent-empty-prompts-actions {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
+  width: min(100%, 560px);
   margin-top: 26px;
 }
 
-.agent-empty-prompts > div:last-child button {
+.agent-empty-prompts-actions button {
   min-height: 50px;
   padding: 11px 13px;
   border: 1px solid #e4e4e6;
@@ -547,7 +562,7 @@
   transition: border-color .16s ease, background .16s ease;
 }
 
-.agent-empty-prompts > div:last-child button:hover {
+.agent-empty-prompts-actions button:hover {
   border-color: #d2d2d5;
   background: #f8f8f8;
 }
@@ -919,7 +934,7 @@
     max-width: 88%;
   }
 
-  .agent-empty-prompts > div:last-child {
+  .agent-empty-prompts-actions {
     grid-template-columns: 1fr;
   }
 
