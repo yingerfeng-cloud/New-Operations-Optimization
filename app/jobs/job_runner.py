@@ -11,6 +11,7 @@ from app.diagnosis.infeasible_diagnosis import diagnose_infeasible
 from app.explain.result_formatter import SolveResultFormatter
 from app.schemas.solve import TaskRecord, TaskStatus
 from app.services.result_post_processor import result_post_processor
+from app.services.result_presentation import apply_result_presentation, build_result_views
 from app.solvers.solver_router import SolverRouteError, solver_router
 from app.storage.memory_store import STORE
 from app.utils import now_text
@@ -173,16 +174,24 @@ class JobRunner:
                     parameter_sources=explanation_request.get("parameter_sources"),
                     use_llm=bool(explanation_request.get("use_llm", False)),
                 )
-                result["result_capabilities"] = self._result_capabilities(result)
-                result["result_metadata"] = {
-                    "capabilities": result["result_capabilities"],
-                    "problem_type": problem_type,
-                    "explanation_type": (result.get("business_explanation") or {}).get("explanation_type")
-                    if isinstance(result.get("business_explanation"), dict)
-                    else None,
-                }
+                result.setdefault("result_metadata", {}).update(
+                    {
+                        "problem_type": problem_type,
+                        "explanation_type": (result.get("business_explanation") or {}).get("explanation_type")
+                        if isinstance(result.get("business_explanation"), dict)
+                        else None,
+                    }
+                )
+                result = apply_result_presentation(result)
                 task.result = result
-                task.cost = float(result.get("metrics", {}).get("total_cost") or 0.0)
+                task.objective_value = float(solver_result.objective_value) if solver_result.objective_value is not None else None
+                result_metrics = result.get("metrics") if isinstance(result.get("metrics"), dict) else {}
+                business_cost = result_metrics.get("total_cost")
+                if business_cost is None:
+                    business_cost = result_metrics.get("total_operating_cost")
+                if business_cost is None:
+                    business_cost = task.objective_value
+                task.cost = float(business_cost) if business_cost is not None else 0.0
                 task.gap = str(result.get("metrics", {}).get("gap") or "0.00%")
                 task.risk = str(result.get("metrics", {}).get("risk") or "low")
                 self._log(task, "INFO", f"业务结果格式化完成，耗时={task.trace['format_seconds']}s")
@@ -194,6 +203,7 @@ class JobRunner:
                             "model": task.request.model,
                             "scene": task.request.scene,
                             "solver": route["selected_solver"],
+                            "objective_value": task.objective_value,
                             "total_cost": task.cost,
                             "gap": task.gap,
                             "risk": task.risk,
@@ -272,7 +282,7 @@ class JobRunner:
                     parameter_sources=explanation_request.get("parameter_sources"),
                     use_llm=bool(explanation_request.get("use_llm", False)),
                 )
-                processed_failure["result_capabilities"] = self._result_capabilities(processed_failure)
+                processed_failure = apply_result_presentation(processed_failure)
             except Exception:
                 # Explanation must never mask the original solve failure.
                 processed_failure = failure_result
@@ -542,23 +552,8 @@ class JobRunner:
 
     @staticmethod
     def _result_capabilities(result: dict[str, Any]) -> list[str]:
-        """Describe result presentation without coupling the frontend to a model code."""
-        business_output = result.get("business_output") if isinstance(result.get("business_output"), dict) else {}
-        capabilities = ["summary"]
-        if result.get("variable_values") or business_output.get("variable_values"):
-            capabilities.append("variable_series")
-        if any(business_output.get(key) for key in ("storage_curve", "reservoir_process", "water_balance_check", "forebay_level_curve", "tailwater_level_curve")):
-            capabilities.append("hydro_process")
-        if any(business_output.get(key) for key in ("dispatch_series", "power_curve", "load_curve", "load_comparison", "station_power_curve")):
-            capabilities.append("dispatch_series")
-        if any(business_output.get(key) for key in ("function_asset_interpolation", "pwl_diagnostics", "triangle_diagnostics")):
-            capabilities.append("pwl_diagnostics")
-        if str(result.get("problem_type") or "").upper() == "NLP" and any(result.get(key) for key in ("termination_condition", "local_optimum_warning", "constraint_violation_summary")):
-            capabilities.append("nlp_convergence")
-        if result.get("business_explanation") or result.get("explanation") or result.get("suggestion"):
-            capabilities.append("business_explanation")
-        capabilities.append("raw_result")
-        return capabilities
+        """Backward-compatible accessor for the unified presentation contract."""
+        return [view["kind"] for view in build_result_views(result)]
 
 
 job_runner = JobRunner()

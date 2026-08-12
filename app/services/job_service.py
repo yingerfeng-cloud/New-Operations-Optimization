@@ -62,6 +62,10 @@ class JobService:
         with STORE.lock:
             task.error = None
             task.result = None
+            task.objective_value = None
+            task.cost = 0.0
+            task.gap = "-"
+            task.risk = "low"
             task.progress = 5
             task.status = "PENDING"
             task.retry_count += 1

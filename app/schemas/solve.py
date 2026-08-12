@@ -65,6 +65,7 @@ class TaskView(BaseModel):
     progress: int
     gap: str
     cost: float
+    objective_value: float | None = None
     risk: str
     created_at: str
     started_at: str | None = None
@@ -84,6 +85,7 @@ class TaskRecord:
     progress: int = 5
     gap: str = "-"
     cost: float = 0.0
+    objective_value: float | None = None
     risk: str = "low"
     created_at: str = field(default_factory=now_text)
     started_at: str | None = None
@@ -97,7 +99,21 @@ class TaskRecord:
     logs: list[str] = field(default_factory=list)
     run_metrics: dict[str, Any] = field(default_factory=dict)
 
+    def resolved_objective_value(self) -> float | None:
+        value = self.objective_value
+        if value is None and isinstance(self.result, dict):
+            value = self.result.get("objective_value")
+            if value is None and isinstance(self.result.get("metrics"), dict):
+                value = self.result["metrics"].get("objective_value")
+        if value is None:
+            return None
+        try:
+            return float(value)
+        except (TypeError, ValueError):
+            return None
+
     def view(self) -> TaskView:
+        objective_value = self.resolved_objective_value()
         return TaskView(
             id=self.id,
             model_id=self.request.model_id,
@@ -111,6 +127,7 @@ class TaskRecord:
             progress=self.progress,
             gap=self.gap,
             cost=round(float(self.cost), 2),
+            objective_value=round(objective_value, 2) if objective_value is not None else None,
             risk=self.risk,
             created_at=self.created_at,
             started_at=self.started_at,
@@ -130,6 +147,7 @@ class TaskRecordState(BaseModel):
     progress: int = 5
     gap: str = "-"
     cost: float = 0.0
+    objective_value: float | None = None
     risk: str = "low"
     created_at: str
     started_at: str | None = None

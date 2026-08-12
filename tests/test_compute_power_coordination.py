@@ -135,3 +135,25 @@ def test_compute_power_template_can_clone_test_and_publish() -> None:
     body = invoked.json()
     assert body["status"] == "SUCCESS", body
     assert body["business_result"]["single_model_joint_optimization"] is True
+
+
+def test_compute_power_task_summary_uses_solver_objective_value() -> None:
+    parameters = deepcopy(get_template(MODEL_CODE)["sample_runtime_parameters"])
+    created = client.post(
+        "/api/tasks",
+        json={
+            "model_id": "MODEL-POWER-COMPUTE-POWER-COORDINATION-DAY-AHEAD-V1",
+            "parameters": parameters,
+            "async_run": False,
+            "time_limit_seconds": 30,
+        },
+    )
+
+    assert created.status_code == 200, created.text
+    task = created.json()
+    result_response = client.get(f"/api/optimize/result/{task['id']}")
+    assert result_response.status_code == 200, result_response.text
+    result = result_response.json()
+    assert task["objective_value"] == pytest.approx(result["objective_value"], abs=0.01)
+    assert task["objective_value"] > 0
+    assert task["cost"] == pytest.approx(result["metrics"]["total_operating_cost"], abs=0.01)

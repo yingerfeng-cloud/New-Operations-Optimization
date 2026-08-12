@@ -39,5 +39,6 @@ class SolveResult(BaseModel):
     diagnosis: list[dict[str, Any]] = Field(default_factory=list)
     business_output: dict[str, Any] = Field(default_factory=dict)
     business_explanation: dict[str, Any] | str = Field(default_factory=dict)
+    result_views: list[dict[str, Any]] = Field(default_factory=list)
     result_capabilities: list[str] = Field(default_factory=list)
     result_metadata: dict[str, Any] = Field(default_factory=dict)

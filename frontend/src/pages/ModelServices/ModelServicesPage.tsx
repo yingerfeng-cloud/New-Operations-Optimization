@@ -168,7 +168,7 @@ export function ModelServicesPage() {
         solver: result.solver || row.solver || selectedCapability.solver,
         solver_available: result.solver_available ?? trace.solver_available ?? '按后端状态为准',
         termination_condition: result.termination_condition || result.raw_termination_condition || trace.termination_condition || '-',
-        objective: row.cost ?? row.objective_value ?? result.objective_value,
+        objective: row.objective_value ?? result.objective_value ?? row.cost,
         runtime: row.duration_seconds ?? result.solve_time ?? trace.solve_seconds ?? '-',
         constraint_violation_summary: result.constraint_violation_summary || '未返回约束违反摘要',
         local_optimum_warning: result.local_optimum_warning ?? (selectedCapability.problemType === 'NLP' ? 'NLP/Ipopt 结果不承诺全局最优。' : undefined),

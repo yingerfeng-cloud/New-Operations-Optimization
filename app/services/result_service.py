@@ -5,6 +5,7 @@ from typing import Any
 from fastapi import HTTPException
 
 from app.storage.memory_store import STORE
+from app.services.result_presentation import apply_result_presentation
 
 
 class ResultService:
@@ -15,7 +16,7 @@ class ResultService:
             raise HTTPException(status_code=404, detail="Task not found")
         if task.status != "SUCCESS" and not task.result:
             raise HTTPException(status_code=409, detail=f"Task is not completed: {task.status}")
-        return task.result or {}
+        return apply_result_presentation(task.result or {})
 
     def list_results(self) -> list[dict[str, Any]]:
         with STORE.lock:

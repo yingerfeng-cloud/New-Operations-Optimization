@@ -9,40 +9,42 @@ import { PageHeader } from '../../components/PageHeader';
 import { EmptyActionState, MetricCard, MetricGrid } from '../../components/WorkspaceUI';
 import {
   ResultChartPanel,
+  ResultBusinessOutputPanel,
   ResultConstraintsPanel,
-  ResultCascadeHydroPanel,
   ResultExplanationPanel,
   ResultKpiStrip,
   ResultMetricsPanel,
   ResultNlpPanel,
-  ResultVariablesPanel,
 } from '../../features/result-center/ResultPanels';
 import { buildResultLabelMap } from '../../features/result-center/resultLabels';
-import type { SolveResult } from '../../types/result';
+import type { ResultViewDefinition, SolveResult } from '../../types/result';
 
 const record = (value: unknown) => value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {};
 const meaningful = (value: unknown): boolean => Array.isArray(value) ? value.length > 0 : value && typeof value === 'object' ? Object.keys(value).length > 0 : value !== undefined && value !== null && value !== '';
-const anyData = (result: SolveResult, keys: string[]) => keys.some(key => meaningful(result[key]) || meaningful(record(result.business_output)[key]));
-export function resultTabKeys(result?: SolveResult) {
-  if (!result) return ['overview', 'raw'];
-  const output = record(result.business_output); const allKeys = new Set([...Object.keys(result), ...Object.keys(output), ...Object.keys(record(result.metrics))]);
-  const has = (...patterns: string[]) => [...allKeys].some(key => patterns.some(pattern => key.toLowerCase().includes(pattern)));
-  const declared = new Set([...(result.result_capabilities || []), ...(result.result_metadata?.capabilities || [])]);
-  const declares = (...capabilities: string[]) => capabilities.some(capability => declared.has(capability));
-  const keys = ['overview'];
-  const variablesAvailable = meaningful(result.variables) || meaningful(result.variable_values) || meaningful(result.business_variables);
-  if ((declares('variable_series') && variablesAvailable) || (!declared.size && variablesAvailable)) keys.push('curves');
-  const hydroAvailable = anyData(result, ['hydro_process', 'reservoir_process', 'reservoirs', 'storage_series', 'storage_curve', 'water_level_series', 'water_balance_check', 'forebay_level_curve', 'tailwater_level_curve']);
-  if ((declares('hydro_process') && hydroAvailable) || (!declared.size && (hydroAvailable || has('reservoir', 'storage', 'water_level', 'hydro')))) keys.push('reservoir');
-  const dispatchAvailable = anyData(result, ['dispatch_series', 'power_series', 'power_curve', 'load_series', 'load_curve', 'station_power', 'station_power_curve', 'load_comparison']);
-  if ((declares('dispatch_series', 'hydro_process') && dispatchAvailable) || (!declared.size && (dispatchAvailable || has('power', 'output', 'dispatch', 'load')))) keys.push('dispatch');
-  const pwlAvailable = anyData(result, ['pwl_diagnostics', 'pwl_diagnostic', 'triangle_diagnostics', 'function_asset_diagnostics', 'function_asset_interpolation']);
-  if ((declares('pwl_diagnostics') && pwlAvailable) || (!declared.size && (pwlAvailable || has('pwl', 'triangle', 'function_asset')))) keys.push('pwl');
-  const convergenceAvailable = anyData(result, ['nlp_convergence', 'convergence_diagnostics', 'solver_diagnostics']);
-  if ((declares('nlp_convergence') && convergenceAvailable) || (!declared.size && (convergenceAvailable || has('nlp', 'convergence', 'termination', 'local_optimum')))) keys.push('convergence');
-  const explanationAvailable = meaningful(result.business_explanation) || meaningful(result.explanation) || meaningful(result.suggestion);
-  if ((declares('business_explanation') && explanationAvailable) || (!declared.size && explanationAvailable)) keys.push('advice');
-  keys.push('raw'); return [...new Set(keys)];
+export function resultViewDefinitions(result?: SolveResult): ResultViewDefinition[] {
+  if (!result) return [{ key: 'overview', label: '结果概览', kind: 'metrics' }, { key: 'raw', label: '原始结果', kind: 'raw' }];
+  const declared = result.result_views || result.result_metadata?.views;
+  if (declared?.length) return declared;
+  const views: ResultViewDefinition[] = [{ key: 'overview', label: '结果概览', kind: 'metrics', source: 'metrics' }];
+  if (meaningful(result.variables) || meaningful(result.variable_values) || meaningful(result.business_variables)) views.push({ key: 'curves', label: '变量曲线', kind: 'timeseries', source: 'variable_values' });
+  if (meaningful(result.business_output)) views.push({ key: 'business_output', label: '业务输出', kind: 'business_output', source: 'business_output' });
+  if (meaningful(result.constraints) || meaningful(record(result.business_output).constraint_check)) views.push({ key: 'constraints', label: '约束检查', kind: 'constraint_checks', source: 'constraints' });
+  if (String(result.problem_type || result.solver_type || '').toUpperCase() === 'NLP') views.push({ key: 'diagnostics', label: '求解诊断', kind: 'solver_diagnostics', source: 'solver' });
+  if (meaningful(result.business_explanation) || meaningful(result.explanation) || meaningful(result.suggestion)) views.push({ key: 'advice', label: '业务建议', kind: 'explanation', source: 'business_explanation' });
+  views.push({ key: 'raw', label: '原始结果', kind: 'raw', source: '$' });
+  return views;
+}
+export const resultTabKeys = (result?: SolveResult) => resultViewDefinitions(result).map(view => view.key);
+
+function ResultView({ view, result, labelMap }: { view: ResultViewDefinition; result?: SolveResult; labelMap: ReturnType<typeof buildResultLabelMap> }) {
+  if (view.kind === 'metrics') return <ResultMetricsPanel result={result} labelMap={labelMap} />;
+  if (view.kind === 'timeseries') return <ResultChartPanel result={result} labelMap={labelMap} />;
+  if (view.kind === 'business_output') return <ResultBusinessOutputPanel result={result} labelMap={labelMap} />;
+  if (view.kind === 'constraint_checks') return <ResultConstraintsPanel result={result} />;
+  if (view.kind === 'solver_diagnostics') return <ResultNlpPanel result={result} />;
+  if (view.kind === 'explanation') return <ResultExplanationPanel result={result} />;
+  if (view.kind === 'raw') return <JsonViewer value={result} />;
+  return <JsonViewer value={view.source ? record(result)[view.source] : result} />;
 }
 
 export function ResultCenterPage() {
@@ -62,17 +64,7 @@ export function ResultCenterPage() {
   const latestFinishedText = latestFinishedAt
     ? new Date(latestFinishedAt).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false })
     : '-';
-  const tabKeys = resultTabKeys(detail.data);
-  const tabCandidates = {
-    overview: { key: 'overview', label: '结果概览', children: <div className="panel"><ResultMetricsPanel result={detail.data} labelMap={labelMap} /></div> },
-    curves: { key: 'curves', label: '变量曲线', children: <div className="panel"><ResultChartPanel result={detail.data} labelMap={labelMap} /></div> },
-    reservoir: { key: 'reservoir', label: '水库过程', children: <div className="panel"><ResultCascadeHydroPanel result={detail.data} /></div> },
-    dispatch: { key: 'dispatch', label: '出力与负荷', children: <div className="panel"><ResultVariablesPanel result={detail.data} labelMap={labelMap} /></div> },
-    pwl: { key: 'pwl', label: 'PWL 诊断', children: <div className="panel"><ResultConstraintsPanel result={detail.data} /></div> },
-    convergence: { key: 'convergence', label: '收敛诊断', children: <div className="panel"><ResultNlpPanel result={detail.data} /></div> },
-    advice: { key: 'advice', label: '业务建议', children: <div className="panel"><ResultExplanationPanel result={detail.data} /></div> },
-    raw: { key: 'raw', label: '原始结果', children: <div className="panel"><JsonViewer value={detail.data} /></div> },
-  } as const;
+  const resultViews = resultViewDefinitions(detail.data);
 
   return (
     <>
@@ -108,7 +100,7 @@ export function ResultCenterPage() {
         footer={<Space style={{ width: '100%', justifyContent: 'flex-end' }}><span className="muted">高级操作：导出报告预留，未作为主流程能力开放。</span><Button onClick={() => setId(undefined)}>关闭</Button></Space>}
       >
         <ResultKpiStrip result={detail.data} labelMap={labelMap} />
-        <Tabs className="section-gap" items={tabKeys.map(key => tabCandidates[key as keyof typeof tabCandidates])} />
+        <Tabs className="section-gap" items={resultViews.map(view => ({ key: view.key, label: view.label, children: <div className="panel"><ResultView view={view} result={detail.data} labelMap={labelMap} /></div> }))} />
       </Drawer>
     </>
   );

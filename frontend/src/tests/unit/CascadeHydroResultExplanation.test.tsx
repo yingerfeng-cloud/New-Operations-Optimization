@@ -1,13 +1,13 @@
 import { render } from '@testing-library/react';
 import { screen } from '@testing-library/react';
 import { vi } from 'vitest';
-import { ResultCascadeHydroPanel } from '../../features/result-center/ResultPanels';
+import { ResultBusinessOutputPanel } from '../../features/result-center/ResultPanels';
 
 vi.mock('echarts-for-react', () => ({ default: () => <div data-testid="mock-chart">chart</div> }));
 
-test('cascade hydro panel shows P4 KPI and function asset explanation', () => {
+test('hydro output uses the same model-neutral business output renderer', () => {
   render(
-    <ResultCascadeHydroPanel
+    <ResultBusinessOutputPanel
       result={{
         status: 'SUCCESS',
         solver: 'HiGHS',
@@ -22,7 +22,7 @@ test('cascade hydro panel shows P4 KPI and function asset explanation', () => {
       }}
     />,
   );
-  expect(screen.getByText('水电调度关键指标')).toBeInTheDocument();
-  expect(screen.getByText('函数资产插值解释')).toBeInTheDocument();
-  expect(screen.getByText('triangle / lambda 示例')).toBeInTheDocument();
+  expect(screen.getByText('storage_curve')).toBeInTheDocument();
+  expect(screen.getByText('water_balance_check')).toBeInTheDocument();
+  expect(screen.getByText('function_asset_interpolation')).toBeInTheDocument();
 });

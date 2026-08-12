@@ -1,4 +1,4 @@
-import { Alert, Card, Col, Descriptions, Empty, Row, Space, Table, Tag } from 'antd';
+import { Alert, Card, Descriptions, Empty, Space, Table, Tag } from 'antd';
 import type { ReactNode } from 'react';
 import { LazyEChart } from '../../components/LazyEChart';
 import { JsonViewer } from '../../components/JsonViewer';
@@ -209,6 +209,58 @@ export function ResultConstraintsPanel({ result }: { result?: SolveResult }) {
   );
 }
 
+function businessOutputContent(value: unknown, key: string, labelMap?: ResultLabelMap) {
+  if (Array.isArray(value)) {
+    if (!value.length) return <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无数据" />;
+    if (value.every(item => item && typeof item === 'object' && !Array.isArray(item))) {
+      const fields = [...new Set(value.flatMap(item => Object.keys(item as Record<string, unknown>)))];
+      return (
+        <Table
+          className="result-wide-table"
+          scroll={{ x: 'max-content' }}
+          size="small"
+          pagination={{ pageSize: 8 }}
+          rowKey="__row_key"
+          dataSource={rowsFrom(value, key)}
+          columns={fields.map(field => ({ title: resultLabel(field, labelMap), dataIndex: field, render: text }))}
+        />
+      );
+    }
+    return <JsonViewer value={value} />;
+  }
+  const object = objectValue(value);
+  if (Object.keys(object).length) {
+    const scalar = Object.values(object).every(item => item === null || ['string', 'number', 'boolean'].includes(typeof item));
+    if (scalar) {
+      return <ResultSummaryGrid compact items={Object.entries(object).map(([field, item]) => ({ key: field, label: resultLabel(field, labelMap), value: item }))} />;
+    }
+    return <JsonViewer value={value} />;
+  }
+  return <strong>{resultValue(value)}</strong>;
+}
+
+export function ResultBusinessOutputPanel({ result, labelMap }: { result?: SolveResult; labelMap?: ResultLabelMap }) {
+  const output = objectValue(result?.business_output);
+  const entries = Object.entries(output).filter(([, value]) => meaningfulBusinessOutput(value));
+  if (!entries.length) return <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="当前结果未返回业务输出" />;
+  return (
+    <Space orientation="vertical" size={16} style={{ width: '100%' }}>
+      {entries.map(([key, value]) => (
+        <Card key={key} title={<ResultFieldName code={key} labels={labelMap} />}>
+          {businessOutputContent(value, key, labelMap)}
+        </Card>
+      ))}
+    </Space>
+  );
+}
+
+function meaningfulBusinessOutput(value: unknown) {
+  if (value === undefined || value === null || value === '') return false;
+  if (Array.isArray(value)) return value.length > 0;
+  if (typeof value === 'object') return Object.keys(value as Record<string, unknown>).length > 0;
+  return true;
+}
+
 export function ResultExplanationPanel({ result }: { result?: SolveResult }) {
   const explanation = result?.explanation_structured || result?.business_explanation || result?.explanation;
   if (!result) return <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="请选择结果" />;
@@ -223,138 +275,6 @@ export function ResultExplanationPanel({ result }: { result?: SolveResult }) {
       </Card>
       {Boolean(result.evidence_package) && <Card size="small" title="EvidencePackage" className="section-gap"><JsonViewer value={result.evidence_package} /></Card>}
     </>
-  );
-}
-
-function hydroRows(result?: SolveResult, key?: string): RowValue[] {
-  const output = objectValue(result?.business_output);
-  return rowsFrom(output[key || ''] || (result as Record<string, unknown> | undefined)?.[key || ''], key || 'hydro');
-}
-
-function hydroChartOption(title: string, rows: RowValue[], valueField: string) {
-  const reservoirs = [...new Set(rows.map(row => String(row.reservoir || row.station || '-')))];
-  const labels = [...new Set(rows.map(row => String(row.time ?? row.time_index ?? '-')))];
-  return {
-    title: { text: title, left: 12, top: 10, textStyle: { fontSize: 14 } },
-    grid: { top: 58, right: 24, bottom: 36, left: 56 },
-    tooltip: { trigger: 'axis' },
-    legend: { top: 10, right: 16 },
-    xAxis: { type: 'category', data: labels },
-    yAxis: { type: 'value' },
-    series: reservoirs.map(reservoir => ({
-      name: reservoir,
-      type: 'line',
-      smooth: true,
-      data: labels.map(label => {
-        const row = rows.find(item => String(item.reservoir || item.station || '-') === reservoir && String(item.time ?? item.time_index ?? '-') === label);
-        return Number(row?.[valueField] || 0);
-      }),
-    })),
-  };
-}
-
-export function ResultCascadeHydroPanel({ result }: { result?: SolveResult }) {
-  const output = objectValue(result?.business_output);
-  const hasHydroResult = Boolean(output.storage_curve || output.dispatch_detail || output.water_balance_check || output.function_asset_interpolation);
-  if (!hasHydroResult) return <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无水电结果解释" />;
-
-  const dispatchRows = rowsFrom(output.dispatch_detail, 'dispatch_detail');
-  const storageRows = hydroRows(result, 'storage_curve').length ? hydroRows(result, 'storage_curve') : dispatchRows;
-  const outflowRows = hydroRows(result, 'outflow_curve').length ? hydroRows(result, 'outflow_curve') : dispatchRows;
-  const powerRows = hydroRows(result, 'power_curve').length ? hydroRows(result, 'power_curve') : dispatchRows;
-  const spillRows = hydroRows(result, 'spill_curve').length ? hydroRows(result, 'spill_curve') : dispatchRows;
-  const balanceRows = hydroRows(result, 'water_balance_check');
-  const interpolationRows = hydroRows(result, 'function_asset_interpolation');
-  const metrics = objectValue(result?.metrics || result?.summary);
-  const functionAssetSummary = objectValue(output.function_asset_summary || output.function_assets);
-  const loadRows = rowsFrom(output.load_tracking || output.system_curve, 'load_tracking');
-  const hasLoadCompare = loadRows.length > 0;
-  const objectiveBreakdown = objectValue(output.objective_breakdown);
-
-  return (
-    <Space orientation="vertical" size={16} style={{ width: '100%' }}>
-      <ResultKpiStrip result={result} />
-      <Card title="水电调度关键指标">
-        <ResultSummaryGrid compact items={[
-          { key: 'generation', label: '总发电量', value: metrics.total_generation_MWh ?? metrics.total_generation ?? metrics.generation },
-          { key: 'spill', label: '总弃水量', value: metrics.total_spill_million_m3 ?? metrics.total_spill ?? metrics.total_spill_m3s_sum },
-          { key: 'loadDeviation', label: '负荷跟踪偏差', value: metrics.total_abs_load_deviation_MW ?? metrics.load_tracking_deviation },
-          { key: 'terminalDeviation', label: '期末库容偏差', value: metrics.terminal_storage_deviation ?? metrics.total_terminal_volume_deviation },
-          { key: 'objective', label: '目标函数值', value: result?.objective_value ?? metrics.objective_value },
-          { key: 'solver', label: '求解器', value: result?.solver || result?.solver_name || 'HiGHS' },
-          { key: 'problem', label: '问题类型', value: result?.problem_type || 'MILP' },
-          { key: 'runtime', label: '运行耗时', value: result?.runtime || result?.solve_time },
-        ]} />
-      </Card>
-      <Card title="目标函数拆解">
-        <ResultSummaryGrid compact items={[
-          { key: 'generation', label: '发电量价值', value: objectiveBreakdown.generation_value },
-          { key: 'revenue', label: '收益价值', value: objectiveBreakdown.revenue_value },
-          { key: 'spillPenalty', label: '弃水惩罚', value: objectiveBreakdown.spill_penalty_value },
-          { key: 'terminalPenalty', label: '期末库容偏差惩罚', value: objectiveBreakdown.terminal_storage_penalty_value },
-          { key: 'loadPenalty', label: '负荷偏差惩罚', value: objectiveBreakdown.load_deviation_penalty_value },
-          { key: 'total', label: '总目标值', value: objectiveBreakdown.total_objective_value },
-        ]} />
-      </Card>
-      <Row gutter={[14, 14]}>
-        <Col xs={24} lg={12}><Card title="库容过程曲线"><LazyEChart style={{ height: 300 }} option={hydroChartOption('库容过程曲线', storageRows, storageRows[0]?.storage !== undefined ? 'storage' : 'volume_start_million_m3')} /></Card></Col>
-        <Col xs={24} lg={12}><Card title="出库流量曲线"><LazyEChart style={{ height: 300 }} option={hydroChartOption('出库流量曲线', outflowRows, outflowRows[0]?.outflow !== undefined ? 'outflow' : 'q_out_m3s')} /></Card></Col>
-        <Col xs={24} lg={12}><Card title="出力曲线"><LazyEChart style={{ height: 300 }} option={hydroChartOption('出力曲线', powerRows, powerRows[0]?.power !== undefined ? 'power' : 'station_power_MW')} /></Card></Col>
-        <Col xs={24} lg={12}><Card title="弃水曲线"><LazyEChart style={{ height: 300 }} option={hydroChartOption('弃水曲线', spillRows, spillRows[0]?.spill !== undefined ? 'spill' : 'q_spill_m3s')} /></Card></Col>
-      </Row>
-      {hasLoadCompare && <Card title="负荷跟踪解释"><Table className="result-wide-table" scroll={{ x: 'max-content' }} size="small" pagination={{ pageSize: 6 }} rowKey="__row_key" dataSource={loadRows} columns={[
-        { title: '时段', dataIndex: 'time_index' },
-        { title: '负荷目标 (MW)', dataIndex: 'load_forecast_MW' },
-        { title: '实际总出力 (MW)', dataIndex: 'total_hydro_power_MW' },
-        { title: '正偏差：超发 (MW)', dataIndex: 'load_dev_pos_MW' },
-        { title: '负偏差：缺额 (MW)', dataIndex: 'load_dev_neg_MW' },
-        { title: '偏差率', dataIndex: 'deviation_rate' },
-        { title: '满足硬约束', dataIndex: 'hard_constraint_satisfied' },
-      ].map(column => ({ ...column, render: text }))} /></Card>}
-      {!hasLoadCompare && <Alert className="compact-notice" showIcon type="info" title="负荷预测 vs 总出力曲线" description="当前结果未返回 load_forecast 或总出力对比数据，因此不编造曲线。" />}
-      <Card title="水量平衡校验表">
-        <Table
-          className="result-wide-table"
-          scroll={{ x: 'max-content' }}
-          size="small"
-          pagination={{ pageSize: 6 }}
-          rowKey="__row_key"
-          dataSource={balanceRows}
-          columns={['time_index', 'station', 'local_and_upstream_inflow_m3s', 'q_out_m3s', 'volume_start_million_m3', 'volume_end_million_m3', 'balance_error_million_m3', 'delay_mapping'].map(field => ({
-            title: field,
-            dataIndex: field,
-            render: text,
-          }))}
-        />
-      </Card>
-      <Card title="函数资产插值解释">
-        <ResultSummaryGrid compact items={[
-          { key: 'curves1d', label: '使用的 1D 曲线', value: functionAssetSummary.curves_1d || functionAssetSummary.piecewise_1d || '水位库容曲线、尾水位流量曲线' },
-          { key: 'surfaces2d', label: '使用的 2D 曲面', value: functionAssetSummary.surfaces_2d || functionAssetSummary.piecewise_2d || '水电出力二维曲面' },
-          { key: 'triangles', label: '2D 曲面三角形数量', value: functionAssetSummary.triangle_count ?? objectValue(output.function_assets).triangle_count ?? '-' },
-          { key: 'extrapolation', label: '外推风险', value: functionAssetSummary.extrapolation_risk ?? '未返回外推风险明细' },
-          { key: 'points', label: '插值点数量', value: functionAssetSummary.interpolation_point_count ?? interpolationRows.length },
-          { key: 'lambda', label: 'triangle / lambda 示例', value: interpolationRows.find(row => objectValue(row.power_surface).selected_triangle || objectValue(row.power_surface).lambda) ? objectValue(interpolationRows.find(row => objectValue(row.power_surface).selected_triangle || objectValue(row.power_surface).lambda)?.power_surface) : '当前结果未返回三角形插值明细，可在高级求解日志中开启。' },
-        ]} />
-        <Table
-          className="result-wide-table result-interpolation-table"
-          scroll={{ x: 'max-content' }}
-          size="small"
-          pagination={{ pageSize: 6 }}
-          rowKey="__row_key"
-          dataSource={interpolationRows}
-          columns={[
-            { title: '时段', render: (_, row) => text(row.time_index ?? row.time) },
-            { title: '电站', render: (_, row) => text(row.station ?? row.reservoir) },
-            { title: '类型', dataIndex: 'type', render: text },
-            { title: '函数资产', render: (_, row) => text(row.function_asset_id || objectValue(row.power_surface).function_asset_id || objectValue(row.level_storage).function_asset_id || objectValue(row.tailwater_outflow).function_asset_id) },
-            { title: '一维区间', render: (_, row) => text(row.segment_index !== undefined ? { segment: row.segment_index, left: row.left_breakpoint, right: row.right_breakpoint, weights: row.weights } : row.level_storage || row.tailwater_outflow || '-') },
-            { title: '发电流量 q_gen', render: (_, row) => text(row.q_gen_m3s ?? row.flow_m3s ?? objectValue(row.power_surface).q_gen_m3s ?? '-') },
-            { title: '二维三角片', render: (_, row) => text(row.selected_triangle !== undefined ? { triangle: row.selected_triangle, vertices: row.vertices, weights: row.lambda_weights } : row.power_surface || '-') },
-          ]}
-        />
-      </Card>
-    </Space>
   );
 }
 

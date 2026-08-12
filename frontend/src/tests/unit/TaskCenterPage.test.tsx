@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { defaultTaskTab, isPollingTaskStatus, validateTimeSeriesFields } from '../../pages/TaskCenter/TaskCenterPage';
+import { defaultTaskTab, isPollingTaskStatus, resolveTaskObjectiveValue, validateTimeSeriesFields } from '../../pages/TaskCenter/TaskCenterPage';
 import { hasTaskBusinessExplanation, isTaskCancellable, isTaskFailed, isTaskRunning, isTaskTerminal, resolveTaskDetailDefaultTab, shouldPollTask } from '../../features/task-center/taskStatus';
 
 test('keeps the public horizon validation helper backward compatible', () => {
@@ -8,6 +8,11 @@ test('keeps the public horizon validation helper backward compatible', () => {
 
 test.each([['RUNNING', 'timeline'], ['PENDING', 'timeline'], ['SUCCESS', 'result'], ['FAILED', 'explain'], ['INFEASIBLE', 'explain'], ['TIMEOUT', 'explain'], ['CANCELLED', 'overview']])('task %s opens %s', (status, tab) => expect(defaultTaskTab(status)).toBe(tab));
 test('failed task falls back to logs without business explanation', () => expect(defaultTaskTab('FAILED', false)).toBe('logs'));
+test('task objective uses the solver objective instead of a zero business cost', () => {
+  const task = { id: 'T1', model: 'M', scene: 'S', solver: 'HiGHS', status: 'SUCCESS', progress: 100, cost: 0, objective_value: 14645.73, created_at: '' };
+  expect(resolveTaskObjectiveValue(task)).toBe(14645.73);
+  expect(resolveTaskObjectiveValue({ ...task, objective_value: undefined, cost: -268736.07 })).toBe(-268736.07);
+});
 test.each(['PENDING', 'QUEUED', 'RUNNING'])('polls %s task', status => expect(isPollingTaskStatus(status)).toBe(true));
 test.each(['SUCCESS', 'FAILED', 'CANCELLED'])('stops polling %s task', status => expect(isPollingTaskStatus(status)).toBe(false));
 

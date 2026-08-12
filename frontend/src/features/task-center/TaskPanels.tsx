@@ -125,7 +125,7 @@ export function TaskOverviewPanel({ task }: { task?: SolveTask }) {
         <Descriptions.Item label="问题类型">{text(problemType)}</Descriptions.Item>
         <Descriptions.Item label="求解器可用性">{text(task.solver_available ?? trace.solver_available)}</Descriptions.Item>
         <Descriptions.Item label="终止状态">{text(task.termination_condition ?? trace.termination_condition)}</Descriptions.Item>
-        <Descriptions.Item label="目标值">{text(task.cost)}</Descriptions.Item>
+        <Descriptions.Item label="目标值">{text(task.objective_value ?? task.cost)}</Descriptions.Item>
         <Descriptions.Item label="Gap">{text(task.gap)}</Descriptions.Item>
         <Descriptions.Item label="风险">{text(task.risk)}</Descriptions.Item>
         <Descriptions.Item label="重试次数">{text(task.retry_count || 0)}</Descriptions.Item>

@@ -24,6 +24,7 @@ export function validateTimeSeriesFields(fields: RuntimeField[], parameters: Rec
 }
 
 export const isPollingTaskStatus = shouldPollTask;
+export const resolveTaskObjectiveValue = (task: SolveTask) => task.objective_value ?? task.cost;
 export function defaultTaskTab(status?: string, hasExplanation = true) {
   const task = { status, error: hasExplanation ? { message: '诊断' } : undefined } as SolveTask;
   return resolveTaskDetailDefaultTab(task, normalizeTaskStatus(status) === 'SUCCESS' ? {} : undefined);
@@ -102,7 +103,7 @@ export function TaskCenterPage() {
     <PageHeader title="任务调度中心" description="创建、监控、取消和重试优化任务；成功后直接进入结果分析。" extra={<Button type="primary" onClick={() => setCreateOpen(true)}>创建任务</Button>} />
     <MetricGrid><MetricCard title="任务总数" value={rows.length} description="真实任务队列" tone="blue" /><MetricCard title="运行中" value={running} description="校验 / 建模 / 求解" tone="amber" /><MetricCard title="成功" value={success} description="可查看结果" tone="green" /><MetricCard title="异常" value={failed} description={failed ? '需要处理' : '暂无异常'} tone={failed ? 'red' : 'neutral'} /></MetricGrid>
     <Card className="content-card section-gap" title="求解任务列表"><DataTable<SolveTask> dataSource={rows} loading={tasks.isLoading} columns={[
-      { title: '任务编号', dataIndex: 'id' }, { title: '模型', dataIndex: 'model' }, { title: '状态', dataIndex: 'status', render: (status: string) => <StatusTag status={status} /> }, { title: '进度', dataIndex: 'progress', render: (progress: number) => `${progress || 0}%` }, { title: '创建时间', dataIndex: 'created_at' }, { title: '求解器', dataIndex: 'solver' }, { title: '目标值', dataIndex: 'cost' },
+      { title: '任务编号', dataIndex: 'id' }, { title: '模型', dataIndex: 'model' }, { title: '状态', dataIndex: 'status', render: (status: string) => <StatusTag status={status} /> }, { title: '进度', dataIndex: 'progress', render: (progress: number) => `${progress || 0}%` }, { title: '创建时间', dataIndex: 'created_at' }, { title: '求解器', dataIndex: 'solver' }, { title: '目标值', dataIndex: 'objective_value', render: (_value: number | undefined, task: SolveTask) => resolveTaskObjectiveValue(task) },
       { title: '操作', fixed: 'right' as const, render: (_: unknown, task: SolveTask) => <Space className="task-actions"><Button type="link" onClick={() => openDetail(task.id)}>查看</Button><Dropdown trigger={['click']} menu={{ items: [{ key: 'cancel', label: '取消任务', danger: true, disabled: !isRunningStatus(task.status) }, { key: 'retry', label: '重试任务', disabled: !isRetryableStatus(task.status) }, { key: 'result', label: '查看结果', disabled: normalizeTaskStatus(task.status) !== 'SUCCESS' }, { type: 'divider' }, { key: 'delete', label: '删除记录', icon: <DeleteOutlined />, danger: true, disabled: !isTaskTerminal(task.status) }], onClick: ({ key }) => { if (key === 'cancel') cancel.mutate(task.id); if (key === 'retry') retry.mutate(task.id); if (key === 'result') openDetail(task.id); if (key === 'delete') confirmDelete(task); } }}><Button type="link" icon={<MoreOutlined />} aria-label={`任务 ${task.id} 更多操作`}>更多</Button></Dropdown></Space> },
     ]} /></Card>
     <TaskCreateWizard open={createOpen} models={models.data || []} initialModelId={initialModelId} initialScene={initialScene} submitting={create.isPending} onClose={() => setCreateOpen(false)} onSubmit={payload => create.mutateAsync(payload)} />

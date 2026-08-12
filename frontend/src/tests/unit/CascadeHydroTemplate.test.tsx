@@ -4,7 +4,7 @@ import { Step3MathExpansion } from '../../features/model-creation/steps/Step3Mat
 import { Step5ReviewPublish } from '../../features/model-creation/steps/Step5ReviewPublish';
 import { Step4RuntimeParams, buildRuntimeParameterRows } from '../../features/model-creation/steps/Step4RuntimeParams';
 import { inferModelProblemType } from '../../features/model-creation/utils/inferModelProblemType';
-import { ResultCascadeHydroPanel } from '../../features/result-center/ResultPanels';
+import { ResultBusinessOutputPanel } from '../../features/result-center/ResultPanels';
 import { createInitialDraft, type ModelDraft } from '../../features/model-creation/stores/modelCreationStore';
 import { applyTemplateToDraft } from '../../features/model-creation/utils/applyTemplateToDraft';
 import { renderWithQueryClient } from '../testUtils';
@@ -175,9 +175,9 @@ test('Step5 展示函数资产和 MILP 风险诊断', () => {
   expect(screen.getByText('MILP 二进制变量风险')).toBeInTheDocument();
 });
 
-test('结果中心展示水电结果解释视图', () => {
+test('结果中心通过统一业务输出视图展示水电结果', () => {
   renderWithQueryClient(
-    <ResultCascadeHydroPanel
+    <ResultBusinessOutputPanel
       result={{
         status: 'SUCCESS',
         metrics: { total_generation_MWh: 1200, total_spill_million_m3: 0, binary_variable_count: 48 },
@@ -198,14 +198,11 @@ test('结果中心展示水电结果解释视图', () => {
       }}
     />,
   );
-  expect(screen.getByText('库容过程曲线')).toBeInTheDocument();
-  expect(screen.getByText('出库流量曲线')).toBeInTheDocument();
-  expect(screen.getByText('出力曲线')).toBeInTheDocument();
-  expect(screen.getByText('弃水曲线')).toBeInTheDocument();
-  expect(screen.getByText('水量平衡校验表')).toBeInTheDocument();
-  expect(screen.getByText('函数资产插值解释')).toBeInTheDocument();
-  // Ant Design renders a hidden measurement header when horizontal scrolling
-  // is enabled, so assert presence without assuming a single DOM copy.
-  expect(screen.getAllByText('发电流量 q_gen').length).toBeGreaterThan(0);
+  expect(screen.getByText('storage_curve')).toBeInTheDocument();
+  expect(screen.getByText('outflow_curve')).toBeInTheDocument();
+  expect(screen.getByText('power_curve')).toBeInTheDocument();
+  expect(screen.getByText('spill_curve')).toBeInTheDocument();
+  expect(screen.getByText('water_balance_check')).toBeInTheDocument();
+  expect(screen.getByText('function_asset_interpolation')).toBeInTheDocument();
   expect(screen.getAllByText(/cascade_hydro_power_surface_v1/).length).toBeGreaterThan(0);
 });

@@ -104,7 +104,7 @@ test('@real published generic model solves with the real backend and emits resul
   const task = await solve(request, selected!, parameters);
   expect(task.status).toBe('SUCCESS');
   const result = await json<Record<string, any>>(await request.get(`/api/tasks/${task.id}/result`));
-  expect(result.result_capabilities).toEqual(expect.arrayContaining(['summary', 'raw_result']));
+  expect(result.result_capabilities).toEqual(expect.arrayContaining(['metrics', 'raw']));
   expect(result.result_metadata?.capabilities).toEqual(result.result_capabilities);
   expect(result.objective_value).not.toBeNull();
 });
@@ -142,7 +142,7 @@ test('@real candidate horizon and data-derived horizon use real published contra
   const fixedTask = await solve(request, fixedModel!, fixedParameters);
   expect(fixedTask.status).toBe('SUCCESS');
   const fixedResult = await json<Record<string, any>>(await request.get(`/api/tasks/${fixedTask.id}/result`));
-  expect(fixedResult.result_capabilities).toContain('raw_result');
+  expect(fixedResult.result_capabilities).toContain('raw');
 
   const candidate = await createPolicyModel(request, base!, {
     schema_version: 1,
@@ -209,7 +209,8 @@ test('@real hydro capability is selected from semantic structure and solved thro
   const task = await solve(request, selected!, structuredClone(selectedSchema!.semantic_spec.sample_runtime_parameters));
   expect(task.status).toBe('SUCCESS');
   const result = await json<Record<string, any>>(await request.get(`/api/tasks/${task.id}/result`));
-  expect(result.result_capabilities).toEqual(expect.arrayContaining(['hydro_process', 'pwl_diagnostics', 'raw_result']));
+  expect(result.result_capabilities).toEqual(expect.arrayContaining(['business_output', 'raw']));
+  expect(result.result_capabilities).not.toEqual(expect.arrayContaining(['hydro_process', 'pwl_diagnostics']));
   expect(result.business_output?.water_balance_check?.length || result.business_output?.storage_curve?.length).toBeGreaterThan(0);
 });
 

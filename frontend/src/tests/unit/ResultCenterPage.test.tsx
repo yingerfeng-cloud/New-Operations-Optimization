@@ -43,20 +43,24 @@ test('renders result center and structured report detail', async () => {
 }, 20000);
 
 test('result tabs are capability-data driven rather than model-code driven', () => {
-  expect(resultTabKeys(resultSample)).toEqual(expect.arrayContaining(['overview', 'curves', 'dispatch', 'advice', 'raw']));
+  expect(resultTabKeys(resultSample)).toEqual(expect.arrayContaining(['overview', 'curves', 'business_output', 'advice', 'raw']));
   expect(resultTabKeys({ status: 'SUCCESS', metrics: {} })).toEqual(['overview', 'raw']);
-  expect(resultTabKeys({ status: 'SUCCESS', metrics: { convergence: 'ok' } })).toContain('convergence');
+  expect(resultTabKeys({ status: 'SUCCESS', problem_type: 'NLP', metrics: { convergence: 'ok' } })).toContain('diagnostics');
   expect(resultTabKeys({
-    result_capabilities: ['summary', 'hydro_process', 'dispatch_series', 'pwl_diagnostics', 'raw_result'],
+    result_views: [
+      { key: 'overview', label: '结果概览', kind: 'metrics' },
+      { key: 'business_output', label: '业务输出', kind: 'business_output' },
+      { key: 'raw', label: '原始结果', kind: 'raw' },
+    ],
     business_output: {
       storage_curve: [{ time: 1, storage: 2 }],
       water_balance_check: [{ error: 0 }],
       power_curve: [{ time: 1, power: 3 }],
       function_asset_interpolation: [{ triangle: 1 }],
     },
-  })).toEqual(['overview', 'reservoir', 'dispatch', 'pwl', 'raw']);
+  })).toEqual(['overview', 'business_output', 'raw']);
   expect(resultTabKeys({
-    result_capabilities: ['summary', 'raw_result'],
+    result_views: [{ key: 'overview', label: '结果概览', kind: 'metrics' }, { key: 'raw', label: '原始结果', kind: 'raw' }],
     business_output: { storage_curve: [{ time: 1, storage: 2 }] },
   })).toEqual(['overview', 'raw']);
 });
