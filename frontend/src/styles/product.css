@@ -604,9 +604,12 @@ body {
 
 .formula-builder.is-focus-mode {
   position: fixed;
-  inset: 12px;
+  inset: 12px 12px auto;
   z-index: 1200;
   overflow: auto;
+  align-content: start;
+  max-height: calc(100vh - 24px);
+  gap: 8px;
   padding: 18px;
   border: 1px solid var(--proto-line);
   border-radius: 12px;
@@ -654,8 +657,8 @@ body {
 
 .formula-builder-head {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(300px, 360px);
-  gap: 20px;
+  grid-template-columns: minmax(0, 1fr) max-content;
+  gap: 16px;
   align-items: stretch;
 }
 
@@ -679,6 +682,10 @@ body {
 .formula-builder-meta-grid .ant-form-item-control-input,
 .formula-builder-meta-grid .ant-form-item-control-input-content {
   min-width: 0;
+}
+
+.formula-builder-meta-grid .ant-form-item-explain {
+  white-space: nowrap;
 }
 
 .formula-builder-config-row {
@@ -708,10 +715,12 @@ body {
   align-content: start;
   align-self: start;
   gap: 16px;
+  width: max-content;
+  max-width: 100%;
   min-width: 0;
-  padding: 14px 16px;
+  padding: 10px 12px;
   border: 1px solid #dbe8f5;
-  border-radius: 10px;
+  border-radius: 8px;
   background: #f7fbff;
 }
 
@@ -722,7 +731,7 @@ body {
 
 .formula-builder-control-section .ant-radio-group {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   gap: 6px 12px;
 }
 
@@ -1528,6 +1537,24 @@ button.metric-card-v2:hover {
   display: grid;
   gap: 4px;
   min-width: 0;
+}
+
+.scenario-model-heading {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+}
+
+.scenario-model-heading .ant-tag {
+  flex: 0 0 auto;
+  margin-inline-end: 0;
+}
+
+.scenario-model-heading strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .scenario-model-item strong,

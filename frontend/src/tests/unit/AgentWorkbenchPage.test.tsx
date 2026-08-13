@@ -8,7 +8,7 @@ import { renderWithQueryClient } from '../testUtils';
 const testState = vi.hoisted(() => {
   const status: AgentStatus = {
     platform: { reachable: true, health_ok: true, skill_registry_ok: true, skill_count: 2 },
-    llm: { enabled: true, api_key_configured: true, provider: 'openai', model: 'gpt-agent' },
+    llm: { enabled: true, api_key_configured: true, provider: 'openai', model: 'gpt-agent', operational_state: 'healthy', ready: true },
   };
   const skills: AgentSkill[] = [
     { name: 'dispatch_agent', display_name: '调度 Agent', enabled: true, required_parameters: ['load'] },
@@ -47,11 +47,27 @@ const testState = vi.hoisted(() => {
         conversation_id: 'CONV-1',
         workflow_state: 'PARAM_COLLECTING',
         status: 'PARAM_COLLECTING',
+        agent_skill_name: 'dispatch_agent',
+        resolved_skill_name: 'run_day_ahead_dispatch',
+        route_confidence: 0.91,
+        selection_reason: '业务场景和时间范围与日前调度相符',
+        candidate_skills: [
+          { agent_skill_name: 'dispatch_agent', platform_skill_name: 'run_day_ahead_dispatch', display_name: '调度 Agent', final_score: 0.91, reason: '日前计划匹配' },
+          { agent_skill_name: 'diagnosis_agent', platform_skill_name: 'run_diagnosis', display_name: '诊断 Agent', final_score: 0.42, reason: '包含分析诉求' },
+        ],
         run: activeRun,
         missing_required: ['forecast'],
         parameter_draft: { horizon: 24 },
       },
     }],
+    turns: [{
+      turn_id: 'TURN-HISTORY',
+      conversation_id: 'CONV-1',
+      status: 'SUCCEEDED',
+      input: '创建日前调度模型',
+      duration_ms: 1200,
+    }],
+    events: [],
   };
   const analyzeResponse: AgentAnalyzeResponse = {
     conversation_id: 'CONV-2',
@@ -62,6 +78,12 @@ const testState = vi.hoisted(() => {
     agent_message: '参数已抽取，等待确认调用',
     agent_skill_name: 'dispatch_agent',
     resolved_skill_name: 'solve_optimization_model',
+    route_confidence: 0.91,
+    selection_reason: '业务场景和时间范围与日前调度相符',
+    candidate_skills: [
+      { agent_skill_name: 'dispatch_agent', platform_skill_name: 'solve_optimization_model', display_name: '调度 Agent', final_score: 0.91, reason: '日前计划匹配' },
+      { agent_skill_name: 'diagnosis_agent', platform_skill_name: 'run_diagnosis', display_name: '诊断 Agent', final_score: 0.42, reason: '包含分析诉求' },
+    ],
     parameter_draft: { load: [10, 12, 14], horizon: 24 },
     missing_required: ['price'],
     requires_default_confirmation: true,
@@ -106,6 +128,12 @@ const testState = vi.hoisted(() => {
     }],
     approvals: [defaultApproval],
     event_cursor: 7,
+    turn: {
+      turn_id: 'TURN-1',
+      conversation_id: 'CONV-2',
+      status: 'SUCCEEDED' as const,
+      input: '请创建日前调度模型',
+    },
     conversation: {
       ...conversation,
       conversation_id: 'CONV-2',
@@ -124,6 +152,13 @@ const testState = vi.hoisted(() => {
         result: analyzeResponse,
       }],
       pending_approvals: [defaultApproval],
+      turns: [{
+        turn_id: 'TURN-1',
+        conversation_id: 'CONV-2',
+        status: 'SUCCEEDED' as const,
+        input: '请创建日前调度模型',
+      }],
+      events: [],
     },
   };
   return {
@@ -140,6 +175,7 @@ const testState = vi.hoisted(() => {
     getAgentConversation: vi.fn(async (conversationId: string) => conversationId === 'CONV-2' ? turnResponse.conversation : conversation),
     createAgentConversation: vi.fn(async () => conversation),
     createAgentTurn: vi.fn(async () => turnResponse),
+    retryAgentTurn: vi.fn(async () => turnResponse),
     resolveAgentApproval: vi.fn(async (approvalId: string) => approvalId === 'APR-DEFAULT' ? {
       approval: { ...defaultApproval, status: 'APPROVED' as const },
       task: {
@@ -168,6 +204,7 @@ vi.mock('../../api/agents', () => ({
   getAgentConversation: testState.getAgentConversation,
   createAgentConversation: testState.createAgentConversation,
   createAgentTurn: testState.createAgentTurn,
+  retryAgentTurn: testState.retryAgentTurn,
   agentConversationEventStreamUrl: vi.fn(() => '/events'),
   agentRunEventStreamUrl: vi.fn(() => '/run-events'),
   resolveAgentApproval: testState.resolveAgentApproval,
@@ -198,6 +235,63 @@ test('loads agent status, skills and sends a V3 Agent turn', async () => {
   expect(screen.getAllByText('build_and_run_model').length).toBeGreaterThan(0);
   expect(screen.getAllByText('缺失必填参数').length).toBeGreaterThan(0);
   expect(screen.getAllByText('price').length).toBeGreaterThan(0);
+});
+
+test('shows the auto-selected optimization model inline and submits a safe switch turn', async () => {
+  renderPage();
+
+  const decision = await screen.findByRole('region', { name: '优化模型选择' });
+  expect(within(decision).getByText('已自动选择优化模型')).toBeInTheDocument();
+  expect(within(decision).getAllByText('匹配度 91%').length).toBeGreaterThan(0);
+  expect(within(decision).getAllByText('调度 Agent').length).toBeGreaterThan(0);
+  fireEvent.click(within(decision).getByRole('button', { name: '补充参数' }));
+  expect(screen.getByPlaceholderText('给 Agent 发消息')).toHaveValue('forecast：');
+  await waitFor(() => expect(screen.getByPlaceholderText('给 Agent 发消息')).toHaveFocus());
+
+  fireEvent.click(within(decision).getByText('查看或更换模型'));
+  fireEvent.click(within(decision).getByRole('button', { name: '选择模型 诊断 Agent' }));
+
+  await waitFor(() => expect(testState.createAgentTurn).toHaveBeenCalledWith(
+    'CONV-1',
+    '切换为“诊断 Agent”',
+    { preferred_skill: 'diagnosis_agent' },
+    expect.any(String),
+  ));
+});
+
+test('requires an inline model choice when routing needs clarification', async () => {
+  const ambiguousConversation: AgentConversation = {
+    ...testState.conversation,
+    agent_tasks: [{
+      ...(testState.conversation.agent_tasks || [])[0],
+      result: {
+        conversation_id: 'CONV-1',
+        workflow_state: 'CLARIFICATION',
+        status: 'CLARIFICATION',
+        needs_clarification: true,
+        clarification_question: '请选择要执行的业务场景。',
+        route_confidence: 0.68,
+        candidate_skills: [
+          { agent_skill_name: 'dispatch_agent', platform_skill_name: 'run_day_ahead_dispatch', display_name: '调度 Agent', final_score: 0.68 },
+          { agent_skill_name: 'diagnosis_agent', platform_skill_name: 'run_diagnosis', display_name: '诊断 Agent', final_score: 0.64 },
+        ],
+      },
+    }],
+  };
+  testState.getAgentConversation.mockImplementationOnce(async () => ambiguousConversation);
+  renderPage();
+
+  const decision = await screen.findByRole('region', { name: '优化模型选择' });
+  expect(within(decision).getByText('需要确认优化场景')).toBeInTheDocument();
+  expect(within(decision).getByText('请选择要执行的业务场景。')).toBeInTheDocument();
+  fireEvent.click(within(decision).getByRole('button', { name: '选择模型 调度 Agent' }));
+
+  await waitFor(() => expect(testState.createAgentTurn).toHaveBeenCalledWith(
+    'CONV-1',
+    '使用“调度 Agent”继续当前任务',
+    { preferred_skill: 'dispatch_agent' },
+    expect.any(String),
+  ));
 });
 
 test('shows Agent thinking in the conversation instead of a sending spinner on the button', async () => {
@@ -239,6 +333,36 @@ test('keeps a server-recorded failed turn out of the composer without adding ano
   expect(screen.getAllByText('会超时的消息')).toHaveLength(1);
   expect(errorToast).not.toHaveBeenCalled();
   errorToast.mockRestore();
+});
+
+test('renders a durable failed Turn, prioritizes it over stale task state, and retries the same Turn', async () => {
+  const failedConversation: AgentConversation = {
+    ...testState.conversation,
+    status: 'CHAT_ERROR',
+    messages: [{ role: 'user', text: '创建调度任务', turn_id: 'TURN-FAILED', message_id: 'MSG-FAILED-USER' }],
+    turns: [{
+      turn_id: 'TURN-FAILED',
+      conversation_id: 'CONV-1',
+      status: 'FAILED',
+      input: '创建调度任务',
+      retryable: true,
+      duration_ms: 14_000,
+      error: {
+        code: 'LLM_TRANSPORT_ERROR',
+        message: 'Agent 与模型服务的连接中断，本轮未能完成。请稍后重试。',
+        protocol: 'responses_tools',
+      },
+    }],
+  };
+  testState.getAgentConversation.mockImplementationOnce(async () => failedConversation);
+  renderPage();
+
+  expect(await screen.findByRole('alert')).toHaveTextContent('本轮未完成');
+  expect(screen.getByRole('alert')).toHaveTextContent('Agent 与模型服务的连接中断');
+  await waitFor(() => expect(document.querySelector('.agent-run-status-chip')).toHaveTextContent('本轮失败'));
+
+  fireEvent.click(within(screen.getByRole('alert')).getByRole('button', { name: '重试本轮' }));
+  await waitFor(() => expect(testState.retryAgentTurn).toHaveBeenCalledWith('TURN-FAILED'));
 });
 
 test('resolves the V3 approval chain without calling legacy confirmation APIs', async () => {

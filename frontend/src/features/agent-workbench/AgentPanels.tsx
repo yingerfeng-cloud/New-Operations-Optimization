@@ -1,4 +1,4 @@
-import { Alert, Card, Collapse, Descriptions, Empty, Space, Table, Tag } from 'antd';
+import { Alert, Button, Card, Collapse, Descriptions, Empty, Space, Table, Tag } from 'antd';
 import { JsonViewer } from '../../components/JsonViewer';
 import { StatusTag } from '../../components/StatusTag';
 import type { AgentAnalyzeResponse, AgentConversation, AgentMessage, AgentSkill, AgentStatus } from '../../types/agent';
@@ -34,6 +34,18 @@ function objectRows(value?: Record<string, unknown>) {
 
 function listRows(value?: unknown[], prefix = 'row'): Row[] {
   return (value || []).map((item, index) => typeof item === 'object' && item ? { ...(item as Record<string, unknown>), __row_key: `${prefix}-${index}` } : { item, __row_key: `${prefix}-${index}` });
+}
+
+function parameterList(values: unknown[], className: string) {
+  return (
+    <div className={`agent-missing-parameter-list ${className}`}>
+      {values.map((value, index) => (
+        <span className="agent-missing-parameter-chip" key={`${parameterText(value)}-${index}`}>
+          {parameterText(value)}
+        </span>
+      ))}
+    </div>
+  );
 }
 
 export function skillLabel(skill?: AgentSkill) {
@@ -113,20 +125,130 @@ export function AgentWorkflowPanel({ response }: { response?: AgentAnalyzeRespon
   );
 }
 
+type AgentModelCandidate = Record<string, unknown>;
+
+function modelCandidateSkill(candidate: AgentModelCandidate) {
+  return String(candidate.agent_skill_name || candidate.platform_skill_name || candidate.api_skill_name || '');
+}
+
+function modelCandidateLabel(candidate: AgentModelCandidate) {
+  return String(candidate.display_name || candidate.agent_skill_name || candidate.platform_skill_name || '未命名优化模型');
+}
+
+function modelCandidateConfidence(candidate?: AgentModelCandidate) {
+  const value = Number(candidate?.final_score);
+  return Number.isFinite(value) ? value : undefined;
+}
+
+export function AgentModelDecisionCard({
+  response,
+  choosing,
+  onChoose,
+  onReviewParameters,
+  onStartParameterInput,
+}: {
+  response?: AgentAnalyzeResponse;
+  choosing?: boolean;
+  onChoose: (skillName: string, label: string) => void;
+  onReviewParameters?: () => void;
+  onStartParameterInput?: () => void;
+}) {
+  if (!response) return null;
+  const candidates = (response.candidate_skills || []).filter(candidate => modelCandidateSkill(candidate));
+  const currentSkill = String(response.agent_skill_name || response.resolved_skill_name || response.api_skill_name || '');
+  const selectedCandidate = candidates.find(candidate => {
+    const agentSkill = String(candidate.agent_skill_name || '');
+    const platformSkill = String(candidate.platform_skill_name || candidate.api_skill_name || '');
+    return Boolean(currentSkill && [agentSkill, platformSkill].includes(currentSkill));
+  }) || (!response.needs_clarification ? candidates[0] : undefined);
+  const selectedLabel = selectedCandidate
+    ? modelCandidateLabel(selectedCandidate)
+    : String(response.display_name || response.agent_skill_name || response.resolved_skill_name || response.api_skill_name || '');
+  if (!selectedLabel && candidates.length === 0) return null;
+
+  const selectedSkill = selectedCandidate ? modelCandidateSkill(selectedCandidate) : currentSkill;
+  const confidence = response.route_confidence ?? modelCandidateConfidence(selectedCandidate);
+  const missingCount = response.missing_required?.length || 0;
+  const requiresChoice = Boolean(response.needs_clarification || !selectedSkill);
+
+  return (
+    <section className={`agent-model-decision ${requiresChoice ? 'requires-choice' : 'auto-selected'}`} aria-label="优化模型选择">
+      <div className="agent-model-decision-head">
+        <div>
+          <span className="agent-model-eyebrow">{requiresChoice ? '需要确认优化场景' : '已自动选择优化模型'}</span>
+          <strong>{selectedLabel || '请选择一个优化模型'}</strong>
+        </div>
+        {confidence !== undefined && <Tag color={requiresChoice ? 'gold' : 'blue'}>{`匹配度 ${Math.round(confidence * 100)}%`}</Tag>}
+      </div>
+      {response.selection_reason && <p className="agent-model-reason">选择依据：{String(response.selection_reason)}</p>}
+      {requiresChoice && response.clarification_question && <p className="agent-model-question">{response.clarification_question}</p>}
+
+      {candidates.length > 0 && (
+        <details className="agent-model-candidates" open={requiresChoice || undefined}>
+          <summary>{requiresChoice ? '请选择最符合需求的模型' : '查看或更换模型'}</summary>
+          <div className="agent-model-candidate-list">
+            {candidates.map(candidate => {
+              const skillName = modelCandidateSkill(candidate);
+              const label = modelCandidateLabel(candidate);
+              const score = modelCandidateConfidence(candidate);
+              const isCurrent = Boolean(selectedSkill && skillName === selectedSkill);
+              return (
+                <div className={`agent-model-candidate ${isCurrent ? 'is-current' : ''}`} key={skillName}>
+                  <div>
+                    <strong>{label}</strong>
+                    <span>{score === undefined ? '候选优化模型' : `匹配度 ${Math.round(score * 100)}%`}</span>
+                    {candidate.reason ? <small>{String(candidate.reason)}</small> : null}
+                  </div>
+                  <Button
+                    size="small"
+                    type={isCurrent ? 'default' : 'primary'}
+                    disabled={isCurrent || choosing}
+                    loading={choosing && !isCurrent}
+                    aria-label={isCurrent ? `当前模型 ${label}` : `选择模型 ${label}`}
+                    onClick={() => onChoose(skillName, label)}
+                  >
+                    {isCurrent ? '当前使用' : '选择'}
+                  </Button>
+                </div>
+              );
+            })}
+          </div>
+        </details>
+      )}
+
+      {!requiresChoice && (
+        <div className="agent-model-actions">
+          {missingCount > 0 && onStartParameterInput && <Button type="primary" onClick={onStartParameterInput}>补充参数</Button>}
+          {missingCount > 0 && onReviewParameters && <Button onClick={onReviewParameters}>{`查看所需参数（${missingCount}）`}</Button>}
+        </div>
+      )}
+    </section>
+  );
+}
+
 export function AgentParameterPanel({ response }: { response?: AgentAnalyzeResponse }) {
   if (!response) return <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无参数草稿" />;
   const missing = response.missing_required || [];
   const invalid = response.invalid_parameters || [];
   return (
     <>
-      {missing.length > 0 && <Alert showIcon type="warning" title="缺失必填参数" description={missing.map(parameterText).join('；')} className="section-gap" />}
-      {invalid.length > 0 && <Alert showIcon type="error" title="参数校验失败" description={invalid.map(parameterText).join('；')} className="section-gap" />}
-      <Card size="small" title="参数草稿">
-        <Descriptions size="small" bordered column={1} className="section-gap">
-          <Descriptions.Item label="字段完整性">{response.parameter_completeness === undefined ? '-' : `${Math.round(response.parameter_completeness * 100)}%`}</Descriptions.Item>
-          <Descriptions.Item label="业务可行性"><Tag color={response.business_feasible === undefined ? 'default' : response.business_feasible ? 'green' : 'red'}>{response.business_feasible === undefined ? '待检查' : response.business_feasible ? '通过' : '不通过'}</Tag></Descriptions.Item>
-          <Descriptions.Item label="契约适配度">{response.schema_fit_score === undefined ? '-' : `${Math.round(response.schema_fit_score * 100)}%`}</Descriptions.Item>
-        </Descriptions>
+      {missing.length > 0 && <Alert showIcon type="warning" title={<span className="agent-alert-title">缺失必填参数 <span className="agent-alert-count">{missing.length}</span></span>} description={parameterList(missing, 'is-warning')} className="section-gap agent-missing-parameters-alert" />}
+      {invalid.length > 0 && <Alert showIcon type="error" title={<span className="agent-alert-title">参数校验失败 <span className="agent-alert-count">{invalid.length}</span></span>} description={parameterList(invalid, 'is-error')} className="section-gap agent-missing-parameters-alert" />}
+      <Card size="small" title="参数草稿" className="agent-parameter-draft-card">
+        <div className="agent-parameter-health-grid">
+          <div className="agent-parameter-health-item">
+            <span>字段完整性</span>
+            <strong>{response.parameter_completeness === undefined ? '-' : `${Math.round(response.parameter_completeness * 100)}%`}</strong>
+          </div>
+          <div className="agent-parameter-health-item">
+            <span>业务可行性</span>
+            <Tag color={response.business_feasible === undefined ? 'default' : response.business_feasible ? 'green' : 'red'}>{response.business_feasible === undefined ? '待检查' : response.business_feasible ? '通过' : '不通过'}</Tag>
+          </div>
+          <div className="agent-parameter-health-item">
+            <span>契约适配度</span>
+            <strong>{response.schema_fit_score === undefined ? '-' : `${Math.round(response.schema_fit_score * 100)}%`}</strong>
+          </div>
+        </div>
         <Table
           size="small"
           pagination={false}
@@ -138,6 +260,7 @@ export function AgentParameterPanel({ response }: { response?: AgentAnalyzeRespo
             { title: '来源', dataIndex: 'key', render: (key: string) => valueText(response.parameter_sources?.[key]) },
           ]}
           locale={{ emptyText: '暂无参数' }}
+          className="agent-parameter-table"
         />
       </Card>
       {Boolean(response.can_use_default?.length) && (
@@ -164,25 +287,30 @@ export function AgentResultPanel({ response }: { response?: AgentAnalyzeResponse
   const evidenceRecord = (evidence && typeof evidence === 'object' ? evidence : {}) as Record<string, unknown>;
   const evidenceModel = (evidenceRecord.model && typeof evidenceRecord.model === 'object' ? evidenceRecord.model : {}) as Record<string, unknown>;
   const derivedMetrics = (evidenceRecord.derived_metrics && typeof evidenceRecord.derived_metrics === 'object' ? evidenceRecord.derived_metrics : {}) as Record<string, unknown>;
+  const resultMeta = [
+    ['会话', response.conversation_id],
+    ['调用编号', response.invocation_id],
+    ['任务编号', response.task_session?.task_id],
+    ['目标值', response.objective_value],
+  ] as const;
   return (
     <>
-      <Descriptions size="small" bordered column={1}>
-        <Descriptions.Item label="会话">{valueText(response.conversation_id)}</Descriptions.Item>
-        <Descriptions.Item label="调用编号">{valueText(response.invocation_id)}</Descriptions.Item>
-        <Descriptions.Item label="任务编号">{valueText(response.task_session?.task_id)}</Descriptions.Item>
-        <Descriptions.Item label="目标值">{valueText(response.objective_value)}</Descriptions.Item>
-      </Descriptions>
-      {Object.keys(derivedMetrics).length > 0 && <Card size="small" title={`业务指标 · ${valueText(evidenceModel.profile_name || 'generic')}`} className="section-gap"><JsonViewer value={derivedMetrics} /></Card>}
-      {(facts.length + inferences.length + recommendations.length + risks.length + manual.length + limitations.length > 0) && <Space orientation="vertical" size={8} className="full-width section-gap">
-        <Card size="small" title="事实">{facts.length ? facts.map((item, index) => <div key={`fact-${index}`}>{valueText(item)}</div>) : '无'}</Card>
-        <Card size="small" title="推断">{inferences.length ? inferences.map((item, index) => <div key={`inference-${index}`}>{valueText(item)}</div>) : '无'}</Card>
-        <Card size="small" title="建议">{recommendations.length ? recommendations.map((item, index) => <div key={`recommendation-${index}`}>{valueText(item)}</div>) : '无'}</Card>
-        <Card size="small" title="风险提示">{risks.length ? risks.map((item, index) => <div key={`risk-${index}`}>{valueText(item)}</div>) : '无'}</Card>
-        <Card size="small" title="人工复核点">{manual.length ? manual.map((item, index) => <div key={`manual-${index}`}>{valueText(item)}</div>) : '无'}</Card>
-        <Card size="small" title="解释限制">{limitations.length ? limitations.map((item, index) => <div key={`limit-${index}`}>{valueText(item)}</div>) : '无'}</Card>
+      <div className="agent-result-summary">
+        {resultMeta.map(([label, value]) => <div className="agent-result-summary-item" key={label}><span>{label}</span><strong>{valueText(value)}</strong></div>)}
+      </div>
+      {Object.keys(derivedMetrics).length > 0 && <Card size="small" title={`业务指标 · ${valueText(evidenceModel.profile_name || 'generic')}`} className="section-gap agent-derived-metrics-card"><JsonViewer value={derivedMetrics} /></Card>}
+      {(facts.length + inferences.length + recommendations.length + risks.length + manual.length + limitations.length > 0) && <Space orientation="vertical" size={8} className="full-width section-gap agent-result-explanation-list">
+        <Card size="small" title="事实" className="agent-result-explanation-card">{facts.length ? facts.map((item, index) => <div key={`fact-${index}`}>{valueText(item)}</div>) : '无'}</Card>
+        <Card size="small" title="推断" className="agent-result-explanation-card">{inferences.length ? inferences.map((item, index) => <div key={`inference-${index}`}>{valueText(item)}</div>) : '无'}</Card>
+        <Card size="small" title="建议" className="agent-result-explanation-card">{recommendations.length ? recommendations.map((item, index) => <div key={`recommendation-${index}`}>{valueText(item)}</div>) : '无'}</Card>
+        <Card size="small" title="风险提示" className="agent-result-explanation-card">{risks.length ? risks.map((item, index) => <div key={`risk-${index}`}>{valueText(item)}</div>) : '无'}</Card>
+        <Card size="small" title="人工复核点" className="agent-result-explanation-card">{manual.length ? manual.map((item, index) => <div key={`manual-${index}`}>{valueText(item)}</div>) : '无'}</Card>
+        <Card size="small" title="解释限制" className="agent-result-explanation-card">{limitations.length ? limitations.map((item, index) => <div key={`limit-${index}`}>{valueText(item)}</div>) : '无'}</Card>
       </Space>}
-      {evidence !== undefined && <Collapse className="section-gap" items={[{ key: 'evidence', label: '查看原始 evidence package', children: <JsonViewer value={evidence} /> }]} />}
-      {result !== undefined && <Card size="small" title="原始结果" className="section-gap"><JsonViewer value={result} /></Card>}
+      {evidence !== undefined && <Collapse className="section-gap agent-evidence-collapse" items={[{ key: 'evidence', label: '查看原始 evidence package', children: <JsonViewer value={evidence} /> }]} />}
+      {result !== undefined && <Card size="small" title="原始结果" className="section-gap agent-raw-result-card">
+        {resultRecord && Object.keys(resultRecord).length === 0 ? <div className="agent-raw-result-empty"><span>暂无结构化结果</span><code>{'{}'}</code></div> : <JsonViewer value={result} />}
+      </Card>}
     </>
   );
 }

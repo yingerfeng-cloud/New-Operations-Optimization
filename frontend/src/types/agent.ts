@@ -25,6 +25,10 @@ export interface AgentConversationSummary {
   active_run_status?: AgentRunStatus;
   active_task_id?: string;
   active_task_status?: AgentV3TaskStatus;
+  latest_task_id?: string;
+  latest_task_status?: AgentV3TaskStatus;
+  latest_turn_id?: string;
+  latest_turn_status?: AgentV3TurnStatus;
   [key: string]: unknown;
 }
 
@@ -38,6 +42,39 @@ export interface AgentConversation extends AgentConversationSummary {
   runs?: AgentRun[];
   agent_tasks?: AgentV3Task[];
   pending_approvals?: AgentV3Approval[];
+  turns?: AgentV3Turn[];
+  events?: AgentV3Event[];
+}
+
+export type AgentV3TurnStatus = 'RUNNING' | 'SUCCEEDED' | 'FAILED' | 'INTERRUPTED';
+
+export interface AgentV3TurnError {
+  code?: string;
+  message?: string;
+  detail?: string;
+  retryable?: boolean;
+  provider?: string;
+  protocol?: string;
+  provider_status?: number;
+  provider_request_id?: string;
+  failure_kind?: string;
+}
+
+export interface AgentV3Turn {
+  turn_id: string;
+  conversation_id: string;
+  client_turn_id?: string;
+  status: AgentV3TurnStatus;
+  phase?: string;
+  input?: string;
+  attempt_count?: number;
+  retryable?: boolean;
+  error?: AgentV3TurnError | null;
+  started_at?: string;
+  completed_at?: string;
+  duration_ms?: number;
+  created_at?: string;
+  updated_at?: string;
 }
 
 export type AgentV3TaskStatus = 'PENDING' | 'RUNNING' | 'WAITING_INPUT' | 'APPROVAL_REQUIRED' | 'SUCCEEDED' | 'FAILED' | 'CANCELLED';
@@ -76,7 +113,9 @@ export interface AgentV3TurnResponse {
   approvals: AgentV3Approval[];
   event_cursor: number;
   conversation: AgentConversation;
+  turn: AgentV3Turn;
   idempotent_replay?: boolean;
+  retried?: boolean;
 }
 
 export interface AgentV3Approval {
@@ -200,6 +239,14 @@ export interface AgentStatus {
     api_key_configured?: boolean;
     provider?: string;
     model?: string;
+    operational_state?: 'unknown' | 'healthy' | 'degraded' | 'unavailable' | 'recovering' | 'disabled';
+    ready?: boolean;
+    configured?: boolean;
+    protocol?: string;
+    last_success_at?: string;
+    last_failure_at?: string;
+    function_calling_verified_at?: string;
+    last_error?: AgentV3TurnError | null;
     fallback_mode?: string;
     [key: string]: unknown;
   };

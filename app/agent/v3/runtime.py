@@ -16,6 +16,7 @@ from app.agent.v3.models import ModelTurn, TaskStatus, ToolContext
 from app.agent.v3.skills.optimization import optimization_task_engine, register_optimization_tool
 from app.agent.v3.store import agent_v3_store
 from app.agent.v3.tools import ToolRegistry
+from app.utils import now_text
 
 
 SYSTEM_INSTRUCTIONS = """You are OptiForge, a general conversational assistant.
@@ -52,42 +53,79 @@ class AgentV3Runtime:
         with conversation_lock:
             request_fingerprint = self._turn_fingerprint(message, metadata)
             if client_turn_id:
-                conversation = conversation_store.get(conversation_id)
-                receipt = (conversation.get("turn_receipts") or {}).get(client_turn_id)
-                if isinstance(receipt, dict) and receipt.get("request_fingerprint") not in {None, request_fingerprint}:
+                existing_turn = agent_v3_store.find_turn_by_client_id(conversation_id, client_turn_id)
+                if existing_turn and existing_turn.get("request_fingerprint") not in {None, request_fingerprint}:
                     raise HTTPException(status_code=409, detail="client_turn_id is already bound to different content")
-                if isinstance(receipt, dict) and receipt.get("status") == "SUCCEEDED":
-                    replay = self._replay_turn_receipt(conversation_id, receipt)
+                if existing_turn and existing_turn.get("status") == "SUCCEEDED":
+                    replay = self._replay_turn(existing_turn)
                     replay["idempotent_replay"] = True
                     return replay
-                if isinstance(receipt, dict) and receipt.get("status") == "FAILED":
+                if existing_turn and existing_turn.get("status") == "FAILED":
                     raise HTTPException(
                         status_code=409,
-                        detail="This client turn already failed; retry with a new client_turn_id",
+                        detail={
+                            "code": "TURN_ALREADY_FAILED",
+                            "message": "This client turn already failed; retry the recorded turn",
+                            "turn_id": existing_turn["turn_id"],
+                            "retryable": bool(existing_turn.get("retryable")),
+                        },
                     )
+                if existing_turn:
+                    raise HTTPException(status_code=409, detail="This client turn is already running")
+            turn_id = f"TURN-{uuid.uuid4().hex[:12].upper()}"
+            agent_v3_store.create_turn(
+                conversation_id,
+                turn_id,
+                message,
+                dict(metadata or {}),
+                client_turn_id,
+                request_fingerprint,
+            )
             prior_events = agent_v3_store.list_events(conversation_id)
             prior_sequence = int(prior_events[-1]["sequence"]) if prior_events else 0
             try:
-                response = self._run_turn_locked(conversation_id, message, metadata, client_turn_id)
-                if client_turn_id:
-                    self._store_turn_receipt(
-                        conversation_id,
-                        client_turn_id,
-                        "SUCCEEDED",
-                        request_fingerprint=request_fingerprint,
-                        response=response,
-                    )
-                return response
+                response = self._run_turn_locked(
+                    conversation_id,
+                    message,
+                    metadata,
+                    client_turn_id,
+                    turn_id=turn_id,
+                    append_user_message=True,
+                )
+                turn = self._complete_turn(turn_id, response)
+                return self._with_public_activity({**response, "turn": turn})
             except Exception as exc:
-                self._record_turn_failure(conversation_id, prior_sequence, exc)
-                if client_turn_id:
-                    self._store_turn_receipt(
-                        conversation_id,
-                        client_turn_id,
-                        "FAILED",
-                        request_fingerprint=request_fingerprint,
-                        error=str(getattr(exc, "detail", exc)),
-                    )
+                self._record_turn_failure(conversation_id, turn_id, prior_sequence, exc)
+                raise
+
+    def retry_turn(self, turn_id: str) -> dict[str, Any]:
+        existing = agent_v3_store.get_turn(turn_id)
+        conversation_id = str(existing["conversation_id"])
+        with self._lock_guard:
+            conversation_lock = self._conversation_locks.setdefault(conversation_id, threading.RLock())
+        with conversation_lock:
+            turn = agent_v3_store.start_turn_retry(turn_id)
+            prior_events = agent_v3_store.list_events(conversation_id)
+            prior_sequence = int(prior_events[-1]["sequence"]) if prior_events else 0
+            agent_v3_store.append_event(
+                conversation_id,
+                "turn.retry_started",
+                {"turn_id": turn_id, "attempt": turn["attempt_count"]},
+                turn_id=turn_id,
+            )
+            try:
+                response = self._run_turn_locked(
+                    conversation_id,
+                    str(turn.get("input") or ""),
+                    dict(turn.get("metadata") or {}),
+                    str(turn.get("client_turn_id") or "") or None,
+                    turn_id=turn_id,
+                    append_user_message=False,
+                )
+                completed = self._complete_turn(turn_id, response)
+                return self._with_public_activity({**response, "turn": completed, "retried": True})
+            except Exception as exc:
+                self._record_turn_failure(conversation_id, turn_id, prior_sequence, exc)
                 raise
 
     def delete_conversation(self, conversation_id: str) -> dict[str, Any]:
@@ -114,9 +152,11 @@ class AgentV3Runtime:
         message: str,
         metadata: dict[str, Any] | None = None,
         client_turn_id: str | None = None,
+        *,
+        turn_id: str,
+        append_user_message: bool,
     ) -> dict[str, Any]:
         conversation = conversation_store.get_public(conversation_id)
-        turn_id = f"TURN-{uuid.uuid4().hex[:12].upper()}"
         message_metadata = dict(metadata or {})
         if client_turn_id:
             message_metadata["client_turn_id"] = client_turn_id
@@ -126,25 +166,34 @@ class AgentV3Runtime:
             "text": message,
             "turn_id": turn_id,
             "metadata": message_metadata,
+            "created_at": now_text(),
         }
         messages = list(conversation.get("messages") or [])
-        messages.append(user_message)
+        if append_user_message:
+            messages.append(user_message)
         internal_messages = self._initial_model_transcript(conversation)
+        agent_v3_store.update_turn(
+            turn_id,
+            phase="MODEL_PENDING",
+            model_message_checkpoint=len(internal_messages),
+            **({"input_message_id": user_message["message_id"]} if append_user_message else {}),
+        )
         internal_messages.append({"role": "user", "content": message})
         conversation_updates: dict[str, Any] = {
             "messages": messages,
             "model_messages": internal_messages,
             "status": "CHAT_ACTIVE",
         }
-        if str(conversation.get("title") or "").strip() in {"", "新会话"}:
+        if append_user_message and str(conversation.get("title") or "").strip() in {"", "新会话"}:
             conversation_updates["title"] = message.strip()[:24] or "新会话"
         conversation_store.upsert(conversation_id, conversation_updates)
-        agent_v3_store.append_event(
-            conversation_id,
-            "message.completed",
-            {"message": user_message},
-            turn_id=turn_id,
-        )
+        if append_user_message:
+            agent_v3_store.append_event(
+                conversation_id,
+                "message.completed",
+                {"message": user_message},
+                turn_id=turn_id,
+            )
 
         task_context = self._task_context(conversation_id)
         task_context_message = {
@@ -170,6 +219,11 @@ class AgentV3Runtime:
                 *self._bounded_model_context(internal_messages),
             ]
             model_turn = self.gateway.complete(model_messages, self.registry.model_specs())
+            agent_v3_store.update_turn(
+                turn_id,
+                phase="TOOL_RUNNING" if model_turn.tool_calls else "RESPONSE_PENDING",
+                provider_response_id=model_turn.provider_response_id,
+            )
             final_turn = model_turn
             if not model_turn.tool_calls:
                 break
@@ -383,6 +437,7 @@ class AgentV3Runtime:
             "role": "assistant",
             "text": final_content,
             "turn_id": turn_id,
+            "created_at": now_text(),
         }
         latest = conversation_store.get(conversation_id)
         visible_messages = list(latest.get("messages") or [])
@@ -417,38 +472,6 @@ class AgentV3Runtime:
         }
 
     @staticmethod
-    def _store_turn_receipt(
-        conversation_id: str,
-        client_turn_id: str,
-        status: str,
-        *,
-        request_fingerprint: str,
-        response: dict[str, Any] | None = None,
-        error: str | None = None,
-    ) -> None:
-        conversation = conversation_store.get(conversation_id)
-        receipts = copy.deepcopy(conversation.get("turn_receipts") or {})
-        minimal_response = None
-        if response:
-            minimal_response = {
-                "conversation_id": response.get("conversation_id"),
-                "turn_id": response.get("turn_id"),
-                "message": copy.deepcopy(response.get("message")),
-                "task_ids": [task.get("task_id") for task in response.get("tasks") or []],
-                "approval_ids": [approval.get("approval_id") for approval in response.get("approvals") or []],
-                "event_cursor": response.get("event_cursor"),
-            }
-        receipts[client_turn_id] = {
-            "status": status,
-            "request_fingerprint": request_fingerprint,
-            "response": minimal_response,
-            "error": error,
-        }
-        while len(receipts) > 200:
-            receipts.pop(next(iter(receipts)))
-        conversation_store.upsert(conversation_id, {"turn_receipts": receipts})
-
-    @staticmethod
     def _turn_fingerprint(message: str, metadata: dict[str, Any] | None) -> str:
         canonical = json.dumps(
             {"message": message, "metadata": metadata or {}},
@@ -459,15 +482,29 @@ class AgentV3Runtime:
         return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
     @staticmethod
-    def _replay_turn_receipt(conversation_id: str, receipt: dict[str, Any]) -> dict[str, Any]:
-        stored = copy.deepcopy(receipt.get("response") or {})
+    def _replay_turn(turn: dict[str, Any]) -> dict[str, Any]:
+        conversation_id = str(turn["conversation_id"])
         conversation = conversation_store.get(conversation_id)
-        task_ids = [str(item) for item in stored.pop("task_ids", []) if item]
-        approval_ids = [str(item) for item in stored.pop("approval_ids", []) if item]
+        turn_id = str(turn["turn_id"])
+        task_ids = [str(item) for item in turn.get("task_ids") or [] if item]
+        approval_ids = [str(item) for item in turn.get("approval_ids") or [] if item]
+        response_message_id = str(turn.get("response_message_id") or "")
+        response_message = next(
+            (
+                copy.deepcopy(message)
+                for message in conversation.get("messages") or []
+                if message.get("message_id") == response_message_id
+            ),
+            {"role": "assistant", "text": "", "turn_id": turn_id},
+        )
         return {
-            **stored,
+            "conversation_id": conversation_id,
+            "turn_id": turn_id,
+            "message": response_message,
             "tasks": [agent_v3_store.public_task(agent_v3_store.get_task(task_id)) for task_id in task_ids],
             "approvals": [agent_v3_store.get_approval(approval_id) for approval_id in approval_ids],
+            "event_cursor": int(turn.get("event_cursor") or 0),
+            "turn": copy.deepcopy(turn),
             "conversation": {
                 **{
                     key: value
@@ -480,43 +517,61 @@ class AgentV3Runtime:
         }
 
     @staticmethod
-    def _record_turn_failure(conversation_id: str, prior_sequence: int, exc: Exception) -> None:
+    def _complete_turn(turn_id: str, response: dict[str, Any]) -> dict[str, Any]:
+        current = agent_v3_store.get_turn(turn_id)
+        return agent_v3_store.complete_turn(
+            turn_id,
+            response_message_id=str((response.get("message") or {}).get("message_id") or ""),
+            provider_response_id=current.get("provider_response_id"),
+            task_ids=[str(task.get("task_id")) for task in response.get("tasks") or [] if task.get("task_id")],
+            approval_ids=[str(approval.get("approval_id")) for approval in response.get("approvals") or [] if approval.get("approval_id")],
+            event_cursor=int(response.get("event_cursor") or 0),
+        )
+
+    @staticmethod
+    def _with_public_activity(response: dict[str, Any]) -> dict[str, Any]:
+        conversation_id = str(response["conversation_id"])
+        conversation = dict(response.get("conversation") or {})
+        conversation["turns"] = agent_v3_store.list_turns(conversation_id)
+        conversation["events"] = agent_v3_store.list_events(conversation_id)
+        response["conversation"] = conversation
+        return response
+
+    @staticmethod
+    def _record_turn_failure(conversation_id: str, turn_id: str, prior_sequence: int, exc: Exception) -> None:
         try:
-            new_events = agent_v3_store.list_events(conversation_id, prior_sequence)
-            turn_id = next((str(event.get("turn_id")) for event in new_events if event.get("turn_id")), None)
-            if not turn_id:
-                return
             detail = getattr(exc, "detail", exc)
             error_code = str(detail.get("code") or "TURN_FAILED") if isinstance(detail, dict) else "TURN_FAILED"
-            error = str(detail)
+            provider_error = detail if isinstance(detail, dict) else {"message": str(detail)}
+            retryable = bool(provider_error.get("retryable", False))
             visible_text = {
                 "LLM_TIMEOUT": "Agent 响应超时，本轮未能完成。请稍后重试。",
                 "LLM_TRANSPORT_ERROR": "Agent 与模型服务的连接中断，本轮未能完成。请稍后重试。",
+                "LLM_CIRCUIT_OPEN": "模型服务正在恢复中，请稍后重试本轮。",
             }.get(error_code, "本轮处理未能完成，请稍后重试。")
-            conversation = conversation_store.get(conversation_id)
-            assistant_message = {
-                "message_id": f"MSG-{uuid.uuid4().hex[:12].upper()}",
-                "role": "assistant",
-                "text": visible_text,
-                "turn_id": turn_id,
-                "metadata": {
-                    "delivery_status": "failed",
-                    "error_code": error_code,
-                    "retryable": True,
-                },
+            error = {
+                "code": error_code,
+                "message": visible_text,
+                "retryable": retryable,
+                "provider": provider_error.get("provider"),
+                "protocol": provider_error.get("protocol"),
+                "provider_status": provider_error.get("provider_status"),
+                "provider_request_id": provider_error.get("provider_request_id"),
+                "failure_kind": provider_error.get("failure_kind"),
+                "detail": provider_error.get("message") or str(detail),
             }
-            visible_messages = list(conversation.get("messages") or [])
-            visible_messages.append(assistant_message)
+            failed_turn = agent_v3_store.fail_turn(turn_id, error)
+            conversation = conversation_store.get(conversation_id)
             internal_messages = list(conversation.get("model_messages") or [])
-            internal_messages.append({"role": "assistant", "content": assistant_message["text"]})
+            checkpoint = int(failed_turn.get("model_message_checkpoint") or 0)
             conversation_store.upsert(
                 conversation_id,
-                {"messages": visible_messages, "model_messages": internal_messages, "status": "CHAT_ERROR"},
+                {"model_messages": internal_messages[:checkpoint], "status": "CHAT_ERROR"},
             )
             agent_v3_store.append_event(
                 conversation_id,
                 "turn.failed",
-                {"error": error, "message": assistant_message},
+                {"turn": failed_turn, "error": error, "after_sequence": prior_sequence},
                 turn_id=turn_id,
             )
         except Exception:

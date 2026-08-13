@@ -90,6 +90,10 @@ const solveStrategyInfo: Record<string, { label: string; description: string }> 
   triangulated_milp_exact: { label: 'MILP 三角剖分', description: '用二进制变量选择二维曲面的三角片，精确表达三角剖分 PWL，但会增加 MILP 规模。' },
 };
 
+function functionStatusText(value: string) {
+  return ({ draft: '草稿', published: '已发布', trial: '试运行', active: '启用' } as Record<string, string>)[value] || value;
+}
+
 export function solveStrategyText(strategy?: string) {
   const raw = String(strategy || '');
   return solveStrategyInfo[raw]?.label || raw || '-';
@@ -112,7 +116,7 @@ function StrategyHelp({ strategy }: { strategy?: string }) {
   const raw = String(strategy || '');
   return (
     <Alert
-      className="compact-notice"
+      className="strategy-help"
       type="info"
       showIcon
       title={`${solveStrategyText(raw)} · ${raw || '未选择'}`}
@@ -492,7 +496,6 @@ export function FunctionAssetsPage() {
   const usedCount = rows.filter(item => (item.referenced_by || []).length > 0).length;
   const oneDimCount = rows.filter(item => item.function_type === 'piecewise_1d').length;
   const twoDimCount = rows.filter(item => item.function_type === 'piecewise_2d').length;
-  const lpStrategyCount = rows.filter(item => String(item.solve_strategy || '').includes('lp')).length;
   const invalidCount = rows.filter(item => item.validation_status === 'invalid').length;
 
   const done = (text: string) => {
@@ -746,11 +749,10 @@ export function FunctionAssetsPage() {
         description="管理组件化运筹模型可复用的分段线性曲线、二维曲面和求解策略。"
         extra={<Space><Button onClick={startImport}>导入 CSV</Button><Button type="primary" onClick={startCreate}>新建函数资产</Button></Space>}
       />
-      <MetricGrid>
+      <MetricGrid columns={3}>
         <MetricCard title="资产总数" value={rows.length} description={`${oneDimCount} 条一维曲线 / ${twoDimCount} 个二维曲面`} tone="blue" />
         <MetricCard title="已被引用" value={usedCount} description="模型/组件绑定" tone="green" />
-        <MetricCard title="LP 策略" value={lpStrategyCount} description="分段线性与凸组合策略" tone="purple" />
-        <MetricCard title="异常资产" value={invalidCount} description={invalidCount ? '需要修正' : '暂无异常'} tone={invalidCount ? 'red' : 'neutral'} />
+         <MetricCard title="异常资产" value={invalidCount} description={invalidCount ? '需要修正' : '暂无异常'} tone={invalidCount ? 'red' : 'neutral'} />
       </MetricGrid>
 
       <Card className="content-card section-gap" title="函数与曲线资产">
@@ -820,14 +822,16 @@ export function FunctionAssetsPage() {
                 </Form.Item>
               </Col>
               <Col span={12}><Form.Item name="name" label="资产名称" rules={[{ required: true }]}><Input /></Form.Item></Col>
-              <Col span={12}>
-                <Form.Item name="solve_strategy" label="求解策略" rules={[{ required: true }]}>
-                  <Select options={editingStrategyOptions} />
-                </Form.Item>
-                <Form.Item noStyle shouldUpdate={(previous, current) => previous.solve_strategy !== current.solve_strategy}>
-                  {({ getFieldValue }) => <StrategyHelp strategy={String(getFieldValue('solve_strategy') || '')} />}
-                </Form.Item>
-              </Col>
+               <Col span={12}>
+                 <Form.Item name="solve_strategy" label="求解策略" rules={[{ required: true }]}>
+                   <Select options={editingStrategyOptions} />
+                 </Form.Item>
+               </Col>
+               <Col span={24}>
+                 <Form.Item noStyle shouldUpdate={(previous, current) => previous.solve_strategy !== current.solve_strategy}>
+                   {({ getFieldValue }) => <StrategyHelp strategy={String(getFieldValue('solve_strategy') || '')} />}
+                 </Form.Item>
+               </Col>
               <Col span={24}><Typography.Text strong>输入字段</Typography.Text></Col>
               <Col span={12}><Form.Item name="x_name" label="x 名称" rules={[{ required: true }]}><Input /></Form.Item></Col>
               <Col span={12}><Form.Item name="x_unit" label="x 单位"><Input /></Form.Item></Col>
@@ -836,7 +840,7 @@ export function FunctionAssetsPage() {
               <Col span={24}><Typography.Text strong>输出字段</Typography.Text></Col>
               <Col span={12}><Form.Item name="z_name" label={editingType === 'piecewise_2d' ? 'z 名称' : '输出 y 名称'} rules={[{ required: true }]}><Input /></Form.Item></Col>
               <Col span={12}><Form.Item name="z_unit" label={editingType === 'piecewise_2d' ? 'z 单位' : '输出 y 单位'}><Input /></Form.Item></Col>
-              <Col span={12}><Form.Item name="status" label="状态"><Select options={['draft', 'published', 'trial', 'active'].map(value => ({ value, label: value }))} /></Form.Item></Col>
+               <Col span={12}><Form.Item name="status" label="状态"><Select options={['draft', 'published', 'trial', 'active'].map(value => ({ value, label: functionStatusText(value) }))} /></Form.Item></Col>
               <Col span={24}><Form.Item name="description" label="说明"><Input /></Form.Item></Col>
             </Row>
             <Collapse
@@ -864,7 +868,7 @@ export function FunctionAssetsPage() {
               extra={<Space><Button onClick={() => setManualPoints(points => [...points, { key: `point_${Date.now()}`, x: 0, y: 0, z: editingType === 'piecewise_2d' ? 0 : undefined }])}>添加点</Button><Button onClick={fillSamplePoints}>填充示例数据</Button><Button onClick={() => setManualPoints(points => [...points].sort((a, b) => Number(a.x) - Number(b.x)))}>按 x 排序</Button></Space>}
             >
               <Alert
-                className="section-gap-tight"
+                className="point-count-notice"
                 type="info"
                 showIcon
                 title={editingType === 'piecewise_2d' ? '二维曲面至少需要 3 个点，规则网格建议至少 4 个点。' : '一维曲线至少需要 2 个点。'}
@@ -895,12 +899,14 @@ export function FunctionAssetsPage() {
             <Row gutter={12}>
               <Col span={12}><Form.Item name="name" label="资产名称" rules={[{ required: true }]}><Input /></Form.Item></Col>
               <Col span={12}><Form.Item name="function_type" label="函数类型" rules={[{ required: true }]}><Select options={[{ value: 'piecewise_1d', label: '一维曲线 y=f(x)' }, { value: 'piecewise_2d', label: '二维曲面 z=f(x,y)' }]} onChange={onImportTypeChange} /></Form.Item></Col>
-              <Col span={12}>
-                <Form.Item name="solve_strategy" label="求解策略"><Select options={importStrategyOptions} /></Form.Item>
-                <Form.Item noStyle shouldUpdate={(previous, current) => previous.solve_strategy !== current.solve_strategy}>
-                  {({ getFieldValue }) => <StrategyHelp strategy={String(getFieldValue('solve_strategy') || '')} />}
-                </Form.Item>
-              </Col>
+               <Col span={12}>
+                 <Form.Item name="solve_strategy" label="求解策略"><Select options={importStrategyOptions} /></Form.Item>
+               </Col>
+               <Col span={24}>
+                 <Form.Item noStyle shouldUpdate={(previous, current) => previous.solve_strategy !== current.solve_strategy}>
+                   {({ getFieldValue }) => <StrategyHelp strategy={String(getFieldValue('solve_strategy') || '')} />}
+                 </Form.Item>
+               </Col>
               <Col span={importType === 'piecewise_2d' ? 8 : 12}><Form.Item name="x_field" label="x 字段" rules={[{ required: true }]}><Select allowClear showSearch options={importPreview.fields.map(field => ({ value: field, label: field }))} /></Form.Item></Col>
               <Col span={importType === 'piecewise_2d' ? 8 : 12}><Form.Item name="y_field" label="y 字段" rules={[{ required: true }]}><Select allowClear showSearch options={importPreview.fields.map(field => ({ value: field, label: field }))} /></Form.Item></Col>
               {importType === 'piecewise_2d' && <Col span={8}><Form.Item name="z_field" label="z 字段" rules={[{ required: true }]}><Select allowClear showSearch options={importPreview.fields.map(field => ({ value: field, label: field }))} /></Form.Item></Col>}

@@ -219,7 +219,7 @@ def test_follow_up_tool_call_reuses_the_active_task_instead_of_creating_a_patchw
     assert any(message.get("role") == "tool" for message in second_gateway.requests[0])
 
 
-def test_gateway_failure_closes_turn_with_visible_error_and_failed_event() -> None:
+def test_gateway_failure_closes_turn_without_polluting_visible_or_model_memory() -> None:
     class RaisingGateway:
         def complete(self, messages: list[dict[str, Any]], tools: list[dict[str, Any]]) -> ModelTurn:
             raise RuntimeError("provider unavailable")
@@ -232,8 +232,12 @@ def test_gateway_failure_closes_turn_with_visible_error_and_failed_event() -> No
 
     restored = conversation_store.get(conversation["conversation_id"])
     assert restored["status"] == "CHAT_ERROR"
-    assert restored["messages"][-1]["metadata"]["delivery_status"] == "failed"
-    assert restored["messages"][-1]["metadata"]["error_code"] == "TURN_FAILED"
+    assert [item["role"] for item in restored["messages"]] == ["user"]
+    assert restored["model_messages"] == []
+    turn = agent_v3_store.list_turns(conversation["conversation_id"])[-1]
+    assert turn["status"] == "FAILED"
+    assert turn["error"]["code"] == "TURN_FAILED"
+    assert turn["retryable"] is False
     assert agent_v3_store.list_events(conversation["conversation_id"])[-1]["type"] == "turn.failed"
 
 
@@ -253,17 +257,36 @@ def test_gateway_timeout_is_recorded_as_one_localized_retryable_failure() -> Non
 
     assert raised.value.status_code == 504
     restored = conversation_store.get(conversation["conversation_id"])
-    failure_messages = [
-        item for item in restored["messages"]
-        if (item.get("metadata") or {}).get("delivery_status") == "failed"
-    ]
-    assert len(failure_messages) == 1
-    assert failure_messages[0]["text"] == "Agent 响应超时，本轮未能完成。请稍后重试。"
-    assert failure_messages[0]["metadata"] == {
-        "delivery_status": "failed",
-        "error_code": "LLM_TIMEOUT",
-        "retryable": True,
-    }
+    assert [item["role"] for item in restored["messages"]] == ["user"]
+    assert restored["model_messages"] == []
+    failed_turn = agent_v3_store.list_turns(conversation["conversation_id"])[-1]
+    assert failed_turn["status"] == "FAILED"
+    assert failed_turn["retryable"] is True
+    assert failed_turn["error"]["message"] == "Agent 响应超时，本轮未能完成。请稍后重试。"
+
+
+def test_retryable_turn_reuses_the_accepted_user_message_and_recovers_cleanly() -> None:
+    class TimeoutGateway:
+        def complete(self, messages: list[dict[str, Any]], tools: list[dict[str, Any]]) -> ModelTurn:
+            raise HTTPException(
+                status_code=504,
+                detail={"code": "LLM_TIMEOUT", "message": "LLM response timed out", "retryable": True},
+            )
+
+    conversation = conversation_store.create("Retry")
+    runtime = AgentV3Runtime(gateway=TimeoutGateway(), registry=_registry())
+    with pytest.raises(HTTPException):
+        runtime.run_turn(conversation["conversation_id"], "hello", client_turn_id="client-retry")
+
+    turn = agent_v3_store.list_turns(conversation["conversation_id"])[-1]
+    runtime.gateway = SequenceGateway([ModelTurn(content="你好，我恢复了。")])
+    recovered = runtime.retry_turn(turn["turn_id"])
+
+    restored = conversation_store.get(conversation["conversation_id"])
+    assert recovered["turn"]["status"] == "SUCCEEDED"
+    assert recovered["turn"]["attempt_count"] == 2
+    assert [item["role"] for item in restored["messages"]] == ["user", "assistant"]
+    assert [item["content"] for item in restored["model_messages"]] == ["hello", "你好，我恢复了。"]
 
 
 def test_terminal_task_is_not_resurrected_and_runtime_creates_a_new_task() -> None:
@@ -458,10 +481,17 @@ def test_runtime_persistence_keeps_optimization_run_link_and_interrupts_ghost_wo
     )
     assert normalized == {"optimization_run_id": "RUN-KEEP", "legacy_run_id": "RUN-DROP"}
     with STORE.lock:
+        STORE.agent_turns["TURN-GHOST"] = {
+            "turn_id": "TURN-GHOST",
+            "status": "RUNNING",
+            "attempts": [{"attempt": 1, "status": "RUNNING"}],
+        }
         STORE.agent_tasks["TASK-GHOST"] = {"task_id": "TASK-GHOST", "status": "RUNNING"}
         STORE.tool_invocations["TOOL-GHOST"] = {"invocation_id": "TOOL-GHOST", "status": "RUNNING"}
 
     assert STORE._interrupt_recovered_agent_v3_work() is True
+    assert STORE.agent_turns["TURN-GHOST"]["status"] == "INTERRUPTED"
+    assert STORE.agent_turns["TURN-GHOST"]["retryable"] is True
     assert STORE.agent_tasks["TASK-GHOST"]["status"] == "FAILED"
     assert STORE.tool_invocations["TOOL-GHOST"]["status"] == "FAILED"
 

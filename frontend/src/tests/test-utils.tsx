@@ -3,7 +3,7 @@ import { cleanup, render, type RenderOptions } from '@testing-library/react';
 import type { ReactElement, PropsWithChildren } from 'react';
 import { afterEach, vi } from 'vitest';
 import axios from 'axios';
-import { ConfigProvider, message, notification } from 'antd';
+import { App as AntApp, ConfigProvider, message, notification } from 'antd';
 
 const testQueryClients = new Set<QueryClient>();
 const originalFetch = globalThis.fetch;
@@ -113,7 +113,9 @@ export function renderWithProviders(ui: ReactElement, options?: RenderOptions) {
   function Wrapper({ children }: PropsWithChildren) {
     return (
       <ConfigProvider theme={{ token: { motion: false } }}>
-        <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+        <AntApp>
+          <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+        </AntApp>
       </ConfigProvider>
     );
   }

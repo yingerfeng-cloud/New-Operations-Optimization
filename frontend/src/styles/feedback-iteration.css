@@ -45,6 +45,64 @@
   margin-inline-start: 12px;
 }
 
+/* Strategy explanations are form guidance, so they need the full row and readable wrapping. */
+.strategy-help.ant-alert {
+  width: 100%;
+  min-width: 0;
+  margin: -5px 0 12px;
+  align-items: center;
+  padding: 6px 10px !important;
+  border-radius: 8px !important;
+}
+
+.strategy-help .ant-alert-content {
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.strategy-help .ant-alert-message {
+  flex: 0 0 auto;
+  margin: 0 !important;
+  color: #173d65;
+  font-size: 12px;
+  line-height: 1.4;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.strategy-help .ant-alert-description {
+  min-width: 0;
+  flex: 1 1 auto;
+  color: var(--proto-muted);
+  font-size: 11px;
+  line-height: 1.4;
+  white-space: normal;
+  overflow: visible;
+  overflow-wrap: anywhere;
+  text-overflow: clip;
+}
+
+.point-count-notice.ant-alert {
+  min-height: 0;
+  margin: -4px 0 12px !important;
+  padding: 6px 10px !important;
+  border-radius: 8px !important;
+  align-items: center;
+}
+
+.point-count-notice .ant-alert-icon {
+  margin-inline-end: 8px !important;
+  font-size: 14px !important;
+}
+
+.point-count-notice .ant-alert-message {
+  margin: 0 !important;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
 .skill-definition-validation-alert.ant-alert {
   border-radius: 10px !important;
   align-items: flex-start;
@@ -169,10 +227,8 @@ button.metric-card-v2:hover {
 
 .sidebar {
   background:
-    linear-gradient(rgba(87, 176, 255, .035) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(87, 176, 255, .035) 1px, transparent 1px),
-    linear-gradient(180deg, #102b46 0%, #0c1b2d 100%) !important;
-  background-size: 24px 24px, 24px 24px, auto !important;
+    radial-gradient(circle at 0% 0%, rgba(82, 165, 226, .18), transparent 38%),
+    linear-gradient(180deg, #112f4e 0%, #0d2137 54%, #091727 100%) !important;
   border-right: 1px solid rgba(102, 190, 255, .14);
 }
 
@@ -1432,6 +1488,14 @@ button.metric-card-v2:hover {
   .compact-notice .ant-alert-description {
     margin-top: 2px;
     white-space: normal;
+  }
+
+  .strategy-help .ant-alert-content {
+    display: block;
+  }
+
+  .strategy-help .ant-alert-description {
+    margin-top: 2px;
   }
 
   .metric-grid-4,

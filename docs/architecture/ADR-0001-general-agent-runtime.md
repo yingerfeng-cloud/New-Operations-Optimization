@@ -11,15 +11,16 @@ The current Agent API treats a conversation as a parameter-collection wizard for
 
 OptiForge will use one general conversational Agent runtime. Operations-research capabilities are exposed to that runtime as strict, registered tools (Skills). The language model decides whether to answer directly or request a tool; application code remains responsible for authorization, validation, deterministic execution, persistence, and audit events.
 
-The V3 runtime owns five independent records:
+The V3 runtime owns six independent records:
 
 1. **Conversation**: an ordered internal model transcript containing user, assistant, and tool messages, plus a separate user-visible transcript that does not expose tool protocol payloads.
-2. **Task**: a durable unit of work that can outlive a turn.
-3. **Tool invocation**: auditable input, output, status, and error for one tool call.
-4. **Event**: an append-only conversation stream consumed by the UI.
-5. **Approval**: a resumable decision gate for consequential actions.
+2. **Turn**: the durable delivery and execution lifecycle for one accepted user request, including attempts, phase, provider diagnostics, and retryability.
+3. **Task**: a durable unit of work that can outlive a turn.
+4. **Tool invocation**: auditable input, output, status, and error for one tool call.
+5. **Event**: an append-only conversation stream consumed by the UI.
+6. **Approval**: a resumable decision gate for consequential actions.
 
-The event protocol is stable across Skills: `message.completed`, `turn.failed`, `tool.started`, `tool.completed`, `tool.failed`, `tool.cancelled`, `tool.skipped`, `task.created`, `task.updated`, `task.quarantined`, `approval.required`, `approval.started`, `approval.resolved`, `approval.failed`, `approval.superseded`, `run.progress`, `run.completed`, and `run.failed`.
+The event protocol is stable across Skills: `message.completed`, `turn.retry_started`, `turn.failed`, `tool.started`, `tool.completed`, `tool.failed`, `tool.cancelled`, `tool.skipped`, `task.created`, `task.updated`, `task.quarantined`, `approval.required`, `approval.started`, `approval.resolved`, `approval.failed`, `approval.superseded`, `run.progress`, `run.completed`, and `run.failed`.
 
 ## Runtime boundaries
 
@@ -30,7 +31,9 @@ The event protocol is stable across Skills: `message.completed`, `turn.failed`, 
 - Optimization validation and solving stay deterministic behind the Skill boundary.
 - Provider-specific response formats are translated into the internal `ModelTurn` contract.
 - A disabled model produces an explicit unavailable response; it does not silently fall back to keyword routing.
-- Every client turn carries an idempotency key bound to a request fingerprint; successful retries replay a compact receipt instead of repeating messages or tool side effects.
+- Every client turn carries an idempotency key bound to a request fingerprint. The durable Turn is the idempotency record; successful duplicates are reconstructed from record references, and retryable failures reuse the accepted user message instead of creating another message or Turn.
+- Transport or provider failures are Turn state, never assistant prose. Failed attempts are excluded from future model memory while remaining visible as structured activity and an actionable retry card.
+- Operational health is measured with the same provider/model/tool protocol used by production Agent turns. A configuration or successful plain-text response is not reported as Function Calling readiness.
 - Model input uses a bounded recent-turn window. User messages, typed metadata, cumulative tool arguments, tool-call count, and model-facing tool outputs have explicit limits; authoritative task and invocation results remain intact for audit.
 - Task completion is a conditional store update, so a committed cancellation cannot be overwritten by a late tool result.
 

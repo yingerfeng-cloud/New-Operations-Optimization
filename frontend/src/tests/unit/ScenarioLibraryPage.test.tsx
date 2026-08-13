@@ -80,8 +80,8 @@ test('shows real published count zero without static fallback', async () => {
   renderPage();
   expect(await screen.findAllByText('已发布模型')).not.toHaveLength(0);
   expect(screen.getAllByText('0').length).toBeGreaterThan(0);
-  expect(screen.getAllByText(/推荐模型/).length).toBeGreaterThan(0);
-  expect(screen.getAllByText('推荐模型 0').length).toBeGreaterThan(0);
+  expect(screen.getAllByRole('button', { name: '创建空白模型' }).length).toBeGreaterThan(0);
+  expect(screen.getAllByText('该场景尚未关联模型资产').length).toBeGreaterThan(0);
 });
 
 test('all disabled scenarios render a safe configuration state', async () => {

@@ -14,10 +14,11 @@ These are ownership failures, not presentation defects. A general Agent needs th
 
 The Agent runtime uses the following ownership model:
 
-1. **Visible conversation** owns only the user-visible transcript, bounded internal model transcript, turn receipts, and chat delivery state.
-2. **Durable task** owns the business workflow identity, lifecycle, revision, selected tool, result, approval chain, and linked optimization run.
-3. **Private execution context** is a one-to-one compatibility boundary for a durable optimization task. It contains legacy parameter-collection state and is never listed, rendered, accepted from a client, or sent to the model.
-4. **Optimization run** belongs to one task. Public run APIs resolve through that task instead of mutating a conversation-global run independently.
+1. **Visible conversation** owns only the user-visible transcript and bounded internal model transcript.
+2. **Durable Turn** owns request acceptance, idempotency fingerprint, attempt lifecycle, provider diagnostics, and response references.
+3. **Durable task** owns the business workflow identity, lifecycle, revision, selected tool, result, approval chain, and linked optimization run.
+4. **Private execution context** is a one-to-one compatibility boundary for a durable optimization task. It contains legacy parameter-collection state and is never listed, rendered, accepted from a client, or sent to the model.
+5. **Optimization run** belongs to one task. Public run APIs resolve through that task instead of mutating a conversation-global run independently.
 
 The following invariants are enforced at runtime and repository boundaries:
 
@@ -44,6 +45,8 @@ Optimization input validation is a domain contract, not a sample-data comparison
 ## Migration
 
 Runtime schema version 7 removes shared legacy workflow fields from visible conversations. Pre-contract optimization tasks that have no private execution context are marked `CANCELLED` with `migration_status=QUARANTINED_LEGACY_STATE`; their pending approvals are `SUPERSEDED`, linked nonterminal runs are cancelled, and a `task.quarantined` audit event is appended. User-visible messages remain intact.
+
+Runtime schema version 8 materializes durable Turns from the V3 transcript and event stream. Historical transport-failure assistant messages are removed from the visible transcript and model memory, their accepted user messages are retained, and the failures become retryable Turn records. Obsolete full-response turn receipts are removed.
 
 The old `/analyze`, `/confirm-*`, and run endpoints remain compatibility APIs during migration, but the Agent workbench does not use them. New behavior is implemented only through V3 turns, tasks, approvals, and events.
 

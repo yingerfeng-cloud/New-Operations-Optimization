@@ -55,6 +55,196 @@ class AgentV3Store:
                 if int(event.get("sequence") or 0) > after
             ])
 
+    def create_turn(
+        self,
+        conversation_id: str,
+        turn_id: str,
+        message: str,
+        metadata: dict[str, Any],
+        client_turn_id: str | None,
+        request_fingerprint: str,
+    ) -> dict[str, Any]:
+        now = now_text()
+        record = {
+            "turn_id": turn_id,
+            "conversation_id": conversation_id,
+            "client_turn_id": client_turn_id,
+            "request_fingerprint": request_fingerprint,
+            "status": "RUNNING",
+            "phase": "MODEL_PENDING",
+            "input": message,
+            "metadata": copy.deepcopy(metadata),
+            "input_message_id": None,
+            "response_message_id": None,
+            "provider_response_id": None,
+            "task_ids": [],
+            "approval_ids": [],
+            "event_cursor": 0,
+            "attempt_count": 1,
+            "attempts": [{"attempt": 1, "status": "RUNNING", "started_at": now}],
+            "retryable": False,
+            "error": None,
+            "started_at": now,
+            "completed_at": None,
+            "duration_ms": None,
+            "created_at": now,
+            "updated_at": now,
+        }
+        with STORE.lock:
+            conversation = STORE.conversations.get(conversation_id)
+            if not conversation or conversation.get("kind") == "task_context":
+                raise HTTPException(status_code=404, detail="Conversation not found")
+            if turn_id in STORE.agent_turns:
+                raise HTTPException(status_code=409, detail="Agent turn already exists")
+            if client_turn_id and any(
+                turn.get("conversation_id") == conversation_id
+                and turn.get("client_turn_id") == client_turn_id
+                for turn in STORE.agent_turns.values()
+            ):
+                raise HTTPException(status_code=409, detail="client_turn_id already exists")
+            STORE.agent_turns[turn_id] = record
+            STORE.save_runtime()
+        return copy.deepcopy(record)
+
+    def get_turn(self, turn_id: str) -> dict[str, Any]:
+        with STORE.lock:
+            turn = STORE.agent_turns.get(turn_id)
+            if not turn:
+                raise HTTPException(status_code=404, detail="Agent turn not found")
+            return copy.deepcopy(turn)
+
+    def find_turn_by_client_id(self, conversation_id: str, client_turn_id: str) -> dict[str, Any] | None:
+        with STORE.lock:
+            matches = [
+                copy.deepcopy(turn)
+                for turn in STORE.agent_turns.values()
+                if turn.get("conversation_id") == conversation_id
+                and turn.get("client_turn_id") == client_turn_id
+            ]
+        matches.sort(key=lambda item: str(item.get("created_at") or ""))
+        return matches[-1] if matches else None
+
+    def list_turns(self, conversation_id: str) -> list[dict[str, Any]]:
+        self._require_conversation(conversation_id)
+        with STORE.lock:
+            turns = [
+                copy.deepcopy(turn)
+                for turn in STORE.agent_turns.values()
+                if turn.get("conversation_id") == conversation_id
+            ]
+        return sorted(turns, key=lambda item: str(item.get("created_at") or item.get("started_at") or ""))
+
+    def update_turn(self, turn_id: str, **changes: Any) -> dict[str, Any]:
+        with STORE.lock:
+            turn = STORE.agent_turns.get(turn_id)
+            if not turn:
+                raise HTTPException(status_code=404, detail="Agent turn not found")
+            if str(turn.get("conversation_id") or "") not in STORE.conversations:
+                raise HTTPException(status_code=404, detail="Conversation not found")
+            turn.update(copy.deepcopy(changes))
+            turn["updated_at"] = now_text()
+            snapshot = copy.deepcopy(turn)
+            STORE.save_runtime()
+        return snapshot
+
+    def start_turn_retry(self, turn_id: str) -> dict[str, Any]:
+        now = now_text()
+        with STORE.lock:
+            turn = STORE.agent_turns.get(turn_id)
+            if not turn:
+                raise HTTPException(status_code=404, detail="Agent turn not found")
+            if turn.get("status") not in {"FAILED", "INTERRUPTED"} or not turn.get("retryable"):
+                raise HTTPException(status_code=409, detail="This turn is not retryable")
+            attempt = int(turn.get("attempt_count") or 1) + 1
+            turn.update({
+                "status": "RUNNING",
+                "phase": "MODEL_PENDING",
+                "attempt_count": attempt,
+                "retryable": False,
+                "error": None,
+                "started_at": now,
+                "completed_at": None,
+                "duration_ms": None,
+                "updated_at": now,
+            })
+            attempts = list(turn.get("attempts") or [])
+            attempts.append({"attempt": attempt, "status": "RUNNING", "started_at": now})
+            turn["attempts"] = attempts
+            snapshot = copy.deepcopy(turn)
+            STORE.save_runtime()
+        return snapshot
+
+    def complete_turn(
+        self,
+        turn_id: str,
+        *,
+        response_message_id: str,
+        provider_response_id: str | None,
+        task_ids: list[str],
+        approval_ids: list[str],
+        event_cursor: int,
+    ) -> dict[str, Any]:
+        now = now_text()
+        with STORE.lock:
+            turn = STORE.agent_turns.get(turn_id)
+            if not turn:
+                raise HTTPException(status_code=404, detail="Agent turn not found")
+            attempts = list(turn.get("attempts") or [])
+            if attempts:
+                attempts[-1] = {**attempts[-1], "status": "SUCCEEDED", "completed_at": now}
+            turn.update({
+                "status": "SUCCEEDED",
+                "phase": "COMPLETED",
+                "response_message_id": response_message_id,
+                "provider_response_id": provider_response_id,
+                "task_ids": list(dict.fromkeys(task_ids)),
+                "approval_ids": list(dict.fromkeys(approval_ids)),
+                "event_cursor": event_cursor,
+                "attempts": attempts,
+                "retryable": False,
+                "error": None,
+                "completed_at": now,
+                "duration_ms": self._duration_ms(turn.get("started_at"), now),
+                "updated_at": now,
+            })
+            snapshot = copy.deepcopy(turn)
+            STORE.save_runtime()
+        return snapshot
+
+    def fail_turn(self, turn_id: str, error: dict[str, Any]) -> dict[str, Any]:
+        now = now_text()
+        with STORE.lock:
+            turn = STORE.agent_turns.get(turn_id)
+            if not turn:
+                raise HTTPException(status_code=404, detail="Agent turn not found")
+            attempts = list(turn.get("attempts") or [])
+            if attempts:
+                attempts[-1] = {**attempts[-1], "status": "FAILED", "completed_at": now, "error": copy.deepcopy(error)}
+            turn.update({
+                "status": "FAILED",
+                "phase": "FAILED",
+                "attempts": attempts,
+                "retryable": bool(error.get("retryable")),
+                "error": self._bounded_copy(error, 20_000),
+                "completed_at": now,
+                "duration_ms": self._duration_ms(turn.get("started_at"), now),
+                "updated_at": now,
+            })
+            snapshot = copy.deepcopy(turn)
+            STORE.save_runtime()
+        return snapshot
+
+    @staticmethod
+    def _duration_ms(started_at: Any, completed_at: Any) -> int | None:
+        from datetime import datetime
+
+        try:
+            started = datetime.fromisoformat(str(started_at))
+            completed = datetime.fromisoformat(str(completed_at))
+            return max(0, int((completed - started).total_seconds() * 1000))
+        except (TypeError, ValueError):
+            return None
+
     def create_task(self, conversation_id: str, turn_id: str, title: str, tool_name: str) -> dict[str, Any]:
         task_id = f"TASK-{uuid.uuid4().hex[:12].upper()}"
         now = now_text()

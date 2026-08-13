@@ -92,9 +92,16 @@ def agent_list_conversations() -> list[dict]:
     for row in rows:
         tasks = agent_v3_store.list_tasks(str(row.get("conversation_id")))
         active_tasks = [task for task in tasks if task.get("status") not in {"SUCCEEDED", "FAILED", "CANCELLED"}]
-        latest = (active_tasks or tasks)[-1] if tasks else None
-        row["active_task_id"] = latest.get("task_id") if latest else None
-        row["active_task_status"] = latest.get("status") if latest else None
+        active_task = active_tasks[-1] if active_tasks else None
+        latest_task = tasks[-1] if tasks else None
+        row["active_task_id"] = active_task.get("task_id") if active_task else None
+        row["active_task_status"] = active_task.get("status") if active_task else None
+        row["latest_task_id"] = latest_task.get("task_id") if latest_task else None
+        row["latest_task_status"] = latest_task.get("status") if latest_task else None
+        turns = agent_v3_store.list_turns(str(row.get("conversation_id")))
+        latest_turn = turns[-1] if turns else None
+        row["latest_turn_id"] = latest_turn.get("turn_id") if latest_turn else None
+        row["latest_turn_status"] = latest_turn.get("status") if latest_turn else None
     return rows
 
 
@@ -132,6 +139,8 @@ def agent_get_conversation(conversation_id: str) -> dict:
     return {
         **{key: value for key, value in detail.items() if key not in {"model_messages", "turn_receipts"}},
         "agent_tasks": [agent_v3_store.public_task(task) for task in tasks],
+        "turns": agent_v3_store.list_turns(conversation_id),
+        "events": agent_v3_store.list_events(conversation_id),
         "pending_approvals": agent_v3_store.list_approvals_for_conversation(conversation_id, pending_only=True),
         "active_run": active_run,
         "runs": runs,
@@ -156,6 +165,16 @@ def agent_v3_create_turn(conversation_id: str, body: AgentTurnRequest) -> dict:
         body.metadata.model_dump(exclude_none=True),
         body.client_turn_id,
     )
+
+
+@router.get("/v3/turns/{turn_id}")
+def agent_v3_get_turn(turn_id: str) -> dict:
+    return agent_v3_store.get_turn(turn_id)
+
+
+@router.post("/v3/turns/{turn_id}/retry")
+def agent_v3_retry_turn(turn_id: str) -> dict:
+    return agent_v3_runtime.retry_turn(turn_id)
 
 
 @router.get("/v3/conversations/{conversation_id}/events")
@@ -303,12 +322,16 @@ def agent_status() -> dict:
     except Exception:
         agent_skills = []
     llm = llm_service.config()
+    llm_runtime = llm_service.runtime_health()
     mode = service_mode()
     access_mode = getattr(platform_client, "platform_access_mode", "http")
+    agent_enabled = mode in {"combined", "agent"}
+    agent_ready = agent_enabled and bool(llm_runtime.get("ready"))
     return {
         "agent": {
             "ok": True,
-            "available": mode in {"combined", "agent"},
+            "available": agent_ready,
+            "enabled": agent_enabled,
             "service": "general-agent",
             "runtime_version": "v3",
             "service_mode": mode,
@@ -328,6 +351,8 @@ def agent_status() -> dict:
             "model": llm["model"],
             "runtime_mode": "model_and_tools" if llm["enabled"] else "model_unavailable",
             "legacy_fallback_mode": "rule_based" if not llm["enabled"] else None,
+            "fallback_mode": "llm" if llm["enabled"] else "rule_based",
+            **llm_runtime,
         },
     }
 

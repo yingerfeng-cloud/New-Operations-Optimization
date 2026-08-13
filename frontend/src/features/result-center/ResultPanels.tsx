@@ -120,14 +120,15 @@ export function ResultChartPanel({ result, labelMap }: { result?: SolveResult; l
   const chartSeries = numericSeries(result, labelMap);
   if (!chartSeries.length) return <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="当前结果未返回可绘制的时序变量；目标函数值是单个汇总指标，不作为曲线展示。" />;
   const labels = chartSeries.reduce((longest, series) => series.labels.length > longest.length ? series.labels : longest, [] as string[]);
+  const hasLegend = chartSeries.length > 1;
   return (
     <LazyEChart
       style={{ height: 400 }}
       option={{
-        title: { text: chartSeries.length === 1 ? chartSeries[0].name : '变量时序曲线', left: 12, top: 10, textStyle: { fontSize: 14 } },
-        grid: { top: 58, right: 24, bottom: 36, left: 48 },
+        title: { text: chartSeries.length === 1 ? chartSeries[0].name : '变量时序曲线', left: 12, top: 8, textStyle: { fontSize: 14 } },
+        grid: { top: hasLegend ? 78 : 52, right: 24, bottom: 36, left: 48 },
         tooltip: { trigger: 'axis' },
-        legend: chartSeries.length > 1 ? { top: 8, right: 16, type: 'scroll' } : undefined,
+        legend: hasLegend ? { top: 36, left: 12, right: 16, type: 'scroll' } : undefined,
         xAxis: { type: 'category', name: '时段', data: labels },
         yAxis: { type: 'value' },
         series: chartSeries.map((series, index) => ({

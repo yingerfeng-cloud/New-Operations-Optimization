@@ -191,6 +191,7 @@ def reset_runtime_store(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
         "conversations",
         "agent_runs",
         "agent_tasks",
+        "agent_turns",
         "agent_events",
         "tool_invocations",
         "agent_approvals",
@@ -217,6 +218,10 @@ def reset_runtime_store(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
             _BASE_STORE_SNAPSHOT = {key: deepcopy(getattr(STORE, key)) for key in store_keys}
     if _BASE_REGISTRY_SNAPSHOT is None:
         _BASE_REGISTRY_SNAPSHOT = {key: deepcopy(getattr(component_registry, key)) for key in registry_keys}
+    from app.services.llm_service import OpenAICompatibleAdapter
+    from app.services.llm_gateway_runtime import llm_gateway_runtime
+    OpenAICompatibleAdapter.reset_clients()
+    llm_gateway_runtime.reset()
     try:
         faulthandler.dump_traceback_later(180, repeat=False)
     except Exception:
@@ -254,6 +259,8 @@ def reset_runtime_store(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
                 target[:] = deepcopy(value)
             else:
                 setattr(component_registry, key, deepcopy(value))
+        OpenAICompatibleAdapter.reset_clients()
+        llm_gateway_runtime.reset()
 
 
 @pytest.fixture

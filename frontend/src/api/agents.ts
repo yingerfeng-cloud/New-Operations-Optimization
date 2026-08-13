@@ -14,6 +14,7 @@ import type {
   AgentV3Event,
   AgentV3ApprovalResolution,
   AgentV3Task,
+  AgentV3Turn,
   AgentV3TurnResponse,
 } from '../types/agent';
 
@@ -45,6 +46,16 @@ export const createAgentTurn = (conversationId: string, message: string, metadat
   unwrap<AgentV3TurnResponse>(apiClient.post(
     `/api/agent/v3/conversations/${encodeURIComponent(conversationId)}/turns`,
     { message, metadata, client_turn_id: clientTurnId },
+    { timeout: 180_000, suppressErrorToast: true },
+  ));
+
+export const getAgentTurn = (turnId: string) =>
+  unwrap<AgentV3Turn>(apiClient.get(`/api/agent/v3/turns/${encodeURIComponent(turnId)}`));
+
+export const retryAgentTurn = (turnId: string) =>
+  unwrap<AgentV3TurnResponse>(apiClient.post(
+    `/api/agent/v3/turns/${encodeURIComponent(turnId)}/retry`,
+    undefined,
     { timeout: 180_000, suppressErrorToast: true },
   ));
 

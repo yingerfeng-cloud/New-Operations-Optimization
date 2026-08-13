@@ -140,6 +140,13 @@ class ConversationStore:
             ]
             for task_id in task_ids:
                 del STORE.agent_tasks[task_id]
+            turn_ids = [
+                turn_id
+                for turn_id, turn in STORE.agent_turns.items()
+                if turn.get("conversation_id") == conversation_id
+            ]
+            for turn_id in turn_ids:
+                del STORE.agent_turns[turn_id]
             invocation_ids = [
                 invocation_id
                 for invocation_id, invocation in STORE.tool_invocations.items()
@@ -163,6 +170,7 @@ class ConversationStore:
             "conversation_id": conversation_id,
             "deleted_run_count": len(run_ids),
             "deleted_task_count": len(task_ids),
+            "deleted_turn_count": len(turn_ids),
             "deleted_tool_invocation_count": len(invocation_ids),
             "deleted_approval_count": len(approval_ids),
             "deleted_task_context_count": len(context_ids),

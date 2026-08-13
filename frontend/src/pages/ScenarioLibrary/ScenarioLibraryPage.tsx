@@ -1,4 +1,4 @@
-import { Button, Card, Segmented, Space, Tag, Tooltip, Typography } from 'antd';
+import { Button, Card, Segmented, Space, Tag, Typography } from 'antd';
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
@@ -45,7 +45,8 @@ export function ScenarioLibraryPage() {
       publishedModelCount: ownedModels.filter(model => model.status === 'published').length,
       trialModelCount: ownedModels.filter(model => model.status === 'trial').length,
       recommendedModels,
-      recommendedModelId: recommendedModels[0]?.id,
+      recommendedModel: recommendedModels[0],
+      displayModel: recommendedModels[0] || ownedModels[0],
     };
   }), [models.data, visible]);
 
@@ -65,7 +66,7 @@ export function ScenarioLibraryPage() {
       )}
       {!!scenarios.length && <>
         <Card className="content-card">
-          <FilterBar onReset={() => { setFilter('全部'); setStatusFilter('全部'); }}>
+          <FilterBar>
             <Segmented value={filter} onChange={value => setFilter(String(value))} options={['全部', ...scenarios.map(item => item.name)]} />
             <Segmented value={statusFilter} onChange={value => setStatusFilter(String(value))} options={statusOptions} />
           </FilterBar>
@@ -78,7 +79,7 @@ export function ScenarioLibraryPage() {
               key={scenario.id}
               className="content-card"
               title={<Space><span>{scenario.name}</span><StatusTag status={scenario.status} /></Space>}
-              extra={<Tooltip title="按场景关联筛选已发布且处于活动版本的模型，再按配置优先级和发布时间排序"><Tag color="blue">推荐模型 {scenario.recommendedModels.length}</Tag></Tooltip>}
+              extra={<Button size="small" onClick={() => nav(`/models/create?mode=new&scenario=${encodeURIComponent(scenario.id)}`)}>创建空白模型</Button>}
             >
               <Typography.Paragraph>{scenario.description || '暂无场景说明'}</Typography.Paragraph>
               <MetricGrid columns={3}>
@@ -86,28 +87,28 @@ export function ScenarioLibraryPage() {
                 <MetricCard title="已发布模型" value={scenario.publishedModelCount} tone="green" />
                 <MetricCard title="试运行模型" value={scenario.trialModelCount} tone="purple" />
               </MetricGrid>
-              <div className="scenario-primary-actions section-gap">
-                <Button type="primary" disabled={!scenario.recommendedModelId} title={!scenario.recommendedModelId ? '该场景下暂无活动的已发布模型' : undefined} onClick={() => nav(`/tasks?create=1&scene=${encodeURIComponent(scenario.name)}&model=${encodeURIComponent(scenario.recommendedModelId || '')}`)}>使用推荐模型发起任务</Button>
-                <Button onClick={() => nav(`/models/create?mode=new&scenario=${encodeURIComponent(scenario.id)}`)}>创建空白模型</Button>
-              </div>
               <div className="scenario-model-list">
-                {scenario.ownedModels.map(model => (
-                  <div className="scenario-model-item" key={model.id}>
-                    <div className="scenario-model-main">
-                      <strong>{model.name}</strong>
-                      <span className="scenario-model-code">{String(model.template_id || model.id)}</span>
-                      <div className="scenario-model-action">
-                        <Button size="small" onClick={() => nav(`/models/create?mode=${model.status === 'developing' ? 'edit' : 'version'}&source=${encodeURIComponent(model.id)}`)}>进入建模</Button>
+                {scenario.displayModel ? (
+                  <>
+                    <div className="scenario-model-item scenario-featured-model" key={scenario.displayModel.id}>
+                      <div className="scenario-model-main">
+                        <div className="scenario-model-heading"><strong>{scenario.displayModel.name}</strong></div>
+                        <span className="scenario-model-code">{String(scenario.displayModel.template_id || scenario.displayModel.id)}</span>
+                        {scenario.ownedModelCount > 1 && <Typography.Text type="secondary">另有 {scenario.ownedModelCount - 1} 个模型，已收起</Typography.Text>}
+                        <div className="scenario-model-action">
+                          <Button size="small" onClick={() => nav(`/models/create?mode=${scenario.displayModel?.status === 'developing' ? 'edit' : 'version'}&source=${encodeURIComponent(scenario.displayModel?.id || '')}`)}>进入建模</Button>
+                        </div>
+                      </div>
+                      <div className="scenario-model-meta">
+                        <StatusTag status={scenario.displayModel.status} />
+                        <Tag color="geekblue">{builderText(scenario.displayModel.build_mode)}</Tag>
+                        <Tag color="purple">{scenario.displayModel.model_problem_type || scenario.displayModel.problem_type}</Tag>
                       </div>
                     </div>
-                    <div className="scenario-model-meta">
-                      <StatusTag status={model.status} />
-                      <Tag color="geekblue">{builderText(model.build_mode)}</Tag>
-                      <Tag color="purple">{model.model_problem_type || model.problem_type}</Tag>
-                    </div>
-                  </div>
-                ))}
-                {!scenario.ownedModels.length && <Typography.Text type="secondary">该场景尚未关联模型资产</Typography.Text>}
+                  </>
+                ) : (
+                  <Typography.Text type="secondary">该场景尚未关联模型资产</Typography.Text>
+                )}
               </div>
             </Card>
           ))}

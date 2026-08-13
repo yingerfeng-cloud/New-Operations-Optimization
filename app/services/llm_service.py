@@ -7,7 +7,9 @@ import hashlib
 import getpass
 import logging
 import socket
+import threading
 import time
+import random
 from datetime import datetime, timezone
 from typing import Any
 
@@ -15,6 +17,7 @@ import httpx
 from fastapi import HTTPException
 
 from app.storage.memory_store import STORE
+from app.services.llm_gateway_runtime import llm_gateway_runtime
 
 
 SUPPORTED_PROVIDERS = {"volcengine_ark", "openai_compatible", "disabled"}
@@ -29,40 +32,170 @@ class BaseLLMAdapter:
     def chat_json(self, messages: list[dict[str, str]], parser: Any) -> dict[str, Any]:
         raise NotImplementedError
 
-    def chat_with_tools(self, messages: list[dict[str, Any]], tools: list[dict[str, Any]]) -> dict[str, Any]:
+    def chat_with_tools(
+        self,
+        messages: list[dict[str, Any]],
+        tools: list[dict[str, Any]],
+        *,
+        required_tool_name: str | None = None,
+    ) -> dict[str, Any]:
         raise NotImplementedError
 
 
 class OpenAICompatibleAdapter(BaseLLMAdapter):
     missing_detail = "API Key and Model are required when LLM_ENABLED=true"
 
-    def _post(self, url: str, body: dict[str, Any]) -> httpx.Response:
-        for attempt in range(2):
+    _client_lock = threading.RLock()
+    _clients: dict[tuple[str, float, bool], httpx.Client] = {}
+
+    @classmethod
+    def reset_clients(cls) -> None:
+        """Close pooled clients after configuration changes and in tests."""
+        with cls._client_lock:
+            clients = list(cls._clients.values())
+            cls._clients.clear()
+        for client in clients:
             try:
-                with httpx.Client(timeout=self.config["timeout_seconds"]) as client:
-                    return client.post(
-                        url,
-                        headers={"Authorization": f"Bearer {self.api_key}", "Content-Type": "application/json"},
-                        json=body,
-                    )
+                client.close()
+            except Exception:
+                continue
+
+    def _client(self) -> httpx.Client:
+        base_url = str(self.config.get("base_url") or "")
+        timeout = float(self.config["timeout_seconds"])
+        http2 = bool(self.config.get("http2", False))
+        key = (base_url, timeout, http2)
+        with self._client_lock:
+            client = self._clients.get(key)
+            if client is None:
+                client = httpx.Client(
+                    timeout=httpx.Timeout(timeout, connect=min(timeout, 10.0)),
+                    limits=httpx.Limits(max_connections=20, max_keepalive_connections=10, keepalive_expiry=30.0),
+                    http2=http2,
+                )
+                self._clients[key] = client
+            return client
+
+    def _post(self, url: str, body: dict[str, Any], *, protocol: str) -> httpx.Response:
+        provider = str(self.config.get("provider") or "unknown")
+        model = str(self.config.get("model") or "")
+        max_attempts = max(1, int(self.config.get("transport_max_attempts") or 3))
+        failure_threshold = max(1, int(self.config.get("circuit_failure_threshold") or 3))
+        cooldown_seconds = max(1.0, float(self.config.get("circuit_cooldown_seconds") or 30))
+        circuit_error = llm_gateway_runtime.before_request(
+            provider,
+            model,
+            protocol,
+            failure_threshold=failure_threshold,
+            cooldown_seconds=cooldown_seconds,
+        )
+        if circuit_error:
+            raise HTTPException(status_code=503, detail=circuit_error)
+        started = time.perf_counter()
+        last_exception: Exception | None = None
+        for attempt_index in range(max_attempts):
+            try:
+                response = self._client().post(
+                    url,
+                    headers={"Authorization": f"Bearer {self.api_key}", "Content-Type": "application/json"},
+                    json=body,
+                )
+                response.extensions["optiforge_attempt_count"] = attempt_index + 1
+                response.extensions["optiforge_elapsed_ms"] = int((time.perf_counter() - started) * 1000)
+                return response
             except (httpx.ConnectError, httpx.ReadError, httpx.RemoteProtocolError) as exc:
-                if attempt:
-                    raise HTTPException(
-                        status_code=502,
-                        detail={
-                            "code": "LLM_TRANSPORT_ERROR",
-                            "message": "LLM connection interrupted",
-                            "retryable": True,
-                        },
-                    ) from exc
+                last_exception = exc
+                if attempt_index + 1 >= max_attempts:
+                    break
                 logger.warning(
-                    "LLM transport interrupted; retrying once provider=%s model=%s error=%s",
-                    self.config.get("provider"),
-                    self.config.get("model"),
+                    "LLM transport interrupted; retrying provider=%s model=%s protocol=%s attempt=%s/%s error=%s",
+                    provider,
+                    model,
+                    protocol,
+                    attempt_index + 1,
+                    max_attempts,
                     type(exc).__name__,
                 )
-                time.sleep(0.35)
-        raise RuntimeError("unreachable")
+                delay = min(2.0, 0.25 * (2**attempt_index))
+                time.sleep(delay + random.uniform(0, delay * 0.2))
+        elapsed_ms = int((time.perf_counter() - started) * 1000)
+        detail = {
+            "code": "LLM_TRANSPORT_ERROR",
+            "message": "LLM connection interrupted",
+            "retryable": True,
+            "provider": provider,
+            "model": model,
+            "protocol": protocol,
+            "failure_kind": type(last_exception).__name__ if last_exception else "transport_error",
+            "attempt_count": max_attempts,
+            "elapsed_ms": elapsed_ms,
+        }
+        llm_gateway_runtime.record_failure(
+            provider,
+            model,
+            protocol,
+            detail,
+            failure_threshold=failure_threshold,
+            cooldown_seconds=cooldown_seconds,
+        )
+        raise HTTPException(status_code=502, detail=detail) from last_exception
+
+    @staticmethod
+    def _provider_request_id(response: httpx.Response) -> str | None:
+        for name in ("x-request-id", "x-tt-logid", "request-id"):
+            value = response.headers.get(name)
+            if value:
+                return value
+        return None
+
+    def _record_protocol_success(
+        self,
+        response: httpx.Response,
+        protocol: str,
+        *,
+        capability_verified: bool = False,
+    ) -> None:
+        llm_gateway_runtime.record_success(
+            str(self.config.get("provider") or "unknown"),
+            str(self.config.get("model") or ""),
+            protocol,
+            latency_ms=int(response.extensions.get("optiforge_elapsed_ms") or 0),
+            attempt_count=int(response.extensions.get("optiforge_attempt_count") or 1),
+            provider_request_id=self._provider_request_id(response),
+            capability_verified=capability_verified,
+        )
+
+    def _record_protocol_failure(
+        self,
+        protocol: str,
+        *,
+        code: str,
+        message: str,
+        retryable: bool,
+        failure_kind: str,
+        response: httpx.Response | None = None,
+    ) -> None:
+        detail = {
+            "code": code,
+            "message": message,
+            "retryable": retryable,
+            "provider": self.config.get("provider"),
+            "model": self.config.get("model"),
+            "protocol": protocol,
+            "failure_kind": failure_kind,
+            "provider_status": response.status_code if response is not None else None,
+            "provider_request_id": self._provider_request_id(response) if response is not None else None,
+            "attempt_count": int(response.extensions.get("optiforge_attempt_count") or 1) if response is not None else 1,
+            "elapsed_ms": int(response.extensions.get("optiforge_elapsed_ms") or 0) if response is not None else None,
+        }
+        llm_gateway_runtime.record_failure(
+            str(self.config.get("provider") or "unknown"),
+            str(self.config.get("model") or ""),
+            protocol,
+            detail,
+            failure_threshold=max(1, int(self.config.get("circuit_failure_threshold") or 3)),
+            cooldown_seconds=max(1.0, float(self.config.get("circuit_cooldown_seconds") or 30)),
+        )
 
     def _provider_http_error(self, exc: httpx.HTTPStatusError, protocol: str) -> HTTPException:
         response = exc.response
@@ -80,9 +213,15 @@ class OpenAICompatibleAdapter(BaseLLMAdapter):
             detail={
                 "code": "LLM_PROVIDER_REJECTED",
                 "message": "模型服务拒绝了请求，请检查模型能力与协议配置。",
+                "provider": self.config.get("provider"),
+                "model": self.config.get("model"),
                 "provider_status": response.status_code,
                 "protocol": protocol,
                 "retryable": response.status_code == 429 or response.status_code >= 500,
+                "failure_kind": "provider_http_error",
+                "attempt_count": int(response.extensions.get("optiforge_attempt_count") or 1),
+                "elapsed_ms": int(response.extensions.get("optiforge_elapsed_ms") or 0),
+                "provider_request_id": self._provider_request_id(response),
                 "provider_error": provider_detail,
             },
         )
@@ -100,14 +239,24 @@ class OpenAICompatibleAdapter(BaseLLMAdapter):
             "response_format": {"type": "json_object"},
         }
         try:
-            response = self._post(url, body)
+            response = self._post(url, body, protocol="chat_completions")
             response.raise_for_status()
             data = response.json()
             content = data["choices"][0]["message"]["content"]
-            return parser(content)
+            parsed = parser(content)
+            self._record_protocol_success(response, "chat_completions")
+            return parsed
         except HTTPException:
             raise
         except httpx.HTTPStatusError as exc:
+            self._record_protocol_failure(
+                "chat_completions",
+                code="LLM_PROVIDER_REJECTED",
+                message="Provider rejected request",
+                retryable=exc.response.status_code == 429 or exc.response.status_code >= 500,
+                failure_kind="provider_http_error",
+                response=exc.response,
+            )
             raise self._provider_http_error(exc, "chat_completions") from exc
         except httpx.TimeoutException as exc:
             logger.warning(
@@ -116,18 +265,42 @@ class OpenAICompatibleAdapter(BaseLLMAdapter):
                 model,
                 self.config.get("timeout_seconds"),
             )
+            self._record_protocol_failure(
+                "chat_completions",
+                code="LLM_TIMEOUT",
+                message="LLM response timed out",
+                retryable=True,
+                failure_kind=type(exc).__name__,
+            )
             raise HTTPException(
                 status_code=504,
                 detail={
                     "code": "LLM_TIMEOUT",
                     "message": "LLM response timed out",
                     "retryable": True,
+                    "provider": self.config.get("provider"),
+                    "model": model,
+                    "protocol": "chat_completions",
+                    "failure_kind": type(exc).__name__,
                 },
             ) from exc
         except Exception as exc:
+            self._record_protocol_failure(
+                "chat_completions",
+                code="LLM_RESPONSE_INVALID",
+                message="Provider returned an invalid response",
+                retryable=False,
+                failure_kind=type(exc).__name__,
+            )
             raise HTTPException(status_code=502, detail={"message": "LLM request failed", "error": str(exc)}) from exc
 
-    def chat_with_tools(self, messages: list[dict[str, Any]], tools: list[dict[str, Any]]) -> dict[str, Any]:
+    def chat_with_tools(
+        self,
+        messages: list[dict[str, Any]],
+        tools: list[dict[str, Any]],
+        *,
+        required_tool_name: str | None = None,
+    ) -> dict[str, Any]:
         model = self.config["model"]
         if not self.api_key or not model:
             raise HTTPException(status_code=422, detail=self.missing_detail)
@@ -139,22 +312,40 @@ class OpenAICompatibleAdapter(BaseLLMAdapter):
         }
         if tools:
             body["tools"] = tools
-            body["tool_choice"] = "auto"
+            body["tool_choice"] = (
+                {"type": "function", "function": {"name": required_tool_name}}
+                if required_tool_name
+                else "auto"
+            )
             body["parallel_tool_calls"] = False
         try:
-            response = self._post(f"{self.config['base_url']}/chat/completions", body)
+            response = self._post(f"{self.config['base_url']}/chat/completions", body, protocol="chat_completions_tools")
             response.raise_for_status()
             data = response.json()
             message = data["choices"][0]["message"]
-            return {
+            result = {
                 "response_id": data.get("id"),
                 "content": message.get("content") or "",
                 "tool_calls": message.get("tool_calls") or [],
             }
+            self._record_protocol_success(
+                response,
+                "chat_completions_tools",
+                capability_verified=bool(result["tool_calls"]),
+            )
+            return result
         except HTTPException:
             raise
         except httpx.HTTPStatusError as exc:
-            raise self._provider_http_error(exc, "chat_completions") from exc
+            self._record_protocol_failure(
+                "chat_completions_tools",
+                code="LLM_PROVIDER_REJECTED",
+                message="Provider rejected tool request",
+                retryable=exc.response.status_code == 429 or exc.response.status_code >= 500,
+                failure_kind="provider_http_error",
+                response=exc.response,
+            )
+            raise self._provider_http_error(exc, "chat_completions_tools") from exc
         except httpx.TimeoutException as exc:
             logger.warning(
                 "LLM tool request timed out provider=%s model=%s timeout_seconds=%s",
@@ -162,15 +353,33 @@ class OpenAICompatibleAdapter(BaseLLMAdapter):
                 model,
                 self.config.get("timeout_seconds"),
             )
+            self._record_protocol_failure(
+                "chat_completions_tools",
+                code="LLM_TIMEOUT",
+                message="LLM response timed out",
+                retryable=True,
+                failure_kind=type(exc).__name__,
+            )
             raise HTTPException(
                 status_code=504,
                 detail={
                     "code": "LLM_TIMEOUT",
                     "message": "LLM response timed out",
                     "retryable": True,
+                    "provider": self.config.get("provider"),
+                    "model": model,
+                    "protocol": "chat_completions_tools",
+                    "failure_kind": type(exc).__name__,
                 },
             ) from exc
         except Exception as exc:
+            self._record_protocol_failure(
+                "chat_completions_tools",
+                code="LLM_RESPONSE_INVALID",
+                message="Provider returned an invalid tool response",
+                retryable=False,
+                failure_kind=type(exc).__name__,
+            )
             raise HTTPException(status_code=502, detail={"message": "LLM tool request failed", "error": str(exc)}) from exc
 
 
@@ -230,7 +439,13 @@ class VolcengineArkAdapter(OpenAICompatibleAdapter):
             )
         return result
 
-    def chat_with_tools(self, messages: list[dict[str, Any]], tools: list[dict[str, Any]]) -> dict[str, Any]:
+    def chat_with_tools(
+        self,
+        messages: list[dict[str, Any]],
+        tools: list[dict[str, Any]],
+        *,
+        required_tool_name: str | None = None,
+    ) -> dict[str, Any]:
         model = self.config["model"]
         if not self.api_key or not model:
             raise HTTPException(status_code=422, detail=self.missing_detail)
@@ -246,9 +461,13 @@ class VolcengineArkAdapter(OpenAICompatibleAdapter):
         response_tools = self._responses_tools(tools)
         if response_tools:
             body["tools"] = response_tools
-            body["tool_choice"] = "auto"
+            body["tool_choice"] = (
+                {"type": "function", "name": required_tool_name}
+                if required_tool_name
+                else "auto"
+            )
         try:
-            response = self._post(f"{self.config['base_url']}/responses", body)
+            response = self._post(f"{self.config['base_url']}/responses", body, protocol="responses_tools")
             response.raise_for_status()
             data = response.json()
             content_parts: list[str] = []
@@ -269,15 +488,29 @@ class VolcengineArkAdapter(OpenAICompatibleAdapter):
                     for part in item.get("content") or []:
                         if part.get("type") in {"output_text", "text"} and part.get("text"):
                             content_parts.append(str(part["text"]))
-            return {
+            result = {
                 "response_id": data.get("id"),
                 "content": "\n".join(content_parts),
                 "tool_calls": tool_calls,
             }
+            self._record_protocol_success(
+                response,
+                "responses_tools",
+                capability_verified=bool(result["tool_calls"]),
+            )
+            return result
         except HTTPException:
             raise
         except httpx.HTTPStatusError as exc:
-            raise self._provider_http_error(exc, "responses") from exc
+            self._record_protocol_failure(
+                "responses_tools",
+                code="LLM_PROVIDER_REJECTED",
+                message="Provider rejected Responses tool request",
+                retryable=exc.response.status_code == 429 or exc.response.status_code >= 500,
+                failure_kind="provider_http_error",
+                response=exc.response,
+            )
+            raise self._provider_http_error(exc, "responses_tools") from exc
         except httpx.TimeoutException as exc:
             logger.warning(
                 "LLM Responses tool request timed out provider=%s model=%s timeout_seconds=%s",
@@ -285,11 +518,33 @@ class VolcengineArkAdapter(OpenAICompatibleAdapter):
                 model,
                 self.config.get("timeout_seconds"),
             )
+            self._record_protocol_failure(
+                "responses_tools",
+                code="LLM_TIMEOUT",
+                message="LLM response timed out",
+                retryable=True,
+                failure_kind=type(exc).__name__,
+            )
             raise HTTPException(
                 status_code=504,
-                detail={"code": "LLM_TIMEOUT", "message": "LLM response timed out", "retryable": True},
+                detail={
+                    "code": "LLM_TIMEOUT",
+                    "message": "LLM response timed out",
+                    "retryable": True,
+                    "provider": self.config.get("provider"),
+                    "model": model,
+                    "protocol": "responses_tools",
+                    "failure_kind": type(exc).__name__,
+                },
             ) from exc
         except Exception as exc:
+            self._record_protocol_failure(
+                "responses_tools",
+                code="LLM_RESPONSE_INVALID",
+                message="Provider returned an invalid Responses payload",
+                retryable=False,
+                failure_kind=type(exc).__name__,
+            )
             raise HTTPException(
                 status_code=502,
                 detail={"code": "LLM_REQUEST_FAILED", "message": "LLM tool request failed", "retryable": False},
@@ -300,7 +555,13 @@ class DisabledFallbackAdapter(BaseLLMAdapter):
     def chat_json(self, messages: list[dict[str, str]], parser: Any) -> dict[str, Any]:
         return {}
 
-    def chat_with_tools(self, messages: list[dict[str, Any]], tools: list[dict[str, Any]]) -> dict[str, Any]:
+    def chat_with_tools(
+        self,
+        messages: list[dict[str, Any]],
+        tools: list[dict[str, Any]],
+        *,
+        required_tool_name: str | None = None,
+    ) -> dict[str, Any]:
         return {"content": "", "tool_calls": []}
 
 
@@ -328,6 +589,10 @@ class LLMService:
             "timeout_seconds": float(self._override("timeout_seconds", os.getenv("LLM_TIMEOUT_SECONDS", "60"))),
             "temperature": float(self._override("temperature", os.getenv("LLM_TEMPERATURE", "0.2"))),
             "max_tokens": int(self._override("max_tokens", os.getenv("LLM_MAX_TOKENS", "4096"))),
+            "transport_max_attempts": int(self._override("transport_max_attempts", os.getenv("LLM_TRANSPORT_MAX_ATTEMPTS", "3"))),
+            "circuit_failure_threshold": int(self._override("circuit_failure_threshold", os.getenv("LLM_CIRCUIT_FAILURE_THRESHOLD", "3"))),
+            "circuit_cooldown_seconds": float(self._override("circuit_cooldown_seconds", os.getenv("LLM_CIRCUIT_COOLDOWN_SECONDS", "30"))),
+            "http2": str(self._override("http2", os.getenv("LLM_HTTP2", "false"))).strip().lower() in {"1", "true", "yes", "on"},
             "enabled": enabled,
             "api_key_configured": api_key_configured,
             "supported_providers": sorted(SUPPORTED_PROVIDERS),
@@ -337,7 +602,11 @@ class LLMService:
         }
 
     def update_config(self, body: dict[str, Any]) -> dict[str, Any]:
-        allowed = {"provider", "base_url", "model", "enabled", "temperature", "max_tokens", "timeout_seconds"}
+        previous = self.config()
+        allowed = {
+            "provider", "base_url", "model", "enabled", "temperature", "max_tokens", "timeout_seconds",
+            "transport_max_attempts", "circuit_failure_threshold", "circuit_cooldown_seconds", "http2",
+        }
         updates = {key: body[key] for key in allowed if key in body}
         provider = str(updates.get("provider", self.config()["provider"]) or "disabled")
         if provider not in SUPPORTED_PROVIDERS:
@@ -360,12 +629,25 @@ class LLMService:
             updates["key_ciphertext"] = ""
             updates["key_storage"] = ""
         updates.pop("api_key", None)
+        self._validate_runtime_config({**self.config(), **updates})
         updates["last_updated_at"] = datetime.now(timezone.utc).isoformat()
         with STORE.lock:
             STORE.llm_config.pop("api_key", None)
             STORE.llm_config.update(updates)
             STORE.save_runtime()
-        return self.config()
+        OpenAICompatibleAdapter.reset_clients()
+        current = self.config()
+        llm_gateway_runtime.invalidate(
+            str(previous.get("provider") or "unknown"),
+            str(previous.get("model") or ""),
+            self.production_protocol(previous),
+        )
+        llm_gateway_runtime.invalidate(
+            str(current.get("provider") or "unknown"),
+            str(current.get("model") or ""),
+            self.production_protocol(current),
+        )
+        return current
 
     def test(self) -> dict[str, Any]:
         if not self.enabled():
@@ -375,15 +657,43 @@ class LLMService:
                 "message": "LLM is disabled; rule-based fallback is active.",
                 "diagnostics": self._diagnostics(),
                 "config": self._safe_config(),
+                "runtime_health": self.runtime_health(),
             }
         try:
-            content = self.chat_json(
+            probe_tool = {
+                "type": "function",
+                "function": {
+                    "name": "probe_agent_function_call",
+                    "description": "No-op diagnostic used only to verify that the model can emit a function call.",
+                    "parameters": {"type": "object", "properties": {}, "additionalProperties": False},
+                },
+            }
+            response = self.chat_with_tools(
                 [
-                    {"role": "system", "content": "Return JSON only."},
-                    {"role": "user", "content": 'Return {"ok": true, "provider": "volcengine_ark"}'},
-                ]
+                    {"role": "system", "content": "This is a capability probe. Call probe_agent_function_call exactly once and do not answer with text."},
+                    {"role": "user", "content": "Verify function calling now."},
+                ],
+                [probe_tool],
+                required_tool_name="probe_agent_function_call",
             )
-            return {"ok": bool(content.get("ok")), "enabled": True, "response": content, "diagnostics": self._diagnostics(), "config": self._safe_config()}
+            tool_calls = response.get("tool_calls") or []
+            function_call_ok = any(
+                str((call.get("function") or {}).get("name") or "") == "probe_agent_function_call"
+                for call in tool_calls
+            )
+            if not function_call_ok:
+                self._record_capability_failure("模型返回成功，但未按要求产生 Function Calling。")
+            return {
+                "ok": function_call_ok,
+                "enabled": True,
+                "protocol": self.production_protocol(),
+                "function_calling": function_call_ok,
+                "response_id": response.get("response_id"),
+                "message": "Function Calling 协议验证通过。" if function_call_ok else "模型可连接，但 Function Calling 能力验证未通过。",
+                "diagnostics": self._diagnostics(),
+                "config": self._safe_config(),
+                "runtime_health": self.runtime_health(),
+            }
         except HTTPException as exc:
             return {
                 "ok": False,
@@ -391,7 +701,62 @@ class LLMService:
                 "message": "LLM connection test failed.",
                 "diagnostics": self._diagnostics(exc),
                 "config": self._safe_config(),
+                "runtime_health": self.runtime_health(),
             }
+
+    def production_protocol(self, config: dict[str, Any] | None = None) -> str:
+        current = config or self.config()
+        return "responses_tools" if current.get("provider") == "volcengine_ark" else "chat_completions_tools"
+
+    def runtime_health(self) -> dict[str, Any]:
+        config = self.config()
+        protocol = self.production_protocol(config)
+        if not config.get("enabled"):
+            return {
+                "provider": config.get("provider"),
+                "model": config.get("model"),
+                "protocol": protocol,
+                "operational_state": "disabled",
+                "ready": False,
+                "configured": False,
+            }
+        configured = bool(config.get("api_key_configured") and config.get("model"))
+        state = llm_gateway_runtime.snapshot(str(config.get("provider")), str(config.get("model") or ""), protocol)
+        state["configured"] = configured
+        state["ready"] = bool(
+            configured
+            and state.get("operational_state") == "healthy"
+            and state.get("function_calling_verified_at")
+        )
+        return state
+
+    def _record_capability_failure(self, message: str) -> None:
+        config = self.config()
+        protocol = self.production_protocol(config)
+        llm_gateway_runtime.record_failure(
+            str(config.get("provider") or "unknown"),
+            str(config.get("model") or ""),
+            protocol,
+            {
+                "code": "LLM_FUNCTION_CALL_UNAVAILABLE",
+                "message": message,
+                "retryable": False,
+                "protocol": protocol,
+                "failure_kind": "capability_mismatch",
+                "attempt_count": 1,
+            },
+            failure_threshold=1,
+            cooldown_seconds=float(config.get("circuit_cooldown_seconds") or 30),
+        )
+
+    @staticmethod
+    def _validate_runtime_config(config: dict[str, Any]) -> None:
+        if not 1 <= int(config.get("transport_max_attempts") or 0) <= 5:
+            raise HTTPException(status_code=422, detail="transport_max_attempts 必须在 1 到 5 之间。")
+        if not 1 <= int(config.get("circuit_failure_threshold") or 0) <= 20:
+            raise HTTPException(status_code=422, detail="circuit_failure_threshold 必须在 1 到 20 之间。")
+        if not 1 <= float(config.get("circuit_cooldown_seconds") or 0) <= 600:
+            raise HTTPException(status_code=422, detail="circuit_cooldown_seconds 必须在 1 到 600 秒之间。")
 
     def extract_parameters(self, message: str, input_schema: list[dict[str, Any]]) -> dict[str, Any]:
         prompt = {
@@ -477,9 +842,15 @@ class LLMService:
         config = self.config()
         return self._adapter(config).chat_json(messages, self._parse_json)
 
-    def chat_with_tools(self, messages: list[dict[str, Any]], tools: list[dict[str, Any]]) -> dict[str, Any]:
+    def chat_with_tools(
+        self,
+        messages: list[dict[str, Any]],
+        tools: list[dict[str, Any]],
+        *,
+        required_tool_name: str | None = None,
+    ) -> dict[str, Any]:
         config = self.config()
-        return self._adapter(config).chat_with_tools(messages, tools)
+        return self._adapter(config).chat_with_tools(messages, tools, required_tool_name=required_tool_name)
 
     def parse_tool_arguments(self, value: Any) -> dict[str, Any]:
         if isinstance(value, dict):

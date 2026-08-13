@@ -1,5 +1,5 @@
-import { Empty, Tag, Typography } from 'antd';
-import type { AgentRun, AgentRunStatus } from '../../types/agent';
+import { Button, Empty, Tag, Typography } from 'antd';
+import type { AgentRun, AgentRunStatus, AgentV3Turn } from '../../types/agent';
 import { valueText } from './AgentPanels';
 
 const statusMeta: Record<string, { label: string; color: string; step: number }> = {
@@ -22,6 +22,50 @@ const steps = ['识别场景', '检查参数', '人工确认', '模型求解', '
 
 export function runStatusMeta(status?: string) {
   return statusMeta[String(status || '').toUpperCase()] || { label: status || '未开始', color: 'default', step: -1 };
+}
+
+const turnStatusMeta: Record<string, { label: string; color: string }> = {
+  RUNNING: { label: 'Agent 正在处理', color: 'processing' },
+  SUCCEEDED: { label: '已回复', color: 'success' },
+  FAILED: { label: '本轮失败', color: 'error' },
+  INTERRUPTED: { label: '处理已中断', color: 'warning' },
+};
+
+export function agentTurnStatusMeta(status?: string) {
+  return turnStatusMeta[String(status || '').toUpperCase()] || { label: status || '未开始', color: 'default' };
+}
+
+export function AgentTurnActivity({ turns, retryingTurnId, onRetry }: {
+  turns?: AgentV3Turn[];
+  retryingTurnId?: string;
+  onRetry?: (turn: AgentV3Turn) => void;
+}) {
+  const recent = [...(turns || [])].reverse().slice(0, 12);
+  if (!recent.length) return null;
+  return (
+    <section className="agent-turn-activity" aria-label="对话活动">
+      <Typography.Text strong>对话活动</Typography.Text>
+      <div className="agent-turn-activity-list">
+        {recent.map(turn => {
+          const meta = agentTurnStatusMeta(turn.status);
+          return (
+            <article className={`agent-turn-activity-item ${String(turn.status).toLowerCase()}`} key={turn.turn_id}>
+              <div className="agent-turn-activity-heading">
+                <Tag color={meta.color}>{meta.label}</Tag>
+                {typeof turn.duration_ms === 'number' && <small>{(turn.duration_ms / 1000).toFixed(1)} 秒</small>}
+              </div>
+              <strong>{turn.input || '未命名请求'}</strong>
+              {turn.error?.message && <span>{turn.error.message}</span>}
+              <small>{turn.completed_at || turn.started_at || ''}</small>
+              {turn.retryable && onRetry && (
+                <Button size="small" type="link" loading={retryingTurnId === turn.turn_id} onClick={() => onRetry(turn)}>重试本轮</Button>
+              )}
+            </article>
+          );
+        })}
+      </div>
+    </section>
+  );
 }
 
 export function AgentRunInspector({ run }: { run?: AgentRun }) {

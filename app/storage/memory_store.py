@@ -14,7 +14,7 @@ from app.schemas.solve import TaskRecord, TaskRecordState
 
 
 LOGGER = logging.getLogger(__name__)
-RUNTIME_SCHEMA_VERSION = 7
+RUNTIME_SCHEMA_VERSION = 8
 INTERRUPTED_TASK_STATUSES = {"PENDING", "QUEUED", "VALIDATING", "BUILDING_MODEL", "SOLVING", "FORMATTING_RESULT", "RUNNING"}
 MODEL_STATUS_MIGRATIONS = {
     "draft": "developing",
@@ -27,6 +27,11 @@ MODEL_STATUS_MIGRATIONS = {
     "已下线": "offline",
     "发布失败": "publish_failed",
 }
+RENAMED_RUNTIME_FIELDS = {
+    "legacy_business_explanation": "business_explanation",
+    "legacy_objective_code": "objective_code",
+}
+RETIRED_RUNTIME_FIELDS = {"legacy_preset", "legacy_used_as"}
 
 
 class MemoryStore:
@@ -42,6 +47,7 @@ class MemoryStore:
         self.conversations: dict[str, dict[str, Any]] = {}
         self.agent_runs: dict[str, dict[str, Any]] = {}
         self.agent_tasks: dict[str, dict[str, Any]] = {}
+        self.agent_turns: dict[str, dict[str, Any]] = {}
         self.agent_events: dict[str, list[dict[str, Any]]] = {}
         self.tool_invocations: dict[str, dict[str, Any]] = {}
         self.agent_approvals: dict[str, dict[str, Any]] = {}
@@ -94,6 +100,7 @@ class MemoryStore:
                 "conversations": self.conversations,
                 "agent_runs": self.agent_runs,
                 "agent_tasks": self.agent_tasks,
+                "agent_turns": self.agent_turns,
                 "agent_events": self.agent_events,
                 "tool_invocations": self.tool_invocations,
                 "agent_approvals": self.agent_approvals,
@@ -130,7 +137,7 @@ class MemoryStore:
             payload = self._migrate_payload(payload)
             section_names = (
                 "models", "model_versions", "active_model_versions", "assets", "tasks", "results",
-                "invocations", "skills", "conversations", "agent_runs", "agent_tasks", "agent_events",
+                "invocations", "skills", "conversations", "agent_runs", "agent_tasks", "agent_turns", "agent_events",
                 "tool_invocations", "agent_approvals", "llm_config", "system_config",
                 "custom_components", "function_assets",
             )
@@ -157,6 +164,7 @@ class MemoryStore:
             self.conversations.update(sections["conversations"])
             self.agent_runs.update(sections["agent_runs"])
             self.agent_tasks.update(sections["agent_tasks"])
+            self.agent_turns.update(sections["agent_turns"])
             self.agent_events.update(sections["agent_events"])
             self.tool_invocations.update(sections["tool_invocations"])
             self.agent_approvals.update(sections["agent_approvals"])
@@ -216,14 +224,161 @@ class MemoryStore:
             self._migrate_agent_tasks_to_isolated_contexts(migrated)
             LOGGER.info("Migrated Agent runtime to isolated task contexts (v7)")
             version = 7
+        if version == 7:
+            self._migrate_agent_turn_lifecycle(migrated)
+            LOGGER.info("Migrated Agent runtime to durable turn lifecycle (v8)")
+            version = 8
         migrated.setdefault("agent_runs", {})
         migrated.setdefault("agent_tasks", {})
+        migrated.setdefault("agent_turns", {})
         migrated.setdefault("agent_events", {})
         migrated.setdefault("tool_invocations", {})
         migrated.setdefault("agent_approvals", {})
         migrated = self._normalize_deprecated_markers(migrated)
         migrated["schema_version"] = RUNTIME_SCHEMA_VERSION
         return migrated
+
+    @staticmethod
+    def _migrate_agent_turn_lifecycle(payload: dict[str, Any]) -> None:
+        """Materialize turns and remove transport failures from chat memory.
+
+        Earlier runtimes represented provider failures as assistant messages.
+        That mixed infrastructure state into both the visible conversation and
+        the next model prompt.  V8 keeps the accepted user message, turns the
+        failure into a durable turn record, and rebuilds model memory from
+        successful visible turns only for affected conversations.
+        """
+        conversations = payload.setdefault("conversations", {})
+        events_by_conversation = payload.setdefault("agent_events", {})
+        turns = payload.setdefault("agent_turns", {})
+
+        def event_message(event: dict[str, Any]) -> dict[str, Any]:
+            item = (event.get("payload") or {}).get("message")
+            return item if isinstance(item, dict) else {}
+
+        def elapsed_ms(started_at: Any, completed_at: Any) -> int | None:
+            try:
+                started = datetime.fromisoformat(str(started_at))
+                completed = datetime.fromisoformat(str(completed_at))
+                return max(0, int((completed - started).total_seconds() * 1000))
+            except (TypeError, ValueError):
+                return None
+
+        for conversation_id, conversation in conversations.items():
+            if not isinstance(conversation, dict) or conversation.get("kind") == "task_context":
+                continue
+            messages = [item for item in conversation.get("messages") or [] if isinstance(item, dict)]
+            events = [item for item in events_by_conversation.get(conversation_id) or [] if isinstance(item, dict)]
+            event_times: dict[str, str] = {}
+            failed_events: dict[str, dict[str, Any]] = {}
+            task_ids_by_turn: dict[str, list[str]] = {}
+            for event in events:
+                turn_id = str(event.get("turn_id") or "")
+                if not turn_id:
+                    continue
+                message_id = str(event_message(event).get("message_id") or "")
+                if message_id and event.get("created_at"):
+                    event_times.setdefault(message_id, str(event["created_at"]))
+                if event.get("type") == "turn.failed":
+                    failed_events[turn_id] = event
+                task_id = str(event.get("task_id") or "")
+                if task_id and task_id not in task_ids_by_turn.setdefault(turn_id, []):
+                    task_ids_by_turn[turn_id].append(task_id)
+
+            messages_by_turn: dict[str, list[dict[str, Any]]] = {}
+            failed_turn_ids: set[str] = set(failed_events)
+            for message in messages:
+                message_id = str(message.get("message_id") or "")
+                if not message.get("created_at") and message_id in event_times:
+                    message["created_at"] = event_times[message_id]
+                turn_id = str(message.get("turn_id") or "")
+                if turn_id:
+                    messages_by_turn.setdefault(turn_id, []).append(message)
+                if (message.get("metadata") or {}).get("delivery_status") == "failed" and turn_id:
+                    failed_turn_ids.add(turn_id)
+
+            for turn_id, turn_messages in messages_by_turn.items():
+                user_message = next((item for item in turn_messages if item.get("role") == "user"), None)
+                assistant_message = next((
+                    item for item in reversed(turn_messages)
+                    if item.get("role") == "assistant"
+                    and (item.get("metadata") or {}).get("delivery_status") != "failed"
+                ), None)
+                failure_message = next((
+                    item for item in reversed(turn_messages)
+                    if (item.get("metadata") or {}).get("delivery_status") == "failed"
+                ), None)
+                failure_event = failed_events.get(turn_id)
+                failed = turn_id in failed_turn_ids
+                started_at = (
+                    (user_message or {}).get("created_at")
+                    or next((event.get("created_at") for event in events if event.get("turn_id") == turn_id), None)
+                    or conversation.get("created_at")
+                )
+                completed_at = (
+                    (failure_event or {}).get("created_at")
+                    or (assistant_message or {}).get("created_at")
+                    or conversation.get("updated_at")
+                )
+                metadata = dict((user_message or {}).get("metadata") or {})
+                client_turn_id = metadata.pop("client_turn_id", None)
+                error_code = str((failure_message or {}).get("metadata", {}).get("error_code") or "TURN_FAILED")
+                error = None
+                if failed:
+                    error = {
+                        "code": error_code,
+                        "message": (failure_message or {}).get("text") or "本轮处理未能完成",
+                        "retryable": bool((failure_message or {}).get("metadata", {}).get("retryable", True)),
+                        "detail": (failure_event or {}).get("payload", {}).get("error"),
+                    }
+                turns.setdefault(turn_id, {
+                    "turn_id": turn_id,
+                    "conversation_id": conversation_id,
+                    "client_turn_id": client_turn_id,
+                    "request_fingerprint": None,
+                    "status": "FAILED" if failed else "SUCCEEDED" if assistant_message else "INTERRUPTED",
+                    "phase": "FAILED" if failed else "COMPLETED" if assistant_message else "INTERRUPTED",
+                    "input": str((user_message or {}).get("text") or (user_message or {}).get("content") or ""),
+                    "metadata": metadata,
+                    "input_message_id": (user_message or {}).get("message_id"),
+                    "response_message_id": (assistant_message or {}).get("message_id"),
+                    "provider_response_id": None,
+                    "task_ids": task_ids_by_turn.get(turn_id, []),
+                    "approval_ids": [],
+                    "attempt_count": 1,
+                    "retryable": bool((error or {}).get("retryable", False)),
+                    "error": error,
+                    "started_at": started_at,
+                    "completed_at": completed_at,
+                    "duration_ms": elapsed_ms(started_at, completed_at),
+                    "created_at": started_at,
+                    "updated_at": completed_at,
+                })
+
+            if failed_turn_ids:
+                conversation["messages"] = [
+                    message for message in messages
+                    if (message.get("metadata") or {}).get("delivery_status") != "failed"
+                ]
+                # Only successful turns are valid model memory.  Task state and
+                # tool audit remain authoritative in their dedicated stores.
+                conversation["model_messages"] = [
+                    {
+                        "role": message.get("role"),
+                        "content": str(message.get("text") or message.get("content") or ""),
+                    }
+                    for message in conversation["messages"]
+                    if message.get("role") in {"user", "assistant"}
+                    and str(message.get("turn_id") or "") not in failed_turn_ids
+                    and str(message.get("text") or message.get("content") or "").strip()
+                ]
+                latest_turn = max(
+                    (turn for turn in turns.values() if turn.get("conversation_id") == conversation_id),
+                    key=lambda item: str(item.get("completed_at") or item.get("started_at") or ""),
+                    default=None,
+                )
+                conversation["status"] = "CHAT_ERROR" if latest_turn and latest_turn.get("status") == "FAILED" else "CHAT_IDLE"
+            conversation.pop("turn_receipts", None)
 
     @staticmethod
     def _migrate_agent_tasks_to_isolated_contexts(payload: dict[str, Any]) -> None:
@@ -319,14 +474,15 @@ class MemoryStore:
         Prefix-wide deletion previously removed legitimate relationship fields
         such as legacy_run_id and made persisted records non-recoverable.
         """
-        marker_prefix = "legacy" + "_"
         if isinstance(value, dict):
             normalized: dict[Any, Any] = {}
             for key, item in value.items():
-                if str(key) in {"legacy_business_explanation", "legacy_objective_code"}:
-                    suffix = str(key)[len(marker_prefix):]
+                field_name = str(key)
+                if field_name in RETIRED_RUNTIME_FIELDS:
+                    continue
+                if field_name in RENAMED_RUNTIME_FIELDS:
                     normalized_item = cls._normalize_deprecated_markers(item)
-                    normalized.setdefault(suffix, normalized_item)
+                    normalized.setdefault(RENAMED_RUNTIME_FIELDS[field_name], normalized_item)
                     continue
                 normalized[key] = cls._normalize_deprecated_markers(item)
             return normalized
@@ -365,6 +521,26 @@ class MemoryStore:
     def _interrupt_recovered_agent_v3_work(self) -> bool:
         interrupted = False
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        for turn in self.agent_turns.values():
+            if str(turn.get("status") or "").upper() != "RUNNING":
+                continue
+            interrupted = True
+            error = {
+                "code": "AGENT_RESTARTED",
+                "message": "服务重启中断了本轮处理，可直接重试本轮。",
+                "retryable": True,
+                "failure_kind": "service_restart",
+            }
+            turn["status"] = "INTERRUPTED"
+            turn["phase"] = "INTERRUPTED"
+            turn["retryable"] = True
+            turn["error"] = error
+            turn["completed_at"] = timestamp
+            turn["updated_at"] = timestamp
+            attempts = list(turn.get("attempts") or [])
+            if attempts and str(attempts[-1].get("status") or "").upper() == "RUNNING":
+                attempts[-1] = {**attempts[-1], "status": "INTERRUPTED", "completed_at": timestamp, "error": error}
+                turn["attempts"] = attempts
         for task in self.agent_tasks.values():
             task.setdefault("revision", 1)
             if str(task.get("status") or "").upper() not in {"PENDING", "RUNNING"}:

@@ -58,3 +58,10 @@ class AgentTurnRequest(BaseModel):
 class AgentApprovalRequest(BaseModel):
     decision: Literal["approve", "reject"]
     comment: str | None = Field(default=None, max_length=2_000)
+
+
+class AgentTurnStatus(StrEnum):
+    RUNNING = "RUNNING"
+    SUCCEEDED = "SUCCEEDED"
+    FAILED = "FAILED"
+    INTERRUPTED = "INTERRUPTED"

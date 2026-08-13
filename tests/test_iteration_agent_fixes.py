@@ -54,11 +54,13 @@ def test_llm_tool_timeout_has_a_retryable_structured_error(monkeypatch) -> None:
         adapter.chat_with_tools([{"role": "user", "content": "hello"}], [])
 
     assert raised.value.status_code == 504
-    assert raised.value.detail == {
-        "code": "LLM_TIMEOUT",
-        "message": "LLM response timed out",
-        "retryable": True,
-    }
+    assert raised.value.detail["code"] == "LLM_TIMEOUT"
+    assert raised.value.detail["message"] == "LLM response timed out"
+    assert raised.value.detail["retryable"] is True
+    assert raised.value.detail["provider"] == "openai_compatible"
+    assert raised.value.detail["model"] == "test-model"
+    assert raised.value.detail["protocol"] == "chat_completions_tools"
+    assert raised.value.detail["failure_kind"] == "ReadTimeout"
 
 
 def test_llm_tool_transport_interruption_retries_once(monkeypatch) -> None:
@@ -118,9 +120,9 @@ def test_volcengine_tool_call_uses_responses_protocol(monkeypatch) -> None:
         "secret-key",
     )
 
-    def fake_post(url: str, body: dict):
-        captured.update({"url": url, "body": body})
-        return httpx.Response(
+    def fake_post(url: str, body: dict, *, protocol: str):
+        captured.update({"url": url, "body": body, "protocol": protocol})
+        response = httpx.Response(
             200,
             request=httpx.Request("POST", url),
             json={
@@ -135,6 +137,9 @@ def test_volcengine_tool_call_uses_responses_protocol(monkeypatch) -> None:
                 ],
             },
         )
+        response.extensions["optiforge_attempt_count"] = 1
+        response.extensions["optiforge_elapsed_ms"] = 1
+        return response
 
     monkeypatch.setattr(adapter, "_post", fake_post)
     response = adapter.chat_with_tools(
@@ -153,13 +158,16 @@ def test_volcengine_tool_call_uses_responses_protocol(monkeypatch) -> None:
                 },
             }
         ],
+        required_tool_name="optimization_create_or_continue",
     )
 
     body = captured["body"]
     assert captured["url"] == "https://ark.example.test/api/v3/responses"
+    assert captured["protocol"] == "responses_tools"
     assert body["instructions"] == "Use the optimization Skill."
     assert body["input"] == [{"type": "message", "role": "user", "content": "Create a dispatch task."}]
     assert body["tools"][0]["name"] == "optimization_create_or_continue"
+    assert body["tool_choice"] == {"type": "function", "name": "optimization_create_or_continue"}
     assert "function" not in body["tools"][0]
     assert response["tool_calls"][0]["function"]["name"] == "optimization_create_or_continue"
 
@@ -199,6 +207,54 @@ def test_volcengine_responses_input_preserves_function_call_outputs() -> None:
             "output": '{"status":"WAITING_INPUT"}',
         },
     ]
+
+
+def test_llm_health_probe_uses_the_same_forced_tool_protocol_as_agent_turns(monkeypatch) -> None:
+    service = LLMService()
+    observed: dict[str, object] = {}
+    config = {
+        "provider": "volcengine_ark",
+        "base_url": "https://ark.example.test/api/v3",
+        "model": "agent-model",
+        "enabled": True,
+        "api_key_configured": True,
+        "timeout_seconds": 60,
+        "temperature": 0.2,
+        "max_tokens": 100,
+        "transport_max_attempts": 3,
+        "circuit_failure_threshold": 3,
+        "circuit_cooldown_seconds": 30,
+        "http2": False,
+    }
+
+    monkeypatch.setattr(service, "enabled", lambda: True)
+    monkeypatch.setattr(service, "config", lambda: dict(config))
+    monkeypatch.setattr(service, "runtime_health", lambda: {
+        "operational_state": "healthy",
+        "ready": True,
+        "function_calling_verified_at": "2026-08-13 10:00:00",
+    })
+
+    def fake_chat(messages, tools, *, required_tool_name=None):
+        observed.update({"messages": messages, "tools": tools, "required_tool_name": required_tool_name})
+        return {
+            "response_id": "resp-probe",
+            "content": "",
+            "tool_calls": [{
+                "id": "call-probe",
+                "function": {"name": "probe_agent_function_call", "arguments": "{}"},
+            }],
+        }
+
+    monkeypatch.setattr(service, "chat_with_tools", fake_chat)
+
+    result = service.test()
+
+    assert result["ok"] is True
+    assert result["function_calling"] is True
+    assert result["protocol"] == "responses_tools"
+    assert observed["required_tool_name"] == "probe_agent_function_call"
+    assert observed["tools"][0]["function"]["name"] == "probe_agent_function_call"
 
 
 def test_llm_config_save_and_reload(monkeypatch) -> None:

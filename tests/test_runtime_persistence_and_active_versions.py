@@ -18,7 +18,7 @@ from app.services.invocation_service import invocation_service
 from app.services.job_service import job_service
 from app.services.model_service import model_service
 from app.services.skill_registry import skill_registry
-from app.storage.memory_store import MemoryStore, STORE
+from app.storage.memory_store import MemoryStore, RUNTIME_SCHEMA_VERSION, STORE
 from app.utils import has_pyomo
 from tests.test_model_skill_invocation import minimal_dispatch_payload
 
@@ -74,7 +74,7 @@ def test_runtime_schema_v3_restores_models_versions_assets_tasks_and_results(tmp
 
     store.save_runtime()
     payload = json.loads(path.read_text(encoding="utf-8"))
-    assert payload["schema_version"] == 4
+    assert payload["schema_version"] == RUNTIME_SCHEMA_VERSION
     assert "TOP-SECRET-RUNTIME-KEY" not in path.read_text(encoding="utf-8")
     assert set(payload["models"]) == {user_model.id}
     assert "builtin:runtime_case" not in payload["model_versions"]
@@ -117,7 +117,7 @@ def test_runtime_schema_v2_permanently_migrates_tested_model_status_to_trial(tmp
     assert restored.models[historical_model["id"]].status == "trial"
     assert restored.model_versions["FAMILY-STATUS-MIGRATION"][0]["status"] == "trial"
     migrated_payload = json.loads(path.read_text(encoding="utf-8"))
-    assert migrated_payload["schema_version"] == 4
+    assert migrated_payload["schema_version"] == RUNTIME_SCHEMA_VERSION
     assert migrated_payload["models"][historical_model["id"]]["status"] == "trial"
     assert migrated_payload["model_versions"]["FAMILY-STATUS-MIGRATION"][0]["status"] == "trial"
 
@@ -126,15 +126,21 @@ def test_runtime_schema_v3_removes_deprecated_marker_fields(tmp_path, monkeypatc
     path = tmp_path / "runtime_store_markers.json"
     marker_key = "legacy" + "_preset"
     audit_key = "legacy" + "_used_as"
+    relationship_key = "legacy" + "_run_id"
     path.write_text(json.dumps({
         "schema_version": 3,
         "models": {},
         "model_versions": {},
         "active_model_versions": {},
         "custom_components": {
-            "hydro": {marker_key: True, "component_family": "legacy preset"},
+            "hydro": {
+                marker_key: True,
+                audit_key: "legacy" + "_explicit_skill_match",
+                relationship_key: "RUN-KEEP",
+                "component_family": "legacy preset",
+            },
         },
-        "tasks": {"TASK": {"audit": {audit_key: "legacy" + "_explicit_skill_match"}}},
+        "tasks": {},
     }, ensure_ascii=False), encoding="utf-8")
     monkeypatch.setenv("OPTIFORGE_RUNTIME_STORE", str(path))
 
@@ -142,11 +148,99 @@ def test_runtime_schema_v3_removes_deprecated_marker_fields(tmp_path, monkeypatc
 
     migrated_payload = json.loads(path.read_text(encoding="utf-8"))
     serialized = path.read_text(encoding="utf-8")
-    assert migrated_payload["schema_version"] == 4
+    assert migrated_payload["schema_version"] == RUNTIME_SCHEMA_VERSION
     assert marker_key not in serialized
     assert audit_key not in serialized
+    assert migrated_payload["custom_components"]["hydro"][relationship_key] == "RUN-KEEP"
     assert migrated_payload["custom_components"]["hydro"]["component_family"] == "hydro preset"
     assert "explicit_skill_match" not in serialized
+
+
+def test_runtime_schema_v7_migrates_failed_agent_messages_to_durable_turns(tmp_path, monkeypatch) -> None:
+    path = tmp_path / "runtime_store_turn_migration.json"
+    path.write_text(json.dumps({
+        "schema_version": 7,
+        "models": {},
+        "model_versions": {},
+        "active_model_versions": {},
+        "assets": {},
+        "tasks": {},
+        "results": {},
+        "invocations": {},
+        "skills": {},
+        "agent_runs": {},
+        "agent_tasks": {},
+        "agent_events": {
+            "CONV-HISTORY": [
+                {
+                    "event_id": "EVT-1", "sequence": 1, "type": "message.completed",
+                    "conversation_id": "CONV-HISTORY", "turn_id": "TURN-OK",
+                    "created_at": "2026-08-11 10:00:00",
+                    "payload": {"message": {"message_id": "MSG-U1"}},
+                },
+                {
+                    "event_id": "EVT-2", "sequence": 2, "type": "message.completed",
+                    "conversation_id": "CONV-HISTORY", "turn_id": "TURN-FAILED",
+                    "created_at": "2026-08-11 10:01:00",
+                    "payload": {"message": {"message_id": "MSG-U2"}},
+                },
+                {
+                    "event_id": "EVT-3", "sequence": 3, "type": "turn.failed",
+                    "conversation_id": "CONV-HISTORY", "turn_id": "TURN-FAILED",
+                    "created_at": "2026-08-11 10:01:14",
+                    "payload": {"error": {"code": "LLM_TRANSPORT_ERROR"}},
+                },
+            ],
+        },
+        "tool_invocations": {},
+        "agent_approvals": {},
+        "llm_config": {},
+        "system_config": {},
+        "custom_components": {},
+        "function_assets": {},
+        "conversations": {
+            "CONV-HISTORY": {
+                "conversation_id": "CONV-HISTORY",
+                "title": "历史失败",
+                "created_at": "2026-08-11 10:00:00",
+                "updated_at": "2026-08-11 10:01:14",
+                "status": "CHAT_ERROR",
+                "messages": [
+                    {"message_id": "MSG-U1", "turn_id": "TURN-OK", "role": "user", "text": "你好"},
+                    {"message_id": "MSG-A1", "turn_id": "TURN-OK", "role": "assistant", "text": "你好！"},
+                    {"message_id": "MSG-U2", "turn_id": "TURN-FAILED", "role": "user", "text": "创建调度任务"},
+                    {
+                        "message_id": "MSG-A2", "turn_id": "TURN-FAILED", "role": "assistant",
+                        "text": "本轮处理未能完成，请稍后重试。",
+                        "metadata": {"delivery_status": "failed", "error_code": "LLM_TRANSPORT_ERROR", "retryable": True},
+                    },
+                ],
+                "model_messages": [
+                    {"role": "user", "content": "你好"},
+                    {"role": "assistant", "content": "你好！"},
+                    {"role": "user", "content": "创建调度任务"},
+                    {"role": "assistant", "content": "本轮处理未能完成，请稍后重试。"},
+                ],
+                "turn_receipts": {"client-old": {"status": "FAILED", "response": {"conversation": "large"}}},
+            },
+        },
+    }, ensure_ascii=False), encoding="utf-8")
+    monkeypatch.setenv("OPTIFORGE_RUNTIME_STORE", str(path))
+
+    restored = MemoryStore()
+
+    conversation = restored.conversations["CONV-HISTORY"]
+    assert [message["message_id"] for message in conversation["messages"]] == ["MSG-U1", "MSG-A1", "MSG-U2"]
+    assert conversation["model_messages"] == [
+        {"role": "user", "content": "你好"},
+        {"role": "assistant", "content": "你好！"},
+    ]
+    assert "turn_receipts" not in conversation
+    failed_turn = restored.agent_turns["TURN-FAILED"]
+    assert failed_turn["status"] == "FAILED"
+    assert failed_turn["retryable"] is True
+    assert failed_turn["error"]["code"] == "LLM_TRANSPORT_ERROR"
+    assert failed_turn["duration_ms"] == 14_000
 
 
 def test_runtime_persistence_survives_fresh_backend_process(tmp_path) -> None:
