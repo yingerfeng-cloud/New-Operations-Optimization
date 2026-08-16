@@ -5,6 +5,7 @@ import uuid
 from fastapi.testclient import TestClient
 
 from app.main import app
+from app.agent.run_store import agent_run_store
 
 
 client = TestClient(app)
@@ -74,3 +75,23 @@ def test_delete_conversation_cascades_to_agent_runs() -> None:
     assert deleted.json()["deleted_run_count"] == 1
     assert client.get(f"/api/agent/conversations/{cid}").status_code == 404
     assert client.get(f"/api/agent/runs/{run_id}").status_code == 404
+
+
+def test_run_title_tracks_the_current_workflow_after_a_skill_change() -> None:
+    cid = _cid("TITLE")
+    run = agent_run_store.create(
+        cid,
+        {"workflow_state": "PARAM_COLLECTING", "agent_skill_name": "unit_commitment_day_ahead"},
+    )
+
+    updated = agent_run_store.update_from_response(
+        run["run_id"],
+        {
+            "workflow_state": "PARAM_COLLECTING",
+            "agent_skill_name": "contract_spot_exposure_v1",
+            "display_name": "中长期合约分解与现货暴露控制模型",
+        },
+    )
+
+    assert updated["title"] == "中长期合约分解与现货暴露控制模型"
+    assert updated["agent_skill_name"] == "contract_spot_exposure_v1"

@@ -67,6 +67,7 @@ export interface AgentV3Turn {
   status: AgentV3TurnStatus;
   phase?: string;
   input?: string;
+  task_ids?: string[];
   attempt_count?: number;
   retryable?: boolean;
   error?: AgentV3TurnError | null;
@@ -90,6 +91,12 @@ export interface AgentV3Task {
   result?: AgentAnalyzeResponse | Record<string, unknown> | null;
   error?: string | null;
   optimization_run_id?: string;
+  workflow_key?: string;
+  completion_reason?: string;
+  supersedes_task_id?: string;
+  superseded_by_task_id?: string;
+  created_turn_id?: string;
+  last_turn_id?: string;
   created_at?: string;
   updated_at?: string;
 }

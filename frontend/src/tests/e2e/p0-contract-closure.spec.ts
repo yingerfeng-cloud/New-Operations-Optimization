@@ -211,25 +211,43 @@ test('completed MIP task renders and replays the real optimal-solution search', 
 
 test('business Agent request does not carry expert Skill', async ({ page }) => {
   await mockApi(page);
-  let analyzePayload: Record<string, unknown> = {};
+  let turnPayload: Record<string, unknown> = {};
   await page.route('**/api/agent/**', async route => {
     const url = route.request().url();
     let body: unknown = [];
     if (url.endsWith('/status')) body = { platform: { reachable: true }, llm: { enabled: true } };
     else if (url.endsWith('/agent-skills')) body = [{ name: 'dispatch_agent', display_name: '调度 Agent', enabled: true }];
-    else if (url.endsWith('/conversations')) body = [];
-    else if (url.endsWith('/analyze')) { analyzePayload = route.request().postDataJSON(); body = { conversation_id: 'C1', status: 'CHAT_IDLE', agent_message: '已识别' }; }
+    else if (url.endsWith('/conversations')) body = route.request().method() === 'POST'
+      ? { conversation_id: 'C1', title: '新会话', status: 'CHAT_IDLE', messages: [], agent_tasks: [], turns: [], events: [] }
+      : [];
+    else if (url.includes('/v3/conversations/C1/turns')) {
+      turnPayload = route.request().postDataJSON();
+      const turn = { turn_id: 'T1', conversation_id: 'C1', status: 'SUCCEEDED', input: '生成调度计划' };
+      body = {
+        conversation_id: 'C1',
+        turn_id: 'T1',
+        message: { role: 'assistant', text: '已识别' },
+        tasks: [],
+        approvals: [],
+        event_cursor: 0,
+        turn,
+        conversation: { conversation_id: 'C1', title: '新会话', status: 'CHAT_IDLE', messages: [{ role: 'user', text: '生成调度计划' }, { role: 'assistant', text: '已识别' }], agent_tasks: [], turns: [turn], events: [] },
+      };
+    }
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) });
   });
   await page.goto('/agents');
-  await page.getByRole('button', { name: '专家视图' }).click();
-  await page.getByLabel('指定 Skill').click();
-  await page.getByLabel('指定 Skill').press('ArrowDown');
-  await page.getByLabel('指定 Skill').press('Enter');
-  await page.getByRole('button', { name: '返回业务视图' }).click();
-  await page.getByPlaceholder('描述优化目标、时间范围和可用数据').fill('生成调度计划');
-  await page.getByRole('button', { name: '发送需求' }).click();
-  await expect.poll(() => analyzePayload.message).toBe('生成调度计划');
-  expect(analyzePayload).not.toHaveProperty('agent_skill_name');
-  expect(analyzePayload).not.toHaveProperty('skill_name');
+  await page.getByRole('button', { name: '查看运行详情' }).click();
+  await page.getByRole('button', { name: '诊断信息' }).click();
+  await page.getByRole('tab', { name: /路由与参数/ }).click();
+  const skillSelect = page.getByRole('combobox', { name: '指定 Skill' });
+  await skillSelect.click();
+  await skillSelect.press('ArrowDown');
+  await skillSelect.press('Enter');
+  await page.getByRole('button', { name: '收起诊断' }).click();
+  await page.getByRole('button', { name: '关闭运行检查器' }).click();
+  await page.getByPlaceholder('给 Agent 发消息').fill('生成调度计划');
+  await page.getByRole('button', { name: '发送' }).click();
+  await expect.poll(() => turnPayload.message).toBe('生成调度计划');
+  expect(turnPayload.metadata).toEqual({});
 });

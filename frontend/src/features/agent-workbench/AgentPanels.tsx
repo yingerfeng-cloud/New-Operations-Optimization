@@ -146,12 +146,14 @@ export function AgentModelDecisionCard({
   onChoose,
   onReviewParameters,
   onStartParameterInput,
+  onBatchParameterInput,
 }: {
   response?: AgentAnalyzeResponse;
   choosing?: boolean;
   onChoose: (skillName: string, label: string) => void;
   onReviewParameters?: () => void;
   onStartParameterInput?: () => void;
+  onBatchParameterInput?: () => void;
 }) {
   if (!response) return null;
   const candidates = (response.candidate_skills || []).filter(candidate => modelCandidateSkill(candidate));
@@ -218,7 +220,8 @@ export function AgentModelDecisionCard({
 
       {!requiresChoice && (
         <div className="agent-model-actions">
-          {missingCount > 0 && onStartParameterInput && <Button type="primary" onClick={onStartParameterInput}>补充参数</Button>}
+          {missingCount > 0 && onBatchParameterInput && <Button type="primary" onClick={onBatchParameterInput}>批量补充参数</Button>}
+          {missingCount > 0 && !onBatchParameterInput && onStartParameterInput && <Button type="primary" onClick={onStartParameterInput}>填写下一个参数</Button>}
           {missingCount > 0 && onReviewParameters && <Button onClick={onReviewParameters}>{`查看所需参数（${missingCount}）`}</Button>}
         </div>
       )}

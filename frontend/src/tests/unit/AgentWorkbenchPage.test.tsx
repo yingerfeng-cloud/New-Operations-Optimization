@@ -232,8 +232,10 @@ test('loads agent status, skills and sends a V3 Agent turn', async () => {
   expect(testState.createAgentTurn).toHaveBeenCalledWith('CONV-1', '请创建日前调度模型', {}, expect.any(String));
   expect((await screen.findAllByText('参数已抽取，等待确认调用')).length).toBeGreaterThan(0);
   fireEvent.click(screen.getByRole('button', { name: '查看运行详情' }));
-  expect(screen.getAllByText('build_and_run_model').length).toBeGreaterThan(0);
-  expect(screen.getAllByText('缺失必填参数').length).toBeGreaterThan(0);
+  expect(screen.getByRole('generic', { name: '当前工作流摘要' })).toHaveTextContent('参数 2/3');
+  expect(screen.queryByText('build_and_run_model')).not.toBeInTheDocument();
+  fireEvent.click(screen.getByText('参数与校验'));
+  expect(screen.getByText('缺失参数')).toBeInTheDocument();
   expect(screen.getAllByText('price').length).toBeGreaterThan(0);
 });
 
@@ -244,9 +246,10 @@ test('shows the auto-selected optimization model inline and submits a safe switc
   expect(within(decision).getByText('已自动选择优化模型')).toBeInTheDocument();
   expect(within(decision).getAllByText('匹配度 91%').length).toBeGreaterThan(0);
   expect(within(decision).getAllByText('调度 Agent').length).toBeGreaterThan(0);
-  fireEvent.click(within(decision).getByRole('button', { name: '补充参数' }));
-  expect(screen.getByPlaceholderText('给 Agent 发消息')).toHaveValue('forecast：');
-  await waitFor(() => expect(screen.getByPlaceholderText('给 Agent 发消息')).toHaveFocus());
+  fireEvent.click(within(decision).getByRole('button', { name: '批量补充参数' }));
+  const batchDialog = screen.getByRole('dialog', { name: '批量补充参数（1 项待补充）' });
+  expect(within(batchDialog).getByRole('textbox', { name: '填写参数 forecast' })).toBeInTheDocument();
+  fireEvent.click(within(batchDialog).getByRole('button', { name: /取\s*消/ }));
 
   fireEvent.click(within(decision).getByText('查看或更换模型'));
   fireEvent.click(within(decision).getByRole('button', { name: '选择模型 诊断 Agent' }));
@@ -257,6 +260,80 @@ test('shows the auto-selected optimization model inline and submits a safe switc
     { preferred_skill: 'diagnosis_agent' },
     expect.any(String),
   ));
+});
+
+test('offers guided or batch parameter entry without sending before review', async () => {
+  renderPage();
+
+  await screen.findByRole('region', { name: '优化模型选择' });
+  fireEvent.click(screen.getByRole('button', { name: '查看运行详情' }));
+  const inspector = screen.getByRole('dialog', { name: /活动/ });
+  fireEvent.click(within(inspector).getByText('参数与校验'));
+  fireEvent.click(within(inspector).getByRole('button', { name: '填写下一个参数' }));
+  expect(screen.getByPlaceholderText('给 Agent 发消息')).toHaveValue('forecast：');
+
+  fireEvent.click(within(inspector).getByRole('button', { name: '批量补充参数' }));
+  let batchDialog = screen.getByRole('dialog', { name: '批量补充参数（1 项待补充）' });
+  fireEvent.change(within(batchDialog).getByRole('textbox', { name: '填写参数 forecast' }), { target: { value: '96, 102, 108' } });
+  fireEvent.click(within(batchDialog).getByRole('button', { name: /取\s*消/ }));
+  expect(screen.queryByRole('dialog', { name: /批量补充参数/ })).not.toBeInTheDocument();
+  expect(screen.getByPlaceholderText('给 Agent 发消息')).toHaveValue('forecast：');
+
+  fireEvent.click(within(inspector).getByRole('button', { name: '批量补充参数' }));
+  batchDialog = screen.getByRole('dialog', { name: '批量补充参数（1 项待补充）' });
+  fireEvent.click(within(batchDialog).getByRole('button', { name: '写入对话' }));
+  expect(within(batchDialog).getByRole('alert')).toHaveTextContent('请至少填写一个参数');
+  expect(screen.getByPlaceholderText('给 Agent 发消息')).toHaveValue('forecast：');
+
+  fireEvent.change(within(batchDialog).getByRole('textbox', { name: '填写参数 forecast' }), { target: { value: '96, 102, 108' } });
+  fireEvent.click(within(batchDialog).getByRole('button', { name: '写入对话' }));
+  expect(screen.queryByRole('dialog', { name: /批量补充参数/ })).not.toBeInTheDocument();
+  expect(screen.getByPlaceholderText('给 Agent 发消息')).toHaveValue('请为当前工作流补充以下参数：\n- forecast：96, 102, 108');
+  expect(testState.createAgentTurn).not.toHaveBeenCalled();
+  await waitFor(() => expect(screen.getByPlaceholderText('给 Agent 发消息')).toHaveFocus());
+});
+
+test('writes only completed fields when batch filling part of a long parameter list', async () => {
+  const missingRequired = [
+    { name: '优化时段数', key: 'horizon', unit: 'period' },
+    { name: '交易时段', key: 'time' },
+    { name: '负荷预测', key: 'load_forecast', unit: 'MWh' },
+  ];
+  const multiRun: AgentRun = {
+    ...testState.conversation.active_run!,
+    missing_required: missingRequired,
+  };
+  const multiParameterConversation: AgentConversation = {
+    ...testState.conversation,
+    active_run: multiRun,
+    runs: [multiRun],
+    agent_tasks: (testState.conversation.agent_tasks || []).map(task => ({
+      ...task,
+      result: {
+        ...(task.result || {}),
+        run: multiRun,
+        missing_required: missingRequired,
+      },
+    })),
+  };
+  testState.getAgentConversation.mockImplementationOnce(async () => multiParameterConversation);
+  renderPage();
+
+  await screen.findByRole('region', { name: '优化模型选择' });
+  fireEvent.click(screen.getByRole('button', { name: '查看运行详情' }));
+  const inspector = screen.getByRole('dialog', { name: /活动/ });
+  fireEvent.click(within(inspector).getByText('参数与校验'));
+  fireEvent.click(within(inspector).getByRole('button', { name: '批量补充参数' }));
+  const batchDialog = screen.getByRole('dialog', { name: '批量补充参数（3 项待补充）' });
+  expect(within(batchDialog).getByText('优化时段数 · horizon（period）')).toBeInTheDocument();
+  expect(within(batchDialog).getByText('负荷预测 · load_forecast（MWh）')).toBeInTheDocument();
+  fireEvent.change(within(batchDialog).getByRole('textbox', { name: '填写参数 优化时段数' }), { target: { value: '24' } });
+  fireEvent.change(within(batchDialog).getByRole('textbox', { name: '填写参数 负荷预测' }), { target: { value: '[96, 102, 108]' } });
+  fireEvent.click(within(batchDialog).getByRole('button', { name: '写入对话' }));
+
+  const composer = screen.getByPlaceholderText('给 Agent 发消息');
+  expect(composer).toHaveValue('请为当前工作流补充以下参数：\n- 优化时段数（period）：24\n- 负荷预测（MWh）：[96, 102, 108]');
+  expect(composer).not.toHaveValue(expect.stringContaining('交易时段'));
 });
 
 test('requires an inline model choice when routing needs clarification', async () => {
@@ -383,18 +460,46 @@ test('resolves the V3 approval chain without calling legacy confirmation APIs', 
 
 test('clears expert Skill before returning to business mode', async () => {
   renderPage();
+  await screen.findByRole('region', { name: '优化模型选择' });
   fireEvent.click(screen.getByRole('button', { name: '查看运行详情' }));
-  fireEvent.click(screen.getByRole('button', { name: '专家视图' }));
+  fireEvent.click(screen.getByRole('button', { name: '诊断信息' }));
+  fireEvent.click(screen.getByRole('tab', { name: /路由与参数/ }));
   fireEvent.mouseDown(screen.getByLabelText('指定 Skill'));
   fireEvent.click((await screen.findAllByText('调度 Agent')).at(-1)!);
   expect(screen.getByText(/已指定 Skill/)).toBeInTheDocument();
-  fireEvent.click(screen.getByRole('button', { name: '返回业务视图' }));
+  fireEvent.click(screen.getByRole('button', { name: '收起诊断' }));
   expect(screen.getByText('默认自动识别 Skill')).toBeInTheDocument();
   fireEvent.change(screen.getByPlaceholderText('给 Agent 发消息'), { target: { value: '自动识别需求' } });
   fireEvent.click(screen.getByRole('button', { name: '发送' }));
   await waitFor(() => expect(testState.createAgentTurn).toHaveBeenCalled());
   const calls = testState.createAgentTurn.mock.calls as unknown as Array<[string, string, Record<string, unknown>, string]>;
   expect(calls.at(-1)![2]).toEqual({});
+});
+
+test('replaces duplicated expert panels with compact task diagnostics', async () => {
+  renderPage();
+  await screen.findByRole('region', { name: '优化模型选择' });
+  fireEvent.click(screen.getByRole('button', { name: '查看运行详情' }));
+  const dialog = screen.getByRole('dialog', { name: /活动/ });
+  fireEvent.click(within(dialog).getByRole('button', { name: '诊断信息' }));
+
+  const diagnostics = within(dialog).getByRole('region', { name: 'Agent 诊断信息' });
+  expect(within(diagnostics).getByRole('tab', { name: '执行诊断' })).toHaveAttribute('aria-selected', 'true');
+  expect(within(diagnostics).getByRole('region', { name: '运行标识' })).toHaveTextContent('RUN-HISTORY');
+  expect(within(dialog).queryByRole('region', { name: '工作流活动' })).not.toBeInTheDocument();
+  expect(within(dialog).queryByText('参数草稿')).not.toBeInTheDocument();
+  expect(within(dialog).queryByText(/user：制定明日机组组合计划/)).not.toBeInTheDocument();
+
+  fireEvent.click(within(diagnostics).getByRole('tab', { name: /路由与参数/ }));
+  expect(within(diagnostics).getByRole('region', { name: '下一轮指定 Skill' })).toBeInTheDocument();
+  expect(within(diagnostics).getByRole('region', { name: '路由结果' })).toHaveTextContent('dispatch_agent');
+  expect(within(diagnostics).getByRole('region', { name: '参数诊断' })).toHaveTextContent('缺失参数（1）');
+  expect(within(diagnostics).getByRole('region', { name: '候选 Skill' })).toHaveTextContent('仅展示 Top 3');
+
+  fireEvent.click(within(diagnostics).getByRole('tab', { name: '原始数据' }));
+  expect(within(diagnostics).getByText('任务上下文')).toBeInTheDocument();
+  expect(within(diagnostics).getByText('事件载荷（0）')).toBeInTheDocument();
+  expect(within(diagnostics).getByText('运行环境')).toBeInTheDocument();
 });
 
 test('switching history restores the selected conversation run', async () => {
@@ -422,7 +527,7 @@ test('uses the durable task lifecycle instead of a stale run snapshot', async ()
   await waitFor(() => expect(document.querySelector('.agent-run-status-chip')).toHaveTextContent('已取消'));
   fireEvent.click(screen.getByRole('button', { name: '查看运行详情' }));
   const dialog = screen.getByRole('dialog', { name: /活动/ });
-  expect(within(dialog).getByText('已取消')).toBeInTheDocument();
+  expect(within(dialog).getAllByText('已取消').length).toBeGreaterThan(0);
   expect(screen.queryByRole('button', { name: '取消任务' })).not.toBeInTheDocument();
 });
 

@@ -67,16 +67,30 @@ class OptimizationTaskEngine:
     def analyze(self, context: ToolContext, skill_name: str | None) -> dict[str, Any]:
         task = self._task(context.task_id)
         execution = self.ensure_execution_context(task)
+        previous = task.get("result") if isinstance(task.get("result"), dict) else {}
+        # Once the runtime has decided that this turn continues an existing
+        # durable task, keep routing bound to that task's workflow.  Parameter
+        # replies such as "use defaults" contain little business vocabulary;
+        # sending them back through an unhinted router can incorrectly turn a
+        # known workflow into a scene-clarification prompt.
+        effective_skill = (
+            skill_name
+            or task.get("workflow_key")
+            or previous.get("api_skill_name")
+            or previous.get("resolved_skill_name")
+            or previous.get("agent_skill_name")
+        )
         response = agent_runtime_service.analyze(
             {
                 "conversation_id": execution["conversation_id"],
                 # Exact user text is runtime-owned.  Parameter extraction must
                 # never run on a model paraphrase.
                 "message": context.user_message,
-                "skill_name": skill_name,
-                "agent_skill_name": skill_name,
+                "skill_name": effective_skill,
+                "agent_skill_name": effective_skill,
             }
         )
+        self._clarify_unavailable_defaults(task, context.user_message, response)
         return self._public_result(task, response)
 
     def confirm_defaults(self, task: dict[str, Any], run_id: str | None) -> dict[str, Any]:
@@ -134,6 +148,7 @@ class OptimizationTaskEngine:
     def _public_result(task: dict[str, Any], response: dict[str, Any]) -> dict[str, Any]:
         public = copy.deepcopy(response)
         public["conversation_id"] = task["conversation_id"]
+        public["task_id"] = task["task_id"]
         public["task_contract_version"] = TASK_CONTRACT_VERSION
         run = public.get("run")
         if isinstance(run, dict):
@@ -143,6 +158,33 @@ class OptimizationTaskEngine:
         # rendered, returned to the model, or accepted back from a client.
         public.pop("execution_context_id", None)
         return public
+
+    @staticmethod
+    def _clarify_unavailable_defaults(
+        task: dict[str, Any],
+        user_message: str,
+        response: dict[str, Any],
+    ) -> None:
+        compact = "".join(str(user_message or "").lower().split())
+        if not any(marker in compact for marker in ("默认参数", "使用默认值", "用默认值", "使用默认配置")):
+            return
+        candidates = response.get("can_use_default") or response.get("default_candidates") or []
+        if candidates:
+            return
+        previous = task.get("result") if isinstance(task.get("result"), dict) else {}
+        for key in ("agent_skill_name", "api_skill_name", "resolved_skill_name", "model_id", "missing_required"):
+            if not response.get(key) and previous.get(key):
+                response[key] = copy.deepcopy(previous[key])
+        missing = response.get("missing_required") or previous.get("missing_required") or []
+        names = [str(item.get("name") or item.get("key")) for item in missing if isinstance(item, dict)][:3]
+        detail = f"，仍需补充：{'、'.join(names)}" if names else "，仍需补充必填参数"
+        message = f"当前模型没有可直接确认使用的默认参数{detail}。请补充这些参数，或使用参数面板查看完整清单。"
+        response["workflow_state"] = "PARAM_COLLECTING"
+        response["status"] = "PARAM_COLLECTING"
+        response["requires_default_confirmation"] = False
+        response["ready_to_invoke"] = False
+        response["message"] = message
+        response["agent_message"] = message
 
 
 optimization_task_engine = OptimizationTaskEngine()

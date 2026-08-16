@@ -1,4 +1,4 @@
-import { Alert, App as AntApp, Button, Card, Drawer, Dropdown, Empty, Input, Modal, Select, Space, Spin, Tag, Typography } from 'antd';
+import { Alert, App as AntApp, Button, Card, Drawer, Dropdown, Empty, Input, Modal, Space, Spin, Tag, Typography } from 'antd';
 import type { MenuProps } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -18,21 +18,18 @@ import {
   resolveAgentApproval,
 } from '../../api/agents';
 import {
-  AgentMessageTimeline,
   AgentModelDecisionCard,
-  AgentParameterPanel,
   AgentResultPanel,
-  AgentSkillPanel,
-  AgentStatusPanel,
-  AgentWorkflowPanel,
   responseMessage,
   skillLabel,
   skillValue,
   valueText,
 } from '../../features/agent-workbench/AgentPanels';
+import { AgentExpertDiagnostics } from '../../features/agent-workbench/AgentExpertDiagnostics';
 import {
+  AgentExceptionActivity,
   AgentRunInspector,
-  AgentTurnActivity,
+  AgentWorkflowActivity,
   agentTurnStatusMeta,
   responseFromRun,
   runStatusMeta,
@@ -50,6 +47,34 @@ const activeStatuses = new Set(['DRAFT', 'ROUTING', 'CLARIFICATION', 'PARAMETER_
 interface AgentTurnSubmission {
   content?: string;
   preferredSkill?: string;
+}
+
+interface BatchParameterField {
+  id: string;
+  key: string;
+  name: string;
+  unit: string;
+  label: string;
+}
+
+function batchParameterFields(response?: AgentAnalyzeResponse): BatchParameterField[] {
+  return (response?.missing_required || []).map((item, index) => {
+    const record = item && typeof item === 'object' && !Array.isArray(item)
+      ? item as Record<string, unknown>
+      : undefined;
+    const key = String(record?.key || record?.parameter || record?.name || item || `parameter_${index + 1}`);
+    const name = String(record?.name || record?.parameter || record?.key || item || `参数 ${index + 1}`);
+    const unit = String(record?.unit || '').trim();
+    const technicalKey = key !== name ? ` · ${key}` : '';
+    const unitLabel = unit ? `（${unit}）` : '';
+    return {
+      id: `${key}-${index}`,
+      key,
+      name,
+      unit,
+      label: `${name}${technicalKey}${unitLabel}`,
+    };
+  });
 }
 
 function TurnFailureCard({ turn, retrying, onRetry }: { turn: AgentV3Turn; retrying: boolean; onRetry: () => void }) {
@@ -84,6 +109,9 @@ export function AgentWorkbenchPage() {
   const [runInspectorOpen, setRunInspectorOpen] = useState(false);
   const [mobileSessionsOpen, setMobileSessionsOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<AgentConversationSummary>();
+  const [batchParameterOpen, setBatchParameterOpen] = useState(false);
+  const [batchParameterValues, setBatchParameterValues] = useState<Record<string, string>>({});
+  const [batchParameterError, setBatchParameterError] = useState('');
   const activityTriggerRef = useRef<HTMLButtonElement>(null);
   const inspectorDialogRef = useRef<HTMLDivElement>(null);
   const messageEndRef = useRef<HTMLDivElement>(null);
@@ -133,9 +161,26 @@ export function AgentWorkbenchPage() {
   // The selected V3 task is the sole source of run state. Falling back to the
   // conversation's former global run can display and operate on another task.
   const activeRun: AgentRun | undefined = responseRun;
+  const selectedCandidates = Array.isArray(currentTaskResponse?.candidate_skills) ? currentTaskResponse.candidate_skills : [];
+  const selectedSkillName = String(currentTaskResponse?.agent_skill_name || currentTaskResponse?.resolved_skill_name || currentTaskResponse?.api_skill_name || '');
+  const selectedCandidate = selectedCandidates.find(candidate => [candidate.agent_skill_name, candidate.platform_skill_name, candidate.api_skill_name]
+    .map(value => String(value || ''))
+    .includes(selectedSkillName));
+  const persistedRunTitle = String(activeRun?.title || '');
+  const runTitleLooksInternal = Boolean(persistedRunTitle && /^[a-z0-9_.-]+$/i.test(persistedRunTitle));
+  const selectedWorkflowTitle = String(
+    (!runTitleLooksInternal ? persistedRunTitle : '')
+    || currentTaskResponse?.display_name
+    || selectedCandidate?.display_name
+    || persistedRunTitle
+    || currentTaskResponse?.agent_skill_name
+    || activeRun?.agent_skill_name
+    || '',
+  );
   const displayRun: AgentRun | undefined = activeRun && selectedTask
     ? {
         ...activeRun,
+        title: selectedWorkflowTitle || activeRun.title,
         status: selectedTask.status,
         workflow_state: selectedTask.status,
         task_id: selectedTask.task_id,
@@ -143,6 +188,17 @@ export function AgentWorkbenchPage() {
       }
     : activeRun;
   const activeResponse = currentTaskResponse || responseFromRun(activeRun);
+  const batchFields = useMemo(() => batchParameterFields(activeResponse), [activeResponse]);
+  const responseResult = activeResponse?.result;
+  const hasMeaningfulResult = Boolean(
+    activeResponse
+    && (
+      activeResponse.invocation_id
+      || activeResponse.objective_value !== undefined
+      || (responseResult && typeof responseResult === 'object' && Object.keys(responseResult).length > 0)
+      || ['RESULT_READY', 'SUCCESS', 'SUCCEEDED'].includes(String(activeResponse.workflow_state || activeResponse.status || '').toUpperCase())
+    )
+  );
   const latestTurn = conversation.data?.turns?.at(-1);
   // A legacy run snapshot is task output, not a second lifecycle authority.
   // Once a V3 task exists its status wins, including terminal cancellation.
@@ -358,7 +414,10 @@ export function AgentWorkbenchPage() {
   const conversationOptions = (conversations.data || [])
     .map(item => ({ ...item, label: item.title || item.last_message || item.conversation_id, searchable: `${item.title || ''} ${item.last_message || ''} ${item.conversation_id}`.toLowerCase() }))
     .filter(item => item.searchable.includes(search.trim().toLowerCase()));
-  const skillOptions = (skills.data || []).map(item => ({ value: skillValue(item), label: skillLabel(item) })).filter(item => item.value);
+  const skillOptions = (skills.data || []).flatMap(item => {
+    const value = skillValue(item);
+    return value ? [{ value, label: skillLabel(item) }] : [];
+  });
   const llmEnabled = Boolean(status.data?.llm?.enabled);
   const llmReady = Boolean(status.data?.llm?.ready);
   const llmOperationalState = status.data?.llm?.operational_state;
@@ -384,6 +443,9 @@ export function AgentWorkbenchPage() {
     setSelectedSkill(undefined);
     setConversationId(id);
     setText('');
+    setBatchParameterOpen(false);
+    setBatchParameterValues({});
+    setBatchParameterError('');
     setMobileSessionsOpen(false);
   };
   const toggleExpertView = () => {
@@ -412,6 +474,37 @@ export function AgentWorkbenchPage() {
     const prompt = `${parameterName}${parameterUnit ? `（${parameterUnit}）` : ''}：`;
     pendingClientTurnIdRef.current = undefined;
     setText(current => current.trim() ? current : prompt);
+    globalThis.requestAnimationFrame?.(() => composerRef.current?.focus());
+  };
+  const openBatchParameterInput = () => {
+    setBatchParameterValues({});
+    setBatchParameterError('');
+    setBatchParameterOpen(true);
+  };
+  const closeBatchParameterInput = () => {
+    setBatchParameterOpen(false);
+    setBatchParameterValues({});
+    setBatchParameterError('');
+  };
+  const writeBatchParametersToComposer = () => {
+    const completedFields = batchFields
+      .map(field => ({ field, value: String(batchParameterValues[field.id] || '').trim() }))
+      .filter(item => item.value);
+    if (!completedFields.length) {
+      setBatchParameterError('请至少填写一个参数；未填写的参数可以稍后继续补充。');
+      return;
+    }
+    const parameterMessage = [
+      '请为当前工作流补充以下参数：',
+      ...completedFields.map(({ field, value }) => `- ${field.name}${field.unit ? `（${field.unit}）` : ''}：${value}`),
+    ].join('\n');
+    const guidedPrompts = new Set(batchFields.map(field => `${field.name}${field.unit ? `（${field.unit}）` : ''}：`));
+    pendingClientTurnIdRef.current = undefined;
+    setText(current => {
+      const draft = current.trim();
+      return !draft || guidedPrompts.has(draft) ? parameterMessage : `${draft}\n\n${parameterMessage}`;
+    });
+    closeBatchParameterInput();
     globalThis.requestAnimationFrame?.(() => composerRef.current?.focus());
   };
   const sessionMenu = (item: AgentConversationSummary): MenuProps => ({
@@ -552,6 +645,7 @@ export function AgentWorkbenchPage() {
                   onChoose={chooseModel}
                   onReviewParameters={() => setRunInspectorOpen(true)}
                   onStartParameterInput={startParameterInput}
+                  onBatchParameterInput={openBatchParameterInput}
                 />
               )}
               {analyze.isPending && (
@@ -598,19 +692,42 @@ export function AgentWorkbenchPage() {
             <>
               <button type="button" className="agent-run-inspector-backdrop" aria-label="关闭活动面板" onClick={closeRunInspector} />
               <div ref={inspectorDialogRef} className="agent-run-card-open" role="dialog" aria-modal="true" aria-labelledby="agent-run-inspector-title" tabIndex={-1} onKeyDown={handleInspectorKeyDown}>
-                <Card className="content-card agent-run-card" title={<Space size={8}><span id="agent-run-inspector-title">活动</span><Typography.Text type="secondary">· {activityStatus.label}</Typography.Text></Space>} extra={<Space size={4}>{activeTask && <Button danger type="text" loading={cancelTask.isPending} onClick={() => cancelTask.mutate(activeTask.task_id)}>取消任务</Button>}<Button type="link" onClick={toggleExpertView}>{expertView ? '返回业务视图' : '专家视图'}</Button><Button type="text" aria-label="关闭运行检查器" aria-expanded={runInspectorOpen} aria-controls="agent-run-inspector" onClick={closeRunInspector}>关闭</Button></Space>}>
-                  <AgentTurnActivity turns={conversation.data?.turns} retryingTurnId={retryTurn.isPending ? retryTurn.variables : undefined} onRetry={turn => retryTurn.mutate(turn.turn_id)} />
-                  {displayRun && <AgentRunInspector run={displayRun} />}
-                  {activeResponse && <div className="agent-inspector-parameters"><AgentParameterPanel response={activeResponse} /></div>}
-                  {activeResponse && <div className="agent-inspector-result"><AgentResultPanel response={activeResponse} /></div>}
-                  {expertView && (
-                    <div className="agent-expert-panel">
-                      <div className="field"><label>指定 Skill</label><Select aria-label="指定 Skill" allowClear virtual={false} value={selectedSkill} onChange={setSelectedSkill} placeholder="自动识别 Skill（可手工指定）" options={skillOptions} /></div>
-                      <div className="panel section-gap"><AgentWorkflowPanel response={activeResponse} /></div>
-                      <div className="panel section-gap"><AgentStatusPanel status={status.data} /></div>
-                      <div className="panel section-gap"><AgentSkillPanel skills={skills.data} selectedSkill={selectedSkill} /></div>
-                      <div className="panel section-gap"><AgentMessageTimeline conversation={conversation.data} fallback={lastResponse} /></div>
-                    </div>
+                <Card className="content-card agent-run-card" title={<Space size={8}><span id="agent-run-inspector-title">活动</span><Typography.Text type="secondary">· {activityStatus.label}</Typography.Text></Space>} extra={<Space size={4}>{activeTask && <Button danger type="text" loading={cancelTask.isPending} onClick={() => cancelTask.mutate(activeTask.task_id)}>取消任务</Button>}<Button type="link" onClick={toggleExpertView}>{expertView ? '收起诊断' : '诊断信息'}</Button><Button type="text" aria-label="关闭运行检查器" aria-expanded={runInspectorOpen} aria-controls="agent-run-inspector" onClick={closeRunInspector}>关闭</Button></Space>}>
+                  {expertView ? (
+                    <AgentExpertDiagnostics
+                      response={activeResponse}
+                      run={displayRun}
+                      task={selectedTask}
+                      turns={conversation.data?.turns}
+                      events={conversation.data?.events}
+                      status={status.data}
+                      selectedSkill={selectedSkill}
+                      skillOptions={skillOptions}
+                      onSelectSkill={setSelectedSkill}
+                    />
+                  ) : (
+                    <>
+                      {displayRun && (
+                        <AgentRunInspector
+                          run={displayRun}
+                          task={selectedTask}
+                          response={activeResponse}
+                          turns={conversation.data?.turns}
+                          events={conversation.data?.events}
+                          onStartParameterInput={startParameterInput}
+                          onBatchParameterInput={openBatchParameterInput}
+                        />
+                      )}
+                      <AgentWorkflowActivity
+                        tasks={conversation.data?.agent_tasks}
+                        turns={conversation.data?.turns}
+                        events={conversation.data?.events}
+                        runs={conversation.data?.runs}
+                        currentTaskId={selectedTask?.task_id}
+                      />
+                      <AgentExceptionActivity events={conversation.data?.events} turns={conversation.data?.turns} retryingTurnId={retryTurn.isPending ? retryTurn.variables : undefined} onRetry={turn => retryTurn.mutate(turn.turn_id)} />
+                      {hasMeaningfulResult && activeResponse && <div className="agent-inspector-result"><AgentResultPanel response={activeResponse} /></div>}
+                    </>
                   )}
                 </Card>
               </div>
@@ -621,6 +738,39 @@ export function AgentWorkbenchPage() {
       <Drawer rootClassName="agent-mobile-session-drawer" title="会话" placement="left" size="default" open={mobileSessionsOpen} destroyOnHidden onClose={() => setMobileSessionsOpen(false)} extra={<Button type="text" onClick={startConversation} loading={createConversationMutation.isPending}>新建</Button>}>
         {renderSessionContent()}
       </Drawer>
+      <Modal
+        rootClassName="agent-batch-parameter-modal"
+        open={batchParameterOpen}
+        title={`批量补充参数${batchFields.length ? `（${batchFields.length} 项待补充）` : ''}`}
+        okText="写入对话"
+        cancelText="取消"
+        okButtonProps={{ disabled: batchFields.length === 0 }}
+        destroyOnHidden
+        onCancel={closeBatchParameterInput}
+        onOk={writeBatchParametersToComposer}
+      >
+        <Typography.Paragraph type="secondary">可一次填写任意多项。写入后请在对话框复核并发送，未填写项会继续保留。</Typography.Paragraph>
+        {batchFields.length ? (
+          <div className="agent-batch-parameter-form">
+            {batchFields.map(field => (
+              <label key={field.id}>
+                <span>{field.label}</span>
+                <Input.TextArea
+                  aria-label={`填写参数 ${field.name}`}
+                  autoSize={{ minRows: 1, maxRows: 4 }}
+                  placeholder={`请输入${field.name}`}
+                  value={batchParameterValues[field.id] || ''}
+                  onChange={event => {
+                    setBatchParameterValues(values => ({ ...values, [field.id]: event.target.value }));
+                    if (batchParameterError) setBatchParameterError('');
+                  }}
+                />
+              </label>
+            ))}
+          </div>
+        ) : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="当前没有需要补充的参数" />}
+        {batchParameterError && <Alert className="agent-batch-parameter-error" type="warning" showIcon title={batchParameterError} />}
+      </Modal>
       <Modal open={Boolean(deleteTarget)} title="删除会话？" okText="删除会话" cancelText="取消" okButtonProps={{ danger: true, loading: deleteConversationMutation.isPending }} onCancel={() => setDeleteTarget(undefined)} onOk={() => deleteTarget && deleteConversationMutation.mutate(deleteTarget.conversation_id)}>
         <Typography.Paragraph>确定删除“{deleteTarget?.title || deleteTarget?.last_message || deleteTarget?.conversation_id}”吗？删除后会同时删除该会话关联的运行记录，且无法恢复。</Typography.Paragraph>
       </Modal>

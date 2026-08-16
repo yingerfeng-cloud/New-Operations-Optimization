@@ -7,6 +7,7 @@ import { ComponentEditor, formulaFromRow, normalizeComponentForEditor } from '..
 import { ComponentBusinessView, ComponentMathDefinition } from '../../features/component-library/ComponentSchemaTables';
 import { ComponentDependencyPanel } from '../../features/component-library/ComponentDependencyPanel';
 import { ParameterBindingPanel } from '../../features/component-library/ParameterBindingPanel';
+import { copyComponentVersion, getComponents } from '../../api/components';
 import type { ComponentDef } from '../../types/component';
 import { renderWithQueryClient } from '../testUtils';
 
@@ -29,8 +30,8 @@ const componentSample: ComponentDef = {
 };
 
 vi.mock('../../api/components', () => ({
-  getComponents: async () => [componentSample],
-  getComponent: async () => componentSample,
+  getComponents: vi.fn(async () => [componentSample]),
+  getComponent: vi.fn(async () => componentSample),
   createComponent: vi.fn(async payload => payload),
   updateComponent: vi.fn(async (_id, payload) => payload),
   validateComponent: vi.fn(async () => ({ valid: true, errors: [] })),
@@ -74,6 +75,24 @@ test('direct edit waits for detail and hydrates every formula section', async ()
   fireEvent.click(screen.getByRole('button', { name: '目标项' }));
   expect(await screen.findByText('储能成本')).toBeInTheDocument();
 }, 60000);
+
+test('published components offer copy-edit instead of a disabled edit action', async () => {
+  const user = userEvent.setup();
+  vi.mocked(getComponents).mockResolvedValueOnce([{ ...componentSample, status: 'published' }]);
+  vi.mocked(copyComponentVersion).mockResolvedValueOnce({ ...componentSample, component_id: 'storage_soc_copy', status: 'draft' });
+
+  renderPage();
+
+  const row = (await screen.findByText('储能 SOC 约束')).closest('tr');
+  expect(row).not.toBeNull();
+  const copyEditButton = within(row!).getByRole('button', { name: '复制编辑' });
+  expect(copyEditButton).toBeEnabled();
+  expect(within(row!).queryByRole('button', { name: '编辑' })).not.toBeInTheDocument();
+
+  await user.click(copyEditButton);
+  await screen.findByText('组件编辑器');
+  expect(vi.mocked(copyComponentVersion).mock.calls[0]?.[0]).toBe('storage_soc');
+});
 
 test('legacy formula fields are normalized for editing and synchronized on save', async () => {
   const onSave = vi.fn();

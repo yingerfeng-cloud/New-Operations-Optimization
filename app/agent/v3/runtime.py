@@ -16,6 +16,7 @@ from app.agent.v3.models import ModelTurn, TaskStatus, ToolContext
 from app.agent.v3.skills.optimization import optimization_task_engine, register_optimization_tool
 from app.agent.v3.store import agent_v3_store
 from app.agent.v3.tools import ToolRegistry
+from app.services.llm_service import llm_service
 from app.utils import now_text
 
 
@@ -206,6 +207,17 @@ class AgentV3Runtime:
             ),
         } if task_context else None
         preferred_skill = str((metadata or {}).get("preferred_skill") or "").strip()
+        direct_content = self._grounded_status_response(message)
+        if direct_content is None:
+            direct_content = self._orphan_confirmation_response(conversation_id, message)
+        if direct_content is not None:
+            return self._finalize_turn_response(
+                conversation_id,
+                turn_id,
+                direct_content,
+                internal_messages,
+                [],
+            )
         final_turn: ModelTurn | None = None
         created_task_ids: list[str] = []
         total_tool_calls = 0
@@ -306,7 +318,21 @@ class AgentV3Runtime:
                     # continue the one canonical active task, never select or
                     # manufacture a task identifier.
                     task = agent_v3_store.find_active_task(conversation_id, definition.name)
-                    if task is None:
+                    if task is not None and self._starts_new_workflow(task, message, preferred_skill):
+                        previous_task = task
+                        task = agent_v3_store.create_task(
+                            conversation_id,
+                            turn_id,
+                            definition.task_title,
+                            definition.name,
+                        )
+                        agent_v3_store.update_task(
+                            str(task["task_id"]),
+                            event_turn_id=turn_id,
+                            supersedes_task_id=str(previous_task["task_id"]),
+                        )
+                        self._supersede_task_for_switch(previous_task, task, turn_id)
+                    elif task is None:
                         task = agent_v3_store.create_task(conversation_id, turn_id, definition.task_title, definition.name)
                     if str(task["task_id"]) not in created_task_ids:
                         created_task_ids.append(str(task["task_id"]))
@@ -350,6 +376,8 @@ class AgentV3Runtime:
                             status=self._task_status(result),
                             result=result,
                             optimization_run_id=result.get("run_id"),
+                            workflow_key=self._workflow_key(result),
+                            title=self._task_title(task, result),
                         )
                         if task.get("status") == TaskStatus.CANCELLED.value:
                             result_for_model = {
@@ -432,6 +460,22 @@ class AgentV3Runtime:
         if final_turn is None or final_turn.tool_calls:
             raise HTTPException(status_code=502, detail="Agent did not produce a final response")
         final_content = final_turn.content[:50_000]
+        return self._finalize_turn_response(
+            conversation_id,
+            turn_id,
+            final_content,
+            internal_messages,
+            created_task_ids,
+        )
+
+    @staticmethod
+    def _finalize_turn_response(
+        conversation_id: str,
+        turn_id: str,
+        final_content: str,
+        internal_messages: list[dict[str, Any]],
+        created_task_ids: list[str],
+    ) -> dict[str, Any]:
         assistant_message = {
             "message_id": f"MSG-{uuid.uuid4().hex[:12].upper()}",
             "role": "assistant",
@@ -470,6 +514,154 @@ class AgentV3Runtime:
                 "pending_approvals": agent_v3_store.list_approvals_for_conversation(conversation_id, pending_only=True),
             },
         }
+
+    @staticmethod
+    def _canonical_skill_name(value: Any) -> str:
+        normalized = str(value or "").strip().lower()
+        return normalized[4:] if normalized.startswith("run_") else normalized
+
+    @classmethod
+    def _workflow_key(cls, result: dict[str, Any]) -> str | None:
+        for value in (
+            result.get("agent_skill_name"),
+            result.get("resolved_skill_name"),
+            result.get("api_skill_name"),
+        ):
+            normalized = cls._canonical_skill_name(value)
+            if normalized:
+                return normalized
+        return None
+
+    @classmethod
+    def _task_title(cls, task: dict[str, Any], result: dict[str, Any]) -> str:
+        current_skill = cls._workflow_key(result)
+        candidate_name = next(
+            (
+                str(candidate.get("display_name") or "")
+                for candidate in result.get("candidate_skills") or []
+                if isinstance(candidate, dict)
+                and current_skill
+                and current_skill in {
+                    cls._canonical_skill_name(candidate.get("agent_skill_name")),
+                    cls._canonical_skill_name(candidate.get("platform_skill_name")),
+                    cls._canonical_skill_name(candidate.get("api_skill_name")),
+                }
+                and candidate.get("display_name")
+            ),
+            "",
+        )
+        return str(
+            result.get("display_name")
+            or result.get("agent_skill_display_name")
+            or candidate_name
+            or result.get("agent_skill_name")
+            or task.get("title")
+            or "优化工作流"
+        )
+
+    @classmethod
+    def _starts_new_workflow(cls, task: dict[str, Any], message: str, preferred_skill: str) -> bool:
+        compact = "".join(str(message or "").lower().split())
+        explicit_switch = any(
+            marker in compact
+            for marker in ("切换为", "切换到", "切换成", "更换为", "更换到", "改用", "换用", "换成")
+        )
+        if explicit_switch:
+            return True
+        requested = cls._canonical_skill_name(preferred_skill)
+        current = cls._canonical_skill_name(task.get("workflow_key"))
+        if not current and isinstance(task.get("result"), dict):
+            current = cls._workflow_key(task["result"]) or ""
+        return bool(requested and current and requested != current)
+
+    def _supersede_task_for_switch(
+        self,
+        previous_task: dict[str, Any],
+        replacement_task: dict[str, Any],
+        turn_id: str,
+    ) -> None:
+        previous_id = str(previous_task["task_id"])
+        cancel_mode = "logical"
+        cancel_warning = None
+        if previous_task.get("optimization_run_id"):
+            try:
+                optimization_task_engine.cancel_run(previous_task)
+                cancel_mode = "delegated"
+            except HTTPException as exc:
+                if exc.status_code != 409:
+                    raise
+                cancel_warning = str(exc.detail)
+        for approval in agent_v3_store.list_approvals_for_conversation(
+            str(previous_task["conversation_id"]),
+            pending_only=True,
+        ):
+            if approval.get("task_id") == previous_id:
+                agent_v3_store.supersede_approval(str(approval["approval_id"]))
+        superseded = agent_v3_store.update_task(
+            previous_id,
+            event_turn_id=turn_id,
+            unless_status={TaskStatus.SUCCEEDED.value, TaskStatus.FAILED.value, TaskStatus.CANCELLED.value},
+            status=TaskStatus.CANCELLED.value,
+            completion_reason="WORKFLOW_SWITCHED",
+            superseded_by_task_id=str(replacement_task["task_id"]),
+            cancel_mode=cancel_mode,
+            cancel_warning=cancel_warning,
+        )
+        agent_v3_store.append_event(
+            str(previous_task["conversation_id"]),
+            "task.superseded",
+            {
+                "task": superseded,
+                "replacement_task_id": str(replacement_task["task_id"]),
+                "reason": "workflow_switched",
+            },
+            turn_id=turn_id,
+            task_id=previous_id,
+        )
+
+    @staticmethod
+    def _grounded_status_response(message: str) -> str | None:
+        compact = "".join(str(message or "").lower().split())
+        if not any(
+            marker in compact
+            for marker in ("functioncalling待检查", "模型能力待检查", "functioncalling是什么意思")
+        ):
+            return None
+        health = llm_service.runtime_health()
+        state = str(health.get("operational_state") or "unknown")
+        verified = bool(health.get("function_calling_verified_at"))
+        if not health.get("configured") or state == "disabled":
+            return "这个状态表示大模型服务尚未完成配置，因此 Agent 暂时不能调用工具。它是系统级能力状态，不是某个优化模型的业务校验。"
+        if state == "healthy" and verified:
+            return "大模型连接和 Function Calling 能力都已验证，Agent 可以正常识别并调用工具。这个状态与具体优化模型的参数完整性无关。"
+        if state == "healthy":
+            return (
+                "“Function Calling 待检查”表示大模型服务当前可以连接，但工具调用能力探针尚未完成验证，"
+                "所以系统还不能把 Agent 判定为完全可用。它是系统级模型能力状态，不是当前优化模型的业务逻辑、参数或规模校验。"
+            )
+        if state in {"degraded", "recovering"}:
+            return "模型连接当前不稳定或正在恢复，Function Calling 验证需要等待连接恢复后重新完成；这不是优化模型参数校验。"
+        return "模型服务当前不可用，因此 Function Calling 尚无法验证；请先恢复模型连接。这个状态与具体优化模型参数无关。"
+
+    @staticmethod
+    def _orphan_confirmation_response(conversation_id: str, message: str) -> str | None:
+        normalized = str(message or "").strip().lower().rstrip("。！!")
+        if normalized not in {"确认", "确认执行", "同意确认"}:
+            return None
+        if agent_v3_store.list_approvals_for_conversation(conversation_id, pending_only=True):
+            return None
+        active_tasks = [
+            task
+            for task in agent_v3_store.list_tasks(conversation_id)
+            if task.get("status") not in {TaskStatus.SUCCEEDED.value, TaskStatus.FAILED.value, TaskStatus.CANCELLED.value}
+        ]
+        if not active_tasks:
+            return "当前没有待确认的操作。请先说明希望继续执行的任务。"
+        result = active_tasks[-1].get("result") if isinstance(active_tasks[-1].get("result"), dict) else {}
+        missing = result.get("missing_required") or []
+        names = [str(item.get("name") or item.get("key")) for item in missing if isinstance(item, dict)][:3]
+        suffix = f"，仍需补充：{'、'.join(names)}" if names else "，仍需继续补充任务信息"
+        return f"当前没有待确认的审批操作{suffix}。补齐后系统会生成明确的确认步骤。"
 
     @staticmethod
     def _turn_fingerprint(message: str, metadata: dict[str, Any] | None) -> str:

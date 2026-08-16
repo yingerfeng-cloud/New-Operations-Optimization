@@ -125,16 +125,23 @@ export function ComponentLibraryPage() {
             {
               title: '操作',
               fixed: 'right' as const,
-              width: 180,
+              width: 210,
               render: (_: unknown, row: ComponentDef) => (
-                <Space className="asset-actions">
+                <Space className="asset-actions" size={4}>
                   <Button type="link" onClick={() => { setViewId(row.component_id); setEditing(false); setValidation(undefined); }}>查看</Button>
                   <Button
                     type="link"
-                    disabled={String(row.status).toLowerCase() !== 'draft'}
-                    title={String(row.status).toLowerCase() === 'draft' ? '编辑草稿' : '已发布或已停用组件请复制为新版本后编辑'}
-                    onClick={() => { setViewId(row.component_id); setEditing(true); setValidation(undefined); }}
-                  >编辑</Button>
+                    title={String(row.status).toLowerCase() === 'draft' ? '编辑草稿' : '基于当前版本创建草稿副本后编辑'}
+                    onClick={() => {
+                      setValidation(undefined);
+                      if (String(row.status).toLowerCase() === 'draft') {
+                        setViewId(row.component_id);
+                        setEditing(true);
+                      } else {
+                        copy.mutate(row.component_id);
+                      }
+                    }}
+                  >{String(row.status).toLowerCase() === 'draft' ? '编辑' : '复制编辑'}</Button>
                   <Dropdown
                     trigger={['click']}
                     menu={{

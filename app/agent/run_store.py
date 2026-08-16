@@ -103,6 +103,31 @@ class AgentRunStore:
             previous_status = str(record.get("status") or "")
             next_status = run_status_from_response(response, previous_status)
             record.update(self._snapshot_fields(response))
+            selected_skill = str(response.get("agent_skill_name") or "")
+            candidate_title = next(
+                (
+                    str(candidate.get("display_name") or "")
+                    for candidate in response.get("candidate_skills") or []
+                    if isinstance(candidate, dict)
+                    and selected_skill
+                    and selected_skill
+                    in {
+                        str(candidate.get("agent_skill_name") or ""),
+                        str(candidate.get("platform_skill_name") or ""),
+                        str(candidate.get("api_skill_name") or ""),
+                    }
+                    and candidate.get("display_name")
+                ),
+                "",
+            )
+            record["title"] = (
+                response.get("display_name")
+                or response.get("agent_skill_display_name")
+                or candidate_title
+                or response.get("agent_skill_name")
+                or record.get("title")
+                or "优化运行"
+            )
             record["status"] = next_status
             record["workflow_state"] = response.get("workflow_state") or response.get("status") or record.get("workflow_state")
             record["updated_at"] = now_text()

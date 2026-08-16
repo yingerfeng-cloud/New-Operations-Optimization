@@ -533,6 +533,207 @@ def test_optimization_engine_uses_a_private_task_context(monkeypatch) -> None:
     assert result["conversation_id"] == conversation["conversation_id"]
 
 
+def test_explicit_skill_switch_creates_a_new_workflow_and_preserves_history(monkeypatch) -> None:
+    conversation = conversation_store.create("Workflow switch")
+    observed: list[dict[str, Any]] = []
+
+    def analyze(body: dict[str, Any]) -> dict[str, Any]:
+        observed.append(dict(body))
+        skill = str(body.get("agent_skill_name") or "skill_a")
+        return {
+            "conversation_id": body["conversation_id"],
+            "workflow_state": "PARAM_COLLECTING",
+            "agent_skill_name": skill,
+            "api_skill_name": f"run_{skill}",
+            "missing_required": [{"key": "load", "name": "负荷"}],
+            "agent_message": f"{skill} 等待参数。",
+        }
+
+    monkeypatch.setattr(agent_runtime_service, "analyze", analyze)
+    gateway = SequenceGateway(
+        [
+            ModelTurn(tool_calls=[ToolCall(call_id="call-a", name="optimization_create_or_continue", arguments={})]),
+            ModelTurn(tool_calls=[ToolCall(call_id="call-b", name="optimization_create_or_continue", arguments={})]),
+        ]
+    )
+    runtime = AgentV3Runtime(gateway=gateway)
+
+    first = runtime.run_turn(
+        conversation["conversation_id"],
+        "创建技能 A 优化任务",
+        metadata={"preferred_skill": "skill_a"},
+    )
+    second = runtime.run_turn(
+        conversation["conversation_id"],
+        "切换为技能 B 模型",
+        metadata={"preferred_skill": "skill_b"},
+    )
+
+    tasks = agent_v3_store.list_tasks(conversation["conversation_id"])
+    assert len(tasks) == 2
+    assert tasks[0]["status"] == "CANCELLED"
+    assert tasks[0]["completion_reason"] == "WORKFLOW_SWITCHED"
+    assert tasks[0]["superseded_by_task_id"] == tasks[1]["task_id"]
+    assert tasks[1]["supersedes_task_id"] == tasks[0]["task_id"]
+    assert tasks[1]["status"] == "WAITING_INPUT"
+    assert tasks[1]["workflow_key"] == "skill_b"
+    assert tasks[0]["execution_context_id"] != tasks[1]["execution_context_id"]
+    assert first["turn"]["task_ids"] == [tasks[0]["task_id"]]
+    assert second["turn"]["task_ids"] == [tasks[1]["task_id"]]
+    assert [item["agent_skill_name"] for item in observed] == ["skill_a", "skill_b"]
+    assert "task.superseded" in [
+        event["type"] for event in agent_v3_store.list_events(conversation["conversation_id"])
+    ]
+
+
+def test_same_skill_parameter_turn_continues_the_existing_workflow(monkeypatch) -> None:
+    conversation = conversation_store.create("Workflow continuation")
+    monkeypatch.setattr(
+        agent_runtime_service,
+        "analyze",
+        lambda body: {
+            "conversation_id": body["conversation_id"],
+            "workflow_state": "PARAM_COLLECTING",
+            "agent_skill_name": "skill_a",
+            "api_skill_name": "run_skill_a",
+            "missing_required": [{"key": "load", "name": "负荷"}],
+            "agent_message": "继续补充参数。",
+        },
+    )
+    gateway = SequenceGateway(
+        [
+            ModelTurn(tool_calls=[ToolCall(call_id="call-a-1", name="optimization_create_or_continue", arguments={})]),
+            ModelTurn(tool_calls=[ToolCall(call_id="call-a-2", name="optimization_create_or_continue", arguments={})]),
+        ]
+    )
+    runtime = AgentV3Runtime(gateway=gateway)
+
+    first = runtime.run_turn(
+        conversation["conversation_id"],
+        "创建技能 A 优化任务",
+        metadata={"preferred_skill": "skill_a"},
+    )
+    second = runtime.run_turn(
+        conversation["conversation_id"],
+        "负荷为 100",
+        metadata={"preferred_skill": "skill_a"},
+    )
+
+    tasks = agent_v3_store.list_tasks(conversation["conversation_id"])
+    assert len(tasks) == 1
+    assert first["turn"]["task_ids"] == second["turn"]["task_ids"] == [tasks[0]["task_id"]]
+    assert len([
+        event
+        for event in agent_v3_store.list_events(conversation["conversation_id"])
+        if event["type"] == "tool.started"
+    ]) == 2
+
+
+def test_model_capability_question_uses_runtime_health_instead_of_task_context(monkeypatch) -> None:
+    conversation = conversation_store.create("Capability status")
+    gateway = SequenceGateway([])
+    monkeypatch.setattr(
+        llm_service,
+        "runtime_health",
+        lambda: {
+            "configured": True,
+            "operational_state": "healthy",
+            "function_calling_verified_at": None,
+        },
+    )
+
+    response = AgentV3Runtime(gateway=gateway, registry=_registry()).run_turn(
+        conversation["conversation_id"],
+        "Function Calling 待检查是什么意思？",
+    )
+
+    assert "工具调用能力探针尚未完成验证" in response["message"]["text"]
+    assert "不是当前优化模型" in response["message"]["text"]
+    assert response["tasks"] == []
+    assert gateway.requests == []
+
+
+def test_confirmation_without_pending_approval_explains_the_remaining_input() -> None:
+    conversation = conversation_store.create("Orphan confirmation")
+    task = agent_v3_store.create_task(
+        conversation["conversation_id"],
+        "TURN-OLD",
+        "Optimization",
+        "optimization_create_or_continue",
+    )
+    agent_v3_store.update_task(
+        task["task_id"],
+        status="WAITING_INPUT",
+        result={"missing_required": [{"key": "load", "name": "负荷预测"}]},
+    )
+    gateway = SequenceGateway([])
+
+    response = AgentV3Runtime(gateway=gateway, registry=_registry()).run_turn(
+        conversation["conversation_id"],
+        "确认",
+    )
+
+    assert "当前没有待确认的审批操作" in response["message"]["text"]
+    assert "负荷预测" in response["message"]["text"]
+    assert gateway.requests == []
+
+
+def test_default_request_without_candidates_is_rewritten_as_actionable_parameter_guidance(monkeypatch) -> None:
+    conversation = conversation_store.create("No defaults")
+    task = agent_v3_store.create_task(
+        conversation["conversation_id"],
+        "TURN-DEFAULT",
+        "Contract workflow",
+        "optimization_create_or_continue",
+    )
+    agent_v3_store.update_task(
+        task["task_id"],
+        status="WAITING_INPUT",
+        workflow_key="contract_spot_exposure_v1",
+        result={
+            "agent_skill_name": "contract_spot_exposure_v1",
+            "api_skill_name": "run_contract_spot_exposure_v1",
+            "missing_required": [{"key": "horizon", "name": "优化时段数"}],
+        },
+    )
+    analyzed_bodies: list[dict] = []
+
+    def analyze(body: dict) -> dict:
+        analyzed_bodies.append(body)
+        return {
+            "conversation_id": body["conversation_id"],
+            "workflow_state": "CLARIFICATION_REQUIRED",
+            "missing_required": [{"key": "horizon", "name": "优化时段数"}],
+            "can_use_default": [],
+            "agent_message": "请说明业务场景。",
+        }
+
+    monkeypatch.setattr(
+        agent_runtime_service,
+        "analyze",
+        analyze,
+    )
+
+    result = optimization_task_engine.analyze(
+        ToolContext(
+            conversation_id=conversation["conversation_id"],
+            turn_id="TURN-DEFAULT",
+            call_id="CALL-DEFAULT",
+            task_id=task["task_id"],
+            user_message="可以使用模型默认参数进行运行",
+        ),
+        None,
+    )
+
+    assert result["workflow_state"] == "PARAM_COLLECTING"
+    assert result["requires_default_confirmation"] is False
+    assert "没有可直接确认使用的默认参数" in result["agent_message"]
+    assert "优化时段数" in result["agent_message"]
+    assert result["agent_skill_name"] == "contract_spot_exposure_v1"
+    assert analyzed_bodies[0]["skill_name"] == "contract_spot_exposure_v1"
+    assert analyzed_bodies[0]["agent_skill_name"] == "contract_spot_exposure_v1"
+
+
 def test_malformed_provider_tool_arguments_are_returned_for_runtime_audit(monkeypatch) -> None:
     monkeypatch.setattr(llm_service, "enabled", lambda: True)
     monkeypatch.setattr(
