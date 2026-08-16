@@ -612,7 +612,9 @@ export function AgentWorkbenchPage() {
           )}
         >
           <div className="agent-message-list" aria-live="polite" aria-busy={analyze.isPending}>
-            <Spin spinning={conversation.isFetching}>
+            {/* Background refreshes must not blur the transcript; the inline
+                thinking state already communicates an in-flight turn. */}
+            <Spin spinning={conversation.isPending && Boolean(conversationId)}>
               {chatMessages.length ? (
                 <>
                   {chatMessages.map((item, index) => {

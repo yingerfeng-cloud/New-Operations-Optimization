@@ -22,6 +22,7 @@ export function MainLayout() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [manualCollapsed, setManualCollapsed] = useState(() => localStorage.getItem(COLLAPSE_KEY) === 'true');
   const collapsed = manualCollapsed || (medium && localStorage.getItem(COLLAPSE_KEY) === null);
+  const isAgentWorkbench = pathname.startsWith('/agents');
 
   useEffect(() => setDrawerOpen(false), [pathname]);
   const toggleCollapsed = () => {
@@ -33,7 +34,7 @@ export function MainLayout() {
   return (
     <div className={`app-shell app${collapsed && !mobile ? ' app-sidebar-collapsed' : ''}${mobile ? ' app-mobile' : ''}`}>
       {!mobile && <Sidebar collapsed={collapsed} />}
-      <main className="main">
+      <main className={`main${isAgentWorkbench ? ' main-agent-workbench' : ''}`}>
         <Header
           pathname={pathname}
           mobile={mobile}

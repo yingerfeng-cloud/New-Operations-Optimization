@@ -42,6 +42,11 @@ test('matrix respects declared row and column dimension order', () => {
   expect(screen.getByText('行：station')).toBeInTheDocument(); expect(screen.getByText('列：time')).toBeInTheDocument();
 });
 
+test('inline matrix headers stay in normal flow while the task drawer scrolls', () => {
+  render(<ParameterEditor field={makeField(['station', 'time'], 'number', { station: ['S1'], time: ['00:00', '01:00'] })} value={[[1, 2]]} timeSet="time" onChange={vi.fn()} />);
+  expect(document.querySelector('.parameter-matrix-table .ant-table-sticky-holder')).not.toBeInTheDocument();
+});
+
 test('mapped matrices retain values and extend the time axis for the selected horizon', () => {
   const change = vi.fn();
   const field = makeField(['unit', 'time'], 'dict', { unit: ['U1', 'U2'], time: ['0', '1', '2', '3'] });

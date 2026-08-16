@@ -4,7 +4,7 @@ import { LazyEChart } from '../../components/LazyEChart';
 import { JsonViewer } from '../../components/JsonViewer';
 import { StatusTag } from '../../components/StatusTag';
 import type { SolveResult } from '../../types/result';
-import { resultLabel, type ResultLabelMap } from '../result-center/resultLabels';
+import { resultLabel, resultValueLabel, type ResultLabelMap } from '../result-center/resultLabels';
 import type { SolveTask, SolverProgressEvent, SolverProgressTrace, TaskStageTiming } from '../../types/task';
 import { formatDurationSeconds } from '../../utils/formatDuration';
 import { isTaskRetryable, isTaskRunning } from './taskStatus';
@@ -126,7 +126,7 @@ export function TaskOverviewPanel({ task }: { task?: SolveTask }) {
         <Descriptions.Item label="求解器可用性">{text(task.solver_available ?? trace.solver_available)}</Descriptions.Item>
         <Descriptions.Item label="终止状态">{text(task.termination_condition ?? trace.termination_condition)}</Descriptions.Item>
         <Descriptions.Item label="目标值">{text(task.objective_value ?? task.cost)}</Descriptions.Item>
-        <Descriptions.Item label="Gap">{text(task.gap)}</Descriptions.Item>
+        <Descriptions.Item label="最优间隙">{text(task.gap)}</Descriptions.Item>
         <Descriptions.Item label="风险">{text(task.risk)}</Descriptions.Item>
         <Descriptions.Item label="重试次数">{text(task.retry_count || 0)}</Descriptions.Item>
         <Descriptions.Item label="创建时间">{task.created_at}</Descriptions.Item>
@@ -261,7 +261,7 @@ export function SolverProgressPanel({ task }: { task?: SolveTask }) {
     series: [
       { name: '当前最好解', type: 'line', step: 'end', symbol: 'circle', symbolSize: 7, connectNulls: true, data: renderedPoints.map(point => point.incumbent_objective ?? null) },
       { name: '理论最优界', type: 'line', step: 'end', symbol: 'diamond', symbolSize: 8, connectNulls: true, data: renderedPoints.map(point => point.best_bound ?? null) },
-      { name: 'Gap', type: 'line', yAxisIndex: 1, symbol: 'triangle', symbolSize: 7, connectNulls: true, areaStyle: { opacity: 0.08 }, data: renderedPoints.map(point => finiteNumber(point.gap) === undefined ? null : Number(((point.gap || 0) * 100).toFixed(4))) },
+      { name: '最优间隙', type: 'line', yAxisIndex: 1, symbol: 'triangle', symbolSize: 7, connectNulls: true, areaStyle: { opacity: 0.08 }, data: renderedPoints.map(point => finiteNumber(point.gap) === undefined ? null : Number(((point.gap || 0) * 100).toFixed(4))) },
     ],
   };
 
@@ -271,7 +271,7 @@ export function SolverProgressPanel({ task }: { task?: SolveTask }) {
       <div className="solver-progress-metrics">
         <div><span>{isLpIteration ? '最终目标值' : '当前最好解'}</span><strong>{numericText(latest.incumbent_objective)}</strong></div>
         <div><span>{isLpIteration ? '累计迭代次数' : '理论最优界'}</span><strong>{numericText(isLpIteration ? latest.iteration_count : latest.best_bound)}</strong></div>
-        <div><span>{isLpIteration ? '求解算法' : '当前 Gap'}</span><strong>{isLpIteration ? (latest.algorithm || '-') : gapText(latest.gap)}</strong></div>
+        <div><span>{isLpIteration ? '求解算法' : '当前最优间隙'}</span><strong>{isLpIteration ? (latest.algorithm || '-') : gapText(latest.gap)}</strong></div>
         <div><span>{isLpIteration ? '实际问题类型' : '搜索节点'}</span><strong>{isLpIteration ? 'LP / QP' : numericText(latest.node_count)}</strong></div>
         <div><span>求解时间</span><strong>{elapsedText(latest.elapsed_seconds)}</strong></div>
       </div>
@@ -282,7 +282,7 @@ export function SolverProgressPanel({ task }: { task?: SolveTask }) {
           title={<Space size={8}><span>真实收敛轨迹</span>{progress?.status === 'RUNNING' && <Tag color="processing" className="solver-live-tag">实时</Tag>}</Space>}
           extra={progress?.status === 'COMPLETED' && <Button size="small" disabled={replaying} onClick={() => { setVisibleCount(1); setReplaying(true); }}>{replaying ? '重放中…' : '重放搜索过程'}</Button>}
         >
-          <LazyEChart option={option} style={{ height: 360 }} ariaLabel={isLpIteration ? 'HiGHS 真实算法累计迭代次数曲线' : '最好可行解、理论最优界和 Gap 的真实求解收敛曲线'} />
+          <LazyEChart option={option} style={{ height: 360 }} ariaLabel={isLpIteration ? 'HiGHS 真实算法累计迭代次数曲线' : '最好可行解、理论最优界和最优间隙的真实求解收敛曲线'} />
         </Card>
       ) : (
         <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={progress?.message || missingProgressDescription(task)} />
@@ -319,7 +319,7 @@ export function TaskLogsPanel({ task }: { task?: SolveTask }) {
 function TaskResultName({ code, labelMap }: { code: unknown; labelMap?: ResultLabelMap }) {
   const technicalCode = String(code || '-');
   const label = resultLabel(technicalCode, labelMap);
-  return <span className="result-field-name"><span>{label}</span>{label !== technicalCode && <small>{technicalCode}</small>}</span>;
+  return <span className="result-field-name" title={label !== technicalCode ? technicalCode : undefined}>{label}</span>;
 }
 
 export function TaskResultPanel({ result, labelMap }: { result?: SolveResult; labelMap?: ResultLabelMap }) {
@@ -329,7 +329,7 @@ export function TaskResultPanel({ result, labelMap }: { result?: SolveResult; la
   return (
     <>
       <Card size="small" title="关键指标">
-        <Table size="small" pagination={false} rowKey="__row_key" dataSource={rowsFromObject(metrics)} columns={[{ title: '指标', dataIndex: 'key', render: value => <TaskResultName code={value} labelMap={labelMap} /> }, { title: '值', dataIndex: 'value', render: text }]} />
+        <Table size="small" pagination={false} rowKey="__row_key" dataSource={rowsFromObject(metrics)} columns={[{ title: '指标', dataIndex: 'key', render: value => <TaskResultName code={value} labelMap={labelMap} /> }, { title: '值', dataIndex: 'value', render: (value, row) => text(resultValueLabel(row.key, value)) }]} />
       </Card>
       <Card size="small" title="变量结果" className="section-gap">
         <Table

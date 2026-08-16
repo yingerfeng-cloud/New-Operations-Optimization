@@ -2342,6 +2342,33 @@
   gap: 8px;
 }
 
+/* The conversation owns vertical scrolling; the page shell must stay fixed. */
+.main.main-agent-workbench {
+  overflow: hidden;
+}
+
+.main.main-agent-workbench > .main-content.content {
+  box-sizing: border-box;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.main.main-agent-workbench > .main-content.content > .platform-page,
+.main.main-agent-workbench .agent-workbench-page {
+  height: 100%;
+}
+
+.main.main-agent-workbench .agent-workbench-page {
+  display: flex;
+  flex-direction: column;
+}
+
+.main.main-agent-workbench .agent-workbench-layout {
+  flex: 1 1 auto;
+  height: auto;
+  min-height: 0;
+}
+
 @media (max-width: 520px) {
   .agent-run-status-chip {
     display: none;

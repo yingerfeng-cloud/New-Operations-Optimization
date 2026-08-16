@@ -18,3 +18,10 @@ it('shows non-blocking data quality notices', () => {
   expect(screen.getByText(/存在 1 个空值/)).toBeInTheDocument();
   expect(screen.getByText(/不影响参数提交|不会自动阻止提交/)).toBeInTheDocument();
 });
+
+it('warns when a complete numeric series is constant without blocking submission', () => {
+  vi.useFakeTimers();
+  render(<TimeSeriesPreview name="电网接入上限曲线" unit="MW" labels={['T1', 'T2', 'T3']} values={[4, 4, 4]} />);
+  expect(screen.getByText(/全序列数值相同/)).toBeInTheDocument();
+  expect(screen.getByText(/不会自动阻止提交/)).toBeInTheDocument();
+});

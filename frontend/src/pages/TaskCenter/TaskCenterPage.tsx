@@ -76,7 +76,7 @@ export function TaskCenterPage() {
   const failed = rows.filter(task => isTaskFailed(task.status) || normalizeTaskStatus(task.status) === 'CANCELLED').length;
   const current = detail.data;
   const currentModelId = String(current?.model_id || current?.resolved_model_id || result.data?.model_id || '');
-  const resultLabelMap = buildResultLabelMap((models.data || []).find(model => model.id === currentModelId));
+  const resultLabelMap = buildResultLabelMap((models.data || []).find(model => model.id === currentModelId), result.data);
   useEffect(() => {
     if (!viewId) { tabInitializedFor.current = ''; previousStatus.current = ''; setActiveTab('overview'); return; }
     if (!current) return;

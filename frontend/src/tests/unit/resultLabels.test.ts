@@ -1,4 +1,4 @@
-import { buildResultLabelMap, resultLabel } from '../../features/result-center/resultLabels';
+import { buildResultLabelMap, resultLabel, resultValueLabel } from '../../features/result-center/resultLabels';
 import type { ModelAsset } from '../../types/model';
 import type { SolveResult } from '../../types/result';
 
@@ -38,4 +38,14 @@ test('collects labels from result metadata without model-specific rendering logi
   } as SolveResult;
 
   expect(resultLabel('dynamic_metric', buildResultLabelMap(undefined, result))).toBe('动态指标');
+});
+
+test('provides Chinese labels for contract and spot trading metrics', () => {
+  expect(resultLabel('total_contract_cost')).toBe('合约总成本');
+  expect(resultLabel('total_spot_expected_cost')).toBe('现货预期成本');
+  expect(resultLabel('total_risk_penalty')).toBe('风险惩罚成本');
+  expect(resultLabel('total_expected_cost')).toBe('预期总成本');
+  expect(resultLabel('contract_total_gap')).toBe('合约总量偏差');
+  expect(resultLabel('max_spot_exposure_violation')).toBe('最大现货暴露超限');
+  expect(resultValueLabel('risk', 'medium')).toBe('中风险');
 });

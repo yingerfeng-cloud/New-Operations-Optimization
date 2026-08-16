@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import { expect, test } from 'vitest';
-import { SolverProgressPanel, TaskExplanationPanel, TaskInputPanel, TaskTimelinePanel } from '../../features/task-center/TaskPanels';
+import { SolverProgressPanel, TaskExplanationPanel, TaskInputPanel, TaskResultPanel, TaskTimelinePanel } from '../../features/task-center/TaskPanels';
 import type { SolveTask } from '../../types/task';
 
 const task = (overrides: Partial<SolveTask> = {}): SolveTask => ({ id: 'T1', model_id: 'M1', model: '调度模型', scene: '日前调度', solver: 'HiGHS', status: 'SUCCESS', progress: 100, cost: 10, created_at: '2026-07-12', ...overrides });
@@ -15,6 +15,27 @@ test('failed diagnosis includes causes, risk notes, and executable actions', () 
   render(<TaskExplanationPanel task={task({ status: 'INFEASIBLE', diagnostics: { category: '不可行问题', cause: '供需不平衡' }, risk_notes: ['负荷超限'] })} />);
   expect(screen.getByText('结构化解释')).toBeInTheDocument(); expect(screen.getByRole('link', { name: '修改参数重新提交' })).toBeInTheDocument();
   expect(screen.getByRole('link', { name: '检查求解环境' })).toBeInTheDocument();
+});
+
+test('task result metrics use Chinese labels without exposing technical field names', () => {
+  render(<TaskResultPanel result={{ metrics: {
+    objective_value: 4147343.06,
+    total_contract_cost: 3112063.2,
+    total_spot_expected_cost: 909218.75,
+    total_risk_penalty: 126061.11,
+    total_expected_cost: 4147343.06,
+    contract_total_gap: 0,
+    risk: 'medium',
+  } }} />);
+
+  expect(screen.getByText('目标函数值')).toBeInTheDocument();
+  expect(screen.getByText('合约总成本')).toBeInTheDocument();
+  expect(screen.getByText('现货预期成本')).toBeInTheDocument();
+  expect(screen.getByText('风险惩罚成本')).toBeInTheDocument();
+  expect(screen.getByText('预期总成本')).toBeInTheDocument();
+  expect(screen.getByText('中风险')).toBeInTheDocument();
+  expect(screen.queryByText('objective_value')).not.toBeInTheDocument();
+  expect(screen.queryByText('total_contract_cost')).not.toBeInTheDocument();
 });
 
 test('solve timeline shows the timestamp and duration for every recorded stage', () => {
@@ -57,7 +78,7 @@ test('solver progress panel renders real convergence metrics and replay action',
   expect(screen.getByText('2.5%')).toBeInTheDocument();
   expect(screen.getByText('找到首个可行解')).toBeInTheDocument();
   expect(screen.getByRole('button', { name: '重放搜索过程' })).toBeInTheDocument();
-  expect(screen.getByRole('img', { name: '最好可行解、理论最优界和 Gap 的真实求解收敛曲线' })).toBeInTheDocument();
+  expect(screen.getByRole('img', { name: '最好可行解、理论最优界和最优间隙的真实求解收敛曲线' })).toBeInTheDocument();
 });
 
 test('completed historical task explains why search trace is unavailable', () => {

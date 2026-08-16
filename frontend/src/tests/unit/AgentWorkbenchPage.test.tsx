@@ -392,6 +392,26 @@ test('shows Agent thinking in the conversation instead of a sending spinner on t
   await waitFor(() => expect(screen.queryByRole('status', { name: 'Agent 正在思考' })).not.toBeInTheDocument());
 });
 
+test('keeps existing messages readable while the conversation refreshes in the background', async () => {
+  const { queryClient } = renderPage();
+  expect(await screen.findByText('创建日前调度模型')).toBeInTheDocument();
+
+  let resolveRefresh!: (value: AgentConversation) => void;
+  testState.getAgentConversation.mockImplementationOnce(() => new Promise(resolve => {
+    resolveRefresh = resolve;
+  }));
+  await act(async () => {
+    void queryClient.invalidateQueries({ queryKey: ['agent-conversation', 'CONV-1'] });
+  });
+
+  await waitFor(() => expect(queryClient.getQueryState(['agent-conversation', 'CONV-1'])?.fetchStatus).toBe('fetching'));
+  expect(document.querySelector('.agent-message-list .ant-spin-container')).not.toHaveClass('ant-spin-blur');
+  expect(screen.getByText('创建日前调度模型')).toBeVisible();
+
+  await act(async () => resolveRefresh(testState.conversation));
+  await waitFor(() => expect(queryClient.getQueryState(['agent-conversation', 'CONV-1'])?.fetchStatus).toBe('idle'));
+});
+
 test('keeps a server-recorded failed turn out of the composer without adding another toast', async () => {
   const errorToast = vi.spyOn(message, 'error');
   let rejectTurn!: (reason: unknown) => void;

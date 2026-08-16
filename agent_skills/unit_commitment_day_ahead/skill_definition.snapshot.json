@@ -1,14 +1,14 @@
 {
   "schema_version": "1.0",
-  "revision": 3,
+  "revision": 2,
   "skill_name": "run_unit_commitment_day_ahead",
   "display_name": "日前机组组合优化 Unit Commitment",
-  "description": "Execute the published model 日前机组组合优化 Unit Commitment for 日前机组组合优化，生成机组启停、启动和出力计划。 and explain the result against the declared objective: 总成本最小.",
+  "description": "Run the published Day-Ahead Unit Commitment optimization model, generate valid scheduling outputs aligned with the declared total cost minimization objective, and provide fully traceable explanations for all resulting recommendations.",
   "model_binding": {
     "policy": "fixed",
     "model_id": "MODEL-POWER-UNIT-COMMITMENT-DAY-AHEAD",
     "model_version": "v1.0",
-    "model_content_hash": "d0fa63710efe3f6d164c3407782138bca07d71704d66bf9757d4d7e6820e9383"
+    "model_content_hash": "d45c92788fdcc6a3d7c7947f26922fa5a0616e4225e26cdf7eea038335497ecb"
   },
   "input_schema": [
     {
@@ -285,16 +285,27 @@
     "Confirm required parameters: load_forecast, renewable_forecast, unit_min_output, unit_max_output, ramp_up_limit, ramp_down_limit, fuel_cost, startup_cost, initial_unit_status.",
     "Run the bound model and report solver status before interpreting 总成本最小.",
     "Build explanations only from EvidencePackage references and keep facts, inferences, and recommendations separate.",
-    "Require human review before any operational use."
+    "Require human review before any operational use.",
+    "Only activate this Skill when a user explicitly requests execution or analysis of the Day-Ahead Unit Commitment optimization workflow.",
+    "Source and validate all input parameters strictly against the defined input schema, never generate or fill in missing business data arbitrarily.",
+    "Confirm all required parameters are fully provided: load forecast, renewable generation forecast, unit minimum output, unit maximum output, ramp up limit, ramp down limit, fuel cost, startup cost, and initial unit operating status.",
+    "Execute the linked optimization model, and share the full solver status before interpreting the total cost minimization outcome.",
+    "Construct all explanatory content exclusively using references from the generated evidence package, and clearly separate factual observations, derived inferences, and actionable recommendations.",
+    "Mandate formal human review of all outputs prior to any real-world operational application."
   ],
   "trigger_examples": [
     "Run 日前机组组合优化 Unit Commitment with the parameters I provide and explain the result.",
-    "Use 日前机组组合优化 Unit Commitment to analyze 日前机组组合优化，生成机组启停、启动和出力计划。.",
-    "Optimize 总成本最小 with 日前机组组合优化 Unit Commitment and identify binding constraints."
+    "Use 日前机组组合优化 Unit Commitment to analyze 日前机组组合优化.",
+    "Optimize 总成本最小 with 日前机组组合优化 Unit Commitment and identify binding constraints.",
+    "Run the Day-Ahead Unit Commitment optimization using the parameters I supply, then walk me through the resulting outputs.",
+    "Leverage the Day-Ahead Unit Commitment optimization tool to analyze my day-ahead unit scheduling scenario.",
+    "Run the Day-Ahead Unit Commitment optimization to minimize total operating cost, and highlight all active binding constraints in the final result."
   ],
   "non_trigger_examples": [
     "Explain the general theory behind 日前机组组合优化 Unit Commitment without running a model.",
-    "Execute an external operational action or approve a production decision."
+    "Execute an external operational action or approve a production decision.",
+    "Explain the general theoretical principles of Day-Ahead Unit Commitment without running the formal optimization model.",
+    "Carry out any external real-world operational action or directly approve a production scheduling decision."
   ],
   "parameter_questions": [
     {
@@ -634,7 +645,10 @@
     "manual_review_points": [
       "Verify input provenance, freshness, units, and dimensional completeness.",
       "Review constraint satisfaction, violations, and binding margins against the declared model contract.",
-      "Confirm the recommendation with an authorized reviewer before operational use."
+      "Confirm the recommendation with an authorized reviewer before operational use.",
+      "Validate all input data for correct source, timeliness, matching units, and full dimensional completeness.",
+      "Audit all outputs to confirm constraint compliance, flag any constraint violations, and verify binding margins against the official published model contract.",
+      "Obtain explicit confirmation of the final recommendation from a qualified, authorized reviewer before it is used for any operational purpose."
     ],
     "limitations": [
       "The explanation describes the returned solver evidence and does not prove real-world causality.",
@@ -660,24 +674,26 @@
   },
   "generation": {
     "mode": "deterministic_contract_compiler",
-    "generated_at": "2026-08-04 22:02:25",
+    "generated_at": "2026-08-14 17:16:59",
     "llm": {
-      "requested": false,
-      "attempted": false,
-      "applied": false,
+      "requested": true,
+      "attempted": true,
+      "applied": true,
       "fallback_used": false,
-      "reason": "NOT_REQUESTED"
+      "reason": "APPLIED",
+      "provider": "volcengine_ark",
+      "model": "doubao-seed-2-0-lite-260428"
     },
-    "source_contract_hash": "d0fa63710efe3f6d164c3407782138bca07d71704d66bf9757d4d7e6820e9383"
+    "source_contract_hash": "d45c92788fdcc6a3d7c7947f26922fa5a0616e4225e26cdf7eea038335497ecb"
   },
   "validation": {
     "status": "valid",
     "score": 100,
     "errors": [],
     "warnings": [],
-    "validated_at": "2026-08-04 22:02:25"
+    "validated_at": "2026-08-14 17:17:36"
   },
-  "created_at": "2026-08-04 22:02:25",
-  "updated_at": "2026-08-04 22:02:25",
-  "definition_hash": "c4b97c6c6da61a71d8aab5facc15dc5042d268e03e05f1ba5de679ccaa16dfdb"
+  "created_at": "2026-08-14 17:16:59",
+  "updated_at": "2026-08-14 17:16:59",
+  "definition_hash": "56812aaaaa62385a8cc5dfbb26d1e26b012ac7a5db4cde818fd966c9d7df5073"
 }

@@ -60,7 +60,7 @@
   line-height: 18px;
 }
 .time-series-preview-notice.ant-alert {
-  margin-top: 8px;
+  margin: 10px 0 14px;
   padding: 5px 8px;
 }
 .time-series-preview-notice .ant-alert-message {

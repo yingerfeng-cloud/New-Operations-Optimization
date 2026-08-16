@@ -3,7 +3,7 @@ import type { ReactNode } from 'react';
 import { LazyEChart } from '../../components/LazyEChart';
 import { JsonViewer } from '../../components/JsonViewer';
 import type { SolveResult } from '../../types/result';
-import { resultLabel, type ResultLabelMap } from './resultLabels';
+import { resultLabel, resultValueLabel, type ResultLabelMap } from './resultLabels';
 
 type RowValue = Record<string, unknown> & { __row_key?: string };
 
@@ -13,9 +13,10 @@ function text(value: unknown) {
   return JSON.stringify(value);
 }
 
-function resultValue(value: unknown) {
-  if (typeof value !== 'number' || !Number.isFinite(value)) return text(value);
-  return value.toLocaleString('zh-CN', { maximumFractionDigits: 6 });
+function resultValue(value: unknown, key?: string) {
+  const displayValue = resultValueLabel(key, value);
+  if (typeof displayValue !== 'number' || !Number.isFinite(displayValue)) return text(displayValue);
+  return displayValue.toLocaleString('zh-CN', { maximumFractionDigits: 6 });
 }
 
 function previewText(value: unknown, maxLength = 58) {
@@ -29,7 +30,7 @@ function ResultSummaryGrid({ items, compact = false }: { items: Array<{ key: str
       {items.map(item => (
         <div className="result-summary-item" key={item.key}>
           <span>{item.label}</span>
-          <strong title={text(item.value)}>{resultValue(item.value)}</strong>
+        <strong title={text(item.value)}>{resultValue(item.value, item.key)}</strong>
         </div>
       ))}
     </div>
@@ -154,7 +155,7 @@ export function ResultMetricsPanel({ result, labelMap }: { result?: SolveResult;
       dataSource={rowsFrom(result?.metrics || result?.summary || {}, 'metric')}
       columns={[
         { title: '指标', dataIndex: 'key', render: value => <ResultFieldName code={value} labels={labelMap} /> },
-        { title: '值', dataIndex: 'value', render: text },
+        { title: '值', dataIndex: 'value', render: (value, row) => resultValue(value, String(row.key || '')) },
       ]}
     />
   );
