@@ -33,6 +33,45 @@ server.py                      后端启动入口
 
 ## 快速启动
 
+### macOS / Linux
+
+项目已提供 POSIX shell 启动脚本，可在 macOS 的 Terminal 中运行。Windows 迁移过来的 `.venv/` 不能在 macOS 复用；如果仓库中已有该目录，请为 macOS 单独创建 `.venv-mac/`：
+
+```bash
+cd /Users/joiefu/Project/OPTIFORGE
+python3 -m venv .venv-mac
+./.venv-mac/bin/python -m pip install --upgrade pip
+./.venv-mac/bin/python -m pip install -r requirements.txt
+cd frontend
+npm ci
+cd ..
+chmod +x start.sh stop.sh
+./start.sh
+```
+
+启动后访问：
+
+- React 前端：`http://127.0.0.1:5173`
+- FastAPI：`http://127.0.0.1:8000`
+- 健康检查：`http://127.0.0.1:8000/api/health`
+
+停止服务：
+
+```bash
+./stop.sh
+```
+
+也可以在 Finder 中双击 `启动OPTIFORGE.command` 启动，双击 `停止OPTIFORGE.command` 停止。首次运行若被 macOS 拦截，请右键文件并选择“打开”。
+
+不自动打开浏览器，或修改端口：
+
+```bash
+./start.sh --no-browser
+./start.sh --api-port 8001 --frontend-port 5174
+```
+
+如果尚未安装 Python 3 或 Node.js，可先通过 Homebrew 安装：`brew install python node`。启动脚本会优先使用 `.venv-mac/bin/python`，不会误用 Windows 虚拟环境。
+
 ### 1. 安装后端依赖
 
 ```powershell
@@ -40,26 +79,21 @@ python -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -r requirements.txt
 ```
 
-### 2. 脚本启动（推荐）
+### 2. 一键启动（推荐）
 
-Windows PowerShell 下可直接使用仓库根目录脚本启动新版平台：
+macOS / Linux 使用仓库根目录的跨平台脚本：
 
-```powershell
-.\启动前后端.ps1
+```bash
+./start.sh
 ```
 
-该脚本会启动：
+停止服务：
 
-- FastAPI 后端：`http://127.0.0.1:8000`
-- React/Vite 前端：`http://127.0.0.1:5173`
-
-停用服务：
-
-```powershell
-.\停用前后端.ps1
+```bash
+./stop.sh
 ```
 
-启动脚本支持 `-NoBrowser`、`-ApiPort` 和 `-FrontendPort` 参数。脚本默认以 `SERVICE_MODE=platform` 启动核心平台；需要完整使用 Agent 与 Skill 时，请按下方“Skill / Agent 部署模式”手工启动 `combined` 模式。
+启动脚本支持 `--no-browser`、`--api-port` 和 `--frontend-port` 参数，并以 `SERVICE_MODE=combined` 启动平台与 Agent 服务。
 
 ### 3. 手工开发环境
 

@@ -49,6 +49,12 @@ docker compose exec backend bash scripts/run_nlp_tests.sh
 Docker maps `localhost:18000` to the backend container and stores runtime data in `./docker-data`.
 Native runtime continues to use `localhost:8000` and `data/`.
 
+The runtime base image is pulled from Mamba's official GitHub Container
+Registry (`ghcr.io/mamba-org/micromamba`) and pinned by digest. Python, Node.js,
+HiGHS, and Ipopt are then installed from conda-forge inside that image. This
+avoids a runtime dependency on Docker Hub while keeping both Apple Silicon and
+Linux delivery reproducible.
+
 ## Solver Status API
 
 The frontend and operational checks use:
@@ -63,5 +69,23 @@ The response reports HiGHS and Ipopt independently. Ipopt unavailability never m
 
 Ipopt is a local NLP solver. NLP results include `local_optimum_warning: true`.
 The platform reports solver status and local-optimum risk; it does not claim global optimality for NLP.
+
+NLP task options can be supplied through `solver_config`:
+
+```json
+{
+  "solver": "Ipopt",
+  "time_limit_seconds": 300,
+  "solver_config": {
+    "nlp_tolerance": 1e-7,
+    "acceptable_tol": 1e-5,
+    "max_iter": 500
+  }
+}
+```
+
+`time_limit_seconds` maps to Ipopt's `max_cpu_time`. When no NLP tolerance is
+provided, the adapter uses `1e-6`; the MILP-only `mip_gap` setting is not reused
+as an NLP convergence tolerance.
 
 MINLP remains `MINLP_RESERVED`. Models that combine nonlinear expressions with binary or integer variables are blocked unless they are reformulated with McCormick, 1D PWL, or 2D PWL linearization.

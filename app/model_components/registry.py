@@ -3,7 +3,6 @@ from __future__ import annotations
 from copy import deepcopy
 from typing import Any
 
-from app.problem_type_diagnosis import component_problem_type_fields
 from app.model_components.formula_contracts import formula_expression, participation_fields, synchronize_formula_fields
 
 
@@ -233,6 +232,12 @@ def list_component_catalog() -> list[dict[str, Any]]:
 
 
 def component_definition(component_type: str, builder: Any | None = None) -> dict[str, Any]:
+    # Import lazily: problem_type_diagnosis reads formula contracts from this
+    # package, while importing the component package registers all builders.
+    # Keeping this dependency at module scope makes a direct solver-router
+    # import depend on import order and can leave both modules half-initialized.
+    from app.problem_type_diagnosis import component_problem_type_fields
+
     builder = builder or get_component_builder(component_type)
     display_name = getattr(builder, "display_name", component_type)
     description = getattr(builder, "description", "")

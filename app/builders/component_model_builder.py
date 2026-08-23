@@ -187,12 +187,13 @@ class ComponentModelBuilder:
     def _build_sets(self, model: Any, model_spec: dict[str, Any], runtime_parameters: dict[str, Any], context: dict[str, Any]) -> None:
         set_names = self._required_set_names(model_spec)
         declared_sets = {
-            str(item.get("name") or item.get("code") or item.get("key")): item
+            str(item.get("code") or item.get("key") or item.get("name")): item
             for item in model_spec.get("sets", []) or []
-            if item.get("name") or item.get("code") or item.get("key")
+            if item.get("code") or item.get("key") or item.get("name")
         }
+        time_dimension = (model_spec.get("ui_metadata") or {}).get("time_dimension") or {}
         for set_name in set_names:
-            values = self._set_values(set_name, declared_sets.get(set_name, {}), runtime_parameters)
+            values = self._set_values(set_name, declared_sets.get(set_name, {}), runtime_parameters, time_dimension, set(declared_sets))
             if not values:
                 raise RuntimeError(f"组件化模型集合 {set_name} 不能为空。")
             setattr(model, set_name, pyo.Set(initialize=values, ordered=True))
@@ -411,18 +412,32 @@ class ComponentModelBuilder:
                 if index_name not in names:
                     names.append(str(index_name))
         for item in model_spec.get("sets", []) or []:
-            name = item.get("name") or item.get("code") or item.get("key")
+            name = item.get("code") or item.get("key") or item.get("name")
             if name and str(name) not in names:
                 names.append(str(name))
         return names
 
-    def _set_values(self, set_name: str, set_spec: dict[str, Any], runtime_parameters: dict[str, Any]) -> list[Any]:
-        if set_name == "time":
-            horizon = int(runtime_parameters.get("horizon") or len(runtime_parameters.get("time", [])) or 0)
-            return list(runtime_parameters.get("time") or range(horizon))
-        if set_name == "time_volume":
-            horizon = int(runtime_parameters.get("horizon") or len(runtime_parameters.get("time", [])) or 0)
-            return list(runtime_parameters.get("time_volume") or range(horizon + 1))
+    def _set_values(
+        self,
+        set_name: str,
+        set_spec: dict[str, Any],
+        runtime_parameters: dict[str, Any],
+        time_dimension: dict[str, Any] | None = None,
+        available_sets: set[str] | None = None,
+    ) -> list[Any]:
+        config = time_dimension or {}
+        time_set = str(config.get("time_set") or "time")
+        if "state_time_set" in config:
+            raw_state_set = config.get("state_time_set")
+            state_time_set = None if raw_state_set in (None, "") else str(raw_state_set)
+        else:
+            state_time_set = "time_volume" if available_sets and "time_volume" in available_sets else None
+        if set_name == time_set:
+            horizon = int(runtime_parameters.get("horizon") or len(runtime_parameters.get(time_set, [])) or 0)
+            return list(runtime_parameters.get(time_set) or range(horizon))
+        if state_time_set and set_name == state_time_set:
+            horizon = int(runtime_parameters.get("horizon") or len(runtime_parameters.get(time_set, [])) or 0)
+            return list(runtime_parameters.get(state_time_set) or range(horizon + 1))
         runtime_value = runtime_parameters.get(set_name)
         if isinstance(runtime_value, (list, tuple)):
             return list(runtime_value)

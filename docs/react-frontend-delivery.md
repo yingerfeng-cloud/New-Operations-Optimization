@@ -16,8 +16,8 @@
 
 开发模式：
 
-```powershell
-.\启动前后端.ps1 -NoBrowser
+```bash
+./start.sh --no-browser
 ```
 
 访问：

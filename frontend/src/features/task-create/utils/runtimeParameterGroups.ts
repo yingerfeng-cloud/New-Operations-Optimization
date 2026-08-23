@@ -21,6 +21,23 @@ export interface RuntimeFieldIssue {
   fixHint: string;
 }
 
+function hasEmptyRequiredLeaf(value: unknown): boolean {
+  if (value === undefined || value === null) return true;
+  if (typeof value === 'string') return value.trim() === '';
+  if (Array.isArray(value)) return value.length === 0 || value.some(hasEmptyRequiredLeaf);
+  if (typeof value === 'object') {
+    const values = Object.values(value as Record<string, unknown>);
+    return values.length === 0 || values.some(hasEmptyRequiredLeaf);
+  }
+  return false;
+}
+
+export function requiredRuntimeValueError(field: RuntimeField, value: unknown): string {
+  if (!field.required) return '';
+  if (isRuntimeValueEmpty(value)) return '必填值为空';
+  return hasEmptyRequiredLeaf(value) ? '必填结构中存在未填写项' : '';
+}
+
 function fallbackGroup(field: RuntimeField, config: TimeDimensionConfig) {
   const kind = parameterEditorKind(field);
   if (kind === 'matrix') return { key: 'matrix', label: '矩阵参数', order: 50 };
@@ -58,7 +75,7 @@ export function runtimeFieldIssues(
 ): RuntimeFieldIssue[] {
   const result: RuntimeFieldIssue[] = [];
   groups.forEach(group => group.fields.forEach(field => {
-    const message = editorErrors[field.code] || (field.required && isRuntimeValueEmpty(values[field.code]) ? '必填值为空' : '');
+    const message = editorErrors[field.code] || requiredRuntimeValueError(field, values[field.code]);
     if (message) result.push({ code: field.code, name: field.name, groupKey: group.key, groupLabel: group.label, message, fixHint: field.helpText || '请按模型参数契约补充有效值并重新检查。' });
   }));
   timeErrors.forEach(message => {
@@ -85,7 +102,7 @@ export function filterRuntimeFields(
   errors: Record<string, string>,
 ) {
   if (filter === 'required') return fields.filter(field => field.required);
-  if (filter === 'error') return fields.filter(field => Boolean(errors[field.code]) || (field.required && isRuntimeValueEmpty(values[field.code])));
+  if (filter === 'error') return fields.filter(field => Boolean(errors[field.code]) || Boolean(requiredRuntimeValueError(field, values[field.code])));
   if (filter === 'modified') return fields.filter(field => isRuntimeValueModified(values[field.code], defaultValues[field.code]));
   return fields;
 }
@@ -99,9 +116,9 @@ export function runtimeGroupStats(group: RuntimeParameterGroup, values: Record<s
   return {
     filled: group.fields.filter(field => !isRuntimeValueEmpty(values[field.code])).length,
     total: group.fields.length,
-    completed: required.filter(field => !isRuntimeValueEmpty(values[field.code])).length,
+    completed: required.filter(field => !requiredRuntimeValueError(field, values[field.code])).length,
     required: required.length,
-    errors: group.fields.filter(field => Boolean(errors[field.code]) || (field.required && isRuntimeValueEmpty(values[field.code]))).length,
+    errors: group.fields.filter(field => Boolean(errors[field.code]) || Boolean(requiredRuntimeValueError(field, values[field.code]))).length,
     modified: group.fields.filter(field => isRuntimeValueModified(values[field.code], defaults[field.code])).length,
   };
 }

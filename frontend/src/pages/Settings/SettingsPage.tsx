@@ -247,11 +247,11 @@ function LlmConfigPanel({ config }: { config?: LlmConfig }) {
             </Row>
           </section>
         </div>
-        <Descriptions className="section-gap" bordered column={2}>
+        <Descriptions className="section-gap settings-runtime-meta" bordered column={2}>
           <Descriptions.Item label="配置来源">{config?.config_source || '-'}</Descriptions.Item>
           <Descriptions.Item label="Key 状态">{config?.api_key_configured ? '已配置' : '未配置'}</Descriptions.Item>
-          <Descriptions.Item label="持久化文件">{config?.persistence_path || '-'}</Descriptions.Item>
-          <Descriptions.Item label="更新时间">{config?.last_updated_at || '-'}</Descriptions.Item>
+          <Descriptions.Item label="持久化文件" span={2}>{config?.persistence_path || '-'}</Descriptions.Item>
+          <Descriptions.Item label="更新时间" span={2}>{config?.last_updated_at || '-'}</Descriptions.Item>
         </Descriptions>
         <div className="settings-action-bar">
           <Button onClick={() => test.mutate()} loading={test.isPending}>测试连接</Button>

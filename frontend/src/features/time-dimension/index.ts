@@ -12,7 +12,8 @@ export interface RuntimeField {
   code: string; name: string; required: boolean; dimension: string[]; defaultValue?: unknown; exampleValue?: unknown;
   type?: string; unit?: string; description?: string; enumValues?: unknown[]; dimensionValues?: Record<string, string[]>; min?: number; max?: number;
   groupKey?: string; groupLabel?: string; groupOrder?: number; fieldOrder?: number;
-  editorHint?: string; helpText?: string; dataSourceLabel?: string;
+  editorHint?: string; helpText?: string; dataSourceLabel?: string; sourceSystem?: string; defaultPolicy?: string;
+  role?: 'parameter' | 'set_members' | 'time_labels'; editable?: boolean;
 }
 
 export const objectValue = (value: unknown): Record<string, unknown> => value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {};
@@ -53,6 +54,8 @@ export function runtimeFieldsFromContracts(...sources: unknown[]): RuntimeField[
   const rows = new Map<string, RuntimeField>();
   const authoritativeInputCodes = new Set<string>();
   const setValues: Record<string, string[]> = {};
+  const setMetadata = new Map<string, { editable?: boolean; sourceSystem?: string }>();
+  const timeLabelSets = new Set<string>();
   const explicitGroups = new Map<string, { key: string; label: string; order: number }>();
   const seen = new Set<unknown>();
   const addField = (item: Record<string, unknown>) => {
@@ -60,6 +63,8 @@ export function runtimeFieldsFromContracts(...sources: unknown[]): RuntimeField[
     if (!code) return;
     const existing = rows.get(code);
     const validation = objectValue(item.validation);
+    const editableValue = item.runtime_editable ?? item.editable;
+    const rawRole = String(item.field_role || item.semantic_role || item.ui_role || existing?.role || '');
     for (const [dimension, values] of Object.entries(objectValue(item.sets))) {
       if (Array.isArray(values) && values.length) setValues[dimension] = values.map(String);
     }
@@ -77,6 +82,10 @@ export function runtimeFieldsFromContracts(...sources: unknown[]): RuntimeField[
       groupOrder: item.ui_group_order == null ? existing?.groupOrder : Number(item.ui_group_order), fieldOrder: item.ui_order == null ? existing?.fieldOrder : Number(item.ui_order),
       editorHint: String(item.ui_editor || existing?.editorHint || '') || undefined, helpText: String(item.ui_help || existing?.helpText || '') || undefined,
       dataSourceLabel: String(item.ui_data_source || existing?.dataSourceLabel || '') || undefined,
+      sourceSystem: String(item.source_system || existing?.sourceSystem || '') || undefined,
+      defaultPolicy: String(item.default_policy || existing?.defaultPolicy || '') || undefined,
+      role: ['parameter', 'set_members', 'time_labels'].includes(rawRole) ? rawRole as RuntimeField['role'] : existing?.role,
+      editable: editableValue == null ? existing?.editable : Boolean(editableValue),
     });
   };
   const rememberInputCodes = (value: unknown) => {
@@ -119,6 +128,8 @@ export function runtimeFieldsFromContracts(...sources: unknown[]): RuntimeField[
     seen.add(source);
     const record = objectValue(source);
     const uiMetadata = objectValue(record.ui_metadata);
+    const timeDimension = objectValue(uiMetadata.time_dimension);
+    if (timeDimension.label_set) timeLabelSets.add(String(timeDimension.label_set));
     for (const group of records(uiMetadata.runtime_parameter_groups)) {
       const key = String(group.key || '');
       if (!key) continue;
@@ -130,6 +141,13 @@ export function runtimeFieldsFromContracts(...sources: unknown[]): RuntimeField[
       const code = String(item.code || item.name || '');
       const values = Array.isArray(item.values) ? item.values : Array.isArray(item.members) ? item.members : [];
       if (code && values.length) setValues[code] = values.map(String);
+      if (code) {
+        const editableValue = item.runtime_editable ?? item.editable;
+        setMetadata.set(code, {
+          editable: editableValue == null ? setMetadata.get(code)?.editable : Boolean(editableValue),
+          sourceSystem: String(item.source_system || setMetadata.get(code)?.sourceSystem || '') || undefined,
+        });
+      }
     }
     for (const [code, value] of Object.entries(objectValue(record.sets))) if (Array.isArray(value)) setValues[code] = value.map(String);
     [...records(record.parameters), ...records(record.runtime_parameters), ...records(record.parameter_bindings)].forEach(addField);
@@ -138,14 +156,51 @@ export function runtimeFieldsFromContracts(...sources: unknown[]): RuntimeField[
   sources.forEach(visit);
   return [...rows.values()].filter(field => !authoritativeInputCodes.size || authoritativeInputCodes.has(field.code)).map(field => {
     const explicit = explicitGroups.get(field.code);
+    const isDimensionSet = field.dimension.length === 1 && field.dimension[0] === field.code && Boolean(setValues[field.code]);
+    const metadata = setMetadata.get(field.code);
+    const role = field.role || (timeLabelSets.has(field.code) ? 'time_labels' : isDimensionSet ? 'set_members' : 'parameter');
     return {
       ...field,
       groupKey: explicit?.key || field.groupKey,
       groupLabel: explicit?.label || field.groupLabel,
       groupOrder: explicit?.order ?? field.groupOrder,
       dimensionValues: Object.fromEntries(field.dimension.filter(code => setValues[code]).map(code => [code, setValues[code]])),
+      role,
+      editable: field.editable ?? (role === 'set_members' ? metadata?.editable ?? false : role === 'time_labels' ? true : undefined),
+      sourceSystem: field.sourceSystem || metadata?.sourceSystem,
     };
   });
+}
+
+function valuesAsLabels(value: unknown): string[] {
+  return Array.isArray(value) ? value.filter(item => item !== undefined && item !== null && String(item).trim() !== '').map(String) : [];
+}
+
+export function runtimeDimensionValues(field: RuntimeField, fields: RuntimeField[], parameters: Record<string, unknown>): Record<string, string[]> {
+  return Object.fromEntries(field.dimension.map(dimension => {
+    const setField = fields.find(item => item.code === dimension && (item.role === 'set_members' || item.dimension.length === 1 && item.dimension[0] === dimension));
+    const runtime = valuesAsLabels(parameters[dimension]);
+    const fallback = valuesAsLabels(setField?.defaultValue).length
+      ? valuesAsLabels(setField?.defaultValue)
+      : valuesAsLabels(setField?.exampleValue).length ? valuesAsLabels(setField?.exampleValue) : field.dimensionValues?.[dimension] || [];
+    return [dimension, runtime.length ? runtime : fallback];
+  }).filter(([, values]) => values.length));
+}
+
+export function runtimeTimeLabels(config: TimeDimensionConfig, fields: RuntimeField[], parameters: Record<string, unknown>, horizon?: number, resolvedIntervalMinutes?: number): string[] {
+  if (!config.enabled || !horizon || horizon <= 0) return [];
+  const labelField = config.label_set ? fields.find(field => field.code === config.label_set) : undefined;
+  const explicit = config.label_set ? valuesAsLabels(parameters[config.label_set]) : [];
+  const declared = explicit.length ? explicit : valuesAsLabels(labelField?.defaultValue).length ? valuesAsLabels(labelField?.defaultValue) : valuesAsLabels(labelField?.exampleValue);
+  if (declared.length >= horizon) return declared.slice(0, horizon);
+  const intervalMinutes = resolvedIntervalMinutes || config.interval_minutes;
+  if (config.label_generation === 'auto' && config.label_format === 'HH:mm' && intervalMinutes) {
+    return Array.from({ length: horizon }, (_, index) => {
+      const minutes = index * intervalMinutes;
+      return `${String(Math.floor(minutes / 60) % 24).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`;
+    });
+  }
+  return [...declared, ...Array.from({ length: horizon - declared.length }, (_, index) => `T${declared.length + index + 1}`)];
 }
 
 export function managedTimeFields(config: TimeDimensionConfig) {

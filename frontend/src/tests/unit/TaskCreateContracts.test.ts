@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'vitest';
 import { buildTaskPayload } from '../../features/task-create/utils/buildTaskPayload';
 import { parseTaskRuntimeJson } from '../../features/task-create/TaskCreateWizard';
-import { deriveHorizon, managedTimeFields, truncateRuntimeParametersForHorizon, validateRuntimeTimeDimension, type RuntimeField, type TimeDimensionConfig } from '../../features/time-dimension';
+import { deriveHorizon, managedTimeFields, runtimeTimeLabels, truncateRuntimeParametersForHorizon, validateRuntimeTimeDimension, type RuntimeField, type TimeDimensionConfig } from '../../features/time-dimension';
 
 const base = (overrides: Partial<TimeDimensionConfig>): TimeDimensionConfig => ({ enabled: true, policy: 'fixed', time_set: 'time', state_time_set: null, editable: false, allowed_horizons: [], interval_minutes_by_horizon: {}, delta_t_by_horizon: {}, ...overrides });
 const series: RuntimeField = { code: 'load_forecast', name: '负荷预测', required: true, dimension: ['time'] };
@@ -17,6 +17,12 @@ describe('task create contract gate', () => {
     const payload = buildTaskPayload({ model_id: 'm1', solver: 'HiGHS', horizon: 24, parameters: { demand: 100 } }, config);
     expect(payload).not.toHaveProperty('horizon');
     expect(payload.runtime_parameters).toEqual({ demand: 100 });
+  });
+
+  test('uses the selected model scene and never injects a power-specific scene', () => {
+    const config = base({ enabled: false, policy: 'not_applicable' });
+    expect(buildTaskPayload({ model_id: 'm1', scene: '梯级水电调度', solver: 'HiGHS', parameters: {} }, config).scene).toBe('梯级水电调度');
+    expect(buildTaskPayload({ model_id: 'm1', solver: 'auto', parameters: {} }, config)).not.toHaveProperty('scene');
   });
 
   test('fixed horizon is read-only and omitted from legacy payload fields', () => {
@@ -122,5 +128,12 @@ describe('task create contract gate', () => {
   test('managed granularity is filtered only when the contract owns it', () => {
     expect(managedTimeFields(base({ interval_minutes: 15, delta_t: 0.25 })).has('delta_t')).toBe(true);
     expect(managedTimeFields(base({ interval_minutes: undefined, delta_t: undefined })).has('delta_t')).toBe(false);
+  });
+
+  test('resolves labels from the contract label_set without relying on a time_labels field name', () => {
+    const config = base({ default_horizon: 2, interval_minutes: 60, label_set: 'display_periods', label_generation: 'auto', label_format: 'HH:mm' });
+    const labelField: RuntimeField = { code: 'display_periods', name: '显示时段', required: true, dimension: ['time'], exampleValue: ['00:00', '01:00'] };
+    expect(runtimeTimeLabels(config, [labelField], {}, 2)).toEqual(['00:00', '01:00']);
+    expect(managedTimeFields(config).has('display_periods')).toBe(true);
   });
 });

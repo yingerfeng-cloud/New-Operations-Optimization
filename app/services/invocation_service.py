@@ -41,11 +41,15 @@ class InvocationService:
         }
 
     def input_schema(self, semantic_spec: dict[str, Any]) -> list[dict[str, Any]]:
-        sets = {
-            str(item.get("key") or item.get("code")): list(item.get("values") or [])
+        set_definitions = {
+            str(item.get("key") or item.get("code")): item
             for item in semantic_spec.get("sets", []) or []
             if item.get("key") or item.get("code")
         }
+        sets = {code: list(item.get("values") or item.get("members") or []) for code, item in set_definitions.items()}
+        component_spec = semantic_spec.get("component_spec") or {}
+        time_dimension = (semantic_spec.get("ui_metadata") or {}).get("time_dimension") or (component_spec.get("ui_metadata") or {}).get("time_dimension") or {}
+        label_set = str(time_dimension.get("label_set") or "")
         rows = []
         for param in semantic_spec.get("parameters", []) or []:
             code = param.get("math_param") or param.get("code") or param.get("key")
@@ -57,11 +61,23 @@ class InvocationService:
             default_value = param.get("default_value", param.get("default"))
             if default_policy == "default_allowed" and default_value is None:
                 default_value = sample_value
+            dimensions = list(param.get("dimension") or [])
+            set_definition = set_definitions.get(str(code), {})
+            field_role = str(param.get("field_role") or param.get("semantic_role") or "")
+            if not field_role and str(code) == label_set:
+                field_role = "time_labels"
+            if not field_role and dimensions == [str(code)] and str(code) in set_definitions:
+                field_role = "set_members"
+            runtime_editable = param.get("runtime_editable")
+            if runtime_editable is None and field_role == "set_members":
+                runtime_editable = set_definition.get("runtime_editable", set_definition.get("editable", False))
+            if runtime_editable is None and field_role == "time_labels" and time_dimension.get("label_generation") == "auto":
+                runtime_editable = False
             rows.append(
                 {
                     "key": code,
                     "name": param.get("name") or code,
-                    "dimension": list(param.get("dimension") or []),
+                    "dimension": dimensions,
                     "type": validation.get("type") or self._infer_type(param),
                     "unit": param.get("unit", ""),
                     "required": bool(validation.get("required", param.get("required", True))),
@@ -69,8 +85,13 @@ class InvocationService:
                     "default_value": default_value,
                     "sample_value": sample_value,
                     "default_policy": default_policy,
-                    "sets": {dim: sets.get(str(dim), []) for dim in list(param.get("dimension") or [])},
+                    "source_system": param.get("source_system"),
+                    "runtime_injected": bool(param.get("runtime_injected", False)),
+                    "field_role": field_role or "parameter",
+                    "runtime_editable": True if runtime_editable is None else bool(runtime_editable),
+                    "sets": {dim: sets.get(str(dim), []) for dim in dimensions},
                     "validation": validation,
+                    **{key: param[key] for key in ("ui_group", "ui_group_label", "ui_group_order", "ui_order", "ui_editor", "ui_help", "ui_data_source") if key in param},
                 }
             )
         return rows
@@ -134,7 +155,7 @@ class InvocationService:
                             "use_llm": bool(options.get("llm_explain", False)),
                         }
                     },
-                    solver=str(options.get("solver") or "HiGHS"),
+                    solver=str(options.get("solver") or model.solver or "auto"),
                     async_run=mode != "sync",
                     time_limit_seconds=int(options.get("time_limit_seconds") or 300),
                 )

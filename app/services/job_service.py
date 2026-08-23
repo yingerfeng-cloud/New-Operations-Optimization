@@ -93,7 +93,6 @@ class JobService:
             STORE.save_runtime()
 
     def _prepare_request(self, req: SolveRequest) -> None:
-        req.solver = "HiGHS"
         user_parameter_keys = set(req.parameters or {})
         user_runtime_keys = set(req.runtime_parameters or {})
         user_payload_keys = set(req.payload or {})

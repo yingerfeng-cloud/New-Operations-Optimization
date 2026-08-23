@@ -1260,6 +1260,8 @@ class ModelService:
             if run_solver:
                 problem_type = solver_router.infer_problem_type_from_model(pyomo_model)
                 solver_result = solver_router.solve(pyomo_model, problem_type=problem_type, requested_solver=None)
+                if solver_result.status not in {"optimal", "local_optimal", "feasible"}:
+                    raise RuntimeError(solver_result.message or f"solver returned {solver_result.status}")
                 result["solver_check"] = {"status": "passed", "warnings": [], "objective_value": solver_result.objective_value, "solver_status": solver_result.status, "problem_type": problem_type}
         except Exception as exc:
             function_component_index = self._first_function_mapping_component_index(component_spec) if is_component_based else None
@@ -1865,12 +1867,37 @@ class ModelService:
                 if model:
                     lifecycle_status = str(template.get("status") or "published")
                     updates: dict[str, Any] = {}
-                    if self._is_managed_default(model) and model.scenario_id != template.get("scenario_id"):
+                    managed_default = self._is_managed_default(model)
+                    template_version = str(template.get("version") or "v1.0")
+                    managed_version = str((model.ui_metadata or {}).get("managed_template_version") or model.version or "")
+                    if managed_default and managed_version != template_version:
+                        updates.update({
+                            "name": template["name"],
+                            "version": template_version,
+                            "solver": template.get("solver", model.solver),
+                            "problem_type": template.get("problem_type", template.get("model_problem_type", model.problem_type)),
+                            "model_problem_type": template.get("model_problem_type", template.get("problem_type", model.model_problem_type)),
+                            "required_solver_capabilities": template.get("required_solver_capabilities", model.required_solver_capabilities),
+                            "build_mode": template.get("build_mode", model.build_mode),
+                            "semantic_spec": deepcopy(template),
+                            "component_spec": deepcopy(template.get("component_spec", {})),
+                            "component_schema": deepcopy(template.get("component_schema", {})),
+                            "parameters": deepcopy(template.get("sample_runtime_parameters", {})),
+                            "time_granularity": self._template_time_granularity(template),
+                            "ui_metadata": {
+                                **deepcopy(template.get("ui_metadata", {}) or {}),
+                                "managed_default_template": True,
+                                "managed_template_version": template_version,
+                            },
+                            "input_contract": {"runtime_parameters": [p["code"] for p in template.get("parameters", [])]},
+                            "output_contract": {"variables": [v["code"] for v in template.get("variables", [])]},
+                        })
+                    if managed_default and model.scenario_id != template.get("scenario_id"):
                         updates["scenario_id"] = template.get("scenario_id")
                     canonical_scene = template.get("scenario_name") or template.get("scenario", template["name"])
-                    if self._is_managed_default(model) and model.scene != canonical_scene:
+                    if managed_default and model.scene != canonical_scene:
                         updates["scene"] = canonical_scene
-                    if self._is_managed_default(model) and lifecycle_status == "published" and model.status != "published":
+                    if managed_default and lifecycle_status == "published" and model.status != "published":
                         updates.update({
                             "status": "published",
                             "is_active_version": True,

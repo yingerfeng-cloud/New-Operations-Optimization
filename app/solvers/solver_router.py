@@ -101,6 +101,9 @@ class SolverRouter:
         mip_gap: float = 0.001,
         time_limit_seconds: int = 300,
         threads: int | None = None,
+        nlp_tolerance: float | None = None,
+        max_iter: int | None = None,
+        acceptable_tol: float | None = None,
         progress_callback: SolverProgressCallback | None = None,
     ) -> SolverRunResult:
         route = self.route(problem_type, requested_solver)
@@ -108,12 +111,23 @@ class SolverRouter:
             raise SolverRouteError(route)
         self._assert_highs_can_accept_model(model, route)
         adapter = self.adapters[self._key(str(route["selected_solver"]))]
+        solve_options: dict[str, Any] = {
+            "mip_gap": mip_gap,
+            "time_limit_seconds": time_limit_seconds,
+            "threads": threads,
+            "progress_callback": progress_callback,
+        }
+        if self._key(str(route["selected_solver"])) == "ipopt":
+            solve_options.update(
+                {
+                    "nlp_tolerance": nlp_tolerance,
+                    "max_iter": max_iter,
+                    "acceptable_tol": acceptable_tol,
+                }
+            )
         return adapter.solve(
             model,
-            mip_gap=mip_gap,
-            time_limit_seconds=time_limit_seconds,
-            threads=threads,
-            progress_callback=progress_callback,
+            **solve_options,
         )
 
     def infer_problem_type_from_model(self, model: Any, default: str = "LP") -> str:

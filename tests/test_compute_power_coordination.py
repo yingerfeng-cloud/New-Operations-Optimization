@@ -64,6 +64,43 @@ def test_compute_power_template_and_component_are_preset_assets() -> None:
         assert STORE.skills[f"run_{MODEL_CODE}"]["status"] == "enabled"
 
 
+def test_managed_compute_power_template_upgrade_refreshes_time_contract() -> None:
+    model_service.seed_default_templates()
+    model_id = "MODEL-POWER-COMPUTE-POWER-COORDINATION-DAY-AHEAD-V1"
+    with STORE.lock:
+        current = STORE.models[model_id]
+        stale_semantic_spec = deepcopy(current.semantic_spec)
+        stale_semantic_spec.setdefault("ui_metadata", {}).pop("time_dimension", None)
+        stale_ui_metadata = deepcopy(current.ui_metadata)
+        stale_ui_metadata.pop("time_dimension", None)
+        stale_ui_metadata.update(
+            {
+                "managed_default_template": True,
+                "managed_template_version": "v1.0",
+            }
+        )
+        STORE.models[model_id] = current.model_copy(
+            update={
+                "version": "v1.0",
+                "semantic_spec": stale_semantic_spec,
+                "ui_metadata": stale_ui_metadata,
+            }
+        )
+
+    model_service.seed_default_templates()
+
+    with STORE.lock:
+        upgraded = STORE.models[model_id]
+    time_dimension = upgraded.semantic_spec["ui_metadata"]["time_dimension"]
+    assert upgraded.version == "v1.1"
+    assert upgraded.ui_metadata["managed_template_version"] == "v1.1"
+    assert time_dimension["time_set"] == "time"
+    assert time_dimension["state_time_set"] == "time_volume"
+    assert time_dimension["label_set"] == "time_labels"
+    assert time_dimension["label_generation"] == "auto"
+    assert time_dimension["interval_minutes"] == 60
+
+
 def test_compute_power_sample_is_a_single_joint_milp(solved_case: dict) -> None:
     context = solved_case["context"]
     result = solved_case["result"]

@@ -1,11 +1,15 @@
 .git
 .venv
+.venv-*
+**/.DS_Store
 __pycache__
+**/__pycache__
 .pytest_cache
 frontend/node_modules
 frontend/dist
 frontend/playwright-report
 frontend/test-results
+frontend/coverage
 frontend/*.tsbuildinfo
 artifacts
 logs

@@ -1,7 +1,7 @@
 import { fireEvent, screen, waitFor } from '@testing-library/react';
 import { useState } from 'react';
 import { beforeEach, expect, test, vi } from 'vitest';
-import { TaskCreateWizard } from '../../features/task-create/TaskCreateWizard';
+import { solverOptionsFromContracts, TaskCreateWizard } from '../../features/task-create/TaskCreateWizard';
 import type { ModelAsset } from '../../types/model';
 import { renderWithQueryClient } from '../testUtils';
 
@@ -29,6 +29,14 @@ async function selectModel(name = '模型一 · v1') {
 beforeEach(() => {
   mocks.schema.mockReset().mockResolvedValue(contract);
   mocks.detail.mockReset().mockResolvedValue({});
+});
+
+test('solver choices follow model contract metadata', () => {
+  expect(solverOptionsFromContracts({ solver: 'SCIP', ui_metadata: { solver_options: ['SCIP', 'Gurobi'] } })).toEqual([
+    { value: 'SCIP', label: 'SCIP' },
+    { value: 'Gurobi', label: 'Gurobi' },
+  ]);
+  expect(solverOptionsFromContracts({})).toEqual([{ value: 'auto', label: 'auto' }]);
 });
 
 test('blocks when both contract interfaces fail and exposes retry', async () => {
@@ -70,6 +78,32 @@ test('array input schema renders object parameters as editable key-value rows', 
   expect(screen.getByDisplayValue('U2')).toBeInTheDocument();
   expect(screen.getByDisplayValue('120')).toBeInTheDocument();
   expect(screen.getByDisplayValue('90')).toBeInTheDocument();
+});
+
+test('renders string and nested-map defaults, then blocks a partially cleared required matrix', async () => {
+  mocks.schema.mockResolvedValue({
+    ui_metadata: { time_dimension: { enabled: false, policy: 'not_applicable', time_set: 'time', state_time_set: null } },
+    input_schema: [
+      { key: 'workload', name: '算力任务池', required: true, dimension: ['workload'], type: 'array', default_value: ['inference'], sets: { workload: ['inference'] } },
+      { key: 'cluster_compatibility', name: '任务集群兼容性', required: true, dimension: ['workload', 'cluster'], type: 'dict', default_value: { inference: { gpu_a: 1, gpu_b: 0 } }, sets: { workload: ['inference'], cluster: ['gpu_a', 'gpu_b'] } },
+    ],
+  });
+  mocks.detail.mockResolvedValue({});
+  renderWithQueryClient(<Harness />);
+  await selectModel();
+  await waitFor(() => expect(screen.getByRole('button', { name: '下一步' })).toBeEnabled());
+  fireEvent.click(screen.getByRole('button', { name: '下一步' }));
+  expect(await screen.findByText('集合成员由模型契约提供')).toBeInTheDocument();
+  expect(screen.getByText('inference')).toBeInTheDocument();
+  expect(screen.queryByLabelText('算力任务池 inference')).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: /矩阵参数/ }));
+  expect(await screen.findByLabelText('任务集群兼容性 inference gpu_a')).toHaveValue('1');
+  expect(screen.getByLabelText('任务集群兼容性 inference gpu_b')).toHaveValue('0');
+  fireEvent.click(screen.getByRole('button', { name: '清 空' }));
+  expect(screen.getByRole('button', { name: '问题 1' })).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: '下一步' }));
+  expect(screen.getByText('填写运行数据')).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: '提交求解并打开详情' })).not.toBeInTheDocument();
 });
 
 test('closing resets model, step, and edited parameters', async () => {

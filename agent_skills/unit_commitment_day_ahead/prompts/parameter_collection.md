@@ -1,1 +1,1 @@
-收集 load_forecast 和 renewable_forecast。initial_unit_status、initial_unit_output 可作为默认值建议，但必须确认后使用。
+收集 load_forecast 和 renewable_forecast。unit_min_output、unit_max_output、ramp_up_limit、ramp_down_limit、fuel_cost、startup_cost、initial_unit_status、initial_unit_output 可使用模型契约中的默认值建议，但必须确认后使用。

@@ -73,10 +73,18 @@
       ],
       "type": "dict",
       "unit": "MW",
-      "required": true,
+      "required": false,
       "description": "",
-      "default_value": null,
-      "sample_value": null,
+      "default_value": {
+        "U1": 50,
+        "U2": 30,
+        "U3": 20
+      },
+      "sample_value": {
+        "U1": 50,
+        "U2": 30,
+        "U3": 20
+      },
       "default_policy": "default_allowed",
       "sets": {
         "unit": [
@@ -98,10 +106,18 @@
       ],
       "type": "dict",
       "unit": "MW",
-      "required": true,
+      "required": false,
       "description": "",
-      "default_value": null,
-      "sample_value": null,
+      "default_value": {
+        "U1": 180,
+        "U2": 120,
+        "U3": 80
+      },
+      "sample_value": {
+        "U1": 180,
+        "U2": 120,
+        "U3": 80
+      },
       "default_policy": "default_allowed",
       "sets": {
         "unit": [
@@ -123,10 +139,18 @@
       ],
       "type": "dict",
       "unit": "MW/h",
-      "required": true,
+      "required": false,
       "description": "",
-      "default_value": null,
-      "sample_value": null,
+      "default_value": {
+        "U1": 80,
+        "U2": 60,
+        "U3": 40
+      },
+      "sample_value": {
+        "U1": 80,
+        "U2": 60,
+        "U3": 40
+      },
       "default_policy": "default_allowed",
       "sets": {
         "unit": [
@@ -148,10 +172,18 @@
       ],
       "type": "dict",
       "unit": "MW/h",
-      "required": true,
+      "required": false,
       "description": "",
-      "default_value": null,
-      "sample_value": null,
+      "default_value": {
+        "U1": 80,
+        "U2": 60,
+        "U3": 40
+      },
+      "sample_value": {
+        "U1": 80,
+        "U2": 60,
+        "U3": 40
+      },
       "default_policy": "default_allowed",
       "sets": {
         "unit": [
@@ -173,10 +205,18 @@
       ],
       "type": "dict",
       "unit": "元/MWh",
-      "required": true,
+      "required": false,
       "description": "",
-      "default_value": null,
-      "sample_value": null,
+      "default_value": {
+        "U1": 280,
+        "U2": 330,
+        "U3": 420
+      },
+      "sample_value": {
+        "U1": 280,
+        "U2": 330,
+        "U3": 420
+      },
       "default_policy": "default_allowed",
       "sets": {
         "unit": [
@@ -198,10 +238,18 @@
       ],
       "type": "dict",
       "unit": "元/次",
-      "required": true,
+      "required": false,
       "description": "",
-      "default_value": null,
-      "sample_value": null,
+      "default_value": {
+        "U1": 6000,
+        "U2": 3500,
+        "U3": 1500
+      },
+      "sample_value": {
+        "U1": 6000,
+        "U2": 3500,
+        "U3": 1500
+      },
       "default_policy": "default_allowed",
       "sets": {
         "unit": [
@@ -223,11 +271,19 @@
       ],
       "type": "dict",
       "unit": "0/1",
-      "required": true,
+      "required": false,
       "description": "",
-      "default_value": null,
-      "sample_value": null,
-      "default_policy": "user_required",
+      "default_value": {
+        "U1": 1,
+        "U2": 0,
+        "U3": 0
+      },
+      "sample_value": {
+        "U1": 1,
+        "U2": 0,
+        "U3": 0
+      },
+      "default_policy": "default_allowed",
       "sets": {
         "unit": [
           "U1",
@@ -238,6 +294,39 @@
       "validation": {
         "type": "dict",
         "binary": true
+      }
+    },
+    {
+      "key": "initial_unit_output",
+      "name": "初始机组出力",
+      "dimension": [
+        "unit"
+      ],
+      "type": "dict",
+      "unit": "MW",
+      "required": false,
+      "description": "",
+      "default_value": {
+        "U1": 80,
+        "U2": 0,
+        "U3": 0
+      },
+      "sample_value": {
+        "U1": 80,
+        "U2": 0,
+        "U3": 0
+      },
+      "default_policy": "default_allowed",
+      "sets": {
+        "unit": [
+          "U1",
+          "U2",
+          "U3"
+        ]
+      },
+      "validation": {
+        "type": "dict",
+        "min": 0
       }
     }
   ],
@@ -282,7 +371,7 @@
   "instructions": [
     "Use this Skill only when the user requests execution or analysis of 日前机组组合优化 Unit Commitment.",
     "Collect and validate parameters exclusively against input_schema; do not invent missing business data.",
-    "Confirm required parameters: load_forecast, renewable_forecast, unit_min_output, unit_max_output, ramp_up_limit, ramp_down_limit, fuel_cost, startup_cost, initial_unit_status.",
+    "Confirm required parameters: load_forecast, renewable_forecast. Present the declared defaults for all other parameters and require explicit confirmation before using them.",
     "Run the bound model and report solver status before interpreting 总成本最小.",
     "Build explanations only from EvidencePackage references and keep facts, inferences, and recommendations separate.",
     "Require human review before any operational use.",
@@ -321,37 +410,42 @@
     {
       "parameter_key": "unit_min_output",
       "question": "Provide 机组最小出力 (dimensions: unit; unit: MW).",
-      "required": true
+      "required": false
     },
     {
       "parameter_key": "unit_max_output",
       "question": "Provide 机组最大出力 (dimensions: unit; unit: MW).",
-      "required": true
+      "required": false
     },
     {
       "parameter_key": "ramp_up_limit",
       "question": "Provide 上爬坡限制 (dimensions: unit; unit: MW/h).",
-      "required": true
+      "required": false
     },
     {
       "parameter_key": "ramp_down_limit",
       "question": "Provide 下爬坡限制 (dimensions: unit; unit: MW/h).",
-      "required": true
+      "required": false
     },
     {
       "parameter_key": "fuel_cost",
       "question": "Provide 燃料成本 (dimensions: unit; unit: 元/MWh).",
-      "required": true
+      "required": false
     },
     {
       "parameter_key": "startup_cost",
       "question": "Provide 启停成本 (dimensions: unit; unit: 元/次).",
-      "required": true
+      "required": false
     },
     {
       "parameter_key": "initial_unit_status",
       "question": "Provide 初始启停状态 (dimensions: unit; unit: 0/1).",
-      "required": true
+      "required": false
+    },
+    {
+      "parameter_key": "initial_unit_output",
+      "question": "Provide 初始机组出力 (dimensions: unit; unit: MW).",
+      "required": false
     }
   ],
   "explanation_spec": {

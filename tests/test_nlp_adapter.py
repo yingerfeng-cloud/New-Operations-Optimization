@@ -57,6 +57,13 @@ def test_nlp_adapter_reserves_minlp_without_calling_ipopt(monkeypatch: pytest.Mo
     assert result.objective is None
 
 
+def test_iteration_limit_is_not_success_when_current_point_violates_constraints() -> None:
+    adapter = NLPSolverAdapter()
+
+    assert adapter._status_from_termination("maxIterations", {"max_violation": 0.5}) == "failed"
+    assert adapter._status_from_termination("maxIterations", {"max_violation": 1e-7}) == "feasible"
+
+
 def test_nlp_adapter_solves_real_nlp_with_ipopt() -> None:
     _require_ipopt()
     result = NLPSolverAdapter().solve(

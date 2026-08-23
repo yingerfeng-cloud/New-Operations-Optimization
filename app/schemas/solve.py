@@ -34,7 +34,7 @@ class SolveRequest(BaseModel):
     model_id: str | None = None
     horizon: int | None = None
     interval_minutes: int | None = None
-    solver: str = "HiGHS"
+    solver: str = "auto"
     mode: str = "business_semantic"
     mip_gap: float = 0.001
     time_limit_seconds: int = 300

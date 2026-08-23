@@ -13,6 +13,8 @@ from app.solvers.status import IPOPT_UNAVAILABLE_MESSAGE
 
 LOCAL_OPTIMUM_WARNING = "NLP solve is a local optimum search; results depend on initial values, bounds, and model scaling."
 IPOPT_INSTALL_HINT = f"{IPOPT_UNAVAILABLE_MESSAGE} Install Ipopt and ensure the ipopt executable is on PATH before enabling NLP solves."
+DEFAULT_NLP_TOLERANCE = 1e-6
+FEASIBILITY_TOLERANCE = 1e-5
 
 
 class NLPSolverAdapter:
@@ -57,12 +59,16 @@ class NLPSolverAdapter:
 
         self._initialize_unset_variables(model)
         solver = pyo.SolverFactory("ipopt")
+        tolerance = float(max(nlp_tolerance if nlp_tolerance is not None else DEFAULT_NLP_TOLERANCE, 1e-12))
         solver.options["max_cpu_time"] = float(max_cpu_time if max_cpu_time is not None else time_limit_seconds)
-        solver.options["tol"] = float(max(nlp_tolerance if nlp_tolerance is not None else mip_gap, 1e-8))
+        solver.options["tol"] = tolerance
+        solver.options["constr_viol_tol"] = tolerance
         if max_iter is not None:
             solver.options["max_iter"] = int(max_iter)
         if acceptable_tol is not None:
-            solver.options["acceptable_tol"] = float(acceptable_tol)
+            acceptable_tolerance = float(max(acceptable_tol, 1e-12))
+            solver.options["acceptable_tol"] = acceptable_tolerance
+            solver.options["acceptable_constr_viol_tol"] = acceptable_tolerance
 
         started = time.monotonic()
         try:
@@ -72,10 +78,12 @@ class NLPSolverAdapter:
         solve_time = time.monotonic() - started
 
         termination = str(result.solver.termination_condition)
-        status = self._status_from_termination(termination)
         objective_value = self._objective_value(model)
         variables = self.extract_variables(model)
         violations = self.constraint_violations(model)
+        status = self._status_from_termination(termination, violations)
+        if status not in {"local_optimal", "feasible"}:
+            objective_value = None
         message = f"Ipopt termination_condition={termination}. {LOCAL_OPTIMUM_WARNING}"
         return SolverRunResult(
             status=status,
@@ -190,7 +198,7 @@ class NLPSolverAdapter:
             "violations": rows[:20],
         }
 
-    def _status_from_termination(self, termination: str) -> str:
+    def _status_from_termination(self, termination: str, violations: dict[str, Any] | None = None) -> str:
         lowered = termination.lower()
         if "optimal" in lowered or "locallyoptimal" in lowered:
             return "local_optimal"
@@ -200,8 +208,12 @@ class NLPSolverAdapter:
             return "infeasible"
         if "unbounded" in lowered:
             return "unbounded"
-        if "max" in lowered or "feasible" in lowered:
+        if "feasible" in lowered:
             return "feasible"
+        if "max" in lowered:
+            max_violation = (violations or {}).get("max_violation")
+            if isinstance(max_violation, (int, float)) and max_violation <= FEASIBILITY_TOLERANCE:
+                return "feasible"
         return "failed"
 
     def _label(self, name: str, index: Any) -> str:

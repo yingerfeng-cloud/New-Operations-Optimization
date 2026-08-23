@@ -161,8 +161,8 @@ cd ..
 
 项目提供 Windows PowerShell 启动脚本：
 
-~~~powershell
-.\启动前后端.ps1
+~~~bash
+./start.sh
 ~~~
 
 默认地址：
@@ -173,15 +173,15 @@ cd ..
 
 脚本支持的常用参数：
 
-~~~powershell
-.\启动前后端.ps1 -NoBrowser
-.\启动前后端.ps1 -ApiPort 8001 -FrontendPort 5174
+~~~bash
+./start.sh --no-browser
+./start.sh --api-port 8001 --frontend-port 5174
 ~~~
 
 停止服务：
 
-~~~powershell
-.\停用前后端.ps1
+~~~bash
+./stop.sh
 ~~~
 
 脚本会将进程输出写入 `logs/`，并记录 PID 文件。端口被占用时，先执行停用脚本，或确认占用端口的进程确实属于当前项目后再处理。

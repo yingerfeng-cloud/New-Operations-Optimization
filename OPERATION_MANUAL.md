@@ -11,6 +11,31 @@
 
 ## 2. 环境准备
 
+### macOS / Linux
+
+Windows 环境中的 `.venv/` 不能直接复用。macOS 建议使用独立虚拟环境，并通过项目内的 shell 脚本启动：
+
+```bash
+cd /Users/joiefu/Project/OPTIFORGE
+python3 -m venv .venv-mac
+./.venv-mac/bin/python -m pip install --upgrade pip
+./.venv-mac/bin/python -m pip install -r requirements.txt
+cd frontend
+npm ci
+cd ..
+./start.sh
+```
+
+停止服务：
+
+```bash
+./stop.sh
+```
+
+也可以在 Finder 中双击 `启动OPTIFORGE.command` 或 `停止OPTIFORGE.command` 执行对应操作。
+
+### Windows
+
 后端：
 
 ```powershell
@@ -34,12 +59,16 @@ VITE_API_BASE_URL=http://localhost:8000
 
 ## 3. 启动
 
-### 3.1 脚本启动（推荐）
+### 3.0 macOS / Linux 脚本启动
+
+在仓库根目录执行 `./start.sh`，脚本会启动 FastAPI `8000` 和 React/Vite `5173`，并自动打开浏览器。可使用 `./start.sh --no-browser` 禁止自动打开浏览器，或使用 `--api-port` / `--frontend-port` 修改端口。
+
+### 3.1 一键启动（推荐）
 
 在仓库根目录执行：
 
-```powershell
-.\启动前后端.ps1
+```bash
+./start.sh
 ```
 
 脚本会同时启动 FastAPI `8000` 和 React/Vite `5173`，并写入 PID 文件：
@@ -49,11 +78,11 @@ VITE_API_BASE_URL=http://localhost:8000
 
 停用服务：
 
-```powershell
-.\停用前后端.ps1
+```bash
+./stop.sh
 ```
 
-当前脚本默认以 `SERVICE_MODE=platform` 启动核心平台。需要使用 Agent 和 Skill 时，请按第 3.2 节的 `SERVICE_MODE=combined` 方式启动后端。
+当前脚本以 `SERVICE_MODE=combined` 启动平台与 Agent 服务。
 
 生产/后端托管模式：
 

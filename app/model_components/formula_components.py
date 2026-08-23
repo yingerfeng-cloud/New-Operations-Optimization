@@ -22,7 +22,6 @@ from app.model_components.formula_contracts import (
 )
 from app.model_components.lifecycle import normalize_component_asset_lifecycle
 from app.storage.memory_store import STORE
-from app.problem_type_diagnosis import component_problem_type_fields
 from app.model_components.solver_capabilities import normalize_capabilities
 
 
@@ -188,6 +187,11 @@ def load_library_component(component_type: str) -> dict[str, Any] | None:
 
 
 def normalize_component_payload(payload: dict[str, Any]) -> dict[str, Any]:
+    # Delay this import until normalization is called. Importing it at module
+    # load time creates a cycle when the solver router loads problem diagnosis,
+    # which in turn loads the model-components package for formula contracts.
+    from app.problem_type_diagnosis import component_problem_type_fields
+
     component_id = str(payload.get("component_id") or payload.get("type") or "").strip()
     dependencies = component_dependency_ids(payload)
     constraints = deepcopy(payload.get("constraints") or payload.get("generated_constraints") or [])

@@ -374,12 +374,13 @@ body {
 .status-pill-red { background: var(--proto-soft-red) !important; color: var(--proto-red) !important; }
 
 .table-card {
+  --table-card-radius: 8px;
   padding: 0;
   overflow: hidden;
 }
 
 .table-card .ant-table {
-  border-radius: 8px;
+  border-radius: var(--table-card-radius);
 }
 
 .table-card .ant-table-thead > tr > th {
@@ -1157,6 +1158,12 @@ body {
   overflow-wrap: anywhere;
 }
 
+.settings-runtime-meta .ant-descriptions-item-content {
+  white-space: nowrap;
+  word-break: normal;
+  overflow-wrap: normal;
+}
+
 .settings-table-card {
   overflow: hidden;
 }
@@ -1866,6 +1873,11 @@ button.metric-card-v2:hover {
 
   .settings-summary-item:last-child {
     grid-column: auto;
+  }
+
+  .settings-runtime-meta .ant-descriptions-item-content {
+    white-space: normal;
+    overflow-wrap: anywhere;
   }
 
   .formula-builder-meta-grid {

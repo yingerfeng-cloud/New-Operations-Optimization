@@ -21,8 +21,8 @@ COMPUTE_POWER_SETS = [
         "generation_rule": "horizon_plus_1",
         "required": True,
     },
-    {"code": "workload", "name": "算力任务池", "type": "normal", "required": True},
-    {"code": "cluster", "name": "GPU 集群", "type": "normal", "required": True},
+    {"code": "workload", "name": "算力任务池", "type": "normal", "required": True, "runtime_editable": False, "source_system": "scheduler"},
+    {"code": "cluster", "name": "GPU 集群", "type": "normal", "required": True, "runtime_editable": False, "source_system": "resource_manager"},
 ]
 
 

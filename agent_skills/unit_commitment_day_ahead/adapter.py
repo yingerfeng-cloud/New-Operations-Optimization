@@ -4,7 +4,16 @@ from typing import Any
 
 
 REQUIRED_PARAMETERS = ["load_forecast", "renewable_forecast"]
-OPTIONAL_PARAMETERS = ["initial_unit_status", "initial_unit_output"]
+OPTIONAL_PARAMETERS = [
+    "unit_min_output",
+    "unit_max_output",
+    "ramp_up_limit",
+    "ramp_down_limit",
+    "fuel_cost",
+    "startup_cost",
+    "initial_unit_status",
+    "initial_unit_output",
+]
 API_SKILL_NAME = "run_unit_commitment_day_ahead"
 
 

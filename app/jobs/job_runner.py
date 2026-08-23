@@ -78,8 +78,13 @@ class JobRunner:
                         "INFO",
                         f"运行时模型结构识别为 {problem_type}（模型声明为 {declared_problem_type}），按实际结构展示求解过程",
                     )
-                requested_solver = runtime.get("solver")
+                declared_solver = runtime.get("solver") or semantic_spec.get("solver")
+                request_solver = str(task.request.solver or "").strip()
+                requested_solver = declared_solver or (
+                    request_solver if request_solver.lower() not in {"", "auto", "routed"} else None
+                )
                 route = solver_router.route(problem_type, requested_solver)
+                task.request.solver = str(route.get("selected_solver") or requested_solver or route.get("recommended_solver") or "auto")
                 if not route["ok"]:
                     raise SolverRouteError(route)
                 self._initialize_solver_progress(
@@ -94,6 +99,9 @@ class JobRunner:
                     mip_gap=task.request.mip_gap,
                     time_limit_seconds=task.request.time_limit_seconds,
                     threads=task.request.thread_num,
+                    nlp_tolerance=self._optional_float(task.request.solver_config, "nlp_tolerance", "tol"),
+                    max_iter=self._optional_int(task.request.solver_config, "max_iter"),
+                    acceptable_tol=self._optional_float(task.request.solver_config, "acceptable_tol"),
                     progress_callback=lambda sample: self._record_solver_progress(task, sample),
                 )
                 task.trace["solve_seconds"] = round(time.monotonic() - solve_started, 4)
@@ -116,6 +124,14 @@ class JobRunner:
                     self._log(task, "ERROR", reason)
                     self._finish(task, status="INFEASIBLE", error=reason)
                     return
+                successful_solver_statuses = {"optimal", "local_optimal", "feasible"}
+                if solver_result.status not in successful_solver_statuses:
+                    reason = solver_result.message or solver_result.solver_message or (
+                        f"求解器 {solver_result.solver_name or route['selected_solver']} 未返回可用解：{solver_result.status}"
+                    )
+                    self._log(task, "ERROR", reason)
+                    self._finish(task, status="FAILED", error=reason)
+                    return
                 elapsed = time.monotonic() - started
                 raw_termination = str(getattr(solver_result, "raw_termination_condition", "") or "").lower()
                 if elapsed > float(task.request.time_limit_seconds) or "max" in raw_termination and "time" in raw_termination:
@@ -125,7 +141,7 @@ class JobRunner:
                 self._update(task, status="FORMATTING_RESULT", progress=90)
                 format_started = time.monotonic()
                 self._log(task, "INFO", "开始格式化业务结果")
-                diagnosis = [] if solver_result.status in {"optimal", "feasible"} else diagnose_infeasible(str(model_code), runtime)
+                diagnosis = [] if solver_result.status in successful_solver_statuses else diagnose_infeasible(str(model_code), runtime)
                 formatted = SolveResultFormatter().format(str(model_code), solver_result, context)
                 task.trace["format_seconds"] = round(time.monotonic() - format_started, 4)
                 result = {
@@ -149,6 +165,9 @@ class JobRunner:
                         "time_limit_seconds": task.request.time_limit_seconds,
                         "thread_num": task.request.thread_num,
                         "presolve": task.request.presolve,
+                        "nlp_tolerance": self._optional_float(task.request.solver_config, "nlp_tolerance", "tol"),
+                        "max_iter": self._optional_int(task.request.solver_config, "max_iter"),
+                        "acceptable_tol": self._optional_float(task.request.solver_config, "acceptable_tol"),
                     },
                     "objective_value": solver_result.objective_value,
                     "solve_time": solver_result.solve_time,
@@ -241,6 +260,20 @@ class JobRunner:
         if task is None:
             raise RuntimeError(f"Task not found: {task_id}")
         return task
+
+    @staticmethod
+    def _optional_float(config: dict[str, Any], *keys: str) -> float | None:
+        for key in keys:
+            if config.get(key) is not None:
+                return float(config[key])
+        return None
+
+    @staticmethod
+    def _optional_int(config: dict[str, Any], *keys: str) -> int | None:
+        for key in keys:
+            if config.get(key) is not None:
+                return int(config[key])
+        return None
 
     def _model_code(self, task: TaskRecord) -> str:
         semantic = (task.request.payload or {}).get("semantic_spec") or {}

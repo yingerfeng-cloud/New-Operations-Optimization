@@ -19,7 +19,9 @@ version: 1.0.0
 
 # 可选参数
 
-initial_unit_status、initial_unit_output 可由系统建议默认值，但必须由用户确认后才能进入调用确认。
+以下参数可以使用模型契约中的默认值，但必须由用户确认后才能进入调用确认：
+
+unit_min_output、unit_max_output、ramp_up_limit、ramp_down_limit、fuel_cost、startup_cost、initial_unit_status、initial_unit_output。
 
 # 默认值确认
 

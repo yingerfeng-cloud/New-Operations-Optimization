@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import { resolveTimeDimension, runtimeFieldsFromContracts, type RuntimeField } from '../../features/time-dimension';
-import { filterRuntimeFields, groupRuntimeFields, runtimeFieldIssues, runtimeGroupStats } from '../../features/task-create/utils/runtimeParameterGroups';
+import { filterRuntimeFields, groupRuntimeFields, requiredRuntimeValueError, runtimeFieldIssues, runtimeGroupStats } from '../../features/task-create/utils/runtimeParameterGroups';
 
 const config = { ...resolveTimeDimension(), enabled: true, policy: 'fixed' as const, time_set: 'time', state_time_set: 'state_time' };
 
@@ -24,6 +24,17 @@ describe('runtime parameter grouping', () => {
       code: 'unit_max_output', required: true, type: 'dict', dimension: ['unit'], min: 0,
       defaultValue: { U1: 100 }, exampleValue: { U1: 120, U2: 90 }, dimensionValues: { unit: ['U1', 'U2'] },
     });
+  });
+
+  test('preserves set ownership metadata and defaults undeclared set editors to read-only', () => {
+    const fields = runtimeFieldsFromContracts({
+      input_schema: [{ key: 'workload', name: '算力任务池', dimension: ['workload'], sets: { workload: ['inference'] }, source_system: 'scheduler', field_role: 'set_members', runtime_editable: false }],
+      semantic_spec: { sets: [{ code: 'workload', values: ['inference'], runtime_editable: false }], parameters: [{ code: 'workload', dimension: ['workload'] }] },
+    });
+    expect(fields[0]).toMatchObject({ role: 'set_members', editable: false, sourceSystem: 'scheduler', dimensionValues: { workload: ['inference'] } });
+
+    const inferred = runtimeFieldsFromContracts({ input_schema: [{ key: 'cluster', dimension: ['cluster'], sets: { cluster: ['gpu_a'] } }] });
+    expect(inferred[0]).toMatchObject({ role: 'set_members', editable: false });
   });
 
   test('uses the declared input schema as the runtime-field allowlist', () => {
@@ -65,5 +76,11 @@ describe('runtime parameter grouping', () => {
     expect(filterRuntimeFields(fields, 'modified', values, defaults, errors).map(field => field.code)).toEqual(['b']);
     expect(values).toEqual({ a: 1, b: 2 });
     expect(runtimeGroupStats({ key: 'g', label: 'G', order: 1, fields }, values, errors, defaults)).toMatchObject({ filled: 2, total: 2, completed: 1, required: 1, errors: 1, modified: 1 });
+  });
+
+  test('required structures reject partially blank cells but accept zero values', () => {
+    const matrix: RuntimeField = { code: 'compatibility', name: '兼容性', required: true, dimension: ['workload', 'cluster'] };
+    expect(requiredRuntimeValueError(matrix, { inference: { gpu_a: 1, gpu_b: '' } })).toBe('必填结构中存在未填写项');
+    expect(requiredRuntimeValueError(matrix, { inference: { gpu_a: 1, gpu_b: 0 } })).toBe('');
   });
 });

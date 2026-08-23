@@ -33,6 +33,12 @@ required_parameters:
   - load_forecast
   - renewable_forecast
 optional_parameters:
+  - unit_min_output
+  - unit_max_output
+  - ramp_up_limit
+  - ramp_down_limit
+  - fuel_cost
+  - startup_cost
   - initial_unit_status
   - initial_unit_output
 confirmation_required: {"default_values": true, "before_invoke": true}

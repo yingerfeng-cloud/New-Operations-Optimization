@@ -61,10 +61,18 @@
     ],
     "type": "dict",
     "unit": "MW",
-    "required": true,
+    "required": false,
     "description": "",
-    "default_value": null,
-    "sample_value": null,
+    "default_value": {
+      "U1": 50,
+      "U2": 30,
+      "U3": 20
+    },
+    "sample_value": {
+      "U1": 50,
+      "U2": 30,
+      "U3": 20
+    },
     "default_policy": "default_allowed",
     "sets": {
       "unit": [
@@ -86,10 +94,18 @@
     ],
     "type": "dict",
     "unit": "MW",
-    "required": true,
+    "required": false,
     "description": "",
-    "default_value": null,
-    "sample_value": null,
+    "default_value": {
+      "U1": 180,
+      "U2": 120,
+      "U3": 80
+    },
+    "sample_value": {
+      "U1": 180,
+      "U2": 120,
+      "U3": 80
+    },
     "default_policy": "default_allowed",
     "sets": {
       "unit": [
@@ -111,10 +127,18 @@
     ],
     "type": "dict",
     "unit": "MW/h",
-    "required": true,
+    "required": false,
     "description": "",
-    "default_value": null,
-    "sample_value": null,
+    "default_value": {
+      "U1": 80,
+      "U2": 60,
+      "U3": 40
+    },
+    "sample_value": {
+      "U1": 80,
+      "U2": 60,
+      "U3": 40
+    },
     "default_policy": "default_allowed",
     "sets": {
       "unit": [
@@ -136,10 +160,18 @@
     ],
     "type": "dict",
     "unit": "MW/h",
-    "required": true,
+    "required": false,
     "description": "",
-    "default_value": null,
-    "sample_value": null,
+    "default_value": {
+      "U1": 80,
+      "U2": 60,
+      "U3": 40
+    },
+    "sample_value": {
+      "U1": 80,
+      "U2": 60,
+      "U3": 40
+    },
     "default_policy": "default_allowed",
     "sets": {
       "unit": [
@@ -161,10 +193,18 @@
     ],
     "type": "dict",
     "unit": "元/MWh",
-    "required": true,
+    "required": false,
     "description": "",
-    "default_value": null,
-    "sample_value": null,
+    "default_value": {
+      "U1": 280,
+      "U2": 330,
+      "U3": 420
+    },
+    "sample_value": {
+      "U1": 280,
+      "U2": 330,
+      "U3": 420
+    },
     "default_policy": "default_allowed",
     "sets": {
       "unit": [
@@ -186,10 +226,18 @@
     ],
     "type": "dict",
     "unit": "元/次",
-    "required": true,
+    "required": false,
     "description": "",
-    "default_value": null,
-    "sample_value": null,
+    "default_value": {
+      "U1": 6000,
+      "U2": 3500,
+      "U3": 1500
+    },
+    "sample_value": {
+      "U1": 6000,
+      "U2": 3500,
+      "U3": 1500
+    },
     "default_policy": "default_allowed",
     "sets": {
       "unit": [
@@ -211,11 +259,19 @@
     ],
     "type": "dict",
     "unit": "0/1",
-    "required": true,
+    "required": false,
     "description": "",
-    "default_value": null,
-    "sample_value": null,
-    "default_policy": "user_required",
+    "default_value": {
+      "U1": 1,
+      "U2": 0,
+      "U3": 0
+    },
+    "sample_value": {
+      "U1": 1,
+      "U2": 0,
+      "U3": 0
+    },
+    "default_policy": "default_allowed",
     "sets": {
       "unit": [
         "U1",
@@ -226,6 +282,39 @@
     "validation": {
       "type": "dict",
       "binary": true
+    }
+  },
+  {
+    "key": "initial_unit_output",
+    "name": "初始机组出力",
+    "dimension": [
+      "unit"
+    ],
+    "type": "dict",
+    "unit": "MW",
+    "required": false,
+    "description": "",
+    "default_value": {
+      "U1": 80,
+      "U2": 0,
+      "U3": 0
+    },
+    "sample_value": {
+      "U1": 80,
+      "U2": 0,
+      "U3": 0
+    },
+    "default_policy": "default_allowed",
+    "sets": {
+      "unit": [
+        "U1",
+        "U2",
+        "U3"
+      ]
+    },
+    "validation": {
+      "type": "dict",
+      "min": 0
     }
   }
 ]

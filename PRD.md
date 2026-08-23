@@ -335,14 +335,14 @@ station_summary[].spill_volume_million_m3
 
 启动要求：
 
-- 在仓库根目录执行 `.\启动前后端.ps1` 可启动核心平台和 React/Vite 开发前端。
+- 在仓库根目录执行 `./start.sh` 可启动核心平台和 React/Vite 开发前端。
 - 需要使用 Agent 与 Skill 时，以 `SERVICE_MODE=combined` 启动 FastAPI，并将 Agent 平台地址配置为本机 8000 端口。
 - 启动后检查 `/api/health` 和 `/api/solvers/status`。
 - 生产托管模式先在 `frontend/` 执行 `npm run build`，再用 `server.py` 启动 FastAPI。
 
 停止要求：
 
-- 在仓库根目录执行 `.\停用前后端.ps1` 停止当前项目启动的 API 和前端进程。
+- 在仓库根目录执行 `./stop.sh` 停止当前项目启动的 API 和前端进程。
 - 进程 PID 和日志位于 `logs/`，端口冲突时先确认当前项目进程再处理。
 
 ## 11. 自动化测试

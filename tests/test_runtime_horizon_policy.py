@@ -5,6 +5,7 @@ from pathlib import Path
 import pytest
 from fastapi import HTTPException
 
+from app.builders.component_model_builder import ComponentModelBuilder
 from app.semantic.semantic_validator import RuntimeParameterValidator
 from app.services.time_dimension_service import normalize_runtime_time_dimension, resolve_time_dimension_config
 from app.templates.power_templates import get_template
@@ -18,6 +19,14 @@ TIME_DIMENSION = {
     "state_time_set": "time_volume",
     "editable": True,
 }
+
+
+def test_component_builder_resolves_custom_time_set_names_from_contract() -> None:
+    builder = ComponentModelBuilder()
+    config = {"time_set": "period", "state_time_set": "state_period"}
+    available = {"period", "state_period"}
+    assert builder._set_values("period", {}, {"horizon": 3}, config, available) == [0, 1, 2]
+    assert builder._set_values("state_period", {}, {"horizon": 3}, config, available) == [0, 1, 2, 3]
 
 
 def _semantic_spec() -> dict:

@@ -11,6 +11,18 @@ FORMULA_NOT_GENERATED = "公式未生成，请检查左端变量、右端参数�
 TRIVIAL_ZERO_CONSTRAINT_RE = re.compile(r"^\s*(?:∀\s*[^：:]+[：:]\s*)?0\s*(?:>=|<=|==)\s*0\s*$")
 
 
+def _has_blank_runtime_leaf(value: Any) -> bool:
+    if value is None:
+        return True
+    if isinstance(value, str):
+        return not value.strip()
+    if isinstance(value, (list, tuple)):
+        return not value or any(_has_blank_runtime_leaf(item) for item in value)
+    if isinstance(value, dict):
+        return not value or any(_has_blank_runtime_leaf(item) for item in value.values())
+    return False
+
+
 def _first_non_blank(*values: Any) -> str:
     for value in values:
         if value is None:
@@ -260,6 +272,28 @@ class RuntimeParameterValidator:
 
     def validate(self, semantic_spec: dict[str, Any], runtime_parameters: dict[str, Any]) -> list[dict[str, Any]]:
         errors: list[dict[str, Any]] = []
+        parameter_definitions = list(semantic_spec.get("parameters") or [])
+        parameter_definitions.extend((semantic_spec.get("component_spec") or {}).get("parameters") or [])
+        checked_required: set[str] = set()
+        for param in parameter_definitions:
+            code = str(param.get("math_param") or param.get("code") or param.get("key") or "")
+            validation = param.get("validation") or {}
+            required = bool(validation.get("required", param.get("required", False)))
+            if not code or code in checked_required or not required or code not in runtime_parameters:
+                continue
+            checked_required.add(code)
+            if _has_blank_runtime_leaf(runtime_parameters[code]):
+                errors.append(
+                    {
+                        "field": code,
+                        "error": "blank required parameter",
+                        "expected": "完整且非空的必填值",
+                        "actual": "包含空值",
+                        "message": f"必填运行参数 {code} 中存在未填写项。",
+                    }
+                )
+        if errors:
+            return errors
         build_mode = semantic_spec.get("build_mode") or (semantic_spec.get("component_spec") or {}).get("build_mode")
         if build_mode == "component_based":
             return self._validate_component_based(semantic_spec, runtime_parameters)
@@ -287,6 +321,8 @@ class RuntimeParameterValidator:
     def _validate_component_runtime_shape(self, semantic_spec: dict[str, Any], params: dict[str, Any]) -> None:
         component_spec = semantic_spec.get("component_spec") or {}
         set_lengths = self._semantic_set_lengths(semantic_spec, params)
+        set_members = self._semantic_set_members(semantic_spec, params)
+        self._validate_fixed_runtime_sets(semantic_spec, params)
         runtime_validation = (semantic_spec.get("ui_metadata") or {}).get("runtime_validation") or (component_spec.get("ui_metadata") or {}).get("runtime_validation") or {}
         error_prefix = str(runtime_validation.get("error_prefix") or "组件化模型参数错误")
         dimension_labels = runtime_validation.get("dimension_labels") if isinstance(runtime_validation.get("dimension_labels"), dict) else {}
@@ -315,7 +351,7 @@ class RuntimeParameterValidator:
                 raise RuntimeError(f"component runtime parameter error: {code} must be a dict, got {type(value).__name__}.")
             dimensions = extract_dimensions(param)
             if dimensions or expected_type not in {"array", "list", "dict"}:
-                self._validate_value_matches_dimensions(code, value, dimensions, set_lengths, error_prefix, dimension_labels)
+                self._validate_value_matches_dimensions(code, value, dimensions, set_lengths, set_members, error_prefix, dimension_labels)
             if expected_type in {"number", "integer"}:
                 numeric = float(value)
                 if validation.get("min") is not None and numeric < float(validation["min"]):
@@ -351,12 +387,50 @@ class RuntimeParameterValidator:
                 lengths[state_time_set] = horizon + 1
         return lengths
 
+    def _semantic_set_members(self, semantic_spec: dict[str, Any], params: dict[str, Any]) -> dict[str, list[Any]]:
+        members: dict[str, list[Any]] = {}
+        component_spec = semantic_spec.get("component_spec") or {}
+        for item in list(semantic_spec.get("sets") or []) + list(component_spec.get("sets") or []):
+            code = str(item.get("code") or item.get("key") or "")
+            declared = item.get("members") if item.get("members") is not None else item.get("values")
+            if code and isinstance(declared, list):
+                members[code] = list(declared)
+        for code in list(members):
+            if isinstance(params.get(code), list):
+                members[code] = list(params[code])
+        time_dimension = (semantic_spec.get("ui_metadata") or {}).get("time_dimension") or (component_spec.get("ui_metadata") or {}).get("time_dimension") or {}
+        time_set = str(time_dimension.get("time_set") or "time")
+        state_time_set = resolve_state_time_set(time_dimension, available_sets=set(members))
+        horizon = self._coerce_int(params.get("horizon"))
+        if horizon is not None:
+            members[time_set] = list(params.get(time_set) or range(horizon))
+            if state_time_set:
+                members[state_time_set] = list(params.get(state_time_set) or range(horizon + 1))
+        return members
+
+    def _validate_fixed_runtime_sets(self, semantic_spec: dict[str, Any], params: dict[str, Any]) -> None:
+        component_spec = semantic_spec.get("component_spec") or {}
+        seen: set[str] = set()
+        for item in list(semantic_spec.get("sets") or []) + list(component_spec.get("sets") or []):
+            code = str(item.get("code") or item.get("key") or "")
+            if not code or code in seen or item.get("runtime_editable") is not False or code not in params:
+                continue
+            seen.add(code)
+            declared = item.get("members") if item.get("members") is not None else item.get("values")
+            actual = params.get(code)
+            if not isinstance(declared, list):
+                continue
+            actual_members = list(actual) if isinstance(actual, (list, tuple)) else actual
+            if actual_members != declared:
+                raise RuntimeError(f"组件化模型集合 {code} 由模型契约固定，运行任务不可修改集合成员。")
+
     def _validate_value_matches_dimensions(
         self,
         code: str,
         value: Any,
         dimensions: list[str],
         set_lengths: dict[str, int],
+        set_members: dict[str, list[Any]],
         error_prefix: str,
         dimension_labels: dict[str, Any],
     ) -> None:
@@ -371,12 +445,16 @@ class RuntimeParameterValidator:
                 raise RuntimeError(f"参数 {code} 维度不匹配：当前 {dimensions[0]} 集合长度为 {expected}，但实际提供 {len(value)} 个值。")
             if isinstance(value, dict) and len(value) != expected:
                 raise RuntimeError(f"参数 {code} 维度不匹配：当前 {dimensions[0]} 集合长度为 {expected}，但实际提供 {len(value)} 个值。")
+            if isinstance(value, dict):
+                self._validate_mapping_keys(code, str(dimensions[0]), value, set_members.get(str(dimensions[0])))
             return
         if len(dimensions) == 2:
             first_expected, second_expected = expected_lengths
             if first_expected is not None and isinstance(value, (list, dict)) and len(value) != int(first_expected):
                 raise RuntimeError(f"参数 {code} 维度不匹配：第一维应为 {int(first_expected)}。")
             rows = list(enumerate(value)) if isinstance(value, list) else list(value.items()) if isinstance(value, dict) else []
+            if isinstance(value, dict):
+                self._validate_mapping_keys(code, str(dimensions[0]), value, set_members.get(str(dimensions[0])))
             if second_expected is None:
                 return
             second = int(second_expected)
@@ -385,6 +463,25 @@ class RuntimeParameterValidator:
             for row_key, row in rows:
                 if isinstance(row, (list, dict)) and len(row) != second:
                     raise RuntimeError(f"{error_prefix}：{first_label} {row_key} 的 {code} 长度为 {len(row)}，但 horizon 为 {second}。")
+                if isinstance(row, dict):
+                    self._validate_mapping_keys(code, str(dimensions[1]), row, set_members.get(str(dimensions[1])), parent=row_key)
+
+    def _validate_mapping_keys(self, code: str, dimension: str, value: dict[Any, Any], expected_members: list[Any] | None, parent: Any = None) -> None:
+        if not expected_members:
+            return
+        expected = {str(item) for item in expected_members}
+        actual = {str(item) for item in value}
+        missing = sorted(expected - actual)
+        extra = sorted(actual - expected)
+        if not missing and not extra:
+            return
+        location = f"（{parent}）" if parent is not None else ""
+        details = []
+        if missing:
+            details.append(f"缺少 {', '.join(missing)}")
+        if extra:
+            details.append(f"包含未声明成员 {', '.join(extra)}")
+        raise RuntimeError(f"参数 {code}{location} 的 {dimension} 索引与集合定义不一致：{'；'.join(details)}。")
 
     def _validate_by_template(self, semantic_spec: dict[str, Any], params: dict[str, Any]) -> list[dict[str, Any]]:
         errors: list[dict[str, Any]] = []

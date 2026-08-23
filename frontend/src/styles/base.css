@@ -216,14 +216,28 @@ button {
 }
 
 .table-card {
+  --table-card-radius: 16px;
   overflow: hidden;
 }
 
 .table-card .ant-table-wrapper,
 .table-card .ant-spin-nested-loading,
 .table-card .ant-spin-container,
-.table-card .ant-table {
-  border-radius: 16px;
+.table-card .ant-table,
+.table-card .ant-table-container {
+  border-radius: var(--table-card-radius);
+}
+
+.table-card .ant-table-content {
+  border-radius: var(--table-card-radius) !important;
+}
+
+.table-card .ant-table-thead > tr:first-child > th:first-child {
+  border-start-start-radius: var(--table-card-radius) !important;
+}
+
+.table-card .ant-table-thead > tr:first-child > th:last-child {
+  border-start-end-radius: var(--table-card-radius) !important;
 }
 
 .table-card .ant-table-thead > tr > th {
