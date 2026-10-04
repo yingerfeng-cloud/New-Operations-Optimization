@@ -4,8 +4,48 @@
 .parameter-keyvalue-actions .parameter-toolbar { margin: 0; padding: 3px 4px; }
 .parameter-keyvalue-actions .parameter-toolbar-label { margin-right: 2px; }
 .parameter-keyvalue-actions .ant-btn-sm { min-height: 24px; height: 24px; padding-inline: 7px; }
-.parameter-structured-editor > .ant-alert { padding: 4px 8px; border-radius: 6px; }
-.parameter-structured-editor > .ant-alert .ant-alert-message { font-size: 12px; line-height: 18px; }
+.parameter-notice.ant-alert,
+.parameter-notice.ant-alert-info,
+.parameter-notice.ant-alert-warning {
+  width: 100%;
+  min-height: 44px;
+  align-items: flex-start;
+  padding: 8px 12px !important;
+  border: 1px solid #b7cff3 !important;
+  border-radius: 8px !important;
+  background: #f0f6ff !important;
+  color: #173d65 !important;
+}
+.parameter-notice .ant-alert-icon {
+  flex: 0 0 auto;
+  margin-inline-end: 9px !important;
+  color: #2166c2 !important;
+  font-size: 15px !important;
+}
+.parameter-notice .ant-alert-content,
+.parameter-notice .ant-alert-section {
+  min-width: 0;
+}
+.parameter-notice .ant-alert-section {
+  display: grid;
+  gap: 2px;
+}
+.parameter-notice .ant-alert-title,
+.parameter-notice .ant-alert-message {
+  margin: 0 !important;
+  color: #173d65 !important;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+.parameter-notice .ant-alert-description {
+  margin: 0;
+  color: #49627c !important;
+  font-size: 12px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
 .parameter-editor-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin: 8px 0; color: #667085; font-size: 12px; }
 .parameter-scale-note { color: #175cd3; }
 .parameter-scale-note.warning { color: #b54708; }
@@ -59,14 +99,7 @@
   font-variant-numeric: tabular-nums;
   line-height: 18px;
 }
-.time-series-preview-notice.ant-alert {
-  margin: 10px 0 14px;
-  padding: 5px 8px;
-}
-.time-series-preview-notice .ant-alert-message {
-  font-size: 12px;
-  line-height: 18px;
-}
+.time-series-preview-notice.ant-alert { margin: 10px 0 14px; }
 .time-series-preview > small {
   display: block;
   padding: 0 4px 2px;

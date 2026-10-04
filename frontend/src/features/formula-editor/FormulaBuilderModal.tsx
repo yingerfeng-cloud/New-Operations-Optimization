@@ -8,7 +8,7 @@ import { parseFormulaDsl, type FormulaSymbols } from './formulaParser';
 import { validateFormula } from './formulaValidator';
 import { analyzeFormulaText } from '../model-creation/utils/nonlinearDiagnostics';
 import { FormulaCodeEditor, type FormulaCodeEditorHandle } from './FormulaCodeEditor';
-import { artifactFromResult, authoritativeArtifactState, compileFormulaAuthoritatively, isAuthoritativeArtifactCurrent, type AuthoritativeCompileContext } from './authoritativeCompilation';
+import { artifactFromResult, authoritativeArtifactState, compileFormulaAuthoritatively, isAuthoritativeArtifactCurrent, normalizeCompileContext, formulaCompileSignature, type AuthoritativeCompileContext } from './authoritativeCompilation';
 import { markFormulaCompiled, withCurrentFormulaVersion } from './formulaVersioning';
 
 const now = () => new Date().toISOString();
@@ -149,13 +149,9 @@ export function FormulaBuilder({
       variables: Object.entries(symbols.variables || {}).map(([code, meta]) => ({ code, ...meta, dimension: meta.indices || [] })),
     },
   };
-  const effectiveCompileContext: AuthoritativeCompileContext = {
-    ...baseCompileContext,
-    model_context: {
-      ...(baseCompileContext.model_context || {}),
-      boundary_strategy: formula.boundary_strategy || 'strict',
-    },
-  };
+  const effectiveCompileContext = normalizeCompileContext(formula, baseCompileContext);
+  const latestCompileSignature = useRef('');
+  latestCompileSignature.current = formulaCompileSignature(formula, effectiveCompileContext);
 
   useEffect(() => {
     const seed = value || newFormula(lockedKind || 'constraint');
@@ -218,8 +214,10 @@ export function FormulaBuilder({
 
   const runAuthoritativeCompile = async () => {
     setCompiling(true);
+    const requestedSignature = formulaCompileSignature(formula, effectiveCompileContext);
     try {
       const { result } = await compileFormulaAuthoritatively(formula, effectiveCompileContext);
+      if (latestCompileSignature.current !== requestedSignature) return;
       setAuthoritative(result);
       setFormula(current => {
         const compiled = { ...current, scope: result.scope };
@@ -313,7 +311,7 @@ export function FormulaBuilder({
         <div className="formula-builder-details">
           <div className="formula-builder-meta-grid">
             <Form.Item label="公式名称" required validateStatus={formulaName ? undefined : 'error'} help={formulaName ? undefined : '请输入便于业务理解的公式名称'}>
-              <Input value={formula.name} onChange={event => commit({ ...formula, name: event.target.value })} />
+              <Input aria-label="公式名称" value={formula.name} onChange={event => commit({ ...formula, name: event.target.value })} />
             </Form.Item>
             <Form.Item
               label="公式编码"
@@ -605,6 +603,7 @@ export function FormulaBuilderModal({
       footer={null}
       destroyOnHidden
       title="公式编辑器"
+      aria-label="公式编辑器"
       closable={false}
       keyboard={false}
     >

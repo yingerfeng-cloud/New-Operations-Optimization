@@ -1,0 +1,26 @@
+
+> optiforge-platform-frontend@1.0.0 test:e2e:real
+> playwright test -c playwright.real-backend.config.ts src/tests/e2e/real_backend_smoke.spec.ts --repeat-each=3
+
+[WebServer] INFO:     Started server process [53192]
+[WebServer] INFO:     Waiting for application startup.
+[WebServer] INFO:     Application startup complete.
+[WebServer] INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
+[WebServer] (node:53196) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] (node:53219) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+
+Running 3 tests using 1 worker
+
+(node:53221) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  1 src/tests/e2e/real_backend_smoke.spec.ts:45:1 › @real real backend smoke creates generic model draft and runs backend testModel (8.7s)
+(node:53231) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  2 src/tests/e2e/real_backend_smoke.spec.ts:45:1 › @real real backend smoke creates generic model draft and runs backend testModel (8.0s)
+(node:53242) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  3 src/tests/e2e/real_backend_smoke.spec.ts:45:1 › @real real backend smoke creates generic model draft and runs backend testModel (8.1s)
+
+  3 passed (29.2s)

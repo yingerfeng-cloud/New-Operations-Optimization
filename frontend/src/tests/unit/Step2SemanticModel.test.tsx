@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import { useState } from 'react';
 import { vi } from 'vitest';
 import { mergeSelectedComponentParameters, Step2SemanticModel } from '../../features/model-creation/steps/Step2SemanticModel';
+import { SemanticOverviewCard } from '../../features/model-creation/components/SemanticOverviewCard';
 import { createInitialDraft, type ModelDraft } from '../../features/model-creation/stores/modelCreationStore';
 import { renderWithQueryClient } from '../testUtils';
 
@@ -104,6 +105,34 @@ test('opens semantic item editor from overview card', () => {
 
   expect(screen.getByText('编辑集合')).toBeInTheDocument();
   expect(screen.getByDisplayValue('unit')).toBeInTheDocument();
+});
+
+test('separates set-member contract fields from ordinary parameters in the overview', () => {
+  const draft = createInitialDraft();
+  draft.semantic.sets = [
+    { code: 'time', name: '调度时段', type: 'time_period', managed_by: 'time_dimension' },
+    { code: 'workload', name: '算力任务池', sourceType: 'system' },
+  ];
+  draft.semantic.parameters = [
+    { code: 'time', name: '调度时段', dimension: ['time'], sourceType: 'system' },
+    { code: 'workload', name: '算力任务池', dimension: ['workload'], sourceType: 'runtime' },
+    { code: 'electricity_price', name: '电价', dimension: ['time'], sourceType: 'runtime' },
+  ];
+
+  render(
+    <SemanticOverviewCard
+      draft={draft}
+      onAddSet={vi.fn()}
+      onAddParameter={vi.fn()}
+      onAddVariable={vi.fn()}
+    />,
+  );
+
+  expect(screen.getByRole('note')).toHaveTextContent('集合成员字段');
+  expect(screen.getByText(/不是第二套集合定义/)).toBeInTheDocument();
+  expect(screen.getByText('1 个参数 + 2 个集合成员字段')).toBeInTheDocument();
+  expect(screen.getByText('电价')).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: '编辑 调度时段' })).not.toBeInTheDocument();
 });
 
 test('renders component builder writeback without raw JSON block', () => {

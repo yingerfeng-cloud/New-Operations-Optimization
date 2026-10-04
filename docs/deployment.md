@@ -45,8 +45,9 @@ Docker defaults:
 - container API port: `8000`
 - host data directory: `docker-data/`
 - container data directory: `/app/data`
+- generated Agent Skill packages: `docker-data/agent_skills/`
 
-Docker uses the same `app/`, `frontend/`, and `tests/` code paths. It does not introduce a second backend or a separate Ipopt service.
+Docker seeds the built-in Agent Skill packages into the persistent data directory on first start. Newly generated packages and their enabled/disabled state therefore survive container recreation without overwriting existing local packages. Docker uses the same `app/`, `frontend/`, and `tests/` code paths. It does not introduce a second backend or a separate Ipopt service.
 
 ## Acceptance Commands
 

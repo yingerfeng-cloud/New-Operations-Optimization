@@ -10,6 +10,8 @@ from app.explainers.generic_explainer import generic_explainer
 from app.explainers.llm_summarizer import llm_summarizer
 from app.services.skill_definition_service import skill_definition_service
 from app.storage.memory_store import STORE
+from app.variable_contract import normalize_variables
+from app.model_dimensions import extract_dimensions
 
 
 class ResultPostProcessor:
@@ -95,8 +97,7 @@ class ResultPostProcessor:
                 "requires_human_review": bool((definition.get("execution_policy") or {}).get("requires_human_review", True)),
             }
         )
-        if not output.get("explanation"):
-            output["explanation"] = explanation.get("summary") or ""
+        output["explanation"] = explanation.get("summary") or ""
         return output
 
     def _minimal_evidence(
@@ -248,10 +249,10 @@ class ResultPostProcessor:
                     {
                         "key": str(raw.get("math_var") or raw.get("code") or raw.get("key") or raw.get("name")),
                         "name": str(raw.get("name") or raw.get("math_var") or raw.get("code") or raw.get("key")),
-                        "dimension": list(raw.get("dimension") or raw.get("dimensions") or raw.get("indices") or []),
+                        "dimension": extract_dimensions(raw),
                         "unit": str(raw.get("unit") or ""),
                     }
-                    for raw in semantic.get("variables") or []
+                    for raw in normalize_variables(semantic.get("variables") or [])
                     if isinstance(raw, dict) and (raw.get("math_var") or raw.get("code") or raw.get("key") or raw.get("name"))
                 ],
                 "explanation_structured": "object",

@@ -35,6 +35,7 @@ RUN micromamba run -n base npm run build --prefix /app/frontend
 ENV OPTIFORGE_DATA_DIR=/app/data \
     OPTIFORGE_RUNTIME_STORE=/app/data/runtime_store.json \
     RUNTIME_STORE_PATH=/app/data/runtime_store.json \
+    OPTIFORGE_AGENT_SKILLS_DIR=/app/data/agent_skills \
     PATH=/opt/conda/bin:$PATH \
     OPTIFORGE_SOLVER_MODE=docker \
     SERVICE_MODE=combined \

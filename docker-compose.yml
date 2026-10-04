@@ -11,6 +11,7 @@ services:
       OPTIFORGE_DATA_DIR: /app/data
       OPTIFORGE_RUNTIME_STORE: /app/data/runtime_store.json
       RUNTIME_STORE_PATH: /app/data/runtime_store.json
+      OPTIFORGE_AGENT_SKILLS_DIR: /app/data/agent_skills
       OPTIFORGE_SOLVER_MODE: docker
       SERVICE_MODE: combined
       OPTIMIZATION_PLATFORM_BASE_URL: http://127.0.0.1:8000

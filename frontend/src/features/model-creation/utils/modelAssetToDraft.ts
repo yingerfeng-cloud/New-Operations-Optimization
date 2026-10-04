@@ -223,7 +223,36 @@ function genericObjectiveFormula(term: Record<string, unknown>) {
   return coefficient ? `${coefficient} * ${variableExpr}` : variableExpr;
 }
 
-function formulaDef(kind: FormulaDef['kind'], name: string, expression: string, id: string, solveParticipation: FormulaDef['solve_participation'] = 'solve_active'): FormulaDef {
+function formulaMetadata(source: Record<string, unknown>): Partial<FormulaDef> {
+  const metadata: Partial<FormulaDef> = {};
+  const boundary = String(source.boundary_strategy || '').trim();
+  if (['strict', 'skip_first', 'skip_last', 'skip_out_of_range', 'explicit_subset'].includes(boundary)) {
+    metadata.boundary_strategy = boundary as NonNullable<FormulaDef['boundary_strategy']>;
+  }
+  if (Array.isArray(source.scope)) {
+    const scope = source.scope
+      .filter(item => item && typeof item === 'object')
+      .map(item => {
+        const value = item as Record<string, unknown>;
+        return { alias: String(value.alias || ''), set: String(value.set || value.code || '') };
+      })
+      .filter(item => item.alias && item.set);
+    if (scope.length) metadata.scope = scope;
+  }
+  if (Array.isArray(source.foreach) && source.foreach.every(item => typeof item === 'string')) {
+    metadata.foreach = source.foreach as string[];
+  }
+  return metadata;
+}
+
+function formulaDef(
+  kind: FormulaDef['kind'],
+  name: string,
+  expression: string,
+  id: string,
+  solveParticipation: FormulaDef['solve_participation'] = 'solve_active',
+  metadata: Partial<FormulaDef> = {},
+): FormulaDef {
   return {
     formula_id: id,
     name,
@@ -236,6 +265,7 @@ function formulaDef(kind: FormulaDef['kind'], name: string, expression: string, 
     referenced_parameters: [],
     referenced_variables: [],
     free_indices: [],
+    ...metadata,
     solve_participation: solveParticipation,
     compile_status: expression ? 'ready' : 'error',
   };
@@ -251,12 +281,16 @@ function formulasFromGenericSpec(genericSpec: Record<string, unknown>): FormulaD
       formulaName(term, `目标项 ${index + 1}`),
       genericObjectiveFormula(term),
       `asset-objective-${index}`,
+      'solve_active',
+      formulaMetadata(term),
     )),
     ...constraints.map((constraint, index) => formulaDef(
       'constraint',
       formulaName(constraint, `约束 ${index + 1}`),
       formulaText(constraint),
       `asset-constraint-${index}`,
+      'solve_active',
+      formulaMetadata(constraint),
     )),
   ];
 }
@@ -275,6 +309,7 @@ function formulasFromTemplateDraft(savedDraft: Record<string, unknown>, mathemat
       formulaText(term),
       `asset-template-objective-${String(term.term_id || index)}`,
       'preview_only',
+      formulaMetadata(term),
     )),
     ...constraints.map((constraint, index) => formulaDef(
       'constraint',
@@ -282,6 +317,7 @@ function formulasFromTemplateDraft(savedDraft: Record<string, unknown>, mathemat
       formulaText(constraint),
       `asset-template-constraint-${String(constraint.constraint_id || index)}`,
       'preview_only',
+      formulaMetadata(constraint),
     )),
   ];
 }

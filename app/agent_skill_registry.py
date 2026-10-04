@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import os
 import re
 from pathlib import Path
 from typing import Any
@@ -13,7 +14,11 @@ from app.services.skill_registry import skill_registry
 
 
 ROOT = Path(__file__).resolve().parents[1]
-AGENT_SKILLS_DIR = ROOT / "agent_skills"
+AGENT_SKILLS_DIR = Path(
+    os.getenv("OPTIFORGE_AGENT_SKILLS_DIR")
+    or os.getenv("AGENT_SKILLS_DIR")
+    or str(ROOT / "agent_skills")
+)
 
 
 class AgentSkillRegistry:
@@ -194,6 +199,10 @@ class AgentSkillRegistry:
         path = self.root / name / "skill.yaml"
         if not path.is_file():
             raise HTTPException(status_code=404, detail=f"Agent Skill not found: {name}")
+        self._write_state_fields(path, state)
+        return self.load_skill(name)
+
+    def _write_state_fields(self, path: Path, state: str) -> None:
         lines = path.read_text(encoding="utf-8").splitlines()
         replaced = False
         for index, line in enumerate(lines):
@@ -211,7 +220,6 @@ class AgentSkillRegistry:
         else:
             lines.insert(2, enabled_line)
         path.write_text("\n".join(lines) + "\n", encoding="utf-8")
-        return self.load_skill(name)
 
     def sync_schema(self, name: str) -> dict[str, Any]:
         skill = self.load_skill(name)
@@ -313,6 +321,10 @@ class AgentSkillRegistry:
         target.mkdir(parents=True, exist_ok=True)
         if not (target / "skill.yaml").exists():
             self._write_text(target / "skill.yaml", self._default_skill_yaml(name, api_skill, enabled=False))
+        else:
+            # Regeneration creates a new package revision. Require an explicit
+            # enable action again instead of silently keeping the old active state.
+            self._write_state_fields(target / "skill.yaml", AgentSkillState.DRAFT.value)
         if not (target / "SKILL.md").exists():
             self._write_text(target / "SKILL.md", self._skill_markdown(name, api_skill, definition))
         if not (target / "adapter.py").exists():

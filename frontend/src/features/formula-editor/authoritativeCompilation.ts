@@ -10,8 +10,26 @@ const scopeOf = (formula: FormulaDef) => formula.scope?.length
   ? formula.scope
   : formula.free_indices.map((alias, index) => ({ alias, set: formula.foreach[index] || alias }));
 
+// Boundary policy belongs to the formula; callers may also carry it in their
+// context. Canonicalize once so requests and both sides of the apply gate agree.
+export function normalizeCompileContext(formula: FormulaDef, context: AuthoritativeCompileContext): AuthoritativeCompileContext {
+  return {
+    symbols: context.symbols,
+    model_context: { ...context.model_context, boundary_strategy: formula.boundary_strategy || 'strict' },
+  };
+}
+
+function canonical(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(canonical);
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(Object.entries(value).sort(([a], [b]) => a.localeCompare(b)).map(([key, item]) => [key, canonical(item)]));
+  }
+  return value;
+}
+
 export function formulaCompileSignature(formula: FormulaDef, context: AuthoritativeCompileContext): string {
-  return JSON.stringify({
+  const normalized = normalizeCompileContext(formula, context);
+  return JSON.stringify(canonical({
     formula: formula.dsl_formula,
     formula_type: formula.kind,
     participation: formula.solve_participation || 'solve_active',
@@ -19,9 +37,9 @@ export function formulaCompileSignature(formula: FormulaDef, context: Authoritat
     objective_direction: formula.objective_direction,
     weight: formula.weight,
     scope: scopeOf(formula),
-    symbols: context.symbols,
-    model_context: context.model_context || {},
-  });
+    symbols: normalized.symbols,
+    model_context: normalized.model_context,
+  }));
 }
 
 export function isAuthoritativeArtifactCurrent(formula: FormulaDef, context: AuthoritativeCompileContext): boolean {
@@ -34,6 +52,7 @@ export function isAuthoritativeArtifactCurrent(formula: FormulaDef, context: Aut
 }
 
 export function formulaAnalyzePayload(formula: FormulaDef, context: AuthoritativeCompileContext): FormulaAnalyzePayload {
+  const normalized = normalizeCompileContext(formula, context);
   return {
     formula: formula.dsl_formula,
     formula_type: formula.kind,
@@ -42,11 +61,8 @@ export function formulaAnalyzePayload(formula: FormulaDef, context: Authoritativ
     formula_id: formula.formula_id,
     objective_direction: formula.kind === 'objective' ? formula.objective_direction : undefined,
     scope: scopeOf(formula),
-    symbols: context.symbols,
-    model_context: {
-      ...(context.model_context || {}),
-      boundary_strategy: formula.boundary_strategy || 'strict',
-    },
+    symbols: normalized.symbols,
+    model_context: normalized.model_context,
   };
 }
 

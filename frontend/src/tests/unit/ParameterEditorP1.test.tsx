@@ -74,6 +74,7 @@ test('fixed set members are displayed as contract-owned read-only values', () =>
   const field = { ...makeField(['workload'], 'array', { workload: ['inference', 'training'] }), code: 'workload', role: 'set_members' as const, editable: false, sourceSystem: 'scheduler' };
   render(<ParameterEditor field={field} value={['inference', 'training']} onChange={vi.fn()} />);
   expect(screen.getByText('集合成员由模型契约提供')).toBeInTheDocument();
+  expect(document.querySelector('.parameter-notice')).toBeInTheDocument();
   expect(screen.getByText('集合成员（只读）')).toBeInTheDocument();
   expect(screen.getByText('inference')).toBeInTheDocument();
   expect(screen.queryByRole('button', { name: '清 空' })).not.toBeInTheDocument();

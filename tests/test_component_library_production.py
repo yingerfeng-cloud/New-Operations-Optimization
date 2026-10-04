@@ -94,6 +94,20 @@ def test_published_component_must_be_copied_before_editing() -> None:
     assert "复制" in str(updated.json())
 
 
+def test_copied_draft_component_can_be_deleted() -> None:
+    component_id = f"deletable_copy_source_{uuid.uuid4().hex[:8]}"
+    assert client.post("/api/components/catalog", json=_soc_component(component_id)).status_code == 200
+    assert client.post(f"/api/components/{component_id}/publish").status_code == 200
+
+    copied = client.post(f"/api/components/{component_id}/copy-version").json()
+    copied_id = copied["component_id"]
+    deleted = client.delete(f"/api/components/{copied_id}")
+
+    assert deleted.status_code == 200, deleted.text
+    assert deleted.json() == {"component_id": copied_id, "status": "deleted"}
+    assert not any(item["component_id"] == copied_id for item in client.get("/api/components/catalog").json())
+
+
 def test_offline_is_the_only_asset_level_unavailable_state() -> None:
     component_id = f"offline_lifecycle_{uuid.uuid4().hex[:8]}"
     assert client.post("/api/components/catalog", json=_soc_component(component_id)).status_code == 200

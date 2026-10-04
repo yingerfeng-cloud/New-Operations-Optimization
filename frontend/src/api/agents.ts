@@ -26,6 +26,10 @@ export const getAgentSkills = () => unwrap<AgentSkill[]>(apiClient.get('/api/age
 
 export const getAgentSkill = (name: string) => unwrap<AgentSkill>(apiClient.get(`/api/agent/agent-skills/${encodeURIComponent(name)}`));
 
+export const enableAgentSkill = (name: string) => unwrap<AgentSkill>(apiClient.post(`/api/agent/agent-skills/${encodeURIComponent(name)}/enable`));
+
+export const disableAgentSkill = (name: string) => unwrap<AgentSkill>(apiClient.post(`/api/agent/agent-skills/${encodeURIComponent(name)}/disable`));
+
 export const getAgentSkillParameterExample = (name: string) => unwrap<Record<string, unknown>>(apiClient.get(`/api/agent/agent-skills/${encodeURIComponent(name)}/parameter-example`));
 
 export const createAgentConversation = (payload: AgentConversationPayload = {}) => unwrap<AgentConversation>(apiClient.post('/api/agent/conversations', payload));

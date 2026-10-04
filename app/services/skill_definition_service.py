@@ -6,6 +6,9 @@ import re
 from copy import deepcopy
 from typing import Any
 
+from app.variable_contract import normalize_variables
+from app.model_dimensions import extract_dimensions
+
 from app.schemas.skill import SkillDefinition
 from app.utils import now_text
 
@@ -65,7 +68,7 @@ class SkillDefinitionService:
                     "key": item["key"],
                     "name": item["name"],
                     "unit": item.get("unit") or "",
-                    "dimensions": list(item.get("dimension") or item.get("dimensions") or []),
+                    "dimensions": extract_dimensions(item),
                     "role": item.get("role") or "decision_variable",
                     "summary_functions": self._summary_functions(item),
                     "description": item.get("description") or "",
@@ -519,11 +522,14 @@ class SkillDefinitionService:
         return re.findall(r"(?<![\w])[-+]?\d+(?:\.\d+)?(?:[eE][-+]?\d+)?", text)
 
     def _declared_variables(self, model: Any, output_schema: dict[str, Any]) -> list[dict[str, Any]]:
-        candidates: list[dict[str, Any]] = []
-        candidates.extend(item for item in (output_schema or {}).get("variables") or [] if isinstance(item, dict))
+        outputs = normalize_variables((output_schema or {}).get("variables") or [])
+        metadata: dict[str, dict[str, Any]] = {}
         for spec in self._specs(model):
-            candidates.extend(item for item in spec.get("variables") or [] if isinstance(item, dict))
-        return self._deduplicate_contract_rows(candidates, ("math_var", "code", "key", "name"), default_prefix="variable")
+            for variable in normalize_variables(spec.get("variables") or []):
+                metadata.setdefault(variable["key"], variable)
+        # Output schema defines the public contract. Component-local intermediates
+        # can enrich declared outputs, but cannot become undeclared metric sources.
+        return [{**metadata.get(variable["key"], {}), **variable} for variable in outputs]
 
     def _declared_constraints(self, model: Any) -> list[dict[str, Any]]:
         candidates: list[dict[str, Any]] = []

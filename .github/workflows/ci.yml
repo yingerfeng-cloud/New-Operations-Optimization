@@ -52,6 +52,15 @@ jobs:
           python-version: '3.13.5'
           cache: pip
       - run: pip install -r requirements.txt
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.17.0'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+        working-directory: frontend
+      - run: npm run build
+        working-directory: frontend
       - name: Contract regression
         run: >-
           python -m pytest -q
@@ -68,6 +77,8 @@ jobs:
           tests/test_component_based_hydro_model.py
           tests/test_component_advanced_formula_a3.py
           tests/test_component_formula_contract_final.py
+          tests/test_react_frontend_hosting.py
+          tests/test_screenshot_fixture_contract.py
       - name: Audit fixed component formulas
         run: python scripts/audit_component_formulas.py --output reports/component_formula_audit.json
       - name: Upload component formula audit

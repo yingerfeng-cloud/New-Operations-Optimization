@@ -11,13 +11,15 @@ const apiMocks = vi.hoisted(() => ({
   runSkill: vi.fn(),
   enableSkill: vi.fn(),
   disableSkill: vi.fn(),
-  syncSkillSchema: vi.fn(),
   createAgentSkill: vi.fn(),
   getSkillInvocations: vi.fn(),
   getSkillVersions: vi.fn(),
   generateModelSkill: vi.fn(),
   validateSkill: vi.fn(),
   updateSkill: vi.fn(),
+  getAgentSkill: vi.fn(),
+  enableAgentSkill: vi.fn(),
+  disableAgentSkill: vi.fn(),
 }));
 
 vi.mock('../../api/skills', () => ({
@@ -26,13 +28,18 @@ vi.mock('../../api/skills', () => ({
   runSkill: apiMocks.runSkill,
   enableSkill: apiMocks.enableSkill,
   disableSkill: apiMocks.disableSkill,
-  syncSkillSchema: apiMocks.syncSkillSchema,
   createAgentSkill: apiMocks.createAgentSkill,
   getSkillInvocations: apiMocks.getSkillInvocations,
   getSkillVersions: apiMocks.getSkillVersions,
   generateModelSkill: apiMocks.generateModelSkill,
   validateSkill: apiMocks.validateSkill,
   updateSkill: apiMocks.updateSkill,
+}));
+
+vi.mock('../../api/agents', () => ({
+  getAgentSkill: apiMocks.getAgentSkill,
+  enableAgentSkill: apiMocks.enableAgentSkill,
+  disableAgentSkill: apiMocks.disableAgentSkill,
 }));
 
 vi.mock('@ant-design/icons', async () => {
@@ -47,6 +54,7 @@ vi.mock('@ant-design/icons', async () => {
 });
 
 vi.mock('antd', async () => {
+  const actual = await vi.importActual<typeof import('antd')>('antd');
   const React = await import('react');
   const h = React.createElement;
   const noop = vi.fn();
@@ -97,10 +105,11 @@ vi.mock('antd', async () => {
     Paragraph: ({ children, className }: any) => h('p', { className }, children),
     Title: ({ children }: any) => h('h3', null, children),
   };
+  const App = ({ children }: any) => children;
   const message = { success: noop, error: noop, warning: noop, info: noop, destroy: noop, loading: vi.fn(() => noop) };
   const ConfigProvider = ({ children }: any) => children;
   const notification = { ...message };
-  return { Alert, Button, Card, Checkbox, ConfigProvider, Descriptions, Drawer, Input, Modal, Space, Statistic, Table, Tabs, Tag, Typography, message, notification };
+  return { ...actual, Alert, App: actual.App, Button, Card, Checkbox, ConfigProvider: actual.ConfigProvider, Descriptions, Drawer, Input, Modal, Space, Statistic, Table, Tabs, Tag, Typography, message, notification };
 });
 
 const baseSkill: PlatformSkill = {
@@ -156,8 +165,10 @@ beforeEach(() => {
   apiMocks.runSkill.mockResolvedValue({ status: 'SUCCESS', objective_value: 10 });
   apiMocks.enableSkill.mockImplementation(async (name: string) => ({ ...disabledSkill, skill_name: name, skill_status: 'enabled' }));
   apiMocks.disableSkill.mockImplementation(async (name: string) => ({ ...baseSkill, skill_name: name, skill_status: 'disabled' }));
-  apiMocks.syncSkillSchema.mockImplementation(async (name: string) => ({ ...baseSkill, skill_name: name }));
   apiMocks.createAgentSkill.mockResolvedValue({ skill: baseSkill, agent_skill: { name: 'storage_dispatch' } });
+  apiMocks.getAgentSkill.mockResolvedValue({ name: 'storage_dispatch', state: 'enabled', enabled: true, validation: { status: 'valid' } });
+  apiMocks.enableAgentSkill.mockResolvedValue({ name: 'storage_dispatch', state: 'enabled', enabled: true, validation: { status: 'valid' } });
+  apiMocks.disableAgentSkill.mockResolvedValue({ name: 'storage_dispatch', state: 'disabled', enabled: false, validation: { status: 'valid' } });
   apiMocks.getSkillInvocations.mockResolvedValue([
     { invocation_id: 'INV-1', status: 'SUCCESS', duration_seconds: 0.2, created_at: '2026-07-08T01:00:00Z' },
   ]);
@@ -220,21 +231,44 @@ test('runs skill test with sample payload and reports invalid JSON', async () =>
   expect(await screen.findByText(/ERROR/)).toBeInTheDocument();
 });
 
-test('supports enable disable sync schema and create agent actions', async () => {
+test('supports platform state and Agent management actions', async () => {
   renderPage();
   const enabledRow = (await screen.findByText('储能调度')).closest('tr')!;
-  fireEvent.click(within(enabledRow).getByRole('button', { name: /停\s*用/ }));
+  fireEvent.click(within(enabledRow).getByRole('button', { name: '停用' }));
   await waitFor(() => expect(apiMocks.disableSkill.mock.calls[0]?.[0]).toBe('run_storage_dispatch'));
 
   const disabledRow = screen.getByText('经济调度').closest('tr')!;
   fireEvent.click(within(disabledRow).getByRole('button', { name: /启\s*用/ }));
   await waitFor(() => expect(apiMocks.enableSkill.mock.calls[0]?.[0]).toBe('run_economic_dispatch'));
 
-  fireEvent.click(within(enabledRow).getByRole('button', { name: /同步/ }));
-  await waitFor(() => expect(apiMocks.syncSkillSchema.mock.calls[0]?.[0]).toBe('run_storage_dispatch'));
-
-  fireEvent.click(within(enabledRow).getByRole('button', { name: /生成 Agent/ }));
+  fireEvent.click(within(enabledRow).getByRole('button', { name: 'Agent 管理' }));
+  await waitFor(() => expect(screen.getByRole('button', { name: '重新生成 Agent 包' })).toBeInTheDocument());
+  fireEvent.click(screen.getByRole('button', { name: '重新生成 Agent 包' }));
   await waitFor(() => expect(apiMocks.createAgentSkill.mock.calls[0]?.[0]).toBe('run_storage_dispatch'));
+});
+
+test('shows generated Agent drafts as pending enablement and enables them explicitly', async () => {
+  const draftSkill = {
+    ...baseSkill,
+    agent_enabled: false,
+    agent_package_status: 'draft',
+  } as PlatformSkill;
+  apiMocks.skills = [draftSkill];
+  apiMocks.getSkill.mockResolvedValue(draftSkill);
+  apiMocks.enableAgentSkill.mockImplementation(async (name: string) => {
+    apiMocks.skills = [{ ...draftSkill, agent_enabled: true, agent_package_status: 'enabled' }];
+    return { name, state: 'enabled', enabled: true, validation: { status: 'valid' } };
+  });
+
+  renderPage();
+  const row = (await screen.findByText('储能调度')).closest('tr')!;
+  expect(within(row).getByText('待启用')).toBeInTheDocument();
+  expect(screen.getByText('Agent 绑定').closest('.ant-statistic')).toHaveTextContent('0');
+
+  fireEvent.click(within(row).getByRole('button', { name: 'Agent 管理' }));
+  await waitFor(() => expect(screen.getByRole('button', { name: '启用 Agent' })).toBeInTheDocument());
+  fireEvent.click(screen.getByRole('button', { name: '启用 Agent' }));
+  await waitFor(() => expect(apiMocks.enableAgentSkill).toHaveBeenCalledWith('storage_dispatch'));
 });
 
 test('generates a complete skill and supports validated manual revisions', async () => {
@@ -258,7 +292,7 @@ test('generates a complete skill and supports validated manual revisions', async
 
   renderPage();
   const row = (await screen.findByText('储能调度')).closest('tr')!;
-  fireEvent.click(within(row).getByRole('button', { name: /重新生成/ }));
+  fireEvent.click(within(row).getByRole('button', { name: /^重新生成完整 Skill$/ }));
   await waitFor(() => expect(apiMocks.generateModelSkill).toHaveBeenCalledWith(
     'MODEL-POWER-STORAGE-DISPATCH',
     { use_llm: false, status: 'enabled' },

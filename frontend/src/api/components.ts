@@ -7,4 +7,5 @@ export const validateComponent = (id: string) => unwrap<{valid:boolean;execution
 export const publishComponent = (id: string) => unwrap<ComponentDef>(apiClient.post(`/api/components/${id}/publish`));
 export const offlineComponent = (id: string) => unwrap<ComponentDef>(apiClient.post(`/api/components/${id}/offline`));
 export const copyComponentVersion = (id: string, payload: Record<string, unknown> = {}) => unwrap<ComponentDef>(apiClient.post(`/api/components/${id}/copy-version`, payload));
+export const deleteComponent = (id: string) => unwrap<{ component_id: string; status: string }>(apiClient.delete(`/api/components/${id}`));
 export const validateComponentDependencies = (payload: Record<string, unknown>) => unwrap<{valid:boolean;errors:unknown[]}>(apiClient.post('/api/components/validate-dependencies', payload));

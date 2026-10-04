@@ -280,7 +280,7 @@ class HydroReservoirBalanceComponent(HydroComponentBase):
     depends_on = ["hydro_cascade_inflow_delay"]
     display_name = "水库水量平衡组件"
     description = "描述库容随入库、下泄变化的时序递推。"
-    formula = "volume[s,t+1] = volume[s,t] + (inflow[s,t] - q_out[s,t]) * delta_v"
+    formula = "volume[s,tv+1] = volume[s,tv] + (inflow[s,t] - q_out[s,t]) * delta_v"
     example = "15 分钟内入库大于下泄时库容增加，反之库容下降。"
     required_parameters = ["time_step_seconds", "local_inflow"]
     common_errors = ["time_volume 长度不是 horizon + 1", "梯级入库表达式未先构建"]

@@ -15,6 +15,7 @@ def _dispatch_schema() -> list[dict]:
             "required": True,
             "sample_value": [100, 110, 120, 130],
             "sets": {"time": [0, 1, 2, 3]},
+            "time_dimension": {"policy": "runtime_variable", "time_set": "time", "default_horizon": 4},
         },
         {
             "key": "unit_min_output",

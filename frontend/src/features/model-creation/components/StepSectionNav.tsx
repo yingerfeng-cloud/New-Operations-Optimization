@@ -24,7 +24,7 @@ export function StepSectionNav({
     <nav className="step-section-nav" aria-label="步骤内章节导航">
       <Select className="step-section-nav-select" aria-label="选择章节" value={active} onChange={navigate} options={items.map(item => ({ value: item.key, label: item.label }))} />
       <div className="step-section-nav-links">
-        {items.map(item => <button className={active === item.key ? 'active' : ''} type="button" key={item.key} onClick={() => navigate(item.key)}>{item.label}</button>)}
+        {items.map(item => <button className={active === item.key ? 'active' : ''} aria-current={active === item.key ? 'page' : undefined} type="button" key={item.key} onClick={() => navigate(item.key)}>{item.label}</button>)}
       </div>
       {onFocus && <button className="step-focus-trigger" type="button" onClick={onFocus}>聚焦编辑</button>}
     </nav>

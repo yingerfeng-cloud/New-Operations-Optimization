@@ -426,6 +426,9 @@ def test_generated_skill_is_persisted_versioned_fixed_and_manually_editable(tmp_
         agent_registry.create_from_api_skill(skill_name)
         assert (package_path / "SKILL.md").read_text(encoding="utf-8") == manual_skill_text
         agent_registry.set_state("arbitrary_model_7f3c", "enabled")
+        regenerated = agent_registry.create_from_api_skill(skill_name)
+        assert regenerated["state"] == "draft"
+        agent_registry.set_state("arbitrary_model_7f3c", "enabled")
         route = agent_skill_router.route(
             "请运行 Arbitrary contract model",
             {},

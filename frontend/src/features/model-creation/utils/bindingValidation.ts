@@ -35,14 +35,47 @@ function componentRows(component: Record<string, unknown>, key: string) {
   return Array.isArray(value) ? value as Array<Record<string, unknown>> : [];
 }
 
-export function getComponentBindingRows(component: Record<string, unknown>): BindingRow[] {
-  const explicit = componentRows(component, 'parameter_bindings');
+function schemaRows(value: unknown): Array<Record<string, unknown>> {
+  if (!Array.isArray(value)) return [];
+  return value
+    .filter(item => item !== undefined && item !== null)
+    .map(item => {
+      if (typeof item === 'string' || typeof item === 'number') {
+        return { code: String(item), name: String(item) };
+      }
+      return item && typeof item === 'object' && !Array.isArray(item)
+        ? item as Record<string, unknown>
+        : {};
+    })
+    .filter(item => Boolean(item.code || item.key || item.name || item.parameter || item.parameter_code));
+}
+
+/**
+ * Return the input contract of a component, rather than every parameter that
+ * happens to be present in a legacy component definition.  Built-in hydro
+ * definitions historically carried the full model parameter catalog in
+ * `parameters`, while `inputs` is the authoritative list of parameters that
+ * the component actually consumes.
+ */
+export function componentParameterDefinitions(component: Record<string, unknown>): Array<Record<string, unknown>> {
+  const direct = schemaRows(component.parameters);
+  if (direct.length) return direct;
   const definition = component.definition && typeof component.definition === 'object' && !Array.isArray(component.definition)
     ? component.definition as Record<string, unknown>
     : {};
-  const parameters = componentRows(component, 'parameters').length
-    ? componentRows(component, 'parameters')
-    : componentRows(definition, 'parameters');
+  const definitionParameters = schemaRows(definition.parameters);
+  const inputRows = schemaRows(definition.inputs);
+  if (!inputRows.length) return definitionParameters;
+  const byCode = new Map(definitionParameters.map(row => [String(row.code || row.key || row.name || row.parameter || row.parameter_code), row]));
+  return inputRows.map(input => {
+    const code = String(input.code || input.key || input.name || input.parameter || input.parameter_code || '');
+    return { ...(byCode.get(code) || {}), ...input, code };
+  });
+}
+
+export function getComponentBindingRows(component: Record<string, unknown>): BindingRow[] {
+  const explicit = componentRows(component, 'parameter_bindings');
+  const parameters = componentParameterDefinitions(component);
   const rows: BindingRow[] = parameters.map((parameter, index) => {
     const code = String(parameter.code || parameter.parameter || parameter.component_parameter || `parameter_${index + 1}`);
     const saved = explicit.find(binding => bindingCode(binding) === code);

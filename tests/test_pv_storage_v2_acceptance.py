@@ -63,6 +63,7 @@ def test_rolling_service_reports_partial_success_and_soc_handoff(monkeypatch) ->
     result = RollingService().run(
         RollingRunRequest(
             model_template_code="pv_storage_day_ahead_dispatch_v2",
+            model_id="MODEL-POWER-PV-STORAGE-DAY-AHEAD-DISPATCH-V2",
             horizon=2,
             step_size=1,
             rounds=2,

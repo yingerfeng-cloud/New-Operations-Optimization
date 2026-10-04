@@ -90,7 +90,6 @@ export const runSkill = (name: string, parameters: Record<string, unknown>, opti
   unwrap<Record<string, unknown>>(apiClient.post(`/api/skills/${encodeURIComponent(name)}/run`, { parameters, options }));
 export const enableSkill = (name: string) => unwrap<PlatformSkill>(apiClient.post(`/api/skills/${encodeURIComponent(name)}/enable`));
 export const disableSkill = (name: string) => unwrap<PlatformSkill>(apiClient.post(`/api/skills/${encodeURIComponent(name)}/disable`));
-export const syncSkillSchema = (name: string) => unwrap<PlatformSkill>(apiClient.post(`/api/skills/${encodeURIComponent(name)}/sync-schema`));
 export const previewModelSkill = (modelId: string, options: { use_llm?: boolean } = {}) =>
   unwrap<{ model_id: string; skill_name: string; definition: SkillDefinition; validation: SkillValidation; persisted: false }>(apiClient.post(`/api/models/${encodeURIComponent(modelId)}/skills/preview`, options));
 export const generateModelSkill = (modelId: string, options: { use_llm?: boolean; status?: string } = {}) =>

@@ -208,6 +208,24 @@ test('renders component and runtime model panels', () => {
   expect(screen.getByText('默认运行参数')).toBeInTheDocument();
 }, 30000);
 
+test('derives a readable runtime schema when a legacy asset only stores defaults', () => {
+  cleanup();
+  render(
+    <ModelRuntimePanel
+      model={{
+        ...testState.modelSample,
+        parameter_schema: {},
+        semantic_spec: { parameters: [{ code: 'horizon', name: '调度时段数', dimension: [], required: true }] },
+        parameters: { horizon: 4 },
+      }}
+      detail={{ parameter_schema: {}, parameters: { horizon: 4 } }}
+    />,
+  );
+  expect(screen.getByText('此模型未单独保存运行参数 Schema')).toBeInTheDocument();
+  expect(screen.getByText('调度时段数')).toBeInTheDocument();
+  expect(screen.getAllByText('4').length).toBeGreaterThanOrEqual(1);
+});
+
 test('renders governance and history model panels', () => {
   cleanup();
   render(<ModelGovernancePanel model={testState.modelSample} detail={testState.assetDetail} />);

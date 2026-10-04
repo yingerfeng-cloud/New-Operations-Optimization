@@ -19,6 +19,7 @@ router = APIRouter(prefix="/api/pv-storage", tags=["pv-storage"])
 
 class IntradayRollingRequest(BaseModel):
     template_code: str = "pv_storage_day_ahead_dispatch_v2"
+    model_id: str | None = None
     rolling_horizon: int = 4
     execution_step: int = 1
     rounds: int = 3
@@ -55,6 +56,7 @@ def run_intraday_rolling(req: IntradayRollingRequest) -> dict[str, Any]:
     result = rolling_service.run(
         RollingRunRequest(
             model_template_code=req.template_code,
+            model_id=req.model_id,
             horizon=req.rolling_horizon,
             step_size=req.execution_step,
             rounds=req.rounds,

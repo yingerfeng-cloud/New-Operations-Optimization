@@ -13,7 +13,7 @@ TIME_SERIES_KEYS = {
 }
 
 
-def infer_parameter_dimensions(parameters: dict[str, Any] | None) -> dict[str, Any]:
+def infer_parameter_dimensions(parameters: dict[str, Any] | None, input_schema: list[dict[str, Any]] | None = None) -> dict[str, Any]:
     """Materialize dynamic sets from supplied business data.
 
     Template samples describe examples, not runtime cardinality.  This function
@@ -30,12 +30,14 @@ def infer_parameter_dimensions(parameters: dict[str, Any] | None) -> dict[str, A
         ),
         None,
     )
-    if series is not None:
-        horizon = len(series)
-        supplied_time = inferred.get("time")
-        if not isinstance(supplied_time, list) or len(supplied_time) != horizon:
-            inferred["time"] = list(range(horizon))
-        inferred["horizon"] = horizon
+    config = schema_time_dimension(input_schema or [])
+    policy = config.get("policy")
+    time_set = str(config.get("time_set") or "time")
+    if series is not None and policy in {"runtime_variable", "data_derived"}:
+        # Explicit user contracts always win; shape validation reports conflicts.
+        horizon = inferred.get("horizon") or len(inferred.get(time_set) or []) or len(series)
+        inferred.setdefault(time_set, list(range(horizon)) if isinstance(horizon, int) and horizon > 0 else [])
+        inferred.setdefault("horizon", horizon)
 
     unit_keys: set[str] = set()
     for key in (
@@ -50,19 +52,24 @@ def infer_parameter_dimensions(parameters: dict[str, Any] | None) -> dict[str, A
         if isinstance(value, dict):
             unit_keys.update(str(item) for item in value)
     if unit_keys:
-        inferred["unit"] = sorted(unit_keys, key=_natural_key)
+        inferred.setdefault("unit", sorted(unit_keys, key=_natural_key))
 
     # The economic-dispatch builder needs an initial point for first-period
     # ramping.  In the absence of an explicit value, minimum stable output is a
     # deterministic and auditable system inference.
     if "initial_unit_output" not in inferred and isinstance(inferred.get("unit_min_output"), dict):
-        inferred["initial_unit_output"] = copy.deepcopy(inferred["unit_min_output"])
+        status = inferred.get("initial_unit_status") or {}
+        inferred["initial_unit_output"] = {
+            key: value if not status or status.get(key, 1) else 0
+            for key, value in inferred["unit_min_output"].items()
+        }
     return inferred
 
 
-def validate_business_semantics(parameters: dict[str, Any] | None) -> list[dict[str, Any]]:
+def validate_business_semantics(parameters: dict[str, Any] | None, *, unit_commitment: bool = False) -> list[dict[str, Any]]:
     """Validate cross-field constraints that JSON shape checks cannot express."""
     values = parameters or {}
+    unit_commitment = unit_commitment or isinstance(values.get("initial_unit_status"), dict)
     invalid: list[dict[str, Any]] = []
     load = values.get("load_forecast")
     minimum = values.get("unit_min_output")
@@ -108,7 +115,7 @@ def validate_business_semantics(parameters: dict[str, Any] | None) -> list[dict[
             if all(_is_number(minimum.get(unit)) and _is_number(maximum.get(unit)) for unit in shared):
                 total_min = sum(float(minimum[unit]) for unit in shared)
                 total_max = sum(float(maximum[unit]) for unit in shared)
-                below = [i for i, value in enumerate(load) if _is_number(value) and float(value) < total_min]
+                below = [] if unit_commitment else [i for i, value in enumerate(load) if _is_number(value) and float(value) < total_min]
                 above = [i for i, value in enumerate(load) if _is_number(value) and float(value) > total_max]
                 if below or above:
                     pieces = []
@@ -135,7 +142,10 @@ def validate_business_semantics(parameters: dict[str, Any] | None) -> list[dict[
             if unit in minimum
             and unit in maximum
             and _is_number(value)
-            and not (float(minimum[unit]) <= float(value) <= float(maximum[unit]))
+            and not (
+                (0 <= float(value) <= 0 if unit_commitment and not (values.get("initial_unit_status") or {}).get(unit, 1)
+                 else float(minimum[unit]) <= float(value) <= float(maximum[unit]))
+            )
         ]
         if bad_initial:
             invalid.append({
@@ -156,3 +166,39 @@ def _natural_key(value: str) -> tuple[str, int]:
     prefix = value.rstrip("0123456789")
     suffix = value[len(prefix):]
     return prefix, int(suffix) if suffix else -1
+
+
+def schema_time_dimension(input_schema: list[dict[str, Any]]) -> dict[str, Any]:
+    for item in input_schema:
+        if isinstance(item.get("time_dimension"), dict) and item["time_dimension"]:
+            return item["time_dimension"]
+    for item in input_schema:
+        values = (item.get("sets") or {}).get("time")
+        if values:
+            return {"policy": "fixed", "time_set": "time", "default_horizon": len(values)}
+    return {"policy": "runtime_variable", "time_set": "time"}
+
+
+def validate_time_contract(parameters: dict[str, Any], input_schema: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    config = schema_time_dimension(input_schema)
+    policy = config.get("policy")
+    time_set = str(config.get("time_set") or "time")
+    expected = config.get("default_horizon") if policy == "fixed" else parameters.get("horizon")
+    if policy == "data_derived":
+        sources = config.get("derive_from") or list(TIME_SERIES_KEYS)
+        if isinstance(sources, str): sources = [sources]
+        series = next((parameters[key] for key in sources if isinstance(parameters.get(key), (list, dict)) and parameters[key]), None)
+        if series is not None: expected = len(series)
+    errors = []
+    if expected is not None:
+        for key, actual in (("horizon", parameters.get("horizon")), (time_set, len(parameters[time_set]) if isinstance(parameters.get(time_set), list) else None)):
+            if actual is not None and actual != expected:
+                errors.append({"key": key, "code": "TIME_CONTRACT_CONFLICT", "error": "time contract conflict", "expected": expected, "actual": actual})
+    if policy == "runtime_variable" and isinstance(expected, int):
+        allowed = config.get("allowed_horizons") or []
+        minimum = config.get("min_horizon") or 1
+        maximum = config.get("max_horizon")
+        step = config.get("horizon_step") or 1
+        if (allowed and expected not in allowed) or expected < minimum or (maximum and expected > maximum) or (expected - minimum) % step:
+            errors.append({"key": "horizon", "code": "HORIZON_NOT_ALLOWED", "error": "horizon outside model policy", "actual": expected})
+    return errors

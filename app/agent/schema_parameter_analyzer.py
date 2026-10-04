@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 from app.agent.default_value_resolver import default_value_resolver
-from app.agent.parameter_contract import infer_parameter_dimensions, validate_business_semantics
+from app.agent.parameter_contract import infer_parameter_dimensions, validate_business_semantics, schema_time_dimension, validate_time_contract
 
 
 class SchemaParameterAnalyzer:
@@ -18,7 +18,7 @@ class SchemaParameterAnalyzer:
         input_schema: list[dict[str, Any]],
         partial_parameters: dict[str, Any] | None,
     ) -> dict[str, Any]:
-        supplied = infer_parameter_dimensions(partial_parameters)
+        supplied = infer_parameter_dimensions(partial_parameters, input_schema)
         normalized = dict(supplied)
         missing: list[dict[str, Any]] = []
         invalid: list[dict[str, Any]] = []
@@ -59,7 +59,8 @@ class SchemaParameterAnalyzer:
                 )
                 questions.append(self._question(item))
 
-        semantic_invalid = validate_business_semantics(normalized)
+        invalid.extend(validate_time_contract(normalized, input_schema))
+        semantic_invalid = validate_business_semantics(normalized, unit_commitment=any(item.get("key") == "initial_unit_status" or item.get("dispatch_mode") == "unit_commitment" for item in input_schema))
         invalid.extend(semantic_invalid)
         questions.extend(
             str(item.get("message"))
@@ -139,6 +140,9 @@ class SchemaParameterAnalyzer:
         if len(dimensions) != 1:
             return None
         dimension = str(dimensions[0])
+        config = item.get("time_dimension") or schema_time_dimension([item])
+        if dimension == str(config.get("time_set") or "time") and config.get("policy") == "fixed":
+            return config.get("default_horizon") or len((item.get("sets") or {}).get(dimension) or []) or None
         dynamic_values = supplied.get(dimension)
         if isinstance(dynamic_values, list) and dynamic_values:
             return len(dynamic_values)
@@ -158,6 +162,9 @@ class SchemaParameterAnalyzer:
         if len(dimensions) != 1:
             return []
         dimension = str(dimensions[0])
+        config = item.get("time_dimension") or schema_time_dimension([item])
+        if dimension == str(config.get("time_set") or "time") and config.get("policy") == "fixed":
+            return [str(value) for value in (item.get("sets") or {}).get(dimension) or []]
         dynamic_values = supplied.get(dimension)
         if isinstance(dynamic_values, list) and dynamic_values:
             return [str(value) for value in dynamic_values]

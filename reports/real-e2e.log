@@ -1,0 +1,28 @@
+
+> optiforge-platform-frontend@1.0.0 test:e2e:real
+> playwright test -c playwright.real-backend.config.ts
+
+[WebServer] INFO:     Started server process [53845]
+[WebServer] INFO:     Waiting for application startup.
+[WebServer] INFO:     Application startup complete.
+[WebServer] INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
+[WebServer] (node:53849) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] (node:53871) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+
+Running 9 tests using 1 worker
+
+(node:53873) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  1 src/tests/e2e/formula_real_backend_gate.spec.ts:23:1 › @real real authoritative backend closes linear maximize state preview dimension and bilinear formula gates (122ms)
+  ✓  2 src/tests/e2e/formula_ui_real_solver_closure.spec.ts:94:1 › @real UI authoritative artifacts preserve four boundary semantics through the real Builder and HiGHS (14.6s)
+  ✓  3 src/tests/e2e/real_backend_smoke.spec.ts:45:1 › @real real backend smoke creates generic model draft and runs backend testModel (11.2s)
+  ✓  4 src/tests/e2e/real_production_gate.spec.ts:81:1 › @real controlled environment is healthy and contains callable seed models (254ms)
+  ✓  5 src/tests/e2e/real_production_gate.spec.ts:89:1 › @real published generic model solves with the real backend and emits result metadata (4.7s)
+  ✓  6 src/tests/e2e/real_production_gate.spec.ts:112:1 › @real candidate horizon and data-derived horizon use real published contracts (20.7s)
+  ✓  7 src/tests/e2e/real_production_gate.spec.ts:191:1 › @real hydro capability is selected from semantic structure and solved through the generic task API (31.7s)
+  ✓  8 src/tests/e2e/real_production_gate.spec.ts:217:1 › @real real infeasible submission returns actionable diagnosis instead of a generic failure only (4.8s)
+  ✓  9 src/tests/e2e/real_production_gate.spec.ts:243:1 › @real agent performs automatic skill matching without a hidden requested skill (6.4s)
+
+  9 passed (1.7m)

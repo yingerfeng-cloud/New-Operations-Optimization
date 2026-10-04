@@ -20,7 +20,7 @@ from app.model_components.formula_contracts import (
     participation_fields,
     synchronize_formula_fields,
 )
-from app.model_components.lifecycle import normalize_component_asset_lifecycle
+from app.model_components.lifecycle import normalize_component_asset_lifecycle, component_lifecycle_status, COMPONENT_PUBLISHED_STATUS
 from app.storage.memory_store import STORE
 from app.model_components.solver_capabilities import normalize_capabilities
 
@@ -184,6 +184,33 @@ def load_library_component(component_type: str) -> dict[str, Any] | None:
     if not component:
         return None
     return normalize_component_payload(normalize_component_asset_lifecycle(component))
+
+
+def resolve_formula_component(component: dict[str, Any], *, require_registered: bool = False) -> dict[str, Any]:
+    component_id = str(component.get("type") or component.get("component_id") or "")
+    require_registered = require_registered or bool(component.get("version") or (component.get("definition") or {}).get("version"))
+    asset = load_library_component(component_id)
+    inline = component.get("definition") or {}
+    if asset:
+        if component_lifecycle_status(asset) != COMPONENT_PUBLISHED_STATUS:
+            raise RuntimeError(f"组件 {component_id} 未发布，不能参与模型构建或发布。")
+        expected_version = str(component.get("version") or inline.get("version") or asset.get("version") or "1.0.0")
+        if expected_version != str(asset.get("version") or "1.0.0"):
+            raise RuntimeError(f"组件 {component_id} 固定版本不匹配：{expected_version}")
+        if inline:
+            snapshot = normalize_component_payload(inline)
+            for field in ("generated_constraints", "generated_objective_terms", "variables", "parameters", "sets"):
+                if snapshot.get(field) != asset.get(field):
+                    raise RuntimeError(f"组件 {component_id} 内嵌公式与已发布资产版本不一致：{field}")
+        definition = asset
+    elif inline and not require_registered:
+        definition = normalize_component_payload(inline)
+    else:
+        raise RuntimeError(f"组件 {component_id} 不存在，请先注册并发布组件资产。")
+    validation = validate_component_definition(definition)
+    if not validation["valid"] or not validation.get("execution_ready", False):
+        raise RuntimeError(f"组件 {component_id} 公式校验失败：{validation['errors']}")
+    return definition
 
 
 def normalize_component_payload(payload: dict[str, Any]) -> dict[str, Any]:
@@ -563,10 +590,10 @@ def _parameter_default(context: dict[str, Any], name: str) -> Any:
 
 def _symbol_table(component: dict[str, Any]) -> dict[str, set[str]]:
     sets = {str(item.get("code") or item.get("name") or item.get("key")) for item in [_normalize_schema_item(row, "set") for row in component.get("sets", []) or []] if item}
-    parameters = {str(item.get("code") or item.get("name") or item.get("key")) for item in [_normalize_schema_item(row, "parameter") for row in ((component.get("parameters", []) or component.get("inputs", []) or []))] if item}
+    parameters = {str(item.get("code") or item.get("name") or item.get("key")) for item in [_normalize_schema_item(row, "parameter") for row in [*(component.get("parameters", []) or component.get("inputs", []) or []), *(component.get("derived_parameters") or [])]] if item}
     variables = {str(item.get("code") or item.get("name") or item.get("key")) for item in [_normalize_schema_item(row, "variable") for row in component.get("variables", []) or []] if item}
     curves = {str(item.get("code") or item.get("name") or item.get("key")) for item in [_normalize_schema_item(row, "curve") for row in ((component.get("curves", []) or component.get("piecewise_curves", []) or []))] if item}
-    indices = {"t", "s", "u", "i", "j", "k", "scenario", "time", "station", "unit", *sets}
+    indices = {"t", "s", "u", "i", "j", "k", "scenario", "time", "station", "unit", *sets, *DEFAULT_INDEX_ALIASES.values()}
     for constraint in component.get("constraints", []) or component.get("generated_constraints", []) or []:
         for item in _normalize_index_specs(list(constraint.get("indices") or [])):
             indices.add(item["set"])
@@ -946,7 +973,7 @@ def _compile_test_model_spec(component: dict[str, Any]) -> dict[str, Any]:
                 seen_sets.add(dim)
     return {
         "sets": sets,
-        "parameters": component.get("parameters") or [],
+        "parameters": [*(component.get("parameters") or []), *(component.get("derived_parameters") or [])],
         "variables": [
             {
                 **variable,
@@ -963,7 +990,7 @@ def _compile_test_runtime_parameters(component: dict[str, Any], model_spec: dict
     params: dict[str, Any] = {}
     for item in model_spec["sets"]:
         params[item["code"]] = list(item.get("values") or _default_set_values(item["code"]))
-    for param in component.get("parameters") or []:
+    for param in model_spec["parameters"]:
         code = str(param.get("code") or param.get("name") or param.get("key") or "")
         if not code:
             continue
@@ -975,7 +1002,7 @@ def _compile_test_runtime_parameters(component: dict[str, Any], model_spec: dict
             default = param.get("default_value")
         if default is None:
             default = param.get("sample", 1)
-        params[code] = _default_value_for_dimensions(list(param.get("dimension") or []), params, default)
+        params[code] = _default_value_for_dimensions(list(param.get("dimension") or param.get("indices") or []), params, default)
     _align_compile_index_parameters(component, params)
     return params
 

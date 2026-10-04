@@ -1,13 +1,9 @@
 import type { ModelDraft } from '../stores/modelCreationStore';
-import { bindingCode, isBindingComplete } from './bindingValidation';
+import { bindingCode, componentParameterDefinitions, isBindingComplete } from './bindingValidation';
 import { extractDimensions } from './modelDimensions';
 
 type DraftComponent = ModelDraft['components'][number];
 type ModelParameter = ModelDraft['semantic']['parameters'][number];
-
-function rows(value: unknown): Array<Record<string, unknown>> {
-  return Array.isArray(value) ? value.filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === 'object' && !Array.isArray(item)) : [];
-}
 
 function normalizedUnit(value: unknown) {
   return String(value || '').trim().toLocaleLowerCase();
@@ -16,19 +12,15 @@ function normalizedUnit(value: unknown) {
 function compatible(componentParameter: Record<string, unknown>, modelParameter: ModelParameter) {
   const expectedDimensions = extractDimensions(componentParameter);
   const actualDimensions = extractDimensions(modelParameter as unknown as Record<string, unknown>);
-  if (expectedDimensions.length !== actualDimensions.length || expectedDimensions.some((value, index) => value !== actualDimensions[index])) return false;
+  // An old component catalog used an empty dimension for a few inputs (notably
+  // `edges`) even though the model contract declared the dimension.  Treat an
+  // empty component dimension as unspecified, but keep strict matching when
+  // both sides provide dimensions.
+  if (expectedDimensions.length && !actualDimensions.length) return false;
+  if (expectedDimensions.length && actualDimensions.length && (expectedDimensions.length !== actualDimensions.length || expectedDimensions.some((value, index) => value !== actualDimensions[index]))) return false;
   const expectedUnit = normalizedUnit(componentParameter.unit);
   const actualUnit = normalizedUnit(modelParameter.unit);
   return !expectedUnit || !actualUnit || expectedUnit === actualUnit;
-}
-
-function componentParameters(component: DraftComponent) {
-  const direct = rows(component.parameters);
-  if (direct.length) return direct;
-  const definition = component.definition && typeof component.definition === 'object' && !Array.isArray(component.definition)
-    ? component.definition as Record<string, unknown>
-    : {};
-  return rows(definition.parameters);
 }
 
 /** Infer a binding only when code, ordered dimensions and units identify one parameter. */
@@ -37,12 +29,14 @@ export function reconcileComponentParameterBindings(
   components: DraftComponent[],
 ): DraftComponent[] {
   return components.map(component => {
-    const explicit = rows(component.parameter_bindings);
+    const explicit = Array.isArray(component.parameter_bindings)
+      ? component.parameter_bindings.filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === 'object' && !Array.isArray(item))
+      : [];
     const explicitByCode = new Map(explicit.map((binding, index) => [bindingCode(binding, index), binding]));
     const parameterCodes = new Set<string>();
     const nextBindings: Array<Record<string, unknown>> = [];
 
-    componentParameters(component).forEach(parameter => {
+    componentParameterDefinitions(component).forEach(parameter => {
       const code = String(parameter.code || parameter.parameter || parameter.component_parameter || '').trim();
       if (!code) return;
       parameterCodes.add(code);

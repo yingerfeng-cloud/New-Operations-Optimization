@@ -45,3 +45,18 @@ test('keeps successful dependency analysis in the card header instead of a large
   expect(screen.getByRole('button', { name: /依赖分析：通过/ })).toBeInTheDocument();
   expect(screen.queryByRole('alert')).not.toBeInTheDocument();
 });
+
+test('marks preview formulas with semantic errors as compile failures', async () => {
+  const onChange = vi.fn();
+  analyzeFormulaMock.mockResolvedValue({
+    success: false, ast_version: '1.0', compiler_version: '2.0.0', normalized_expression: '', expression_class: 'linear',
+    diagnostics: [{ code: 'FORMULA_SYMBOL_UNKNOWN', severity: 'error', stage: 'symbol', message: '引用对象不存在：inflow', start: 0, end: 6 }],
+    references: [], scope: [], participation: 'preview_only', estimated_expansion: { constraint_count: 0, term_count: 0, exact: false },
+    status: 'preview_only', checks: { syntax: 'passed', symbol_dimension_unit: 'failed', classification: 'linear', compile: 'skipped' },
+  });
+  const previewFormula = row({ formula_id: 'preview-bad', name: '水量平衡预览', solve_participation: 'preview_only', dsl_formula: 'inflow[t] == local_inflow[t]', compile_status: 'ready' });
+  render(<FormulaManagementPanel formulas={[previewFormula]} semantic={{ sets: [{ code: 'time' }], parameters: [{ code: 'local_inflow' }], variables: [{ code: 'inflow' }] }} symbols={symbols} onChange={onChange} onEdit={vi.fn()} />);
+
+  fireEvent.click(screen.getByRole('button', { name: /批量权威编译/ }));
+  await waitFor(() => expect(onChange).toHaveBeenCalledWith(expect.arrayContaining([expect.objectContaining({ formula_id: 'preview-bad', compile_status: 'compile_failed', compile_error: '引用对象不存在：inflow' })])));
+});

@@ -752,11 +752,11 @@ def _cascade_hydro_dispatch() -> dict[str, Any]:
             "weights": sample["weights"],
             "terms": [
                 {"term_id": "hydro_load_deviation_penalty", "name": "负荷偏差惩罚", "expression": "sum(load_dev_pos[t] + load_dev_neg[t] for t in time)", "weight_key": "load_deviation", "solve_participation": "solve_active", "supported_by_backend": True, "enabled": True},
-                {"term_id": "hydro_spill_penalty", "name": "弃水惩罚", "expression": "sum(q_spill[station,t] for station in station for t in time)", "weight_key": "spill", "solve_participation": "solve_active", "supported_by_backend": True, "enabled": True},
-                {"term_id": "hydro_terminal_volume_penalty", "name": "期末库容偏差惩罚", "expression": "sum(terminal_dev_pos[station] + terminal_dev_neg[station] for station in station)", "weight_key": "terminal_volume", "solve_participation": "solve_active", "supported_by_backend": True, "enabled": True},
-                {"term_id": "hydro_ramp_penalty", "name": "出力爬坡平滑惩罚", "expression": "sum(ramp_abs[station,t] for station in station for t in time)", "weight_key": "ramp", "solve_participation": "solve_active", "supported_by_backend": True, "enabled": True},
-                {"term_id": "hydro_generation_value", "name": "发电量价值", "expression": "sum(station_power[station,t] for station in station for t in time)", "weight_key": "generation", "solve_participation": "solve_active", "supported_by_backend": True, "enabled": True},
-                {"term_id": "hydro_revenue_value", "name": "发电收益", "expression": "sum(station_power[station,t] for station in station for t in time)", "weight_key": "revenue", "solve_participation": "solve_active", "supported_by_backend": True, "enabled": True},
+                {"term_id": "hydro_spill_penalty", "name": "弃水惩罚", "expression": "sum(q_spill[s,t] for s in station for t in time)", "weight_key": "spill", "solve_participation": "solve_active", "supported_by_backend": True, "enabled": True},
+                {"term_id": "hydro_terminal_volume_penalty", "name": "期末库容偏差惩罚", "expression": "sum(terminal_dev_pos[s] + terminal_dev_neg[s] for s in station)", "weight_key": "terminal_volume", "solve_participation": "solve_active", "supported_by_backend": True, "enabled": True},
+                {"term_id": "hydro_ramp_penalty", "name": "出力爬坡平滑惩罚", "expression": "sum(ramp_abs[s,t] for s in station for t in time)", "weight_key": "ramp", "solve_participation": "solve_active", "supported_by_backend": True, "enabled": True},
+                {"term_id": "hydro_generation_value", "name": "发电量价值", "expression": "sum(station_power[s,t] for s in station for t in time)", "weight_key": "generation", "solve_participation": "solve_active", "supported_by_backend": True, "enabled": True},
+                {"term_id": "hydro_revenue_value", "name": "发电收益", "expression": "sum(station_power[s,t] for s in station for t in time)", "weight_key": "revenue", "solve_participation": "solve_active", "supported_by_backend": True, "enabled": True},
             ],
         },
         "future_extensions": {
@@ -774,7 +774,7 @@ def _cascade_hydro_dispatch() -> dict[str, Any]:
         "name": "梯级水电日前调度优化模型",
         "scenario": "Cascade hydro day-ahead dispatch with maintenance, load tracking, spill analysis, and terminal volume control.",
         "description": "Component-based cascade hydro day-ahead dispatch optimization model.",
-        "version": "v1.0",
+        "version": "v1.1",
         "status": "trial",
         "solver": "HiGHS",
         "build_mode": "component_based",
@@ -852,7 +852,7 @@ def _cascade_hydro_dispatch() -> dict[str, Any]:
                 },
                 "hydro_reservoir_balance": {
                     "description": "Reservoir volume is propagated from inflow, outflow, and period length.",
-                    "公式示例": "volume[s,t+1] = volume[s,t] + (inflow[s,t] - q_out[s,t]) * delta_v",
+                    "公式示例": "volume[s,tv+1] = volume[s,tv] + (inflow[s,t] - q_out[s,t]) * delta_v",
                     "参数示例": {"time_step_seconds": 900},
                     "common_error": "time_volume length must equal horizon + 1.",
                 },
@@ -1207,7 +1207,7 @@ def _contract_spot_exposure_v1() -> dict[str, Any]:
         "sets": sets,
         "parameters": parameters,
         "variables": variables,
-        "components": [{"type": "contract_spot_exposure_formula_block", "definition": component_definition}],
+        "components": [{"type": "contract_spot_exposure_formula_block", "version": "1.0.0", "definition": {**component_definition, "version": "1.0.0"}}],
         "objective": {"type": "weighted_sum", "sense": "minimize", "terms": objective_terms, "weights": {}},
         "output_contract": {
             "series_index_set": "time",
@@ -1443,7 +1443,7 @@ def _retail_da_spot_bidding_v1() -> dict[str, Any]:
         "sets": sets,
         "parameters": parameters,
         "variables": variables,
-        "components": [{"type": "retail_da_spot_bidding_formula_block", "definition": component_definition}],
+        "components": [{"type": "retail_da_spot_bidding_formula_block", "version": "1.0.0", "definition": {**component_definition, "version": "1.0.0"}}],
         "objective": {"type": "weighted_sum", "sense": "minimize", "terms": objective_terms, "weights": {}},
         "output_contract": {
             "series_index_set": "time",

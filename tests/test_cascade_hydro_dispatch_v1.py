@@ -77,7 +77,7 @@ def test_cascade_hydro_v1_result_explanation_is_unified() -> None:
 def test_cascade_hydro_v1_optimize_api_runs_compatibility_chain() -> None:
     response = client.post(
         "/api/optimize/run",
-        json={"model_code": "cascade_hydro_dispatch_v1", "runtime_parameters": _short_params(), "async_run": False, "time_limit_seconds": 30},
+        json={"model_id": "MODEL-POWER-CASCADE-HYDRO-DISPATCH-V1", "runtime_parameters": _short_params(), "async_run": False, "time_limit_seconds": 30},
     )
     assert response.status_code == 200, response.text
     task = response.json()
@@ -102,3 +102,11 @@ def test_cascade_hydro_v1_model_service_publish_and_invoke() -> None:
     body = invoke.json()
     assert body["status"] == "SUCCESS", body
     assert body["business_result"]["function_asset_interpolation"]
+
+
+def test_trial_hydro_code_is_rejected_but_published_code_executes():
+    trial = client.post('/api/optimize/run', json={'model_code': 'cascade_hydro_dispatch_v1', 'runtime_parameters': _short_params(), 'async_run': False})
+    assert trial.status_code == 409, trial.text
+    published = client.post('/api/optimize/run', json={'model_code': 'storage_dispatch', 'runtime_parameters': get_template('storage_dispatch')['sample_runtime_parameters'], 'async_run': False})
+    assert published.status_code == 200, published.text
+    assert published.json()['status'] == 'SUCCESS'

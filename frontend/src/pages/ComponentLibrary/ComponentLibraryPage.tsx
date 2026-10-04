@@ -1,9 +1,9 @@
-import { MoreOutlined } from '@ant-design/icons';
-import { Button, Card, Descriptions, Drawer, Dropdown, Select, Space, Spin, Tabs, Tag, message } from 'antd';
+import { DeleteOutlined, MoreOutlined } from '@ant-design/icons';
+import { Button, Card, Descriptions, Drawer, Dropdown, Modal, Select, Space, Spin, Tabs, Tag, message } from 'antd';
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useParams } from 'react-router-dom';
-import { copyComponentVersion, createComponent, getComponent, getComponents, offlineComponent, publishComponent, updateComponent, validateComponent } from '../../api/components';
+import { copyComponentVersion, createComponent, deleteComponent, getComponent, getComponents, offlineComponent, publishComponent, updateComponent, validateComponent } from '../../api/components';
 import { getSystemConfig } from '../../api/systemConfig';
 import { DataTable } from '../../components/DataTable';
 import { PageHeader } from '../../components/PageHeader';
@@ -57,6 +57,28 @@ export function ComponentLibraryPage() {
   const publish = useMutation({ mutationFn: publishComponent, onSuccess: () => { done('组件发布成功'); setEditing(false); } });
   const copy = useMutation({ mutationFn: copyComponentVersion, onSuccess: component => { done('已复制为新的草稿版本'); setViewId(component.component_id); setEditing(true); } });
   const offline = useMutation({ mutationFn: offlineComponent, onSuccess: () => { done('组件已停用'); setEditing(false); } });
+  const remove = useMutation({
+    mutationFn: deleteComponent,
+    onSuccess: (_result, componentId) => {
+      if (viewId === componentId) {
+        setViewId(undefined);
+        setEditing(false);
+        setValidation(undefined);
+      }
+      qc.removeQueries({ queryKey: ['component', componentId] });
+      qc.invalidateQueries({ queryKey: ['components'] });
+      message.success('草稿组件已删除');
+    },
+  });
+  const confirmDelete = (component: ComponentDef) => Modal.confirm({
+    title: '删除草稿组件？',
+    icon: <DeleteOutlined />,
+    content: `组件 ${component.component_id} 将被永久删除，此操作无法撤销。已发布、已停用或已被模型引用的组件不能删除。`,
+    okText: '删除草稿',
+    cancelText: '取消',
+    okButtonProps: { danger: true },
+    onOk: () => remove.mutateAsync(component.component_id),
+  });
   const save = useMutation({
     mutationFn: (value: Partial<ComponentDef>) => viewId ? updateComponent(viewId, value) : createComponent(value),
     onSuccess: component => {
@@ -150,16 +172,19 @@ export function ComponentLibraryPage() {
                         { key: 'publish', label: String(row.status).toLowerCase() === 'offline' ? '重新发布' : '发布组件', disabled: String(row.status).toLowerCase() === 'published' },
                         { key: 'copy', label: '复制版本' },
                         { key: 'offline', label: '停用组件', danger: true, disabled: String(row.status).toLowerCase() !== 'published' },
+                        { type: 'divider' },
+                        { key: 'delete', label: '删除草稿', icon: <DeleteOutlined />, danger: true, disabled: String(row.status).toLowerCase() !== 'draft' },
                       ],
                       onClick: ({ key }) => {
                         if (key === 'validate') validate.mutate(row.component_id);
                         if (key === 'publish') publish.mutate(row.component_id);
                         if (key === 'copy') copy.mutate(row.component_id);
                         if (key === 'offline') offline.mutate(row.component_id);
+                        if (key === 'delete') confirmDelete(row);
                       },
                     }}
                   >
-                    <Button type="link" icon={<MoreOutlined />}>更多</Button>
+                    <Button type="link" icon={<MoreOutlined />} aria-label="更多">更多</Button>
                   </Dropdown>
                 </Space>
               ),

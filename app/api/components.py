@@ -144,7 +144,7 @@ def delete_component(component_id: str) -> dict:
     if not component:
         raise HTTPException(status_code=404, detail="Component not found")
     if component_lifecycle_status(component) != COMPONENT_DRAFT_STATUS or _component_references(component_id):
-        raise HTTPException(status_code=409, detail="已发布或已被引用组件不能物理删除，只能停用或复制新版本。")
+        raise HTTPException(status_code=409, detail="已发布、已停用或已被引用组件不能物理删除，只能停用或复制新版本。")
     with STORE.lock:
         del STORE.custom_components[component_id]
         STORE.save_runtime()

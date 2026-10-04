@@ -42,7 +42,7 @@ class SchemaDrivenParameterExtractorV2:
         updates = dict(meta.get("parameters") or {})
         for key in removed:
             updates.pop(key, None)
-        parameters = infer_parameter_dimensions({**existing, **imported, **updates})
+        parameters = infer_parameter_dimensions({**existing, **imported, **updates}, input_schema)
         for key in ("horizon", "time", "unit", "initial_unit_output"):
             if key in parameters and existing.get(key) != parameters.get(key):
                 updates[key] = parameters[key]

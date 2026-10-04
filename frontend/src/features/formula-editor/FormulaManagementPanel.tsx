@@ -1,4 +1,4 @@
-import { Alert, Button, Card, Input, Modal, Popover, Progress, Select, Space, Table, Tag, Typography, message } from 'antd';
+import { Alert, Button, Card, Input, Modal, Popover, Progress, Select, Space, Table, Tag, Tooltip, Typography, message } from 'antd';
 import { CheckCircleOutlined, WarningOutlined } from '@ant-design/icons';
 import { useMemo, useState } from 'react';
 import type { FormulaDef, FormulaVersionSnapshot } from '../../types/formula';
@@ -108,10 +108,12 @@ export function FormulaManagementPanel({
     setProgress(0);
     let next = [...formulas];
     let failed = 0;
+    const failedNames: string[] = [];
     for (let index = 0; index < targets.length; index += 1) {
       const formula = targets[index];
       try {
         const { result, artifact } = await compileFormulaAuthoritatively(formula, effectiveCompileContext);
+        const compileError = result.diagnostics.filter(item => item.severity === 'error').map(item => item.message).join('；');
         const updated = markFormulaCompiled({
           ...formula,
           scope: result.scope,
@@ -119,21 +121,28 @@ export function FormulaManagementPanel({
           ast_version: result.ast_version,
           compiler_version: result.compiler_version,
           authoritative_artifact: artifact,
-          compile_status: result.status,
-          compile_error: result.diagnostics.filter(item => item.severity === 'error').map(item => item.message).join('；') || undefined,
+          // preview_only is a participation mode, not a validity result. A
+          // preview formula with semantic errors must still be visible as a
+          // failed compile so the bulk result and status filter agree.
+          compile_status: !result.success ? 'compile_failed' : result.status,
+          compile_error: compileError || undefined,
           updated_at: new Date().toISOString(),
         }, artifact);
-        if (!result.success) failed += 1;
+        if (!result.success) {
+          failed += 1;
+          failedNames.push(formula.name);
+        }
         next = next.map(item => item.formula_id === formula.formula_id ? updated : item);
       } catch (error) {
         failed += 1;
+        failedNames.push(formula.name);
         next = next.map(item => item.formula_id === formula.formula_id ? { ...item, compile_status: 'compile_failed', compile_error: error instanceof Error ? error.message : '权威编译失败' } : item);
       }
       setProgress(Math.round(((index + 1) / targets.length) * 100));
       onChange(next);
     }
     setCompiling(false);
-    if (failed) message.error(`批量编译完成，${failed} 条未通过`);
+    if (failed) message.error(`批量编译完成，${failed} 条未通过：${failedNames.slice(0, 3).join('、')}${failedNames.length > 3 ? '等' : ''}`);
     else message.success(`批量编译完成，${targets.length} 条全部通过`);
   };
 
@@ -145,24 +154,31 @@ export function FormulaManagementPanel({
       title="公式管理工作台"
       extra={(
         <Popover title="依赖分析" content={dependencyDetails} trigger="click">
-          <Button
-            type="text"
-            size="small"
-            icon={dependencyIssueCount
-              ? <WarningOutlined style={{ color: '#d97706' }} />
-              : <CheckCircleOutlined style={{ color: '#16a34a' }} />}
-          >
-            依赖分析：{dependencyIssueCount ? `${dependencyIssueCount} 项` : '通过'}
-          </Button>
+          <Tooltip title="检查未使用变量、参数、集合、未参与目标的变量和重复约束组；不会修改公式。">
+            <Button
+              type="text"
+              size="small"
+              icon={dependencyIssueCount
+                ? <WarningOutlined style={{ color: '#d97706' }} />
+                : <CheckCircleOutlined style={{ color: '#16a34a' }} />}
+            >
+              依赖分析：{dependencyIssueCount ? `${dependencyIssueCount} 项` : '通过'}
+            </Button>
+          </Tooltip>
         </Popover>
-      )}
+        )}
     >
+      <Typography.Paragraph className="formula-management-intro" type="secondary">
+        这里集中维护公式：可筛选、编辑、复制、停用、调整顺序，查看依赖并批量执行后端权威编译。上方“目标函数/约束条件”是阅读视图，本表是维护视图，引用同一份公式，不会生成重复公式。
+      </Typography.Paragraph>
       <Space wrap style={{ marginBottom: 12 }}>
         <Input.Search aria-label="搜索公式" allowClear placeholder="名称、表达式、变量或参数" value={keyword} onChange={event => setKeyword(event.target.value)} style={{ width: 280 }} />
         <Select aria-label="公式类型筛选" value={kind} onChange={setKind} style={{ width: 130 }} options={[{ value: 'all', label: '全部类型' }, { value: 'objective', label: '目标函数' }, { value: 'constraint', label: '约束' }]} />
         <Select aria-label="公式状态筛选" value={status} onChange={setStatus} style={{ width: 150 }} options={[{ value: 'all', label: '全部状态' }, { value: 'compile_valid', label: '编译通过' }, { value: 'compile_failed', label: '编译失败' }, { value: 'preview_only', label: '仅预览' }, { value: 'disabled', label: '已停用' }]} />
         <Select aria-label="公式分组筛选" value={group} onChange={setGroup} style={{ width: 150 }} options={[{ value: 'all', label: '全部分组' }, ...groups.map(value => ({ value, label: value }))]} />
-        <Button type="primary" loading={compiling} onClick={() => { void bulkCompile(); }}>批量权威编译（{filtered.filter(item => item.solve_participation !== 'disabled').length}）</Button>
+        <Tooltip title="逐条调用后端权威编译器，检查语法、符号与维度，并保存可用于求解的编译产物；只处理当前筛选结果中未停用的公式。">
+          <Button type="primary" loading={compiling} onClick={() => { void bulkCompile(); }}>批量权威编译（{filtered.filter(item => item.solve_participation !== 'disabled').length}）</Button>
+        </Tooltip>
       </Space>
       {compiling && <Progress percent={progress} size="small" />}
       <Table
@@ -174,7 +190,11 @@ export function FormulaManagementPanel({
           { title: '名称', render: (_, row) => <div><Typography.Text strong>{row.name}</Typography.Text><div><Tag>{row.business_group || '未分组'}</Tag></div></div> },
           { title: '类型', width: 90, render: (_, row) => row.kind === 'objective' ? '目标' : '约束' },
           { title: '参与状态', width: 100, render: (_, row) => <Tag color={row.solve_participation === 'disabled' ? 'default' : row.solve_participation === 'preview_only' ? 'blue' : 'green'}>{row.solve_participation || 'solve_active'}</Tag> },
-          { title: '编译状态', width: 110, render: (_, row) => <Tag color={row.compile_status === 'compile_valid' || row.compile_status === 'ready' ? 'green' : row.compile_status === 'compile_failed' || row.compile_status === 'error' ? 'red' : 'orange'}>{row.compile_status}</Tag> },
+          { title: '编译状态', width: 110, render: (_, row) => {
+            const diagnostic = row.compile_error || row.diagnostics?.filter(item => item.severity === 'error').map(item => item.message).join('；');
+            const tag = <Tag color={row.compile_status === 'compile_valid' || row.compile_status === 'ready' ? 'green' : row.compile_status === 'compile_failed' || row.compile_status === 'error' ? 'red' : 'orange'}>{row.compile_status}</Tag>;
+            return diagnostic ? <Tooltip title={diagnostic}>{tag}</Tooltip> : tag;
+          } },
           { title: '表达式', ellipsis: true, render: (_, row) => <Typography.Text code>{row.dsl_formula || '—'}</Typography.Text> },
           { title: '操作', width: 330, render: (_, row) => <Space wrap size={4}>
             <Button size="small" onClick={() => onEdit(row)}>编辑</Button>

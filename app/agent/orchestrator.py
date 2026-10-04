@@ -713,6 +713,8 @@ class AgentOrchestrator:
             message = str(first.get("message") or first.get("error") or "参数之间存在冲突")
             return f"参数已收到，但当前不能进入求解：{message}"
         missing = analysis.get("missing_required") or []
+        if missing and default_confirmed:
+            return "已识别到优化任务，但参数还不完整，请继续补充。"
         if missing:
             names = [str(item.get("name") or item.get("key")) for item in missing[:3] if isinstance(item, dict)]
             suffix = f"，还需要：{'、'.join(names)}" if names else ""

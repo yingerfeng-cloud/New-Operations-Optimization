@@ -12,9 +12,20 @@ it('debounces generic series preview and exposes statistics', () => {
   expect(screen.getByText('4')).toBeInTheDocument();
 });
 
+it('keeps an empty preview in the same container and notice style', () => {
+  vi.useFakeTimers();
+  render(<TimeSeriesPreview name="输入序列" unit="MW" labels={[]} values={[]} />);
+  expect(screen.getByRole('region', { name: '输入序列曲线预览（MW）' })).toBeInTheDocument();
+  expect(screen.getByText('暂无曲线预览')).toBeInTheDocument();
+  expect(screen.getByText('填写数值后显示曲线预览。')).toBeInTheDocument();
+  expect(document.querySelector('.time-series-preview .parameter-notice')).toBeInTheDocument();
+  expect(screen.queryByTestId('mock-echarts')).not.toBeInTheDocument();
+});
+
 it('shows non-blocking data quality notices', () => {
   vi.useFakeTimers();
   render(<TimeSeriesPreview name="通用参数" labels={['T1', 'T2', 'T3']} values={[5, '', 'bad']} />);
+  expect(screen.getByText('数据质量提示')).toBeInTheDocument();
   expect(screen.getByText(/存在 1 个空值/)).toBeInTheDocument();
   expect(screen.getByText(/不影响参数提交|不会自动阻止提交/)).toBeInTheDocument();
 });

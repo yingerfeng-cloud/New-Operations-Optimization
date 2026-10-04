@@ -17,6 +17,24 @@ function arrayValue(value: unknown): Row[] {
   return Array.isArray(value) ? value as Row[] : [];
 }
 
+function schemaRows(value: unknown): Row[] {
+  if (Array.isArray(value)) {
+    const rows: Row[] = value
+      .filter(item => item !== undefined && item !== null)
+      .map(item => {
+        if (typeof item === 'string' || typeof item === 'number') return { code: String(item), name: String(item) };
+        return item && typeof item === 'object' && !Array.isArray(item) ? item as Row : {};
+      });
+    return rows.filter(row => Boolean(row.code || row.key || row.name || row.parameter || row.parameter_code));
+  }
+  const object = objectValue(value);
+  return Object.entries(object).map(([code, item]) => (
+    item && typeof item === 'object' && !Array.isArray(item)
+      ? { ...item as Row, code: (item as Row).code || code }
+      : { code, name: code, default_value: item }
+  ));
+}
+
 function text(value: unknown) {
   if (value === undefined || value === null || value === '') return '-';
   if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') return String(value);
@@ -284,14 +302,50 @@ export function ModelComponentPanel({ model, detail = {} }: { model: ModelAsset;
 }
 
 export function ModelRuntimePanel({ model, detail = {} }: { model: ModelAsset; detail?: Detail }) {
-  const schema = objectValue(detail.parameter_schema || model.parameter_schema);
-  const parameters = objectValue(detail.parameters || model.parameters);
-  const schemaRows = arrayValue(schema.parameters || schema.inputs || schema.required || schema.input_schema);
+  const schema = { ...objectValue(model.parameter_schema), ...objectValue(detail.parameter_schema) };
+  const parameters = { ...objectValue(model.parameters), ...objectValue(detail.parameters) };
+  const declaredSchemaRows = [
+    schema.parameters,
+    schema.inputs,
+    schema.required,
+    schema.input_schema,
+    schema.runtime_parameters,
+  ].map(schemaRows).find(rows => rows.length) || [];
+  const semantic = semanticFrom(model, detail);
+  const semanticRows = schemaRows(semantic.parameters);
+  const schemaSource = declaredSchemaRows.length ? 'declared' : semanticRows.length ? 'semantic' : Object.keys(parameters).length ? 'defaults' : 'empty';
+  const fallbackSchemaRows: Row[] = Object.keys(parameters).map(key => ({ code: key, name: key }));
+  const rawSchemaRows: Row[] = declaredSchemaRows.length ? declaredSchemaRows : semanticRows.length ? semanticRows : fallbackSchemaRows;
+  const runtimeSchemaRows = rawSchemaRows.map((row, index) => {
+    const code = String(row.code || row.key || row.name || row.parameter || row.parameter_code || `parameter_${index + 1}`);
+    return {
+      ...row,
+      code,
+      name: row.name || row.label || code,
+      default_value: row.default_value ?? row.defaultValue ?? row.default ?? row.sample_value ?? row.sample ?? parameters[code],
+    };
+  });
   const valueRows = Object.entries(parameters).map(([key, value]) => ({ key, value }));
   return (
     <Space orientation="vertical" size={14} style={{ width: '100%' }}>
       <Card size="small" title="运行参数 Schema">
-        <SmallTable rows={schemaRows} columns={[
+        {schemaSource !== 'declared' && schemaSource !== 'empty' && <Alert
+          showIcon
+          type="info"
+          title="此模型未单独保存运行参数 Schema"
+          description={schemaSource === 'semantic'
+            ? '当前表根据模型语义中的参数定义生成；默认值来自模型的默认运行参数。后续保存版本时会固化为显式 Schema。'
+            : '当前表根据默认运行参数推导，仅用于说明可传入的参数；建议在创建版本时补充名称、维度和必填规则。'}
+          style={{ marginBottom: 12 }}
+        />}
+        {schemaSource === 'empty' && <Alert
+          showIcon
+          type="info"
+          title="模型尚未声明运行参数"
+          description="空表表示当前模型没有可展示的运行参数 Schema，也没有默认运行参数；它不是求解报错。"
+          style={{ marginBottom: 12 }}
+        />}
+        <SmallTable rows={runtimeSchemaRows} columns={[
           { title: '参数', dataIndex: 'code', render: (value, row) => text(value || row.key || row.name) },
           { title: '名称', dataIndex: 'name', render: (value, row) => text(value || row.label) },
           { title: '维度', dataIndex: 'dimension', render: (value, row) => text(value || row.indices) },

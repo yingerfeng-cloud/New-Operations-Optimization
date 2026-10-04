@@ -6,6 +6,52 @@ function formatList(value?: string[]) {
   return (value || []).join(', ');
 }
 
+type SemanticParameter = ModelDraft['semantic']['parameters'][number];
+type SemanticSet = ModelDraft['semantic']['sets'][number];
+
+type ParameterMetadata = SemanticParameter & {
+  role?: string;
+  field_role?: string;
+  semantic_role?: string;
+  ui_role?: string;
+  runtime_editable?: boolean;
+  editable?: boolean;
+  source_system?: string;
+  sourceSystem?: string;
+};
+
+function parameterMetadata(parameter: SemanticParameter) {
+  return parameter as ParameterMetadata;
+}
+
+/**
+ * A few model contracts expose set members as input fields with the same code
+ * as their set (for example `workload` and `cluster`). They are not a second
+ * semantic set; they are the member-list contract used to populate that set.
+ */
+function isSetMemberParameter(parameter: SemanticParameter, sets: SemanticSet[]) {
+  const metadata = parameterMetadata(parameter);
+  const set = sets.find(item => item.code === parameter.code);
+  if (!set) return false;
+
+  const role = String(metadata.role || metadata.field_role || metadata.semantic_role || metadata.ui_role || '').toLowerCase();
+  if (role === 'time_labels') return false;
+  if (role === 'set_members') return true;
+
+  const dimensions = parameter.indices || parameter.dimension || parameter.dimensions || parameter.index_sets || [];
+  const source = String(metadata.sourceType || metadata.source_type || metadata.source_system || metadata.sourceSystem || '').toLowerCase();
+  const setOwner = String(set.managed_by || '').toLowerCase();
+  const isSelfIndexed = dimensions.length === 1 && dimensions[0] === parameter.code;
+
+  return isSelfIndexed
+    || setOwner === 'time_dimension'
+    || metadata.runtime_editable === false
+    || metadata.editable === false
+    || source === 'system'
+    // These are standard contract-owned dimensions in the compute-power model.
+    || ['time', 'time_volume', 'workload', 'cluster'].includes(parameter.code);
+}
+
 function semanticItem({
   key,
   code,
@@ -63,6 +109,21 @@ export function SemanticOverviewCard({
   onEditParameter?: (index: number) => void;
   onEditVariable?: (index: number) => void;
 }) {
+  const managedSetParameters = draft.semantic.parameters.filter(parameter => isSetMemberParameter(parameter, draft.semantic.sets));
+  const ordinaryParameters = draft.semantic.parameters
+    .map((item, index) => ({ item, index }))
+    .filter(({ item }) => !isSetMemberParameter(item, draft.semantic.sets));
+  const managedSetParameterSummary = managedSetParameters.length ? (
+    <div className="semantic-group-note" role="note">
+      <Space wrap size={[4, 4]}>
+        <Tag color="cyan">集合成员字段</Tag>
+        {managedSetParameters.map(item => <Tag key={item.code} color="cyan">{item.name || item.code} · {item.code}</Tag>)}
+      </Space>
+      <Typography.Text type="secondary">
+        这些字段用于提供或同步集合成员，不是第二套集合定义；时间维度和业务系统会按契约管理它们。
+      </Typography.Text>
+    </div>
+  ) : null;
   const groups = [
     {
       key: 'sets',
@@ -78,6 +139,8 @@ export function SemanticOverviewCard({
         color: 'blue',
         onEdit: onEditSet ? () => onEditSet(index) : undefined,
       })),
+      note: undefined,
+      countLabel: undefined,
     },
     {
       key: 'parameters',
@@ -85,7 +148,7 @@ export function SemanticOverviewCard({
       icon: <FunctionOutlined />,
       color: 'green',
       action: onAddParameter,
-      items: draft.semantic.parameters.map((item, index) => semanticItem({
+      items: ordinaryParameters.map(({ item, index }) => semanticItem({
         key: `parameter-${item.code}-${index}`,
         code: item.code,
         name: item.name,
@@ -93,6 +156,10 @@ export function SemanticOverviewCard({
         color: item.required === false ? 'default' : 'green',
         onEdit: onEditParameter ? () => onEditParameter(index) : undefined,
       })),
+      note: managedSetParameterSummary,
+      countLabel: managedSetParameters.length
+        ? `${ordinaryParameters.length} 个参数 + ${managedSetParameters.length} 个集合成员字段`
+        : String(ordinaryParameters.length),
     },
     {
       key: 'variables',
@@ -108,6 +175,8 @@ export function SemanticOverviewCard({
         color: 'purple',
         onEdit: onEditVariable ? () => onEditVariable(index) : undefined,
       })),
+      note: undefined,
+      countLabel: undefined,
     },
     {
       key: 'rules',
@@ -121,6 +190,8 @@ export function SemanticOverviewCard({
         meta: item.compile_status,
         color: item.compile_status === 'ready' ? 'green' : 'orange',
       })),
+      note: undefined,
+      countLabel: undefined,
     },
   ];
 
@@ -138,10 +209,11 @@ export function SemanticOverviewCard({
             <div className="semantic-group-head">
               <Space>
                 <Tag color={group.color} icon={group.icon}>{group.title}</Tag>
-                <Typography.Text type="secondary">{group.items.length}</Typography.Text>
+                <Typography.Text type="secondary">{group.countLabel ?? group.items.length}</Typography.Text>
               </Space>
               {group.action && <Button size="small" type="text" icon={<PlusOutlined />} onClick={group.action} aria-label={`新增${group.title}`} />}
             </div>
+            {group.note}
             <div className="semantic-item-list">
               {group.items.length ? group.items : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无内容" />}
             </div>

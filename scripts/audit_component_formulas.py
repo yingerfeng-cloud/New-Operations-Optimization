@@ -58,7 +58,7 @@ def _compile_context(component: dict[str, Any]) -> tuple[dict[str, Any], dict[st
         code = str(item.get("code") or item.get("key") or item.get("name") or "")
         if code:
             sets[code] = {"code": code, "values": list(item.get("values") or item.get("members") or _set_values(code))}
-    parameters = _rows(component.get("parameters") or component.get("inputs"))
+    parameters = _rows(component.get("parameters") or component.get("inputs")) + _rows(component.get("derived_parameters"))
     variables = _rows(component.get("variables"))
     for item in [*parameters, *variables]:
         for dimension in item.get("dimension") or item.get("indices") or []:
@@ -179,6 +179,7 @@ def audit_components() -> dict[str, Any]:
                     }
                 )
     return {
+        "component_ids": sorted(str(item.get("component_id") or item.get("type")) for item in [*builtins, *fixtures]),
         "component_count": len(builtins) + len(fixtures),
         "builtin_component_count": len(builtins),
         "fixture_component_count": len(fixtures),

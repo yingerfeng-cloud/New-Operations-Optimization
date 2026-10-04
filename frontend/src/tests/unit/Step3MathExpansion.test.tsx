@@ -1,4 +1,5 @@
-import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { EditorView } from '@codemirror/view';
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { Modal } from 'antd';
 import { useState } from 'react';
 import { beforeEach, vi } from 'vitest';
@@ -98,7 +99,10 @@ function Harness({ initial }: { initial: ModelDraft }) {
   return (
     <>
       <Step3MathExpansion draft={draft} onChange={setDraft} />
+      <button onClick={() => setDraft(current => ({ ...current, time_dimension: { ...current.time_dimension!, default_horizon: 4 } }))}>修改时间维度</button>
+      <button onClick={() => setDraft(current => ({ ...current, semantic: { ...current.semantic, variables: current.semantic.variables.map(variable => ({ ...variable, unit: 'MW' })) } }))}>修改符号</button>
       <div data-testid="component-count">{draft.components.length}</div>
+      <pre data-testid="formulas-json">{JSON.stringify(draft.formulas)}</pre>
       <pre data-testid="draft-json">{JSON.stringify(draft.components)}</pre>
     </>
   );
@@ -147,9 +151,26 @@ test('Step3 generic builder composes only backend authoritative fragments into g
   await waitFor(() => expect(screen.getByText('已生成')).toBeInTheDocument());
   expect(screen.getByText('generic_spec 预览')).toBeInTheDocument();
   expect(screen.getByText(/"formula_compiler": "backend_authoritative_v2"/)).toBeInTheDocument();
-  expect(screen.getByText(/"source_formula_id"/)).toBeInTheDocument();
+  expect(screen.getAllByText(/"source_formula_id"/).length).toBeGreaterThan(0);
   expect(expandFormulaMock).toHaveBeenCalledTimes(2);
   expect(legacyCompilerMock).not.toHaveBeenCalled();
+});
+
+test('treats coefficient-times-variable expressions as linear while flagging variable products', () => {
+  const draft = genericDraft();
+  renderWithQueryClient(<Harness initial={draft} />);
+
+  expect(screen.queryByText('存在风险')).not.toBeInTheDocument();
+  expect(screen.getAllByText('待校验').length).toBeGreaterThan(0);
+
+  draft.formulas = [formula('constraint', 'p[t] * reserve[t] <= 10', ['time'])];
+  draft.semantic.variables = [
+    { code: 'p', name: '出力', dimension: ['time'], domain: 'NonNegativeReals' },
+    { code: 'reserve', name: '备用', dimension: ['time'], domain: 'NonNegativeReals' },
+  ];
+  renderWithQueryClient(<Harness initial={draft} />);
+
+  expect(screen.getByText('非线性阻断')).toBeInTheDocument();
 });
 
 test('Step3 exposes weighted objective mode, global direction and normalized summary', () => {
@@ -184,6 +205,23 @@ test('Step3 component builder renders generated constraints and dependencies', (
   expect(screen.getAllByText('p_grid[t] == load[t]').length).toBeGreaterThan(0);
   expect(screen.getAllByText('network_limit').length).toBeGreaterThan(0);
   expect(screen.getAllByText('load_forecast').length).toBeGreaterThan(0);
+});
+
+test('Step3 explains empty component outputs and binding states', () => {
+  const draft = componentDraft();
+  draft.components = [{
+    component_id: 'standalone_component',
+    name: '独立组件',
+    generated_constraints: [{ constraint_id: 'c1', name: '边界', formula: 'volume[t] >= 0' }],
+    parameter_bindings: [{ component_parameter: 'load', model_parameter: 'load_forecast', status: 'bound' }],
+  }];
+
+  renderWithQueryClient(<Harness initial={draft} />);
+
+  expect(screen.getByText(/当前组件不生成目标项/)).toBeInTheDocument();
+  expect(screen.getByText('无上游组件依赖')).toBeInTheDocument();
+  expect(screen.getByText('已绑定')).toBeInTheDocument();
+  expect(screen.queryAllByRole('columnheader', { name: '目标项' })).toHaveLength(0);
 });
 
 test('Step3 template builder opens formula editor for generated formulas', async () => {
@@ -294,4 +332,73 @@ test('Step3 excludes display_only strategy and warns for convex hull approximati
   expect(await screen.findByText('convex_hull_lp_approx 非精确近似')).toBeInTheDocument();
 
   expect(screen.queryByText('display_only - 仅展示')).not.toBeInTheDocument();
+});
+
+async function editExpression(dialog: HTMLElement, expression: string) {
+  const view = EditorView.findFromDOM(within(dialog).getByLabelText('公式表达式'));
+  if (!view) throw new Error('CodeMirror editor missing');
+  await act(async () => view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: expression } }));
+}
+
+test.each(['strict', 'skip_first'] as const)('Step3 compiles, saves and closes editors then adds again with %s', async boundary => {
+  const draft = genericDraft();
+  draft.formulas = [];
+  draft.semantic.variables = [{ code: 'p', name: '出力', dimension: ['time'], domain: 'NonNegativeReals' }];
+  renderWithQueryClient(<Harness initial={draft} />);
+  fireEvent.click(screen.getByRole('button', { name: '新增目标函数' }));
+  let dialog = await screen.findByRole('dialog');
+  expect(within(dialog).getByText('公式编辑器')).toBeInTheDocument();
+  fireEvent.click(within(dialog).getByRole('radio', { name: '最小化' }));
+  await editExpression(dialog, 'sum(p[t] for t in time)');
+  fireEvent.click(within(dialog).getByRole('button', { name: '后端编译与展开' }));
+  await waitFor(() => expect(expandFormulaMock).toHaveBeenCalled());
+  await waitFor(() => expect(within(dialog).getByRole('button', { name: '应用公式' })).toBeEnabled());
+  fireEvent.click(within(dialog).getByRole('button', { name: '应用公式' }));
+  await waitFor(() => {
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(JSON.parse(screen.getByTestId('formulas-json').textContent!)).toEqual([expect.objectContaining({ kind: 'objective', compile_status: 'compile_valid' })]);
+  });
+  fireEvent.click(screen.getByRole('button', { name: '新增约束公式' }));
+  dialog = await screen.findByRole('dialog');
+  expect(within(dialog).queryByRole('radio', { name: '最小化' })).not.toBeInTheDocument();
+  if (boundary === 'skip_first') {
+    fireEvent.mouseDown(within(dialog).getByLabelText('边界策略'));
+    fireEvent.click(await screen.findByText('跳过首时点'));
+  }
+  await editExpression(dialog, 'p[t] >= load[t]');
+  fireEvent.click(within(dialog).getByRole('button', { name: '后端编译与展开' }));
+  await waitFor(() => expect(expandFormulaMock).toHaveBeenCalled());
+  await waitFor(() => expect(within(dialog).getByRole('button', { name: '应用公式' })).toBeEnabled());
+  fireEvent.click(within(dialog).getByRole('button', { name: '应用公式' }));
+  await waitFor(() => {
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(JSON.parse(screen.getByTestId('formulas-json').textContent!)).toEqual([
+      expect.objectContaining({ kind: 'objective' }), expect.objectContaining({ kind: 'constraint', boundary_strategy: boundary, compile_status: 'compile_valid' }),
+    ]);
+  });
+  expect(expandFormulaMock).toHaveBeenLastCalledWith(expect.objectContaining({ model_context: expect.objectContaining({ boundary_strategy: boundary }) }));
+});
+
+test('time and symbol changes while the editor is open require compilation again', async () => {
+  const draft = genericDraft();
+  draft.formulas = [];
+  draft.semantic.variables = [{ code: 'p', name: '出力', dimension: ['time'], domain: 'NonNegativeReals' }];
+  renderWithQueryClient(<Harness initial={draft} />);
+  fireEvent.click(screen.getByRole('button', { name: '新增约束公式' }));
+  const dialog = await screen.findByRole('dialog');
+  await editExpression(dialog, 'p[t] >= load[t]');
+  const compile = within(dialog).getByRole('button', { name: '后端编译与展开' });
+  const apply = within(dialog).getByRole('button', { name: '应用公式' });
+  fireEvent.click(compile);
+  await waitFor(() => expect(apply).toBeEnabled());
+  for (const name of ['修改时间维度', '修改符号']) {
+    fireEvent.click(screen.getByRole('button', { name }));
+    expect(apply).toBeDisabled();
+    fireEvent.click(compile);
+    await waitFor(() => expect(apply).toBeEnabled());
+  }
+  expect(expandFormulaMock).toHaveBeenCalledTimes(3);
+  fireEvent.click(apply);
+  await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+  expect(JSON.parse(screen.getByTestId('formulas-json').textContent!)).toHaveLength(1);
 });

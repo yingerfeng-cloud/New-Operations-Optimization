@@ -18,6 +18,9 @@ from app.storage.memory_store import STORE
 from app.utils import now_text
 from app.explainers.base import ADVISORY_DISCLAIMER
 from app.agent.schema_parameter_analyzer import schema_parameter_analyzer
+from app.variable_contract import normalize_variables
+from app.model_dimensions import extract_dimensions
+from app.services.time_dimension_service import resolve_time_dimension_config
 
 
 class InvocationService:
@@ -48,7 +51,7 @@ class InvocationService:
         }
         sets = {code: list(item.get("values") or item.get("members") or []) for code, item in set_definitions.items()}
         component_spec = semantic_spec.get("component_spec") or {}
-        time_dimension = (semantic_spec.get("ui_metadata") or {}).get("time_dimension") or (component_spec.get("ui_metadata") or {}).get("time_dimension") or {}
+        time_dimension = resolve_time_dimension_config(model=None, semantic_spec=semantic_spec, component_spec=component_spec, generic_spec=semantic_spec.get("generic_spec"), runtime_parameters={})
         label_set = str(time_dimension.get("label_set") or "")
         rows = []
         for param in semantic_spec.get("parameters", []) or []:
@@ -61,7 +64,7 @@ class InvocationService:
             default_value = param.get("default_value", param.get("default"))
             if default_policy == "default_allowed" and default_value is None:
                 default_value = sample_value
-            dimensions = list(param.get("dimension") or [])
+            dimensions = extract_dimensions(param)
             set_definition = set_definitions.get(str(code), {})
             field_role = str(param.get("field_role") or param.get("semantic_role") or "")
             if not field_role and str(code) == label_set:
@@ -90,6 +93,8 @@ class InvocationService:
                     "field_role": field_role or "parameter",
                     "runtime_editable": True if runtime_editable is None else bool(runtime_editable),
                     "sets": {dim: sets.get(str(dim), []) for dim in dimensions},
+                    "time_dimension": time_dimension,
+                    "dispatch_mode": "unit_commitment" if any((p.get("code") or p.get("math_param") or p.get("key")) == "initial_unit_status" for p in semantic_spec.get("parameters") or []) else "economic_dispatch",
                     "validation": validation,
                     **{key: param[key] for key in ("ui_group", "ui_group_label", "ui_group_order", "ui_order", "ui_editor", "ui_help", "ui_data_source") if key in param},
                 }
@@ -101,12 +106,12 @@ class InvocationService:
             "objective_value": "number",
             "variables": [
                 {
-                    "key": item.get("math_var") or item.get("code") or item.get("key"),
+                    "key": item["key"],
                     "name": item.get("name") or item.get("math_var") or item.get("key"),
-                    "dimension": list(item.get("dimension") or []),
+                    "dimension": extract_dimensions(item),
                     "unit": item.get("unit", ""),
                 }
-                for item in semantic_spec.get("variables", []) or []
+                for item in normalize_variables(semantic_spec.get("variables", []) or [])
             ],
             "explanation": "string",
             "explanation_structured": "object",
@@ -213,6 +218,7 @@ class InvocationService:
                 "constraint_checks": result.get("constraint_checks", result.get("constraint_violation_summary", [])),
                 "business_variables": interpreted["business_variables"],
                 "explanation": interpreted["explanation"],
+                "business_explanation": result.get("business_explanation"),
                 "explanation_structured": result.get("explanation_structured"),
                 "profile_name": result.get("profile_name") or "generic",
                 "evidence_package": result.get("evidence_package"),
@@ -296,10 +302,12 @@ class InvocationService:
                     "constraint_checks": result.get("constraint_checks", result.get("constraint_violation_summary", [])),
                     "business_variables": interpreted["business_variables"],
                     "explanation": interpreted["explanation"],
+                    "business_explanation": result.get("business_explanation"),
                     "explanation_structured": result.get("explanation_structured"),
                     "profile_name": result.get("profile_name") or "generic",
                     "evidence_package": result.get("evidence_package"),
                     "explanation_audit": result.get("explanation_audit"),
+                    "disclaimer": ADVISORY_DISCLAIMER,
                     "warnings": result.get("warnings", result.get("diagnosis", [])),
                     "execution_policy": result.get("execution_policy") or "advisory_only",
                     "requires_human_review": bool(result.get("requires_human_review", True)),
@@ -327,7 +335,7 @@ class InvocationService:
         return str(semantic_spec.get("model_code") or semantic_spec.get("code") or model.template_id or model.id)
 
     def _infer_type(self, param: dict[str, Any]) -> str:
-        dimensions = list(param.get("dimension") or [])
+        dimensions = extract_dimensions(param)
         return "number" if not dimensions else "dict"
 
     def _default_policy_for_param(self, param: dict[str, Any]) -> str:

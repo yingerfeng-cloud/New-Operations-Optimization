@@ -38,26 +38,73 @@ function variableRefs(text: string, variableCodes: string[]) {
   return [...text.matchAll(pattern)].map(match => match[0]);
 }
 
-function topLevelAdditiveTerms(expression: string) {
-  const terms: string[] = [];
-  let start = 0;
-  let roundDepth = 0;
-  let squareDepth = 0;
-  for (let index = 0; index < expression.length; index += 1) {
-    const character = expression[index];
-    if (character === '(') roundDepth += 1;
-    else if (character === ')') roundDepth = Math.max(0, roundDepth - 1);
-    else if (character === '[') squareDepth += 1;
-    else if (character === ']') squareDepth = Math.max(0, squareDepth - 1);
-    else if ((character === '+' || character === '-') && roundDepth === 0 && squareDepth === 0 && index > start) {
-      const term = expression.slice(start, index).trim();
-      if (term) terms.push(term);
-      start = index + 1;
+function matchingDelimiter(text: string, closeIndex: number, open: string, close: string) {
+  let depth = 0;
+  for (let index = closeIndex; index >= 0; index -= 1) {
+    if (text[index] === close) depth += 1;
+    else if (text[index] === open) {
+      depth -= 1;
+      if (depth === 0) return index;
     }
   }
-  const tail = expression.slice(start).trim();
-  if (tail) terms.push(tail);
-  return terms;
+  return -1;
+}
+
+function matchingForwardDelimiter(text: string, openIndex: number, open: string, close: string) {
+  let depth = 0;
+  for (let index = openIndex; index < text.length; index += 1) {
+    if (text[index] === open) depth += 1;
+    else if (text[index] === close) {
+      depth -= 1;
+      if (depth === 0) return index;
+    }
+  }
+  return text.length - 1;
+}
+
+function leftOperandStart(text: string, operatorIndex: number) {
+  let cursor = operatorIndex - 1;
+  while (cursor >= 0 && /\s/.test(text[cursor])) cursor -= 1;
+  if (cursor < 0) return operatorIndex;
+
+  if (text[cursor] === ']') {
+    const openIndex = matchingDelimiter(text, cursor, '[', ']');
+    cursor = openIndex >= 0 ? openIndex - 1 : cursor - 1;
+    while (cursor >= 0 && /[A-Za-z0-9_.]/.test(text[cursor])) cursor -= 1;
+    return cursor + 1;
+  }
+  if (text[cursor] === ')') {
+    const openIndex = matchingDelimiter(text, cursor, '(', ')');
+    return openIndex >= 0 ? openIndex : cursor;
+  }
+
+  while (cursor >= 0 && /[A-Za-z0-9_.]/.test(text[cursor])) cursor -= 1;
+  return cursor + 1;
+}
+
+function rightOperandEnd(text: string, operatorIndex: number) {
+  let cursor = operatorIndex + 1;
+  while (cursor < text.length && /\s/.test(text[cursor])) cursor += 1;
+  if (cursor >= text.length) return cursor;
+
+  if (text[cursor] === '(') return matchingForwardDelimiter(text, cursor, '(', ')') + 1;
+
+  while (cursor < text.length && /[A-Za-z0-9_.]/.test(text[cursor])) cursor += 1;
+  if (text[cursor] === '(') cursor = matchingForwardDelimiter(text, cursor, '(', ')') + 1;
+  while (cursor < text.length && text[cursor] === '[') cursor = matchingForwardDelimiter(text, cursor, '[', ']') + 1;
+  return cursor;
+}
+
+function variableProduct(expression: string, variableCodes: string[]) {
+  for (let index = 0; index < expression.length; index += 1) {
+    if (expression[index] !== '*' || expression[index - 1] === '*' || expression[index + 1] === '*') continue;
+    const left = expression.slice(leftOperandStart(expression, index), index);
+    const right = expression.slice(index + 1, rightOperandEnd(expression, index));
+    const leftVariables = variableRefs(left, variableCodes);
+    const rightVariables = variableRefs(right, variableCodes);
+    if (leftVariables.length && rightVariables.length) return { leftVariables, rightVariables };
+  }
+  return undefined;
 }
 
 function baseName(expression: string) {
@@ -80,11 +127,8 @@ export function analyzeFormulaText(expression: string, variableCodes: string[], 
   const rows: NonlinearDiagnostic[] = [];
   const refs = variableRefs(text, variableCodes);
   const relationSides = text.split(/==|<=|>=/).map(side => side.trim()).filter(Boolean);
-  const productTerm = relationSides
-    .flatMap(topLevelAdditiveTerms)
-    .find(term => term.includes('*') && term.split('*').filter(part => variableRefs(part, variableCodes).length > 0).length >= 2);
-  const factors = productTerm?.split('*').map(item => item.trim()) || [];
-  const factorVars = factors.map(item => variableRefs(item, variableCodes)[0]).filter(Boolean);
+  const product = relationSides.map(side => variableProduct(side, variableCodes)).find(Boolean);
+  const factorVars = product ? [...product.leftVariables, ...product.rightVariables] : [];
   if (factorVars.length >= 2) {
     const pair = factorVars.slice(0, 2);
     rows.push({

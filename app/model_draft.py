@@ -53,6 +53,7 @@ def create_model_draft_from_template(template: dict[str, Any]) -> dict[str, Any]
         draft_item = {
             "component_id": component_type,
             "type": component_type,
+            "version": item.get("version") or definition.get("version"),
             "enabled": item.get("enabled", True),
             "enabled_when": deepcopy(item.get("enabled_when")),
             "required": item.get("required", definition.get("required", False)),
@@ -494,6 +495,9 @@ def build_component_spec_from_draft(draft: dict[str, Any]) -> dict[str, Any]:
 def _component_spec_item_from_draft(item: dict[str, Any]) -> dict[str, Any]:
     component_type = item.get("type") or item.get("component_id")
     row: dict[str, Any] = {"type": component_type}
+    version = item.get("version") or (item.get("definition") or {}).get("version")
+    if version:
+        row["version"] = version
     if item.get("enabled_when") is not None:
         row["enabled_when"] = deepcopy(item["enabled_when"])
     config = deepcopy(item.get("config") or {})
@@ -679,6 +683,7 @@ def build_mathematical_expansion(draft: dict[str, Any]) -> dict[str, Any]:
                 "dsl_formula": _constraint_formula(constraint),
                 "expression": _constraint_formula(constraint),
                 "display_formula": _constraint_formula(constraint),
+                "constraint_id": constraint.get("constraint_id"),
                 "business_meaning": constraint.get("business_meaning"),
                 "source_component": constraint.get("source_component"),
                 "source": constraint.get("source"),
@@ -690,6 +695,13 @@ def build_mathematical_expansion(draft: dict[str, Any]) -> dict[str, Any]:
                 "x": constraint.get("x"),
                 "y": constraint.get("y"),
                 "solve_participation": constraint.get("solve_participation"),
+                # Keep compiler metadata in the generated expansion.  It is
+                # needed when a model asset is reopened and its formulas are
+                # reconstructed in the browser (especially for t-1/t+1
+                # boundary checks).
+                "boundary_strategy": constraint.get("boundary_strategy"),
+                "scope": deepcopy(constraint.get("scope") or []),
+                "foreach": deepcopy(constraint.get("foreach") or constraint.get("indices") or []),
             }
         )
     for component in draft.get("components", []) or []:
@@ -803,6 +815,7 @@ def _draft_components_from_component_spec(component_spec: dict[str, Any]) -> lis
         draft_item = {
             "component_id": component_type,
             "type": component_type,
+            "version": item.get("version") or definition.get("version"),
             "enabled": item.get("enabled", True),
             "enabled_when": deepcopy(item.get("enabled_when")),
             "required": item.get("required", definition.get("required", False)),

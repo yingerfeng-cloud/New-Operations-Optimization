@@ -1,6 +1,10 @@
 from __future__ import annotations
 
 from typing import Any
+from copy import deepcopy
+from app.services.result_interpreter import result_interpreter
+from app.variable_contract import normalize_variables
+from app.model_dimensions import extract_dimensions
 
 from app.explainers.constraint_analyzer import constraint_analyzer
 from app.explainers.metric_engine import metric_engine
@@ -33,9 +37,8 @@ class EvidenceBuilder:
 
         variables = result.get("variable_values") or (result.get("result") or {}).get("variable_values") or {}
         variable_schema = {
-            str(item.get("math_var") or item.get("code") or item.get("key")): item
-            for item in model_spec.get("variables") or []
-            if item.get("math_var") or item.get("code") or item.get("key")
+            item["key"]: item
+            for item in normalize_variables(model_spec.get("variables") or [])
         }
         for item in declared_explanation.get("variables") or []:
             if item.get("key"):
@@ -68,6 +71,7 @@ class EvidenceBuilder:
         if not checks:
             limitations.append("结果未返回可核验的约束检查明细。")
         objective = declared_explanation.get("objective") or {}
+        business_outcomes = result_interpreter.business_evidence(model_spec, variables) if status in {"success", "optimal", "feasible", "completed"} else {}
         return {
             "evidence_schema_version": "2.0",
             "solver": {
@@ -90,6 +94,8 @@ class EvidenceBuilder:
                 "skill_definition_hash": definition.get("definition_hash"),
                 "explanation_spec_version": declared_explanation.get("schema_version") or "default-profile",
                 "objective": objective,
+                "execution_policy": (definition.get("execution_policy") or {}).get("mode") or "advisory_only",
+                "requires_human_review": bool((definition.get("execution_policy") or {}).get("requires_human_review", True)),
             },
             "inputs_summary": {
                 "parameters": dict(parameters or {}),
@@ -99,6 +105,8 @@ class EvidenceBuilder:
             "variables_summary": variable_summaries,
             "constraint_checks": checks,
             "derived_metrics": metrics,
+            "formatter": self._formatter_evidence(result, model_spec, status),
+            "business_outcomes": business_outcomes,
             "risk_notes": risks,
             "manual_review_points": list(
                 explanation_policy.get("manual_review_points")
@@ -111,7 +119,32 @@ class EvidenceBuilder:
                 + risk_limits
                 + list(explanation_policy.get("limitations") or explanation_policy.get("explanation_limits") or [])
             ),
-            "evidence_index": self._evidence_index(variable_summaries, checks, metrics),
+            "evidence_index": {**self._evidence_index(variable_summaries, checks, metrics), "business_outcomes": [f"business_outcomes.{key}" for key in business_outcomes if key != "facts"]},
+        }
+
+    def _formatter_evidence(self, result: dict[str, Any], spec: dict[str, Any], status: str) -> dict[str, Any]:
+        if status not in {"success", "optimal", "feasible", "completed"}:
+            return {}
+        # Reprocessing must retain the original deterministic formatter evidence.
+        previous = (result.get("evidence_package") or {}).get("formatter")
+        if isinstance(previous, dict):
+            return deepcopy(previous)
+        explanation = result.get("business_explanation") or {}
+        if isinstance(explanation, dict) and explanation.get("grounded_on") == "evidence_package":
+            explanation = {}
+        declared = {
+            str(item.get("key") or item.get("code")): item
+            for source in (spec, spec.get("component_spec") or {})
+            for item in (source.get("metrics_config") or {}).get("metrics") or []
+        }
+        return {
+            "source": "SolveResultFormatter",
+            "summary": str(explanation.get("summary") or "") if isinstance(explanation, dict) else str(explanation),
+            "explanation": deepcopy(explanation),
+            "metrics": {
+                key: {"value": deepcopy(value), "unit": declared.get(key, {}).get("unit") or "", "label": declared.get(key, {}).get("name") or key, "source": f"result.metrics.{key}"}
+                for key, value in (result.get("metrics") or {}).items()
+            },
         }
 
     def _constraint_risks(self, checks: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -150,7 +183,7 @@ class EvidenceBuilder:
             "name": name,
             "business_name": meta.get("name") or name,
             "unit": meta.get("unit") or "",
-            "dimension": list(meta.get("dimension") or meta.get("dimensions") or []),
+            "dimension": extract_dimensions(meta),
             "min": min(flat) if flat else None,
             "max": max(flat) if flat else None,
             "sum": round(sum(flat), 8) if flat else None,
@@ -204,6 +237,7 @@ class EvidenceBuilder:
         metrics: dict[str, Any],
     ) -> dict[str, Any]:
         return {
+            "formatter": ["formatter.summary", "formatter.metrics"],
             "solver": [
                 "solver.status",
                 "solver.termination_condition",

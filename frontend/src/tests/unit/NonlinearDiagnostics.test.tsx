@@ -33,6 +33,14 @@ test('variable names do not match longer parameter prefixes', () => {
   expect(diagnostics.some(item => item.nonlinear_type === 'bilinear')).toBe(false);
 });
 
+test('separate linear products inside an additive expression are not marked bilinear', () => {
+  const diagnostics = analyzeFormulaText(
+    'power[c,t] == pue[c,t] * (idle_power[c] * cluster_on[c,t] + gpu_dynamic_power[c] * cluster_gpu_used[c,t])',
+    ['power', 'cluster_on', 'cluster_gpu_used'],
+  );
+  expect(diagnostics.some(item => item.nonlinear_type === 'bilinear')).toBe(false);
+});
+
 function nonlinearDraft(): ModelDraft {
   const draft = createInitialDraft();
   draft.basic_info.name = '非线性诊断测试模型';

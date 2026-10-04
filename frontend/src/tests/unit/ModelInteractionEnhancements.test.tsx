@@ -14,6 +14,8 @@ test('step section navigation renders anchors and selects a section', () => {
   expect(windowScrollSpy.mock.calls.filter(([event]) => event === 'scroll')).toHaveLength(0);
   fireEvent.click(screen.getByRole('button', { name: '目标策略' }));
   expect(screen.getByRole('button', { name: '目标策略' })).toHaveClass('active');
+  fireEvent.scroll(scrollContainer);
+  expect(screen.getByRole('button', { name: '目标策略' })).toHaveClass('active');
 });
 
 test('model inspection opens with summary, blockers and navigation', () => {

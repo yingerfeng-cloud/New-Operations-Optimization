@@ -647,9 +647,14 @@ class SkillRegistry:
                 canonical = meta.get("canonical_api_skill_name")
                 if canonical == skill_name or name in candidates:
                     package_status = self._local_agent_package_status(path)
+                    state = str(
+                        meta.get("state")
+                        or ("enabled" if meta.get("enabled") else meta.get("status") or "draft")
+                    )
                     available[name] = {
                         "name": name,
-                        "enabled": str(meta.get("state") or ("enabled" if meta.get("enabled") else meta.get("status") or "draft")) == "enabled",
+                        "state": state,
+                        "enabled": state == "enabled",
                         "validation": {"status": package_status, "errors": [] if package_status == "valid" else [{"code": "invalid_agent_package", "message": "Agent Skill package is incomplete"}]},
                     }
         except Exception:
@@ -659,11 +664,18 @@ class SkillRegistry:
                 item = available[name]
                 validation = item.get("validation") or {}
                 enabled = bool(item.get("enabled", True)) and validation.get("status") == "valid"
+                lifecycle_status = (
+                    "enabled"
+                    if enabled
+                    else validation.get("status")
+                    if validation.get("status") != "valid"
+                    else str(item.get("state") or "draft")
+                )
                 return {
                     "agent_enabled": enabled,
                     "agent_skill_name": name,
                     "has_agent_package": True,
-                    "agent_package_status": "enabled" if enabled else (validation.get("status") or "disabled"),
+                    "agent_package_status": lifecycle_status,
                     "agent_validation": validation,
                     "disabled_reason": None if enabled else "Agent Skill package is disabled or invalid",
                 }

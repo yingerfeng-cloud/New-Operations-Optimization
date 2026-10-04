@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from typing import Any
+from app.variable_contract import normalize_variables
+from app.model_dimensions import extract_dimensions
 
 
 class ResultInterpreter:
@@ -13,8 +15,40 @@ class ResultInterpreter:
             "explanation": explanation,
         }
 
+    def business_evidence(self, semantic_spec: dict[str, Any], variable_values: dict[str, Any]) -> dict[str, Any]:
+        """Measured business outcomes shared by every result delivery path."""
+        variables = self._business_variables(semantic_spec, variable_values)
+        evidence: dict[str, Any] = {"facts": []}
+        output = variables.get("unit_output") or {}
+        by_unit: dict[str, float] = {}
+        for row in output.get("rows") or []:
+            unit = row.get("unit") or row.get("resource")
+            if unit is not None and isinstance(row.get("value"), (int, float)):
+                by_unit[str(unit)] = by_unit.get(str(unit), 0.0) + float(row["value"])
+        if by_unit:
+            leading_unit = max(by_unit, key=by_unit.get)
+            unit = next((row.get("unit_name") for row in output["rows"] if row.get("unit_name")), "")
+            remaining_output = sum(value for key, value in by_unit.items() if key != leading_unit)
+            evidence["unit_output"] = {"by_unit": by_unit, "leading_unit": leading_unit, "total_output": sum(by_unit.values()), "remaining_output": remaining_output, "unit": unit}
+            remaining_text = f"其余机组补足剩余负荷，出力合计 {remaining_output:g}{unit}。" if remaining_output > 0 else ""
+            evidence["facts"].append({
+                "text": f"机组出力计划中 {leading_unit} 承担主要出力，各时段出力合计 {sum(by_unit.values()):g}{unit}。{remaining_text}",
+                "evidence_refs": ["business_outcomes.unit_output", "variables_summary.unit_output"],
+            })
+        plan = (variables.get("unit_commitment_plan") or {}).get("rows") or []
+        if plan:
+            online_units = sorted({str(row["unit"]) for row in plan if float(row.get("unit_on") or 0) >= 0.5})
+            startups = sum(float(row.get("startup") or 0) >= 0.5 for row in plan)
+            shutdowns = sum(float(row.get("shutdown") or 0) >= 0.5 for row in plan)
+            evidence["unit_commitment"] = {"online_units": online_units, "startup_count": startups, "shutdown_count": shutdowns}
+            evidence["facts"].append({
+                "text": f"机组启停计划包含 {startups} 次启动和 {shutdowns} 次停机，在线机组为 {', '.join(online_units) or '无'}。",
+                "evidence_refs": ["business_outcomes.unit_commitment", "variables_summary.unit_on", "variables_summary.unit_startup"],
+            })
+        return evidence
+
     def _business_variables(self, semantic_spec: dict[str, Any], variable_values: dict[str, Any]) -> dict[str, Any]:
-        variables = semantic_spec.get("variables", []) or []
+        variables = normalize_variables(semantic_spec.get("variables", []) or [])
         names = {
             str(item.get("math_var") or item.get("code") or item.get("key") or item.get("name")): item
             for item in variables
@@ -24,7 +58,7 @@ class ResultInterpreter:
         for name, values in variable_values.items():
             meta = names.get(name, {})
             label = str(meta.get("name") or name)
-            dimensions = list(meta.get("dimension") or [])
+            dimensions = extract_dimensions(meta)
             rows = []
             if isinstance(values, dict):
                 for key, value in values.items():
@@ -39,10 +73,13 @@ class ResultInterpreter:
         return output
 
     def _explain(self, semantic_spec: dict[str, Any], result: dict[str, Any], business_variables: dict[str, Any]) -> str:
+        structured = result.get("explanation_structured") or {}
+        if structured.get("grounded_on") == "evidence_package" and structured.get("summary"):
+            return str(structured["summary"])
         scenario = str(semantic_spec.get("model_code") or semantic_spec.get("code") or semantic_spec.get("scenario") or "").lower()
         objective = result.get("objective_value")
         status = str(result.get("status") or "").upper()
-        if status in {"FAILED", "TIMEOUT", "CANCELLED"}:
+        if status in {"FAILED", "INFEASIBLE", "TIMEOUT", "CANCELLED"}:
             solver_route_error = self._solver_route_error(result)
             if solver_route_error:
                 error_code = str(solver_route_error.get("error_code") or "").upper()

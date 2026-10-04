@@ -1,7 +1,8 @@
-import { Alert, Button, InputNumber, Modal, Select, Space, Table } from 'antd';
+import { Button, InputNumber, Modal, Select, Space, Table } from 'antd';
 import { useEffect, useMemo, useState } from 'react';
 import type { RuntimeField } from '../../time-dimension';
 import { ParameterBatchPasteModal } from './ParameterBatchPasteModal';
+import { ParameterNotice } from './ParameterNotice';
 
 export function FullscreenMatrixEditor({ open, field, value, rowLabels, columnLabels, onCancel, onSave }: {
   open: boolean; field: RuntimeField; value: unknown; rowLabels: string[]; columnLabels: string[]; onCancel: () => void; onSave: (value: unknown[][]) => void;
@@ -23,7 +24,7 @@ export function FullscreenMatrixEditor({ open, field, value, rowLabels, columnLa
         <Select value={selectedColumn} onChange={setSelectedColumn} options={columnLabels.map((label, value) => ({ value, label }))} />
         <Button onClick={() => setDraft(current => current.map(row => row.map((cell, column) => column === selectedColumn ? '' : cell)))}>清空列</Button>
       </Space></div>
-      {missing > 0 && <Alert className="section-gap-tight" type="warning" showIcon title={`有 ${missing} 个缺失值，已在表格中高亮`} />}
+      {missing > 0 && <ParameterNotice className="section-gap-tight" type="warning" title="数据完整性提示" description={`有 ${missing} 个缺失值，已在表格中高亮。`} />}
       <Table className="fullscreen-matrix-table" size="small" sticky pagination={rowLabels.length > 50 ? { pageSize: 50, showSizeChanger: false } : false} scroll={{ x: Math.max(720, columnLabels.length * 116), y: 'calc(100vh - 300px)' }} dataSource={rowData} columns={[{ title: field.dimension[0], dataIndex: 'label', fixed: 'left', width: 140 }, ...columnLabels.map((label, column) => ({ title: label, width: 116, render: (_: unknown, row: { index: number }) => { const cell = draft[row.index]?.[column]; return <div className={cell === '' || cell == null ? 'matrix-cell-missing' : ''}><InputNumber aria-label={`${field.name} ${rowLabels[row.index]} ${label}`} value={typeof cell === 'number' ? cell : undefined} onChange={next => update(row.index, column, next ?? '')} /></div>; } }))]} />
     </Modal>
     {pasteOpen && <ParameterBatchPasteModal open title={field.name} mode="matrix" expectedRows={rowLabels.length} expectedColumns={columnLabels.length} onCancel={() => setPasteOpen(false)} onImport={next => { setDraft(next as unknown[][]); setPasteOpen(false); }} />}

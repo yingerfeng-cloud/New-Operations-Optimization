@@ -28,6 +28,10 @@ class GenericExplainer(BaseExplainer):
         if error_code:
             fact_items.append({"text": self._failure_message(error_code, error_text), "evidence_refs": ["solver.status", "solver.error"]})
         else:
+            formatter = evidence_package.get("formatter") or {}
+            if formatter.get("summary"):
+                fact_items.append({"text": str(formatter["summary"]), "evidence_refs": ["formatter.summary", "formatter.metrics"]})
+            fact_items.extend((evidence_package.get("business_outcomes") or {}).get("facts") or [])
             fact_items.append({"text": f"求解状态为 {solver.get('status') or 'unknown'}。", "evidence_refs": ["solver.status", "solver.termination_condition"]})
             if solver.get("objective_value") is not None:
                 objective = (evidence_package.get("model") or {}).get("objective") or {}
@@ -37,6 +41,9 @@ class GenericExplainer(BaseExplainer):
                     "text": f"{objective_name}的求解值为 {solver['objective_value']}{unit}。",
                     "evidence_refs": ["solver.objective_value", "model.objective"],
                 })
+            if (evidence_package.get("model") or {}).get("execution_policy") == "advisory_only":
+                review_text = "所有方案须经人工复核。" if (evidence_package.get("model") or {}).get("requires_human_review", True) else ""
+                fact_items.append({"text": f"平台不会自动下发生产控制指令。{review_text}", "evidence_refs": ["model.execution_policy", "model.requires_human_review"]})
             for key, metric in (evidence_package.get("derived_metrics") or {}).items():
                 value = metric.get("value")
                 unit = metric.get("unit") or ""
@@ -80,7 +87,11 @@ class GenericExplainer(BaseExplainer):
         facts = [str(item["text"]) for item in fact_items]
         inferences = [str(item["text"]) for item in inference_items]
         recommendations = [str(item["text"]) for item in recommendation_items]
-        summary = facts[0] if facts else "未获得可解释的求解事实。"
+        summary_items = fact_items[:1] if error_code else [
+            item for item in fact_items
+            if any(ref in {"formatter.summary", "solver.status", "solver.objective_value", "model.execution_policy"} or ref.startswith("business_outcomes.") for ref in item.get("evidence_refs") or [])
+        ]
+        summary = " ".join(str(item["text"]) for item in summary_items) if summary_items else "未获得可解释的求解事实。"
         return {
             "explanation_schema_version": "2.0",
             "facts": facts,

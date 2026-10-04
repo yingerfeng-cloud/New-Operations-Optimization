@@ -7,8 +7,9 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.agent.skill_router import agent_skill_router
-from app.agent_skill_registry import agent_skill_registry
+from app.agent_skill_registry import AgentSkillRegistry, agent_skill_registry
 from app.main import app
+from app.services.skill_registry import SkillRegistry
 from app.utils import has_highspy, has_pyomo
 
 
@@ -31,6 +32,49 @@ def test_agent_skill_binds_existing_api_skill() -> None:
     detail = client.get("/api/agent/agent-skills/economic_dispatch").json()
     assert detail["canonical_api_skill_name"] == "run_economic_dispatch"
     assert detail["api_skill_available"] is True
+
+
+def test_platform_skill_reports_agent_lifecycle_state(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    package = tmp_path / "draft_agent"
+    required_files = [
+        "skill.yaml",
+        "SKILL.md",
+        "adapter.py",
+        "input_schema.json",
+        "output_schema.json",
+        "examples.json",
+        "tests/sample_input.json",
+        "tests/missing_parameters.json",
+        "tests/expected_request.json",
+        "prompts/parameter_collection.md",
+        "prompts/default_confirmation.md",
+        "prompts/result_explanation.md",
+        "prompts/error_handling.md",
+    ]
+    for filename in required_files:
+        path = package / filename
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("{}\n", encoding="utf-8")
+    (package / "skill.yaml").write_text(
+        "name: draft_agent\nstate: draft\ncanonical_api_skill_name: run_demo\n",
+        encoding="utf-8",
+    )
+    temporary_registry = AgentSkillRegistry(tmp_path)
+    monkeypatch.setattr("app.agent_skill_registry.agent_skill_registry", temporary_registry)
+
+    registry = SkillRegistry()
+    draft = registry._agent_binding("run_demo", "demo", {"agent_skill_name": "draft_agent"})
+    assert draft["has_agent_package"] is True
+    assert draft["agent_enabled"] is False
+    assert draft["agent_package_status"] == "draft"
+
+    (package / "skill.yaml").write_text(
+        "name: draft_agent\nstate: enabled\ncanonical_api_skill_name: run_demo\n",
+        encoding="utf-8",
+    )
+    enabled = registry._agent_binding("run_demo", "demo", {"agent_skill_name": "draft_agent"})
+    assert enabled["agent_enabled"] is True
+    assert enabled["agent_package_status"] == "enabled"
 
 
 def test_agent_skill_parameter_example_compatibility_route_reuses_agent_skill_service() -> None:

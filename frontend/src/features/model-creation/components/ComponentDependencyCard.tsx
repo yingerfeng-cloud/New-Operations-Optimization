@@ -39,7 +39,10 @@ export function ComponentDependencyCard({
       <div className="card-title-row">
         <div>
           <Typography.Title level={5}>组件与依赖</Typography.Title>
-          <Typography.Paragraph>上游组件依赖与参数绑定是两类独立关系；可确定的同名同维参数会自动绑定，其余项进入绑定面板。</Typography.Paragraph>
+          <Typography.Paragraph>
+            上游组件依赖决定“哪个组件先生成、哪个组件使用它的输出”；只有组件引用其他组件输出时才需要配置，无上游依赖是正常状态。
+            参数绑定决定“组件输入从哪个模型/运行参数取得”；标记为必填的输入需要绑定，可确定的同名同维参数会自动绑定，其余项进入绑定面板。
+          </Typography.Paragraph>
         </div>
         <Space wrap>
           <Tag color={draft.components.length ? 'blue' : 'default'}>{draft.components.length} 个组件</Tag>
@@ -118,10 +121,10 @@ export function ComponentDependencyCard({
               </span>
               <span className="component-dependency-actions">
                 <Tag color={dependencyIssueCount ? 'red' : 'green'}>
-                  {dependencyIssueCount ? `依赖异常 ${dependencyIssueCount} 项` : '依赖完整'}
+                  {dependencyIssueCount ? `上游依赖：异常 ${dependencyIssueCount} 项` : '上游依赖：完整'}
                 </Tag>
                 <Tag color={missingRows.length ? 'orange' : 'green'}>
-                  {missingRows.length ? `缺少 ${missingRows.length} 个绑定` : rows.length ? '参数已绑定' : '无需绑定'}
+                  {missingRows.length ? `参数绑定：缺少 ${missingRows.length} 项` : rows.length ? '参数绑定：已完成' : '参数绑定：无需配置'}
                 </Tag>
                 <Button
                   size="small"

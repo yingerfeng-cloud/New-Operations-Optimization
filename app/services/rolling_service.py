@@ -2,6 +2,7 @@
 
 import time
 import uuid
+from copy import deepcopy
 from typing import Any
 
 from fastapi import HTTPException
@@ -9,6 +10,8 @@ from pydantic import BaseModel, Field
 
 from app.schemas.solve import SolveRequest
 from app.services.job_service import job_service
+from app.services.model_service import model_service
+from app.model_dimensions import extract_dimensions
 from app.services.result_service import result_service
 from app.services.template_service import template_library
 from app.storage.memory_store import STORE
@@ -16,19 +19,33 @@ from app.storage.memory_store import STORE
 
 class RollingRunRequest(BaseModel):
     model_template_code: str
-    horizon: int = 24
-    step_size: int = 1
-    rounds: int = 1
+    model_id: str | None = None
+    horizon: int = Field(default=24, ge=1)
+    step_size: int = Field(default=1, ge=1)
+    rounds: int = Field(default=1, ge=1)
     runtime_parameters: dict[str, Any] = Field(default_factory=dict)
 
 
 class RollingService:
     def run(self, req: RollingRunRequest) -> dict[str, Any]:
+        if req.step_size > req.horizon:
+            raise HTTPException(status_code=422, detail="step_size cannot exceed horizon")
         template = template_library.get_template(req.model_template_code)
+        # Resolve exactly once. Code routing retains the production publish gate;
+        # explicit IDs allow trial runs and every round pins the same version.
+        try:
+            selected = model_service.resolve_model(model_id=req.model_id, model_code=None if req.model_id else req.model_template_code, require_published=not bool(req.model_id))
+        except HTTPException as exc:
+            if not req.model_id and exc.status_code == 404 and model_service.find_models_by_code(req.model_template_code):
+                raise HTTPException(status_code=409, detail={"code": "MODEL_NOT_PUBLISHED", "message": "该 model_code 当前没有已发布版本；试运行仅允许显式传入 model_id 调试。", "model_code": req.model_template_code}) from exc
+            raise
+        model_id = selected.id
+        time_keys = {str(item.get("math_param") or item.get("code") or item.get("key")) for item in selected.semantic_spec.get("parameters") or [] if "time" in extract_dimensions(item)}
         rolling_id = f"ROLL-{uuid.uuid4().hex[:10].upper()}"
         job = {
             "rolling_job_id": rolling_id,
             "model_template_code": req.model_template_code,
+            "model_id": model_id,
             "horizon": req.horizon,
             "step_size": req.step_size,
             "current_round": 0,
@@ -43,14 +60,16 @@ class RollingService:
         for round_index in range(req.rounds):
             window_start = round_index * req.step_size
             window_end = window_start + req.horizon
-            runtime = self._window(sample, window_start, req.horizon)
-            if current_soc is not None:
-                runtime["initial_soc"] = current_soc
+            runtime = dict(sample)
+            failure_reason = None
             result: dict[str, Any] = {}
             task_id = ""
             status = "FAILED"
             try:
-                task = job_service.create_task(SolveRequest(model_code=req.model_template_code, horizon=req.horizon, parameters=runtime, async_run=False))
+                runtime = self._window(sample, window_start, req.horizon, time_keys=time_keys)
+                if current_soc is not None:
+                    runtime["initial_soc"] = current_soc
+                task = job_service.create_task(SolveRequest(model_id=model_id, horizon=req.horizon, parameters=runtime, async_run=False))
                 task_id = task.id
                 for _ in range(120):
                     current = job_service.get_task(task.id)
@@ -59,16 +78,22 @@ class RollingService:
                     time.sleep(0.1)
                 result = result_service.get_result(task.id)
                 status = str(result.get("status", current.status))
+                if status != "SUCCESS":
+                    failure_reason = {"code": status, "message": current.error or result.get("error") or "Rolling solve failed", "details": result.get("solver_route_error") or {}}
             except Exception as exc:
-                result = {"status": "FAILED", "error": str(exc)}
+                failure_reason = {"code": "ROLLING_INPUT_ERROR" if isinstance(exc, HTTPException) else "ROLLING_RUNTIME_ERROR", "message": str(exc.detail) if isinstance(exc, HTTPException) else str(exc), "details": exc.detail if isinstance(exc, HTTPException) else {}, "http_status": exc.status_code if isinstance(exc, HTTPException) else None}
+                result = {"status": "FAILED", "error": failure_reason}
             entry = {
                 "round": round_index + 1,
                 "job_id": task_id,
+                "task_id": task_id or None,
+                "model_id": model_id,
+                "failure_reason": failure_reason,
                 "status": status,
                 "window_start": window_start,
                 "window_end": window_end,
                 "execute_steps": list(range(window_start, window_start + req.step_size)),
-                "executed_steps": self._executed_steps(result, runtime, req.step_size),
+                "executed_steps": self._executed_steps(result, runtime, req.step_size) if status == "SUCCESS" else [],
                 "summary": result.get("business_explanation", {}).get("summary", "") if isinstance(result.get("business_explanation"), dict) else "",
                 "metrics": result.get("metrics", {}),
                 "initial_soc": current_soc,
@@ -76,7 +101,7 @@ class RollingService:
             next_soc = self._executed_soc(result, runtime, req.step_size, current_soc)
             entry["end_soc"] = next_soc
             entry["final_soc"] = next_soc
-            entry["next_instruction"] = self._next_instruction(entry["executed_steps"], next_soc)
+            entry["next_instruction"] = self._next_instruction(entry["executed_steps"], next_soc) if status == "SUCCESS" else None
             if status == "SUCCESS":
                 success_count += 1
                 current_soc = next_soc
@@ -103,11 +128,23 @@ class RollingService:
     def history(self, rolling_job_id: str) -> list[dict[str, Any]]:
         return self.get(rolling_job_id)["history_results"]
 
-    def _window(self, params: dict[str, Any], start: int, horizon: int) -> dict[str, Any]:
-        result = dict(params)
-        for key, value in params.items():
-            if isinstance(value, list) and len(value) >= start + horizon:
-                result[key] = value[start : start + horizon]
+    def _window(self, params: dict[str, Any], start: int, horizon: int, *, time_keys: set[str] | None = None) -> dict[str, Any]:
+        # Insufficient forecasts fail the round; never reuse a previous window.
+        keys = time_keys if time_keys is not None else {"pv_forecast", "price", "schedule", "grid_limit", "deviation_limit"}
+        result = deepcopy(params)
+        def slice_value(key: str, value: Any) -> Any:
+            if isinstance(value, dict):
+                return {label: slice_value(f"{key}.{label}", row) for label, row in value.items()}
+            if isinstance(value, list):
+                if len(value) < start + horizon:
+                    raise HTTPException(status_code=422, detail={"code": "INSUFFICIENT_FORECAST_DATA", "parameter": key, "window_start": start, "required_end": start + horizon, "available": len(value)})
+                return value[start:start + horizon]
+            return value
+        for key in keys - {"time", "time_volume"}:
+            if key in params:
+                result[key] = slice_value(key, params[key])
+        result["time"] = list(range(horizon))
+        result["time_volume"] = list(range(horizon + 1))
         return result
 
     def _executed_steps(self, result: dict[str, Any], runtime: dict[str, Any], step_size: int) -> list[dict[str, Any]]:

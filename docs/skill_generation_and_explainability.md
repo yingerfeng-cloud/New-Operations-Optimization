@@ -51,7 +51,7 @@
 
 ### “生成 Agent”做什么
 
-“生成 Agent”以当前完整 `SkillDefinition` 和 API Skill 为输入，创建或更新 `agent_skills/<agent_skill_name>/` 包。包内包括：
+“生成 Agent”以当前完整 `SkillDefinition` 和 API Skill 为输入，创建或更新 `agent_skills/<agent_skill_name>/` 包（Docker 模式实际保存到持久化目录 `docker-data/agent_skills/`）。包内包括：
 
 - `skill.yaml`：Agent 名称、绑定的 API Skill、状态、执行和安全策略；
 - `SKILL.md`：面向 Agent 的能力说明和使用边界；
@@ -60,7 +60,7 @@
 - `adapter.py`：把已确认的参数草稿转换为 API Skill 请求；
 - `skill_definition.snapshot.json` 和 `tests/`：生成时的定义快照及样例、缺参和期望请求测试数据。
 
-因此，Agent 是自然语言编排和安全确认层，不是新的优化模型。它可以识别意图、收集缺失参数、展示默认值并要求确认，然后调用已有 API Skill；真正的计算、指标和阈值仍由模型契约与 API Skill 执行。Agent 包生成后还要通过结构校验，并在绑定的 API Skill 启用后才能启用。
+因此，Agent 是自然语言编排和安全确认层，不是新的优化模型。它可以识别意图、收集缺失参数、展示默认值并要求确认，然后调用已有 API Skill；真正的计算、指标和阈值仍由模型契约与 API Skill 执行。Agent 包生成后会处于“待启用”状态；通过结构校验并确认绑定的 API Skill 已启用后，必须显式启用 Agent。重新生成已启用的 Agent 也会回到“待启用”，避免新包未经确认直接生效。
 
 ### 变更后的生效规则
 

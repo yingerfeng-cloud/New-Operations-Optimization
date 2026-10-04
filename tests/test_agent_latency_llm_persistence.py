@@ -146,7 +146,18 @@ def test_confirm_defaults_with_missing_required_stays_collecting() -> None:
     assert body["workflow_state"] == "PARAM_COLLECTING"
     assert body["ready_to_invoke"] is False
     assert body["missing_required"]
-    assert "参数还不完整" in body["message"]
+    assert body["message"] == "已识别到优化任务，但参数还不完整，请继续补充。"
+    from app.agent.conversation_store import conversation_store
+    from app.storage.memory_store import STORE
+    saved = conversation_store.get(cid)
+    assert saved['messages'][-1]['text'] == body['message']
+    assert saved['status'] == 'PARAM_COLLECTING'
+    assert not saved.get('task_id')
+    task_count = len(STORE.tasks)
+    completed = client.post('/api/agent/analyze', json={'conversation_id': cid, 'message': '储能容量120MWh，充放电功率40MW，电价220、180、520、610'})
+    assert completed.status_code == 200, completed.text
+    assert completed.json()['workflow_state'] == 'READY_TO_INVOKE'
+    assert len(STORE.tasks) == task_count
 
 
 def test_storage_parameter_names_are_business_chinese() -> None:

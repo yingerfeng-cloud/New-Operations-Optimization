@@ -13,7 +13,7 @@ from fastapi import HTTPException
 from app.builders.generic_linear_builder import GenericLinearBuilder
 from app.generic_formula_compiler import UNSUPPORTED_FORMULA_MESSAGE, compile_generic_formula_spec
 from app.model_components.dependency_graph import component_dependency_ids, component_id as dependency_component_id, selected_dependency_errors
-from app.model_components.formula_components import load_library_component, validate_component_definition
+from app.model_components.formula_components import load_library_component, validate_component_definition, normalize_component_payload, resolve_formula_component
 from app.model_components.formula_contracts import formula_expression, participates_in_solve
 from app.model_components.lifecycle import (
     COMPONENT_PUBLISHED_STATUS,
@@ -479,7 +479,7 @@ class ModelService:
                 ui_metadata.setdefault("template_hint", {})["time_granularity"] = time_granularity
             time_granularity = None
         parameter_bindings = self._collect_parameter_bindings(model)
-        parameter_schema = deepcopy(model.parameter_schema or {})
+        parameter_schema = self._runtime_parameter_schema(model)
         input_contract = deepcopy(model.input_contract or {})
         if parameter_bindings:
             parameter_schema["parameter_bindings"] = deepcopy(parameter_bindings)
@@ -496,6 +496,38 @@ class ModelService:
                 for item in parameter_bindings
             ]
         return model.model_copy(update={"objective": objective, "time_granularity": time_granularity, "ui_metadata": ui_metadata, "parameter_bindings": parameter_bindings, "parameter_schema": parameter_schema, "input_contract": input_contract})
+
+    @staticmethod
+    def _template_parameter_schema(template: dict[str, Any]) -> dict[str, Any]:
+        rows = [deepcopy(item) for item in template.get("parameters", []) or [] if isinstance(item, dict)]
+        return {"parameters": rows} if rows else {}
+
+    def _runtime_parameter_schema(self, model: ModelPackage | ModelView) -> dict[str, Any]:
+        """Return a usable runtime schema, including legacy assets without one.
+
+        Early built-in assets stored their runtime values and semantic parameter
+        definitions separately but left ``parameter_schema`` empty.  Keep an
+        explicit schema when present; otherwise derive one from the model
+        contract so the API and asset drawer describe the same inputs.
+        """
+        schema = deepcopy(model.parameter_schema or {})
+        schema_keys = ("parameters", "inputs", "required", "input_schema", "runtime_parameters")
+        if any(schema.get(key) for key in schema_keys):
+            return schema
+        candidates: list[Any] = []
+        draft = model.model_draft or {}
+        draft_semantic = draft.get("semantic") if isinstance(draft.get("semantic"), dict) else {}
+        semantic = model.semantic_spec or {}
+        component = model.component_spec or semantic.get("component_spec") or {}
+        generic = model.generic_spec or semantic.get("generic_spec") or {}
+        for source in (draft_semantic, semantic, component, generic):
+            if isinstance(source, dict) and isinstance(source.get("parameters"), list):
+                candidates = source["parameters"]
+                if candidates:
+                    break
+        if candidates:
+            schema["parameters"] = deepcopy(candidates)
+        return schema
 
     def _normalize_time_dimension_contract(self, model: ModelPackage) -> ModelPackage:
         return normalize_model_time_dimension_contract(model)
@@ -652,7 +684,7 @@ class ModelService:
             "component_schema": model.component_schema,
             "ui_metadata": model.ui_metadata,
             "semantic_schema": model.semantic_spec,
-            "parameter_schema": model.parameter_schema,
+            "parameter_schema": self._runtime_parameter_schema(model),
             "input_contract": model.input_contract,
             "output_contract": model.output_contract,
         }
@@ -708,7 +740,7 @@ class ModelService:
             "objective": model.objective_config or {"code": model.objective},
             "mathematical_expansion": model.mathematical_expansion,
             "parameters": model.parameters,
-            "parameter_schema": model.parameter_schema,
+            "parameter_schema": self._runtime_parameter_schema(model),
             "component_schema": model.component_schema,
             "ui_metadata": model.ui_metadata,
             "publish_info": {
@@ -1124,6 +1156,11 @@ class ModelService:
                 continue
             definition = load_library_component(component_type)
             if definition:
+                try:
+                    definition = resolve_formula_component(component, require_registered=True)
+                except RuntimeError as exc:
+                    errors.append({"field": f"component_spec.components[{index}]", "error": str(exc), "actual": component_type})
+                    continue
                 if component_lifecycle_status(definition) != COMPONENT_PUBLISHED_STATUS:
                     errors.append({"field": f"component_spec.components[{index}]", "error": "未发布组件不能用于发布模型", "actual": component_type, "suggestion": "请先完成组件发布校验。"})
                     continue
@@ -1760,6 +1797,7 @@ class ModelService:
                     mathematical_expansion=template.get("mathematical_expansion", {}),
                     model_problem_type=template.get("model_problem_type", template.get("problem_type", "MILP")),
                     required_solver_capabilities=template.get("required_solver_capabilities", ["LP"]),
+                    parameter_schema=self._template_parameter_schema(template),
                     ui_metadata={
                         **(template.get("ui_metadata", {}) or {}),
                         "managed_default_template": True,
@@ -1892,6 +1930,10 @@ class ModelService:
                             "input_contract": {"runtime_parameters": [p["code"] for p in template.get("parameters", [])]},
                             "output_contract": {"variables": [v["code"] for v in template.get("variables", [])]},
                         })
+                    if managed_default:
+                        refreshed_schema = self._runtime_parameter_schema(model.model_copy(update=updates))
+                        if refreshed_schema != model.parameter_schema:
+                            updates["parameter_schema"] = refreshed_schema
                     if managed_default and model.scenario_id != template.get("scenario_id"):
                         updates["scenario_id"] = template.get("scenario_id")
                     canonical_scene = template.get("scenario_name") or template.get("scenario", template["name"])
@@ -1936,6 +1978,7 @@ class ModelService:
                         mathematical_expansion=template.get("mathematical_expansion", {}),
                         model_problem_type=template.get("model_problem_type", template.get("problem_type", "MILP")),
                         required_solver_capabilities=template.get("required_solver_capabilities", ["LP"]),
+                        parameter_schema=self._template_parameter_schema(template),
                         ui_metadata={
                             **(template.get("ui_metadata", {}) or {}),
                             "managed_default_template": True,
@@ -1970,10 +2013,22 @@ class ModelService:
                         "solver_capabilities": ["LP"],
                         "backend_builder": component_id,
                         "metadata_only": item.get("metadata_only", False),
-                        "managed_default_version": "hydro-components-v2-validated-metadata",
+                        # Bump when the built-in input/formula contract changes
+                        # so persisted managed defaults receive the corrected
+                        # DSL metadata and derived-symbol declarations.
+                        "managed_default_version": "hydro-components-v5-formula-contract",
                     }
                 )
-        defaults = hydro_assets + [_normalize_default_component(component) for component in _default_library_components()]
+        market_assets = []
+        for code in ("contract_spot_exposure_v1", "retail_da_spot_bidding_v1"):
+            for reference in (power_template_library()[code].get("component_spec") or {}).get("components") or []:
+                asset = normalize_component_payload({**deepcopy(reference["definition"]), "status": "draft", "version": reference.get("version") or "1.0.0"})
+                validation = validate_component_definition(asset)
+                if not validation["valid"] or not validation.get("execution_ready", False):
+                    raise RuntimeError(f"市场模板组件校验失败：{asset['component_id']} {validation['errors']}")
+                asset.update({"status": COMPONENT_PUBLISHED_STATUS, "managed_default_version": "market-formulas-v1", "editable": True})
+                market_assets.append(asset)
+        defaults = hydro_assets + [_normalize_default_component(component) for component in _default_library_components()] + market_assets
         timestamp = now_text()
         with STORE.lock:
             changed = False
@@ -1981,7 +2036,7 @@ class ModelService:
                 component = normalize_component_asset_lifecycle(component)
                 component_id = component["component_id"]
                 existing = STORE.custom_components.get(component_id)
-                if existing and existing.get("managed_default_version") == component.get("managed_default_version"):
+                if existing and (component.get("managed_default_version") == "market-formulas-v1" or existing.get("managed_default_version") == component.get("managed_default_version")):
                     migrated = normalize_component_asset_lifecycle(existing)
                     if migrated != existing:
                         STORE.custom_components[component_id] = migrated

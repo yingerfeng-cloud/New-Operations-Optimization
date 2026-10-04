@@ -90,6 +90,55 @@ def test_component_registry_exposes_lifecycle_and_registered_builder() -> None:
     assert reservoir["generated_constraints"][0]["type"] == "state_transition"
 
 
+def test_hydro_component_parameter_contract_only_lists_consumed_inputs() -> None:
+    catalog = {item["component_id"]: item for item in list_component_catalog()}
+
+    initial = catalog["hydro_initial_volume"]
+    assert [item["code"] for item in initial["parameters"]] == ["initial_volume"]
+    assert initial["inputs"] == ["initial_volume"]
+
+    cascade = catalog["hydro_cascade_inflow_delay"]
+    assert [item["code"] for item in cascade["parameters"]] == ["local_inflow", "edges"]
+    assert next(item for item in cascade["parameters"] if item["code"] == "edges")["dimension"] == ["edge"]
+
+
+def test_hydro_formula_contract_exposes_derived_symbols_without_binding_them() -> None:
+    catalog = {item["component_id"]: item for item in list_component_catalog()}
+    capacity = catalog["hydro_station_available_capacity"]
+    reservoir = catalog["hydro_reservoir_balance"]
+
+    assert [item["code"] for item in capacity["parameters"]] == ["units", "unit_pmax", "availability"]
+    assert [item["code"] for item in capacity["derived_parameters"]] == ["station_pmax"]
+    assert [item["code"] for item in reservoir["derived_parameters"]] == ["delta_v"]
+    balance = reservoir["generated_constraints"][0]
+    assert "volume[s,tv+1]" in balance["expression"]
+    assert balance["boundary_strategy"] == "skip_last"
+    assert balance["scope"] == [
+        {"alias": "s", "set": "station"},
+        {"alias": "t", "set": "time"},
+        {"alias": "tv", "set": "time_volume"},
+    ]
+
+
+def test_cascade_hydro_preview_formulas_use_non_conflicting_aggregate_aliases() -> None:
+    terms = get_template("cascade_hydro_dispatch")["model_draft"]["objective"]["terms"]
+    expressions = [str(item.get("expression") or item.get("dsl_formula")) for item in terms]
+    assert all("for station in station" not in expression for expression in expressions)
+
+
+def test_legacy_asset_without_parameter_schema_gets_contract_fallback() -> None:
+    package = ModelPackage(
+        name="legacy-schema",
+        scene="test",
+        semantic_spec={"parameters": [{"code": "horizon", "name": "时段数", "dimension": []}]},
+        parameters={"horizon": 4},
+    )
+
+    schema = model_service._runtime_parameter_schema(package)
+
+    assert schema["parameters"][0]["code"] == "horizon"
+
+
 def test_constraints_generated_from_components_and_custom_constraints() -> None:
     template = get_template("cascade_hydro_dispatch")
     draft = deepcopy(template["model_draft"])

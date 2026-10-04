@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import json
+from pathlib import Path
+
 import pyomo.environ as pyo
 import pytest
 
@@ -262,10 +265,56 @@ def test_compile_fixture_aligns_scalar_index_parameter_to_target_dimension() -> 
 
 def test_fixed_component_audit_is_reproducible_and_clean() -> None:
     report = audit_components()
-    assert report["component_count"] == 36
-    assert report["builtin_component_count"] == 26
+    baseline = json.loads((Path(__file__).resolve().parents[1] / "reports/component_formula_audit.json").read_text())
+    assert report == baseline
+    assert "compute_power_coordination_core" in report["component_ids"]
+    assert set(report["component_ids"]) == {
+        'audit_backward_transition',
+        'audit_disabled',
+        'audit_dsl_formula',
+        'audit_historical_expression',
+        'audit_historical_formula',
+        'audit_multiple_constraints',
+        'audit_multiple_objectives',
+        'audit_objective',
+        'audit_preview_only',
+        'audit_state_transition',
+        'balance_equation_component',
+        'capacity_bounds_component',
+        'compute_power_coordination_core',
+        'function_mapping_2d_component',
+        'function_mapping_component',
+        'hydro_cascade_inflow_delay',
+        'hydro_ecological_flow',
+        'hydro_generation_flow_bounds',
+        'hydro_head_calculation',
+        'hydro_initial_volume',
+        'hydro_load_tracking',
+        'hydro_outflow_balance',
+        'hydro_outflow_bounds',
+        'hydro_power_flow_conversion',
+        'hydro_ramp_smoothing',
+        'hydro_reservoir_balance',
+        'hydro_spill_bounds',
+        'hydro_station_available_capacity',
+        'hydro_terminal_volume',
+        'hydro_volume_bounds',
+        'mccormick_bilinear_relaxation_component',
+        'network_delay_flow_component',
+        'piecewise_linear_curve',
+        'ramp_smoothing_component',
+        'schedule_tracking_component',
+        'state_balance_component',
+        'terminal_state_tracking_component',
+    }
+    assert all(row["compile_success"] for row in report["details"])
+    compute_rows = [row for row in report["details"] if row["component_id"] == "compute_power_coordination_core"]
+    assert len(compute_rows) == 10
+    assert all(row["compile_status"] == "programmatic" for row in compute_rows)
+    assert report["component_count"] == 37
+    assert report["builtin_component_count"] == 27
     assert report["fixture_component_count"] == 10
-    assert report["constraint_count"] == 41
+    assert report["constraint_count"] == 51
     assert report["objective_count"] == 10
     assert report["empty_formula_count"] == 0
     assert report["compile_failure_count"] == 0

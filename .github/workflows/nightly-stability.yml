@@ -51,13 +51,31 @@ jobs:
           python-version: '3.13.5'
           cache: pip
       - run: pip install -r requirements.txt
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.17.0'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+        working-directory: frontend
+      - run: npm run build
+        working-directory: frontend
       - name: Default non-slow lifecycle (3 consecutive runs)
         shell: bash
         run: |
           for run in 1 2 3; do
             echo "backend default lifecycle run ${run}/3"
-            python -m pytest -q -m "not slow"
+            python -m pytest -q -m "not slow" --junitxml="reports/pytest-nonslow-${run}.xml"
           done
+
+      - name: Upload pytest failure reports
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-nonslow-${{ github.run_id }}
+          path: reports/pytest-*.xml
+          if-no-files-found: error
+          retention-days: 14
 
   backend-slow:
     name: Backend Slow
@@ -70,8 +88,25 @@ jobs:
           python-version: '3.13.5'
           cache: pip
       - run: pip install -r requirements.txt
-      - run: python -m pytest -q -m slow
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.17.0'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+        working-directory: frontend
+      - run: npm run build
+        working-directory: frontend
+      - run: python -m pytest -q -m slow --junitxml=reports/pytest-slow.xml
 
+      - name: Upload pytest failure reports
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-slow-${{ github.run_id }}
+          path: reports/pytest-*.xml
+          if-no-files-found: error
+          retention-days: 14
   real-e2e:
     name: Controlled Real E2E
     runs-on: ubuntu-latest
@@ -96,5 +131,18 @@ jobs:
       - run: npx playwright install --with-deps chromium
         working-directory: frontend
       - run: python scripts/verify_e2e_environment.py
+      - name: Real Smoke (3 consecutive runs)
+        run: npm run test:e2e:real -- src/tests/e2e/real_backend_smoke.spec.ts --repeat-each=3
+        working-directory: frontend
       - run: npm run test:e2e:real
         working-directory: frontend
+      - name: Upload Real E2E failure diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: real-e2e-diagnostics-${{ github.run_id }}
+          path: |
+            frontend/test-results/real-backend/
+            frontend/playwright-report-real-backend/
+          if-no-files-found: error
+          retention-days: 14

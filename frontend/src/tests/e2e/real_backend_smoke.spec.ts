@@ -13,21 +13,33 @@ async function chooseOption(page: Page, select: Locator, name: string | RegExp) 
 }
 
 async function fillFormulaEditor(page: Page, value: string) {
-  const editor = page.getByLabel('公式表达式').locator('.cm-content');
+  const editor = page.getByRole('dialog', { name: '公式编辑器' }).getByLabel('公式表达式').locator('.cm-content');
   await editor.click();
   await page.keyboard.press('Control+A');
   await page.keyboard.insertText(value);
 }
 
 async function compileAndApplyFormula(page: Page, value: string) {
+  const dialog = page.getByRole('dialog', { name: '公式编辑器' });
+  await expect(dialog).toBeVisible();
+  const formulaName = await dialog.getByLabel('公式名称', { exact: true }).inputValue();
   await fillFormulaEditor(page, value);
   const compileResponsePromise = page.waitForResponse(response => response.url().endsWith('/api/formulas/expand'));
-  await page.getByRole('button', { name: '后端编译与展开' }).click();
+  await dialog.getByRole('button', { name: '后端编译与展开' }).click();
   const compileResponse = await compileResponsePromise;
   expect(compileResponse.ok(), await compileResponse.text()).toBeTruthy();
-  const applyButton = page.getByRole('button', { name: '应用公式' });
+  const applyButton = dialog.getByRole('button', { name: '应用公式' });
   await expect(applyButton).toBeEnabled({ timeout: 30_000 });
   await applyButton.click();
+  const savedCard = page.locator('.formula-business-card').filter({ hasText: formulaName });
+  await Promise.all([
+    expect(dialog).toBeHidden(),
+    (async () => {
+      await savedCard.getByRole('button', { name: /原始 DSL/ }).click();
+      await expect(savedCard.locator('code')).toHaveText(value);
+      await expect(savedCard).toContainText('已校验');
+    })(),
+  ]);
 }
 
 test('@real real backend smoke creates generic model draft and runs backend testModel', async ({ page }) => {

@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from copy import deepcopy
+import pytest
+from app.model_components.formula_components import resolve_formula_component
 from pathlib import Path
 
 from app.services.model_service import model_service
@@ -83,3 +85,33 @@ def test_seed_default_templates_does_not_overwrite_user_edited_default_model() -
         reseeded = STORE.models[model_id]
     assert reseeded.parameters["contract_total"] == edited_contract_total
     assert reseeded.name == "用户编辑后的默认合约现货模型"
+
+
+@pytest.mark.parametrize('code', MARKET_TRADING_TEMPLATES)
+@pytest.mark.parametrize('mutation', ['missing', 'draft', 'invalid', 'version'])
+def test_market_components_require_registered_published_valid_fixed_assets(code, mutation):
+    model_service.seed_default_templates()
+    reference = deepcopy(template_library.get_template(code)['component_spec']['components'][0])
+    component_id = reference['type']
+    with STORE.lock:
+        asset = STORE.custom_components[component_id]
+        if mutation == 'missing': STORE.custom_components.pop(component_id)
+        elif mutation == 'draft': STORE.custom_components[component_id] = {**asset, 'status': 'draft'}
+        elif mutation == 'invalid':
+            invalid = deepcopy(asset)
+            for field in ('constraints', 'generated_constraints'):
+                invalid[field][0]['dsl_formula'] = 'unknown_variable[t] == 0'
+            STORE.custom_components[component_id] = invalid
+        elif mutation == 'version': reference['version'] = '9.9.9'
+    with pytest.raises(RuntimeError): resolve_formula_component(reference)
+    assert model_service._validate_component_library_references({'components': [reference]})
+
+
+def test_market_component_reseeding_preserves_user_changes():
+    model_service.seed_default_templates()
+    component_id = 'contract_spot_exposure_formula_block'
+    with STORE.lock:
+        STORE.custom_components[component_id] = {**STORE.custom_components[component_id], 'name': '用户维护的市场组件', 'status': 'draft'}
+    model_service.seed_default_templates()
+    assert STORE.custom_components[component_id]['name'] == '用户维护的市场组件'
+    assert STORE.custom_components[component_id]['status'] == 'draft'

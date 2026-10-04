@@ -8,7 +8,7 @@ import pyomo.environ as pyo
 
 import app.model_components  # noqa: F401
 from app.model_components.context import create_component_context
-from app.model_components.formula_components import DynamicFormulaComponent, load_library_component
+from app.model_components.formula_components import DynamicFormulaComponent, load_library_component, resolve_formula_component
 from app.model_components.objective_components import build_weighted_objective
 from app.model_components.registry import get_component_builder
 from app.model_components.solver_capabilities import check_solver_capability
@@ -175,14 +175,8 @@ class ComponentModelBuilder:
         try:
             return get_component_builder(component_type)
         except RuntimeError:
-            if isinstance(component, dict):
-                definition = component.get("definition") or {}
-                if definition:
-                    return DynamicFormulaComponent(definition)
-            definition = load_library_component(component_type)
-            if not definition or definition.get("status") != "published":
-                raise RuntimeError(f"组件 {component_type} 未发布或不存在，不能参与模型 dry-run。")
-            return DynamicFormulaComponent(definition)
+            reference = component if isinstance(component, dict) else {"type": component_type}
+            return DynamicFormulaComponent(resolve_formula_component(reference))
 
     def _build_sets(self, model: Any, model_spec: dict[str, Any], runtime_parameters: dict[str, Any], context: dict[str, Any]) -> None:
         set_names = self._required_set_names(model_spec)

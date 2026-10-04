@@ -7,7 +7,7 @@ import { ComponentEditor, formulaFromRow, normalizeComponentForEditor } from '..
 import { ComponentBusinessView, ComponentMathDefinition } from '../../features/component-library/ComponentSchemaTables';
 import { ComponentDependencyPanel } from '../../features/component-library/ComponentDependencyPanel';
 import { ParameterBindingPanel } from '../../features/component-library/ParameterBindingPanel';
-import { copyComponentVersion, getComponents } from '../../api/components';
+import { copyComponentVersion, deleteComponent, getComponents } from '../../api/components';
 import type { ComponentDef } from '../../types/component';
 import { renderWithQueryClient } from '../testUtils';
 
@@ -38,6 +38,7 @@ vi.mock('../../api/components', () => ({
   publishComponent: vi.fn(async () => componentSample),
   offlineComponent: vi.fn(async () => componentSample),
   copyComponentVersion: vi.fn(async () => componentSample),
+  deleteComponent: vi.fn(async (component_id: string) => ({ component_id, status: 'deleted' })),
 }));
 
 function renderPage() {
@@ -92,6 +93,24 @@ test('published components offer copy-edit instead of a disabled edit action', a
   await user.click(copyEditButton);
   await screen.findByText('组件编辑器');
   expect(vi.mocked(copyComponentVersion).mock.calls[0]?.[0]).toBe('storage_soc');
+});
+
+test('draft component copies can be deleted from more actions', async () => {
+  const user = userEvent.setup();
+  vi.mocked(getComponents).mockResolvedValueOnce([{ ...componentSample, component_id: 'storage_soc_copy', display_name: '储能 SOC 草稿副本' }]);
+
+  renderPage();
+
+  const row = (await screen.findByText('储能 SOC 草稿副本')).closest('tr');
+  expect(row).not.toBeNull();
+  await user.click(within(row!).getByRole('button', { name: '更多' }));
+  await user.click(await screen.findByRole('menuitem', { name: /删除草稿/ }));
+
+  const dialog = await screen.findByRole('dialog');
+  expect(dialog).toHaveTextContent('删除草稿组件？');
+  await user.click(within(dialog).getByRole('button', { name: '删除草稿' }));
+
+  await waitFor(() => expect(vi.mocked(deleteComponent).mock.calls[0]?.[0]).toBe('storage_soc_copy'));
 });
 
 test('legacy formula fields are normalized for editing and synchronized on save', async () => {

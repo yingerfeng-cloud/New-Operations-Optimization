@@ -415,6 +415,20 @@
   margin-bottom: 10px;
 }
 
+.semantic-group-note {
+  display: grid;
+  gap: 6px;
+  margin: -2px 0 8px;
+  padding: 8px 10px;
+  border: 1px dashed #a9ccec;
+  border-radius: 8px;
+  background: #f1f8ff;
+}
+
+.semantic-group-note .ant-typography {
+  margin: 0;
+}
+
 .semantic-item-list {
   display: grid;
   gap: 8px;
@@ -619,6 +633,45 @@
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 14px;
+}
+
+.model-section-anchor {
+  min-width: 0;
+  scroll-margin-top: 126px;
+}
+
+.formula-management-intro {
+  margin: -2px 0 12px;
+  color: var(--proto-muted, #667085);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.component-summary-intro {
+  margin: 0;
+  color: var(--proto-muted, #667085);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.component-output-empty {
+  margin: 10px 0;
+  padding: 9px 11px;
+  border: 1px dashed #d7e1ed;
+  border-radius: 8px;
+  background: #fafcff;
+}
+
+.component-dependency-state {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+}
+
+.component-dependency-state .ant-typography {
+  font-size: 12px;
 }
 
 .formula-business-card {

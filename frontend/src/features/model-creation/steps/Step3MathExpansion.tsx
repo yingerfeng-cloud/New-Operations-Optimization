@@ -9,7 +9,7 @@ import { getFunctionAssets } from '../../../api/functionAssets';
 import { FormulaBuilderModal } from '../../formula-editor/FormulaBuilderModal';
 import { JsonViewer } from '../../../components/JsonViewer';
 import { FormulaDisplay } from '../../formula-editor/FormulaDisplay';
-import { analyzeDraftNonlinear, firstBilinearDiagnostic } from '../utils/nonlinearDiagnostics';
+import { analyzeDraftNonlinear, analyzeFormulaText, firstBilinearDiagnostic } from '../utils/nonlinearDiagnostics';
 import { FormulaManagementPanel } from '../../formula-editor/FormulaManagementPanel';
 import { compileFormulaAuthoritatively, isAuthoritativeArtifactCurrent, type AuthoritativeCompileContext } from '../../formula-editor/authoritativeCompilation';
 import { composeAuthoritativeGenericSpec } from '../utils/composeAuthoritativeGenericSpec';
@@ -36,6 +36,51 @@ function componentRows(component: Record<string, unknown>, key: string) {
   const value = component[key];
   return Array.isArray(value) ? value as Array<Record<string, unknown>> : [];
 }
+
+function schemaCode(row: Record<string, unknown>) {
+  return String(row.code || row.key || row.name || '').trim();
+}
+
+function schemaDimension(row: Record<string, unknown>) {
+  const value = row.indices || row.dimension || row.dimensions || row.index_sets;
+  return Array.isArray(value) ? value.map(item => String(item)) : [];
+}
+
+function mergeSchemaRows(
+  base: Array<Record<string, unknown>>,
+  additions: Array<Record<string, unknown>>,
+) {
+  const rows = [...base];
+  const seen = new Set(rows.map(schemaCode).filter(Boolean));
+  additions.forEach(row => {
+    const code = schemaCode(row);
+    if (!code || seen.has(code)) return;
+    rows.push({ ...row, code, indices: schemaDimension(row), dimension: schemaDimension(row) });
+    seen.add(code);
+  });
+  return rows;
+}
+
+function componentDefinitionRows(draft: ModelDraft, key: 'variables' | 'derived_parameters') {
+  const rows: Array<Record<string, unknown>> = [];
+  const catalogValue = (draft.advanced as unknown as Record<string, unknown>).component_catalog;
+  const catalog = Array.isArray(catalogValue)
+    ? catalogValue as Array<Record<string, unknown>>
+    : [];
+  draft.components.forEach(component => {
+    const componentType = String(component.type || component.component_id || '');
+    const definition = component.definition && typeof component.definition === 'object'
+      ? component.definition as Record<string, unknown>
+      : catalog.find(item => String(item.type || item.component_id || '') === componentType);
+    if (definition) rows.push(...componentRows(definition, key));
+  });
+  return rows;
+}
+
+const HYDRO_DERIVED_PARAMETER_FALLBACK: Record<string, Array<Record<string, unknown>>> = {
+  hydro_station_available_capacity: [{ code: 'station_pmax', name: '电站可用容量', dimension: ['station', 'time'], derived: true }],
+  hydro_reservoir_balance: [{ code: 'delta_v', name: '流量库容换算系数', dimension: [], derived: true }],
+};
 
 const tableRowIds = new WeakMap<object, string>();
 let tableRowSeq = 0;
@@ -98,15 +143,54 @@ function isSolveSelectableAsset(asset: FunctionAsset) {
   return asset.validation_status !== 'invalid' && !isDisplayOnlyAsset(asset);
 }
 
-function formulaStatus(formula: FormulaDef) {
-  if (formula.compile_status === 'compile_valid') return { color: 'green', text: '权威编译通过' };
-  if (formula.compile_status === 'stale') return { color: 'orange', text: '编译已过期' };
-  if (formula.compile_status === 'error' || formula.compile_status === 'compile_failed') return { color: 'red', text: '编译失败' };
-  if (/(\w+\[[^\]]+\]|\w+)\s*\*\s*(\w+\[[^\]]+\]|\w+)/.test(formula.dsl_formula || '')) return { color: 'orange', text: '存在风险' };
-  return { color: 'blue', text: '待校验' };
+function formulaStatus(formula: FormulaDef, variableCodes: string[]) {
+  if (formula.compile_status === 'compile_valid') {
+    return { color: 'green', text: '已校验', description: '后端已完成权威编译，当前公式片段可用于生成求解结构。' };
+  }
+  if (formula.compile_status === 'stale') {
+    return { color: 'orange', text: '需重新校验', description: '公式或其依赖的语义定义发生变化，原有编译结果已过期。' };
+  }
+  if (formula.compile_status === 'error' || formula.compile_status === 'compile_failed' || formula.compile_status === 'unsupported') {
+    return { color: 'red', text: '校验失败', description: formula.compile_error || '后端编译未通过，请打开编辑器查看具体诊断。' };
+  }
+  if (formula.compile_status === 'disabled') {
+    return { color: 'default', text: '已停用', description: '该公式不会参与当前模型求解。' };
+  }
+  if (formula.compile_status === 'preview_only') {
+    return { color: 'default', text: '仅预览', description: '该公式只用于展示，不会参与当前模型求解。' };
+  }
+
+  const diagnostics = analyzeFormulaText(formula.dsl_formula || '', variableCodes, formula.name);
+  const nonlinear = diagnostics.find(item => item.blocking || item.risk_level === 'high' || item.risk_level === 'medium');
+  if (nonlinear) {
+    return {
+      color: nonlinear.blocking ? 'red' : 'orange',
+      text: nonlinear.blocking ? '非线性阻断' : '需确认',
+      description: nonlinear.message,
+    };
+  }
+
+  if (formula.compile_status === 'syntax_valid') {
+    return { color: 'blue', text: '待语义校验', description: '语法已通过，但变量、参数维度和求解片段还未完成权威校验。' };
+  }
+  if (formula.compile_status === 'semantic_valid') {
+    return { color: 'blue', text: '待权威编译', description: '语义检查已通过，还需要执行后端权威编译才能参与发布。' };
+  }
+  return { color: 'blue', text: '待校验', description: '尚未完成后端权威编译；这个状态不代表公式有问题，只表示还没有最终校验结论。' };
 }
 
-function formulaBusinessCards(formulas: FormulaDef[], onEdit: (formula: FormulaDef) => void) {
+function bindingStatusTag(status: unknown) {
+  const normalized = String(status || '').trim().toLowerCase();
+  if (normalized === 'bound' || normalized === 'complete' || normalized === 'configured') {
+    return <Tooltip title="组件参数已对应到模型参数或运行时输入，求解时可以正常取值。"><Tag color="green">已绑定</Tag></Tooltip>;
+  }
+  if (normalized === 'missing' || normalized === 'unbound' || normalized === 'pending') {
+    return <Tooltip title="组件参数尚未对应到模型参数或运行时输入，完成绑定后才能通过发布校验。"><Tag color="orange">待绑定</Tag></Tooltip>;
+  }
+  return <Tooltip title={normalized ? `原始状态：${String(status)}` : '尚未得到参数绑定校验结论。'}><Tag color="default">{normalized ? String(status) : '待确认'}</Tag></Tooltip>;
+}
+
+function formulaBusinessCards(formulas: FormulaDef[], onEdit: (formula: FormulaDef) => void, variableCodes: string[]) {
   const objectives = formulas.filter(formula => formula.kind === 'objective');
   const constraints = formulas.filter(formula => formula.kind === 'constraint');
   const groups = [
@@ -116,29 +200,33 @@ function formulaBusinessCards(formulas: FormulaDef[], onEdit: (formula: FormulaD
   return (
     <div className="formula-business-grid section-gap">
       {groups.map(group => (
-        <Card key={group.key} title={group.title}>
-          <Space orientation="vertical" size={10} style={{ width: '100%' }}>
-            {group.rows.length ? group.rows.map(formula => {
-              const status = formulaStatus(formula);
-              return (
-                <div className="formula-business-card" key={formula.formula_id}>
-                  <div>
-                    <Space wrap>
-                      <Typography.Text strong>{formula.name}</Typography.Text>
-                      <Tag color={status.color}>{status.text}</Tag>
-                    </Space>
-                    <FormulaDisplay row={formula as unknown as Record<string, unknown>} />
-                    <Space wrap size={4}>
-                      {(formula.referenced_variables || []).map(item => <Tag color="purple" key={`v-${item}`}>{item}</Tag>)}
-                      {(formula.referenced_parameters || []).map(item => <Tag color="green" key={`p-${item}`}>{item}</Tag>)}
-                    </Space>
+        <div key={group.key} className="model-section-anchor" data-section-key={group.key}>
+          <Card title={group.title}>
+            <Space orientation="vertical" size={10} style={{ width: '100%' }}>
+              {group.rows.length ? group.rows.map(formula => {
+                const status = formulaStatus(formula, variableCodes);
+                return (
+                  <div className="formula-business-card" key={formula.formula_id}>
+                    <div>
+                      <Space wrap>
+                        <Typography.Text strong>{formula.name}</Typography.Text>
+                        <Tooltip title={status.description}>
+                          <Tag color={status.color}>{status.text}</Tag>
+                        </Tooltip>
+                      </Space>
+                      <FormulaDisplay row={formula as unknown as Record<string, unknown>} />
+                      <Space wrap size={4}>
+                        {(formula.referenced_variables || []).map(item => <Tag color="purple" key={`v-${item}`}>{item}</Tag>)}
+                        {(formula.referenced_parameters || []).map(item => <Tag color="green" key={`p-${item}`}>{item}</Tag>)}
+                      </Space>
+                    </div>
+                    <Button onClick={() => onEdit(formula)}>编辑</Button>
                   </div>
-                  <Button onClick={() => onEdit(formula)}>编辑</Button>
-                </div>
-              );
-            }) : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={group.empty} />}
-          </Space>
-        </Card>
+                );
+              }) : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={group.empty} />}
+            </Space>
+          </Card>
+        </div>
       ))}
     </div>
   );
@@ -172,25 +260,43 @@ export function Step3MathExpansion({ draft, onChange }: { draft: ModelDraft; onC
   const legacyDisplayOnlyStrategy = selectedStrategy === 'display_only'
     ? [{ value: 'display_only', label: 'display_only - 仅展示（不可用于求解）', disabled: true }]
     : [];
+  const componentVariables = componentDefinitionRows(draft, 'variables');
+  const componentDerivedParameters = componentDefinitionRows(draft, 'derived_parameters');
+  const fallbackDerivedParameters = draft.components.flatMap(component => {
+    const type = String(component.type || component.component_id || '');
+    return HYDRO_DERIVED_PARAMETER_FALLBACK[type] || [];
+  });
+  const parameterRows = mergeSchemaRows(
+    draft.semantic.parameters as unknown as Array<Record<string, unknown>>,
+    [...componentDerivedParameters, ...fallbackDerivedParameters],
+  );
+  const variableRows = mergeSchemaRows(
+    draft.semantic.variables as unknown as Array<Record<string, unknown>>,
+    componentVariables,
+  );
   const symbols = {
     sets: Object.fromEntries(draft.semantic.sets.map(x => [x.code, x.name || x.code])),
-    parameters: Object.fromEntries(draft.semantic.parameters.map(x => [x.code, { label: x.name || x.code, indices: x.indices || x.dimension, unit: x.unit, description: x.description }])),
-    variables: Object.fromEntries(draft.semantic.variables.map(x => [x.code, { label: x.name || x.code, indices: x.indices || x.dimension, unit: x.unit, description: x.description }])),
+    parameters: Object.fromEntries(parameterRows.map(x => [schemaCode(x), { label: String(x.name || schemaCode(x)), indices: schemaDimension(x), unit: String(x.unit || ''), description: String(x.description || '') }])),
+    variables: Object.fromEntries(variableRows.map(x => [schemaCode(x), { label: String(x.name || schemaCode(x)), indices: schemaDimension(x), unit: String(x.unit || ''), description: String(x.description || '') }])),
   };
   const authoritativeContext: AuthoritativeCompileContext = {
     symbols: {
       sets: Object.fromEntries(draft.semantic.sets.map(set => [set.code, { values: set.values || [] }])),
-      parameters: draft.semantic.parameters.map(parameter => ({
+      parameters: parameterRows.map(parameter => ({
         ...parameter,
-        dimension: parameter.indices || parameter.dimension || parameter.dimensions || parameter.index_sets || [],
+        dimension: schemaDimension(parameter),
       })),
-      variables: draft.semantic.variables.map(variable => ({
+      variables: variableRows.map(variable => ({
         ...variable,
-        dimension: variable.indices || variable.dimension || variable.dimensions || variable.index_sets || [],
+        dimension: schemaDimension(variable),
       })),
     },
     model_context: { time_dimension: draft.time_dimension },
   };
+  const formulaVariableCodes = [...new Set([
+    ...draft.semantic.variables.map(variable => variable.code),
+    ...draft.formulas.flatMap(formula => formula.referenced_variables || []),
+  ].filter(Boolean))];
   const nonlinearReport = analyzeDraftNonlinear(draft);
   const nonlinearMessageGroups = Object.entries(nonlinearReport.relationships.reduce<Record<string, number>>((counts, item) => {
     const messageText = String(item.message || '检测到非线性关系');
@@ -199,6 +305,15 @@ export function Step3MathExpansion({ draft, onChange }: { draft: ModelDraft; onC
   }, {})).map(([messageText, count]) => ({ messageText, count }));
   const nonlinearSummary = nonlinearMessageGroups.map(item => `${item.messageText}${item.count > 1 ? `（${item.count} 处）` : ''}`).join('；');
   const nonlinearDetails = <div className="model-diagnostic-details">{nonlinearMessageGroups.map(item => <div key={item.messageText}><span>{item.messageText}</span>{item.count > 1 && <Tag>{item.count} 处</Tag>}</div>)}</div>;
+  const formulaStatusGuide = (
+    <Alert
+      className="section-gap compact-step-note formula-status-guide"
+      type="info"
+      showIcon
+      title="公式状态说明"
+      description="“待校验”表示尚未完成后端权威编译，不代表公式有问题；只有检测到决策变量之间相乘、变量除法、幂或一般非线性函数时，才会显示非线性风险或需确认。普通的参数 × 变量成本项仍属于线性表达。"
+    />
+  );
 
   useEffect(() => {
     if (!mappingOpen || !functionAssets.data?.length) return;
@@ -496,6 +611,9 @@ export function Step3MathExpansion({ draft, onChange }: { draft: ModelDraft; onC
   const renderComponentDetail = (component?: Record<string, unknown>) => {
     if (!component) return <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="请选择左侧构件查看配置" />;
     const status = componentStatus(component);
+    const generatedConstraints = [...componentRows(component, 'generated_constraints'), ...componentRows(component, 'constraints')];
+    const generatedObjectives = [...componentRows(component, 'generated_objective_terms'), ...componentRows(component, 'objective_terms')];
+    const parameterBindings = componentRows(component, 'parameter_bindings');
     return (
       <Card title={String(component.display_name || component.name || component.component_id || '构件配置')} extra={<Tag color={status.color}>{status.text}</Tag>}>
         <Descriptions size="small" column={3} items={[
@@ -515,9 +633,18 @@ export function Step3MathExpansion({ draft, onChange }: { draft: ModelDraft; onC
         {component.solve_strategy === 'convex_hull_lp_approx' && (
           <Alert className="section-gap compact-step-note" type="warning" showIcon title="convex_hull_lp_approx 非精确近似" description="该策略不是一般二维曲面的精确表达，只适用于凸包近似或特定凸/凹函数边界。" />
         )}
-        <Table className="section-gap" size="small" pagination={false} rowKey={stableRowKey} dataSource={[...componentRows(component, 'generated_constraints'), ...componentRows(component, 'constraints')]} columns={[{ title: '约束', dataIndex: 'name' }, { title: '公式', render: (_, row) => <FormulaDisplay row={row} /> }]} />
-        <Table className="section-gap" size="small" pagination={false} rowKey={stableRowKey} dataSource={[...componentRows(component, 'generated_objective_terms'), ...componentRows(component, 'objective_terms')]} columns={[{ title: '目标项', dataIndex: 'name' }, { title: '公式', render: (_, row) => <FormulaDisplay row={row} /> }]} />
-        <Table className="section-gap" size="small" pagination={false} rowKey={stableRowKey} dataSource={componentRows(component, 'parameter_bindings')} columns={[{ title: '组件参数', dataIndex: 'component_parameter' }, { title: '模型参数', dataIndex: 'model_parameter' }, { title: '状态', dataIndex: 'status' }]} />
+        {generatedConstraints.length ? (
+          <Table className="section-gap" size="small" pagination={false} rowKey={stableRowKey} dataSource={generatedConstraints} columns={[{ title: '约束', dataIndex: 'name' }, { title: '公式', render: (_, row) => <FormulaDisplay row={row} /> }]} />
+        ) : <Typography.Paragraph className="component-output-empty" type="secondary">约束：0（当前构件没有生成约束）</Typography.Paragraph>}
+        {generatedObjectives.length ? (
+          <Table className="section-gap" size="small" pagination={false} rowKey={stableRowKey} dataSource={generatedObjectives} columns={[{ title: '目标项', dataIndex: 'name' }, { title: '公式', render: (_, row) => <FormulaDisplay row={row} /> }]} />
+        ) : <Typography.Paragraph className="component-output-empty" type="secondary">目标项：0（当前构件不生成目标项）</Typography.Paragraph>}
+        {parameterBindings.length ? (
+          <>
+            <Typography.Text type="secondary">参数绑定记录（组件参数 → 模型参数）</Typography.Text>
+            <Table className="section-gap" size="small" pagination={false} rowKey={stableRowKey} dataSource={parameterBindings} columns={[{ title: '组件参数', dataIndex: 'component_parameter' }, { title: '模型参数', dataIndex: 'model_parameter', render: value => value || '—' }, { title: '状态', dataIndex: 'status', render: value => bindingStatusTag(value) }]} />
+          </>
+        ) : <Typography.Paragraph className="component-output-empty" type="secondary">参数绑定：0（当前构件没有需要绑定的参数）</Typography.Paragraph>}
       </Card>
     );
   };
@@ -551,9 +678,15 @@ export function Step3MathExpansion({ draft, onChange }: { draft: ModelDraft; onC
 
   const renderComponentSummaryList = () => (
     <Space orientation="vertical" size={16} style={{ width: '100%' }} className="section-gap">
+      <Typography.Paragraph className="component-summary-intro" type="secondary">
+        这里是组件装配后的审计视图：展示组件实际生成的约束、目标项、上游依赖和参数映射。它与上方公式卡片引用同一份模型定义，便于核对生成结果，不会重复求解或生成第二套公式。
+      </Typography.Paragraph>
       {draft.components.length ? draft.components.map((component, index) => {
         const name = String(component.display_name || component.name || component.component_id || `组件 ${index + 1}`);
         const dependencies = [...new Set([...(Array.isArray(component.dependencies) ? component.dependencies : []), ...(Array.isArray(component.depends_on) ? component.depends_on : [])])];
+        const generatedConstraints = [...componentRows(component, 'generated_constraints'), ...componentRows(component, 'constraints')];
+        const generatedObjectives = [...componentRows(component, 'generated_objective_terms'), ...componentRows(component, 'objective_terms')];
+        const parameterBindings = componentRows(component, 'parameter_bindings');
         return (
           <Card
             key={`${name}-${index}`}
@@ -565,9 +698,9 @@ export function Step3MathExpansion({ draft, onChange }: { draft: ModelDraft; onC
             ) : undefined}
           >
             <Descriptions size="small" column={3} items={[
-              { key: 'constraints', label: '生成约束', children: componentRows(component, 'generated_constraints').length || componentRows(component, 'constraints').length },
-              { key: 'objectives', label: '目标项', children: componentRows(component, 'generated_objective_terms').length || componentRows(component, 'objective_terms').length },
-              { key: 'bindings', label: '参数绑定', children: componentRows(component, 'parameter_bindings').length },
+              { key: 'constraints', label: '生成约束', children: generatedConstraints.length },
+              { key: 'objectives', label: '生成目标项', children: generatedObjectives.length },
+              { key: 'bindings', label: '参数绑定', children: parameterBindings.length },
             ]} />
             {Boolean(component.function_asset_id) && (
               <Descriptions className="section-gap" size="small" column={3} items={[
@@ -577,10 +710,23 @@ export function Step3MathExpansion({ draft, onChange }: { draft: ModelDraft; onC
                 { key: 'strategy', label: '求解策略', children: String(component.solve_strategy || '-') },
               ]} />
             )}
-            <Table className="section-gap" size="small" pagination={false} rowKey={stableRowKey} dataSource={[...componentRows(component, 'generated_constraints'), ...componentRows(component, 'constraints')]} columns={[{ title: '约束', dataIndex: 'name' }, { title: '公式', render: (_, row) => <FormulaDisplay row={row} /> }]} />
-            <Table className="section-gap" size="small" pagination={false} rowKey={stableRowKey} dataSource={[...componentRows(component, 'generated_objective_terms'), ...componentRows(component, 'objective_terms')]} columns={[{ title: '目标项', dataIndex: 'name' }, { title: '公式', render: (_, row) => <FormulaDisplay row={row} /> }]} />
-            <Space wrap className="section-gap">{dependencies.length ? dependencies.map(item => <Tag key={String(item)}>{String(item)}</Tag>) : <Tag>无依赖</Tag>}</Space>
-            <Table className="section-gap" size="small" pagination={false} rowKey={stableRowKey} dataSource={componentRows(component, 'parameter_bindings')} columns={[{ title: '组件参数', dataIndex: 'component_parameter' }, { title: '模型参数', dataIndex: 'model_parameter' }, { title: '状态', dataIndex: 'status' }]} />
+            {generatedConstraints.length ? (
+              <Table className="section-gap" size="small" pagination={false} rowKey={stableRowKey} dataSource={generatedConstraints} columns={[{ title: '约束', dataIndex: 'name' }, { title: '公式', render: (_, row) => <FormulaDisplay row={row} /> }]} />
+            ) : <Typography.Paragraph className="component-output-empty" type="secondary">约束：0（当前组件未生成约束）</Typography.Paragraph>}
+            {generatedObjectives.length ? (
+              <Table className="section-gap" size="small" pagination={false} rowKey={stableRowKey} dataSource={generatedObjectives} columns={[{ title: '目标项', dataIndex: 'name' }, { title: '公式', render: (_, row) => <FormulaDisplay row={row} /> }]} />
+            ) : <Typography.Paragraph className="component-output-empty" type="secondary">目标项：0（当前组件不生成目标项；目标函数由上方公式区维护。）</Typography.Paragraph>}
+            {dependencies.length ? (
+              <div className="component-dependency-state"><Typography.Text type="secondary">上游组件：</Typography.Text>{dependencies.map(item => <Tag key={String(item)}>{String(item)}</Tag>)}</div>
+            ) : (
+              <div className="component-dependency-state"><Tag>无上游组件依赖</Tag><Typography.Text type="secondary">该组件可独立装配。</Typography.Text></div>
+            )}
+            {parameterBindings.length ? (
+              <>
+                <Typography.Text type="secondary">参数绑定记录（组件参数 → 模型参数）</Typography.Text>
+                <Table className="section-gap" size="small" pagination={false} rowKey={stableRowKey} dataSource={parameterBindings} columns={[{ title: '组件参数', dataIndex: 'component_parameter' }, { title: '模型参数', dataIndex: 'model_parameter', render: value => value || '—' }, { title: '状态', dataIndex: 'status', render: value => bindingStatusTag(value) }]} />
+              </>
+            ) : <Typography.Paragraph className="component-output-empty" type="secondary">参数绑定：0（当前组件没有需要绑定的参数）</Typography.Paragraph>}
           </Card>
         );
       }) : <Card><Alert type="warning" title="尚未选择组件" description="组件化 Builder 需要组件清单后才能展示生成约束、目标项、依赖和参数绑定。" /></Card>}
@@ -597,13 +743,15 @@ export function Step3MathExpansion({ draft, onChange }: { draft: ModelDraft; onC
           ? '约束和目标项来自内置模板资产；可继续添加自定义公式或保存为新的草稿资产。'
           : '约束和目标项由已选组件生成；自定义公式仍通过统一公式编辑器维护。'}
       />
-      <Space wrap className="section-gap">
-        <Button onClick={() => setEditing(newFormula('constraint'))}>添加自定义公式</Button>
-        <Button type="primary" onClick={() => openFunctionMapping()}>添加函数映射</Button>
-        {nonlinearReport.relationships.some(item => item.nonlinear_type === 'bilinear' && !item.converted) && (
-          <Button onClick={addMccormickFromDiagnostic}>一键生成 McCormick 组件</Button>
-        )}
-      </Space>
+      <div className="model-section-anchor" data-section-key="mapping">
+        <Space wrap className="section-gap">
+          <Button onClick={() => setEditing(newFormula('constraint'))}>添加自定义公式</Button>
+          <Button type="primary" onClick={() => openFunctionMapping()}>添加函数映射</Button>
+          {nonlinearReport.relationships.some(item => item.nonlinear_type === 'bilinear' && !item.converted) && (
+            <Button onClick={addMccormickFromDiagnostic}>一键生成 McCormick 组件</Button>
+          )}
+        </Space>
+      </div>
       {nonlinearReport.count > 0 && (
         <Alert
           className="section-gap compact-step-note model-diagnostic-alert"
@@ -614,17 +762,28 @@ export function Step3MathExpansion({ draft, onChange }: { draft: ModelDraft; onC
           action={<Popover title="转换建议明细" content={nonlinearDetails} trigger="click"><Button type="link" size="small">查看明细</Button></Popover>}
         />
       )}
-      {formulaBusinessCards(draft.formulas, setEditing)}
-      <FormulaManagementPanel
-        formulas={draft.formulas}
-        semantic={draft.semantic}
-        symbols={symbols}
-        compileContext={authoritativeContext}
-        onEdit={setEditing}
-        onChange={formulas => onChange({ ...draft, formulas, advanced: { ...draft.advanced, generic_spec: undefined } })}
-      />
-      {draft.basic_info.builder_mode === 'component_based' && renderComponentSummaryList()}
-      <Collapse className="section-gap" items={[{ key: 'debug', label: '高级调试', children: renderComponentWorkbench() }]} />
+      {formulaStatusGuide}
+      {formulaBusinessCards(draft.formulas, setEditing, formulaVariableCodes)}
+      <div className="model-section-anchor" data-section-key="compile">
+        <FormulaManagementPanel
+          formulas={draft.formulas}
+          semantic={draft.semantic}
+          symbols={symbols}
+          compileContext={authoritativeContext}
+          onEdit={setEditing}
+          onChange={formulas => onChange({ ...draft, formulas, advanced: { ...draft.advanced, generic_spec: undefined } })}
+        />
+      </div>
+      <div className="model-section-anchor" data-section-key="expansion">
+        {draft.basic_info.builder_mode === 'component_based' ? renderComponentSummaryList() : (
+          <Card size="small" className="section-gap" title="组件展开">
+            <Typography.Text type="secondary">当前为模板模式，约束和目标项由模板直接展开，没有单独的组件生成审计表。</Typography.Text>
+          </Card>
+        )}
+      </div>
+      <div className="model-section-anchor" data-section-key="debug">
+        <Collapse className="section-gap" items={[{ key: 'debug', label: '高级调试', children: renderComponentWorkbench() }]} />
+      </div>
       <Modal
         width={720}
         open={mappingOpen}
@@ -843,14 +1002,16 @@ export function Step3MathExpansion({ draft, onChange }: { draft: ModelDraft; onC
           />
         </Space>
       </Card>
-      <Space wrap>
-        <Button type="primary" onClick={() => setEditing(newFormula('constraint'))}>新增约束公式</Button>
-        <Button onClick={() => setEditing(newFormula('objective'))}>新增目标函数</Button>
-        <Button onClick={() => { void compile(); }}>编译模型（后端权威）</Button>
-        {nonlinearReport.relationships.some(item => item.nonlinear_type === 'bilinear' && !item.converted) && (
-          <Button onClick={addMccormickFromDiagnostic}>一键生成 McCormick 组件</Button>
-        )}
-      </Space>
+      <div className="model-section-anchor" data-section-key="mapping">
+        <Space wrap>
+          <Button type="primary" onClick={() => setEditing(newFormula('constraint'))}>新增约束公式</Button>
+          <Button onClick={() => setEditing(newFormula('objective'))}>新增目标函数</Button>
+          <Button onClick={() => { void compile(); }}>编译模型（后端权威）</Button>
+          {nonlinearReport.relationships.some(item => item.nonlinear_type === 'bilinear' && !item.converted) && (
+            <Button onClick={addMccormickFromDiagnostic}>一键生成 McCormick 组件</Button>
+          )}
+        </Space>
+      </div>
       {nonlinearReport.count > 0 && (
         <Alert
           className="section-gap compact-step-note model-diagnostic-alert"
@@ -862,23 +1023,32 @@ export function Step3MathExpansion({ draft, onChange }: { draft: ModelDraft; onC
         />
       )}
       {compileError && <Alert className="section-gap compact-step-note" type="error" showIcon title="编译失败" description={compileError} />}
-      {formulaBusinessCards(draft.formulas, setEditing)}
-      <FormulaManagementPanel
-        formulas={draft.formulas}
-        semantic={draft.semantic}
-        symbols={symbols}
-        compileContext={authoritativeContext}
-        onEdit={setEditing}
-        onChange={formulas => onChange({ ...draft, formulas, advanced: { ...draft.advanced, generic_spec: undefined } })}
-      />
-      <Collapse
-        className="section-gap"
-        items={[{
-          key: 'debug',
-          label: '高级调试',
-          children: (
-            <>
-              <div className="math-expansion-workbench section-gap">
+      {formulaStatusGuide}
+      {formulaBusinessCards(draft.formulas, setEditing, formulaVariableCodes)}
+      <div className="model-section-anchor" data-section-key="compile">
+        <FormulaManagementPanel
+          formulas={draft.formulas}
+          semantic={draft.semantic}
+          symbols={symbols}
+          compileContext={authoritativeContext}
+          onEdit={setEditing}
+          onChange={formulas => onChange({ ...draft, formulas, advanced: { ...draft.advanced, generic_spec: undefined } })}
+        />
+      </div>
+      <div className="model-section-anchor" data-section-key="expansion">
+        <Card size="small" className="section-gap" title="组件展开">
+          <Typography.Text type="secondary">当前为通用公式模式，数学结构直接由公式生成，没有单独的组件生成审计表。</Typography.Text>
+        </Card>
+      </div>
+      <div className="model-section-anchor" data-section-key="debug">
+        <Collapse
+          className="section-gap"
+          items={[{
+            key: 'debug',
+            label: '高级调试',
+            children: (
+              <>
+                <div className="math-expansion-workbench section-gap">
                 <Card className="component-list-panel" title="构件清单">
                   {draft.formulas.length ? draft.formulas.map(f => (
                     <button type="button" className={`component-list-item ${selectedComponentKey === f.formula_id ? 'active' : ''}`} key={f.formula_id} onClick={() => setSelectedComponentKey(f.formula_id)}>
@@ -913,7 +1083,8 @@ export function Step3MathExpansion({ draft, onChange }: { draft: ModelDraft; onC
             </>
           ),
         }]}
-      />
+        />
+      </div>
       {formulaEditor}
     </>
   );

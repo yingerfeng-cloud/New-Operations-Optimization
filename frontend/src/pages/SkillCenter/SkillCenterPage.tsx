@@ -13,14 +13,13 @@ import {
   getSkills,
   generateModelSkill,
   runSkill,
-  syncSkillSchema,
   updateSkill,
   validateSkill,
   type SkillDefinition,
   type PlatformSkill,
   type SkillInputField,
 } from '../../api/skills';
-import { getAgentSkill } from '../../api/agents';
+import { disableAgentSkill, enableAgentSkill, getAgentSkill } from '../../api/agents';
 import { JsonViewer } from '../../components/JsonViewer';
 import { PageHeader } from '../../components/PageHeader';
 
@@ -64,6 +63,20 @@ function errorMessage(value: unknown) {
   return '详情暂时不可用，请检查绑定模型并重新生成 Skill 后重试。';
 }
 
+function agentBindingStatus(row: PlatformSkill) {
+  if (row.agent_enabled) return { label: '已绑定', color: 'green' };
+  const status = String(row.agent_package_status || '').toLowerCase();
+  if (!row.has_agent_package || status === 'not_created') return { label: '未生成', color: 'default' };
+  if (status === 'invalid' || status === 'missing') return { label: '待修复', color: 'red' };
+  if (status === 'disabled' || status === 'deprecated') return { label: '已停用', color: 'default' };
+  return { label: '待启用', color: 'orange' };
+}
+
+function canEnableAgent(row: PlatformSkill) {
+  const status = String(row.agent_package_status || '').toLowerCase();
+  return Boolean(row.has_agent_package && row.agent_skill_name && !row.agent_enabled && !['invalid', 'missing', 'not_created'].includes(status));
+}
+
 export function SkillCenterPage() {
   const qc = useQueryClient();
   const [selectedName, setSelectedName] = useState<string>();
@@ -72,6 +85,7 @@ export function SkillCenterPage() {
   const [debugResult, setDebugResult] = useState<Record<string, unknown>>();
   const [definitionDraft, setDefinitionDraft] = useState('{}');
   const [useLlmGeneration, setUseLlmGeneration] = useState(false);
+  const [detailTab, setDetailTab] = useState('basic');
   const skills = useQuery({ queryKey: ['platform-skills'], queryFn: getSkills });
   const selected = useQuery({ queryKey: ['platform-skill', selectedName], queryFn: () => getSkill(selectedName!), enabled: !!selectedName });
   const agentDetail = useQuery({ queryKey: ['agent-skill-v2', selected.data?.agent_skill_name], queryFn: () => getAgentSkill(String(selected.data?.agent_skill_name)), enabled: Boolean(selected.data?.agent_skill_name) });
@@ -85,7 +99,7 @@ export function SkillCenterPage() {
   const rows = skills.data || [];
   const stats = useMemo(() => {
     const enabled = rows.filter(item => item.skill_status === 'enabled').length;
-    const agentBound = rows.filter(item => item.agent_enabled || item.has_agent_package).length;
+    const agentBound = rows.filter(item => item.agent_enabled).length;
     const calls24h = rows.reduce((sum, item) => sum + Number(item.calls24h || 0), 0);
     const failed24h = rows.reduce((sum, item) => sum + Number(item.failed24h || 0), 0);
     const abnormal = rows.filter(item => item.callable === false && item.skill_status === 'enabled').length;
@@ -95,6 +109,7 @@ export function SkillCenterPage() {
 
   const refresh = () => {
     qc.invalidateQueries({ queryKey: ['platform-skills'] });
+    qc.invalidateQueries({ queryKey: ['agent-skill-v2'] });
     if (selectedName) {
       qc.invalidateQueries({ queryKey: ['platform-skill', selectedName] });
       qc.invalidateQueries({ queryKey: ['skill-invocations', selectedName] });
@@ -104,8 +119,15 @@ export function SkillCenterPage() {
 
   const enableMutation = useMutation({ mutationFn: enableSkill, onSuccess: () => { message.success('Skill 已启用'); refresh(); } });
   const disableMutation = useMutation({ mutationFn: disableSkill, onSuccess: () => { message.success('Skill 已停用'); refresh(); } });
-  const syncMutation = useMutation({ mutationFn: syncSkillSchema, onSuccess: () => { message.success('Schema 已同步'); refresh(); } });
-  const agentMutation = useMutation({ mutationFn: createAgentSkill, onSuccess: () => { message.success('Agent Skill 已生成'); refresh(); } });
+  const agentMutation = useMutation({ mutationFn: createAgentSkill, onSuccess: () => { message.success('Agent Skill 已生成，待启用'); refresh(); } });
+  const enableAgentMutation = useMutation({
+    mutationFn: (name: string) => enableAgentSkill(name),
+    onSuccess: () => { message.success('Agent Skill 已启用'); refresh(); },
+  });
+  const disableAgentMutation = useMutation({
+    mutationFn: (name: string) => disableAgentSkill(name),
+    onSuccess: () => { message.success('Agent Skill 已停用'); refresh(); },
+  });
   const generateMutation = useMutation({
     mutationFn: (skill: PlatformSkill) => {
       if (!skill.model_id) throw new Error('Skill 未绑定模型');
@@ -157,9 +179,15 @@ export function SkillCenterPage() {
 
   const openDebug = (skill: PlatformSkill) => {
     setSelectedName(skill.skill_name);
+    setDetailTab('basic');
     setDebugPayload(JSON.stringify(sampleFromSchema(skill.input_schema), null, 2));
     setDebugResult(undefined);
     setDebugOpen(true);
+  };
+
+  const openDetail = (skillName: string, tab = 'basic') => {
+    setSelectedName(skillName);
+    setDetailTab(tab);
   };
 
   const columns: ColumnsType<PlatformSkill> = [
@@ -175,22 +203,21 @@ export function SkillCenterPage() {
     },
     { title: '绑定模型', width: 240, render: (_, row) => <span>{text(row.model_id)}<br /><Typography.Text type="secondary">{text(row.model_code)} / {text(row.model_version || row.version)}</Typography.Text></span> },
     { title: '状态', width: 110, render: (_, row) => <Tag color={statusColor(row.skill_status)}>{text(row.skill_status)}</Tag> },
-    { title: 'Agent', width: 180, render: (_, row) => <Space orientation="vertical" size={2}><Tag color={row.agent_enabled ? 'green' : 'default'}>{row.agent_enabled ? '已绑定' : '未绑定'}</Tag><Typography.Text type="secondary">{text(row.agent_skill_name || row.agent_package_status)}</Typography.Text></Space> },
+    { title: 'Agent', width: 180, render: (_, row) => { const status = agentBindingStatus(row); return <Space orientation="vertical" size={2}><Tag color={status.color}>{status.label}</Tag><Typography.Text type="secondary">{text(row.agent_skill_name || status.label)}</Typography.Text></Space>; } },
     { title: 'Schema', width: 120, render: (_, row) => `${row.input_parameter_count ?? row.input_schema?.length ?? 0} / ${row.output_field_count ?? outputRows(row.output_schema).length}` },
     { title: '最近调用', width: 170, render: (_, row) => text(row.last_invocation_at) },
     { title: '成功率', width: 100, render: (_, row) => row.success_rate === null || row.success_rate === undefined ? '-' : `${Math.round(Number(row.success_rate) * 100)}%` },
     {
       title: '操作',
       fixed: 'right',
-      width: 420,
+      width: 360,
       render: (_, row) => (
         <Space wrap>
-          <Button size="small" onClick={() => setSelectedName(row.skill_name)}>详情</Button>
+          <Button size="small" onClick={() => openDetail(row.skill_name)}>详情</Button>
           <Button size="small" icon={<BugOutlined />} onClick={() => openDebug(row)}>测试</Button>
-          <Button size="small" type={row.generated ? 'default' : 'primary'} onClick={() => generateMutation.mutate(row)}>{row.generated ? '重新生成' : '生成完整 Skill'}</Button>
+          <Button size="small" type={row.generated ? 'default' : 'primary'} onClick={() => generateMutation.mutate(row)}>{row.generated ? '重新生成完整 Skill' : '生成完整 Skill'}</Button>
           <Button size="small" onClick={() => (row.skill_status === 'enabled' ? disableMutation : enableMutation).mutate(row.skill_name)}>{row.skill_status === 'enabled' ? '停用' : '启用'}</Button>
-          <Button size="small" icon={<ReloadOutlined />} onClick={() => syncMutation.mutate(row.skill_name)}>同步</Button>
-          <Button size="small" icon={<LinkOutlined />} onClick={() => agentMutation.mutate(row.skill_name)}>生成 Agent</Button>
+          <Button size="small" onClick={() => openDetail(row.skill_name, 'agent')}>Agent 管理</Button>
         </Space>
       ),
     },
@@ -229,6 +256,8 @@ export function SkillCenterPage() {
       <Drawer width={760} title={detail?.display_name || detail?.skill_name || 'Skill 详情'} open={!!selectedName} onClose={() => setSelectedName(undefined)}>
         {selected.isLoading ? <div className="skill-detail-state">正在加载 Skill 详情…</div> : selected.isError ? <Alert showIcon type="error" title="Skill 详情加载失败" description={errorMessage(selected.error)} /> : detail ? (
           <Tabs
+            activeKey={detailTab}
+            onChange={setDetailTab}
             items={[
               {
                 key: 'basic',
@@ -252,7 +281,7 @@ export function SkillCenterPage() {
                       showIcon
                       type="warning"
                       title="当前 Skill 暂不可调用"
-                      description={detail.callable_reason.includes('fixed binding') ? '绑定模型内容已发生变化，请点击列表中的“重新生成”，按当前模型契约更新 Skill 后再使用。' : `当前 Skill 暂不可调用：${detail.callable_reason}`}
+                      description={detail.callable_reason.includes('fixed binding') ? '绑定模型内容已发生变化，请点击列表中的“重新生成完整 Skill”，按当前模型契约更新 Skill 后再使用。' : `当前 Skill 暂不可调用：${detail.callable_reason}`}
                     />}
                     <Alert showIcon type="warning" title="本结果仅用于辅助分析，不构成自动控制指令，需经人工复核后方可用于生产调度。" />
                   </Space>
@@ -323,7 +352,16 @@ export function SkillCenterPage() {
               {
                 key: 'agent',
                 label: 'Agent 绑定',
-                children: <Space orientation="vertical" size={12} style={{ width: '100%' }}><JsonViewer value={{ agent_enabled: detail.agent_enabled, agent_skill_name: detail.agent_skill_name, has_agent_package: detail.has_agent_package, agent_package_status: detail.agent_package_status }} />{agentDetail.data && <><Descriptions bordered size="small" column={2} items={[{ key: 'schema', label: 'schema_version', children: agentDetail.data.schema_version }, { key: 'state', label: 'state', children: agentDetail.data.state }, { key: 'profile', label: 'explanation_profile', children: agentDetail.data.explanation_profile }, { key: 'validation', label: 'validation', children: agentDetail.data.validation?.status }, { key: 'quality', label: '语义质量分', children: <Tag color={Number(agentDetail.data.validation?.quality_score ?? agentDetail.data.quality_score ?? 0) >= 90 ? 'green' : 'orange'}>{Number(agentDetail.data.validation?.quality_score ?? agentDetail.data.quality_score ?? 0)} / 100</Tag> }]} /><JsonViewer value={{ business_domain: agentDetail.data.business_domain, supported_intents: agentDetail.data.supported_intents, business_goals: agentDetail.data.business_goals, positive_examples: agentDetail.data.positive_examples, negative_examples: agentDetail.data.negative_examples, do_not_invoke_examples: agentDetail.data.do_not_invoke_examples }} /></>}</Space>,
+                children: <Space orientation="vertical" size={12} style={{ width: '100%' }}>
+                  <JsonViewer value={{ agent_enabled: detail.agent_enabled, agent_skill_name: detail.agent_skill_name, has_agent_package: detail.has_agent_package, agent_package_status: detail.agent_package_status }} />
+                  {detail.has_agent_package && !detail.agent_enabled && <Alert showIcon type="warning" title="Agent 已生成但尚未启用" description="Agent 包已通过结构校验，请点击“启用 Agent”后才会进入可调用状态。" />}
+                  <Space wrap>
+                    {canEnableAgent(detail) && <Button type="primary" loading={enableAgentMutation.isPending} onClick={() => enableAgentMutation.mutate(detail.agent_skill_name!)}>启用 Agent</Button>}
+                    {detail.agent_enabled && detail.agent_skill_name && <Button loading={disableAgentMutation.isPending} onClick={() => disableAgentMutation.mutate(detail.agent_skill_name!)}>停用 Agent</Button>}
+                    <Button icon={<LinkOutlined />} loading={agentMutation.isPending} onClick={() => agentMutation.mutate(detail.skill_name)}>{detail.has_agent_package ? '重新生成 Agent 包' : '生成 Agent 包'}</Button>
+                  </Space>
+                  {agentDetail.data && <><Descriptions bordered size="small" column={2} items={[{ key: 'schema', label: 'schema_version', children: agentDetail.data.schema_version }, { key: 'state', label: 'state', children: agentDetail.data.state }, { key: 'profile', label: 'explanation_profile', children: agentDetail.data.explanation_profile }, { key: 'validation', label: 'validation', children: agentDetail.data.validation?.status }, { key: 'quality', label: '语义质量分', children: <Tag color={Number(agentDetail.data.validation?.quality_score ?? agentDetail.data.quality_score ?? 0) >= 90 ? 'green' : 'orange'}>{Number(agentDetail.data.validation?.quality_score ?? agentDetail.data.quality_score ?? 0)} / 100</Tag> }]} /><JsonViewer value={{ business_domain: agentDetail.data.business_domain, supported_intents: agentDetail.data.supported_intents, business_goals: agentDetail.data.business_goals, positive_examples: agentDetail.data.positive_examples, negative_examples: agentDetail.data.negative_examples, do_not_invoke_examples: agentDetail.data.do_not_invoke_examples }} /></>}
+                </Space>,
               },
               {
                 key: 'invocations',
