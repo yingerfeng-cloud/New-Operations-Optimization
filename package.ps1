@@ -42,13 +42,33 @@ $RequiredPackageItems = @(
   "docs/visual-acceptance/ui-special-iteration/README.md"
 )
 
-$LauncherScripts = @(Get-ChildItem -LiteralPath $Root -File -Filter "*.ps1" |
-  Where-Object { $_.Name -ne "package.ps1" })
-if ($LauncherScripts.Count -lt 2) {
-  throw "Package requires at least one start script and one stop script in the repository root."
+$LauncherPairs = @(
+  @("start.ps1", "stop.ps1"),
+  @("start.sh", "stop.sh")
+)
+$LauncherScripts = @()
+foreach ($pair in $LauncherPairs) {
+  $present = @($pair | Where-Object { Test-Path -LiteralPath (Join-Path $Root $_) -PathType Leaf })
+  if ($present.Count -gt 0 -and $present.Count -ne $pair.Count) {
+    throw "Package requires a complete launcher pair: $($pair -join ', ')"
+  }
+  $LauncherScripts += $present
 }
-$IncludeItems += @($LauncherScripts | ForEach-Object { $_.Name })
-$RequiredPackageItems += @($LauncherScripts | ForEach-Object { $_.Name })
+if ($LauncherScripts.Count -eq 0) {
+  throw "Package requires a supported start/stop launcher pair in the repository root."
+}
+# Finder entry points delegate to the POSIX pair; keep them with the archive.
+$FinderLaunchers = @("启动OPTIFORGE.command", "停止OPTIFORGE.command")
+foreach ($launcher in $FinderLaunchers) {
+  if (Test-Path -LiteralPath (Join-Path $Root $launcher) -PathType Leaf) {
+    if (-not ($LauncherScripts -contains "start.sh")) {
+      throw "Finder launcher $launcher requires start.sh and stop.sh."
+    }
+    $LauncherScripts += $launcher
+  }
+}
+$IncludeItems += $LauncherScripts
+$RequiredPackageItems += $LauncherScripts
 
 $RemovePatterns = @(
   "\\__pycache__(\\|$)",
@@ -115,7 +135,7 @@ function Clean-Package {
 function Test-PackageExclude {
   param([string]$FullName)
 
-  $relative = $FullName.Substring($Root.Length)
+  $relative = $FullName.Substring($Root.Length).Replace("/", "\")
   foreach ($pattern in $RemovePatterns) {
     if ($relative -match $pattern) {
       return $true
@@ -177,7 +197,7 @@ try {
 
   Get-ChildItem -LiteralPath $staging -Recurse -Force |
     Where-Object {
-      $relative = $_.FullName.Substring($staging.Length)
+      $relative = $_.FullName.Substring($staging.Length).Replace("/", "\")
       $matched = $false
       foreach ($pattern in $RemovePatterns) {
         if ($relative -match $pattern) {

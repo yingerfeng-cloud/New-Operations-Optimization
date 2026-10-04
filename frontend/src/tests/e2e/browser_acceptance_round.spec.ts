@@ -8,8 +8,10 @@ test('browser acceptance covers scenario, model, component, task and result entr
   const scenarioCard = page.getByTestId('scenario-card-cascade_hydro_day_ahead');
   await expect(scenarioCard).toBeVisible();
   await scenarioCard.locator('.scenario-model-action button').click();
-  await expect(page).toHaveURL(/\/models\/create/);
-  await expect(page.getByText('从模板创建模型').first()).toBeVisible();
+  await expect(page).toHaveURL(/\/models\/create\?mode=version&source=m2$/);
+  await expect(page.getByRole('heading', { name: '创建新版本并修改' })).toBeVisible();
+  await page.getByRole('button', { name: /1 基础信息/ }).click();
+  await expect(page.locator('[data-field-code="name"] input')).toHaveValue('梯级水电模型');
 
   await page.goto('/models');
   await expect(page.getByRole('heading', { name: '模型资产中心' })).toBeVisible();

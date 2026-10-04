@@ -24,13 +24,14 @@ test('dashboard prioritizes tasks, exceptions, recent work, and real solver stat
 
 test('scene/model context opens task wizard and semantic time table', async ({ page }) => {
   const model = { id: 'P1-MODEL', name: '业务调度模型', scene: '日前调度', version: 'v1', status: 'published', solver: 'HiGHS', problem_type: 'LP', build_mode: 'generic_linear', updated_at: '2026-07-12' };
-  const contract = { ui_metadata: { time_dimension: { enabled: true, policy: 'fixed', default_horizon: 2, time_set: 'time', state_time_set: 'time_volume', interval_minutes: 60, label_format: 'HH:mm' } }, input_schema: { parameters: [{ code: 'load', name: '负荷预测', required: true, type: 'number', dimension: ['time'], default: [10, 20] }, { code: 'volume', name: '库容状态', required: true, type: 'number', dimension: ['time_volume'], default: [1, 2, 3] }] } };
+  const contract = { ui_metadata: { time_dimension: { enabled: true, policy: 'fixed', default_horizon: 2, time_set: 'time', state_time_set: 'time_volume', interval_minutes: 60, label_format: 'HH:mm', label_generation: 'auto' } }, input_schema: { parameters: [{ code: 'load', name: '负荷预测', required: true, type: 'number', dimension: ['time'], default: [10, 20] }, { code: 'volume', name: '库容状态', required: true, type: 'number', dimension: ['time_volume'], default: [1, 2, 3] }] } };
   await page.route('**/api/models', route => route.request().method() === 'GET' ? route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([model]) }) : route.fallback());
   await page.route('**/api/models/P1-MODEL/schema', route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(contract) }));
   await page.route('**/api/models/P1-MODEL/asset-detail', route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(contract) }));
   await page.goto('/tasks?create=1&model=P1-MODEL&scene=%E6%97%A5%E5%89%8D%E8%B0%83%E5%BA%A6');
   await expect(page.getByText(/业务调度模型 · v1/).first()).toBeVisible();
   await expect(page.getByRole('button', { name: '下一步' })).toBeEnabled(); await page.getByRole('button', { name: '下一步' }).click();
+  await page.getByRole('button', { name: /时间序列/ }).click();
   await expect(page.getByText('00:00', { exact: true })).toBeVisible(); await expect(page.getByText('01:00', { exact: true })).toBeVisible();
   await page.getByRole('button', { name: /状态序列/ }).click();
   await expect(page.getByText('初始状态', { exact: true })).toBeVisible();

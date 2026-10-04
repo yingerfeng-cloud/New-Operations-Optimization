@@ -80,7 +80,14 @@ test('free horizon enforces step contract', async ({ page }) => {
   await horizon.fill('25');
   await expect(page.getByText(/步长为 12/)).toBeVisible();
   await horizon.fill('24');
+  const confirmation = page.getByRole('dialog', { name: '将调度周期缩短为 24 点？' });
+  await expect(confirmation).toBeVisible();
+  await confirmation.getByRole('button', { name: '截断并切换' }).click();
+  await expect(confirmation).toBeHidden();
+  await expect(horizon).toHaveValue('24');
   await expect(page.getByText(/步长为 12/)).toHaveCount(0);
+  await page.getByRole('button', { name: '下一步' }).click();
+  await expect(page.getByText('参数检查通过，可以提交求解')).toBeVisible();
 });
 
 test('three-dimensional editor preserves nested payload', async ({ page }) => {
@@ -204,7 +211,7 @@ test('completed MIP task renders and replays the real optimal-solution search', 
   await page.getByRole('tab', { name: '最优解搜索' }).click();
   await expect(page.getByText('真实收敛轨迹')).toBeVisible();
   await expect(page.getByText('求解器已证明当前解最优')).toBeVisible();
-  await expect(page.getByRole('img', { name: '最好可行解、理论最优界和 Gap 的真实求解收敛曲线' }).locator('canvas')).toBeVisible();
+  await expect(page.getByRole('img', { name: '最好可行解、理论最优界和最优间隙的真实求解收敛曲线' }).locator('canvas')).toBeVisible();
   await page.getByRole('button', { name: '重放搜索过程' }).click();
   await expect(page.getByRole('button', { name: '重放中…' })).toBeDisabled();
 });

@@ -129,6 +129,9 @@ jobs:
           python-version: '3.13.5'
       - name: Verify test matrix
         run: python scripts/verify_test_matrix.py
+      - name: Verify delivery package contracts
+        shell: pwsh
+        run: ./scripts/verify_delivery_package.ps1
       - name: Build and inspect delivery package
         shell: pwsh
         run: ./package.ps1 -OutputPath "${{ runner.temp }}/optiforge-platform.zip"

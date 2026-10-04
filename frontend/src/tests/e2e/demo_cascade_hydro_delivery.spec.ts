@@ -19,5 +19,6 @@ test('P4 cascade hydro demo route exposes delivery entry points', async ({ page 
   await page.goto('/results');
   await expect(page.getByRole('heading', { name: '结果报告库' })).toBeVisible();
   await page.goto('/agents');
-  await expect(page.getByRole('heading', { name: 'Agent 工作台' })).toBeVisible();
+  await expect(page.getByText('Agent 工作台', { exact: true })).toBeVisible();
+  await expect(page.getByPlaceholder('给 Agent 发消息')).toBeVisible();
 });
