@@ -90,6 +90,44 @@ test('free horizon enforces step contract', async ({ page }) => {
   await expect(page.getByText('参数检查通过，可以提交求解')).toBeVisible();
 });
 
+for (const decision of ['cancel', 'confirm'] as const) {
+  test(`shrinking horizon ${decision} preserves or truncates time and state data explicitly`, async ({ page }) => {
+    await setup(page);
+    const contract = {
+      ui_metadata: { time_dimension: { enabled: true, policy: 'runtime_variable', time_set: 'time', state_time_set: 'state_time', default_horizon: 4, min_horizon: 1, max_horizon: 8, horizon_step: 1 } },
+      input_schema: { parameters: [
+        { code: 'load_forecast', name: '负荷预测', required: true, dimension: ['time'] },
+        { code: 'volume', name: '库容状态', required: true, dimension: ['state_time'] },
+      ] },
+    };
+    for (const endpoint of ['schema', 'asset-detail']) {
+      await page.route(`**/api/models/free/${endpoint}`, route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(contract) }));
+    }
+    await selectModel(page, '自由周期模型');
+    await page.getByRole('button', { name: '展开高级 JSON 输入' }).click();
+    const original = { load_forecast: [10, 20, 30, 444], volume: [1, 2, 3, 4, 555] };
+    await page.getByLabel('高级参数 JSON').fill(JSON.stringify(original));
+    await page.getByRole('button', { name: '导入并合并' }).click();
+    const horizon = page.getByLabel('调度周期');
+    await expect(horizon).toHaveValue('4');
+    await horizon.fill('2');
+    const confirmation = page.getByRole('dialog', { name: '将调度周期缩短为 2 点？' });
+    await expect(confirmation).toBeVisible();
+    await expect(confirmation).toContainText('状态时点参数将保留 3 个值');
+    await confirmation.getByRole('button', { name: decision === 'cancel' ? /取\s*消/ : '截断并切换' }).click();
+    await expect(confirmation).toBeHidden();
+    await expect(horizon).toHaveValue(decision === 'cancel' ? '4' : '2');
+    await page.getByRole('button', { name: '下一步' }).click();
+    await expect(page.getByText('参数检查通过，可以提交求解')).toBeVisible();
+    const request = page.waitForRequest(item => item.url().endsWith('/api/tasks') && item.method() === 'POST');
+    await page.getByRole('button', { name: '提交求解并打开详情' }).click();
+    const payload = (await request).postDataJSON();
+    expect(payload.horizon).toBe(decision === 'cancel' ? 4 : 2);
+    expect(payload.runtime_parameters.load_forecast).toEqual(decision === 'cancel' ? original.load_forecast : [10, 20]);
+    expect(payload.runtime_parameters.volume).toEqual(decision === 'cancel' ? original.volume : [1, 2, 3]);
+  });
+}
+
 test('three-dimensional editor preserves nested payload', async ({ page }) => {
   await setup(page);
   await selectModel(page, '三维参数模型');

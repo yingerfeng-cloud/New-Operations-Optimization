@@ -402,3 +402,51 @@ test('time and symbol changes while the editor is open require compilation again
   await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
   expect(JSON.parse(screen.getByTestId('formulas-json').textContent!)).toHaveLength(1);
 });
+
+test.each(['expression', 'symbol', 'time', 'boundary'] as const)('ignores a late compile response after changing %s', async change => {
+  const draft = genericDraft();
+  draft.formulas = [];
+  draft.semantic.variables = [{ code: 'p', name: '出力', dimension: ['time'], domain: 'NonNegativeReals' }];
+  const compileResult = expandFormulaMock.getMockImplementation()!;
+  let finishOldCompile!: () => Promise<void>;
+  expandFormulaMock.mockImplementationOnce((payload: Record<string, unknown>) => new Promise(resolve => {
+    finishOldCompile = async () => resolve(await compileResult(payload));
+  }));
+
+  renderWithQueryClient(<Harness initial={draft} />);
+  fireEvent.click(screen.getByRole('button', { name: '新增约束公式' }));
+  const dialog = await screen.findByRole('dialog');
+  await editExpression(dialog, 'p[t] >= load[t]');
+  const compile = within(dialog).getByRole('button', { name: '后端编译与展开' });
+  const apply = within(dialog).getByRole('button', { name: '应用公式' });
+  fireEvent.click(compile);
+  await waitFor(() => expect(expandFormulaMock).toHaveBeenCalledTimes(1));
+  expect(apply).toBeDisabled();
+
+  if (change === 'expression') await editExpression(dialog, 'p[t] >= load[t] + 1');
+  if (change === 'symbol') fireEvent.click(screen.getByRole('button', { name: '修改符号' }));
+  if (change === 'time') fireEvent.click(screen.getByRole('button', { name: '修改时间维度' }));
+  if (change === 'boundary') {
+    fireEvent.mouseDown(within(dialog).getByLabelText('边界策略'));
+    fireEvent.click(await screen.findByText('跳过首时点'));
+  }
+  await act(async () => finishOldCompile());
+  expect(apply).toBeDisabled();
+  expect(within(dialog).queryByText('后端权威编译通过，可参与求解')).not.toBeInTheDocument();
+  expect(JSON.parse(screen.getByTestId('formulas-json').textContent!)).toEqual([]);
+
+  fireEvent.click(compile);
+  await waitFor(() => expect(apply).toBeEnabled());
+  expect(expandFormulaMock).toHaveBeenCalledTimes(2);
+  expect(expandFormulaMock.mock.calls[1][0]).not.toEqual(expandFormulaMock.mock.calls[0][0]);
+  fireEvent.click(apply);
+  await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+  expect(JSON.parse(screen.getByTestId('formulas-json').textContent!)).toEqual([
+    expect.objectContaining({
+      dsl_formula: change === 'expression' ? 'p[t] >= load[t] + 1' : 'p[t] >= load[t]',
+      boundary_strategy: change === 'boundary' ? 'skip_first' : 'strict',
+      compile_status: 'compile_valid',
+      authoritative_artifact: expect.any(Object),
+    }),
+  ]);
+});

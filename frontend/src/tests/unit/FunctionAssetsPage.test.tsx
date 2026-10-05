@@ -1,4 +1,5 @@
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
+import { message } from 'antd';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, vi } from 'vitest';
 import { FunctionAssetsPage, solveStrategyDescription, solveStrategyText } from '../../pages/FunctionAssets/FunctionAssetsPage';
@@ -51,6 +52,7 @@ const surface: FunctionAsset = {
 
 const apiMocks = vi.hoisted(() => ({
   rows: [] as FunctionAsset[],
+  getFunctionAssets: vi.fn(),
   createFunctionAsset: vi.fn(),
   importFunctionAssetCsv: vi.fn(),
   updateFunctionAsset: vi.fn(),
@@ -150,7 +152,7 @@ vi.mock('echarts-for-react', () => ({
 }));
 
 vi.mock('../../api/functionAssets', () => ({
-  getFunctionAssets: async () => apiMocks.rows,
+  getFunctionAssets: apiMocks.getFunctionAssets,
   createFunctionAsset: apiMocks.createFunctionAsset,
   importFunctionAssetCsv: apiMocks.importFunctionAssetCsv,
   updateFunctionAsset: apiMocks.updateFunctionAsset,
@@ -162,6 +164,7 @@ vi.mock('../../api/functionAssets', () => ({
 beforeEach(() => {
   vi.clearAllMocks();
   apiMocks.rows = [curve, surface];
+  apiMocks.getFunctionAssets.mockImplementation(async () => apiMocks.rows);
   apiMocks.createFunctionAsset.mockImplementation(async (payload: Partial<FunctionAsset>) => {
     const requestedId = String(payload.function_id || 'created_surface');
     const functionId = apiMocks.rows.some(row => row.function_id === requestedId) ? `${requestedId}_created` : requestedId;
@@ -274,6 +277,7 @@ test('blocks save before POST when current backend does not expose the latest fu
   fireEvent.click(screen.getByRole('button', { name: /保\s*存/ }));
 
   await waitFor(() => expect(apiMocks.checkFunctionAssetApiReady).toHaveBeenCalled());
+  await waitFor(() => expect(message.error).toHaveBeenCalledWith('函数资产保存失败：请确认 FastAPI 后端已启动且版本为最新'));
   expect(apiMocks.createFunctionAsset).not.toHaveBeenCalled();
 });
 
@@ -294,4 +298,46 @@ test('editing existing 2D surface shows original xyz points and preserves points
   expect(payload.function_type).toBe('piecewise_2d');
   expect(payload.points_2d).toEqual([[0, 0, 1], [10, 0, 21], [0, 10, 31], [10, 10, 51]]);
   expect(payload.points).toEqual([]);
+});
+
+test.each(['create', 'update'] as const)('%s rejection with 422 preserves edits and shows the validation reason without refreshing', async operation => {
+  const mutation = operation === 'create' ? apiMocks.createFunctionAsset : apiMocks.updateFunctionAsset;
+  mutation.mockRejectedValueOnce({ response: { status: 422, data: { detail: {
+    message: 'Function asset validation failed',
+    validation_status: 'invalid',
+    validation_errors: [{ field: 'points_2d', message: 'duplicate (x,y) point is not allowed' }],
+  } } } });
+  const { queryClient } = renderPage();
+  const invalidate = vi.spyOn(queryClient, 'invalidateQueries');
+  expect(await screen.findByText('水电出力曲面')).toBeInTheDocument();
+  const assetTable = screen.getByText('水电出力曲面').closest('table')!;
+  if (operation === 'create') {
+    fireEvent.click(screen.getByRole('button', { name: '新建函数资产' }));
+    await chooseSelectOption('函数类型', '二维曲面 z=f(x,y)');
+  } else {
+    fireEvent.click(within(screen.getByText('水电出力曲面').closest('tr')!).getByRole('button', { name: '编辑' }));
+  }
+  const drawer = currentDrawer();
+  fireEvent.change(drawer.getByLabelText('资产名称'), { target: { value: '保留未保存的曲面' } });
+  fireEvent.change(drawer.getByPlaceholderText(/0 0 1/), { target: { value: '0 0 7\n10 0 21\n0 0 31\n10 10 57' } });
+  fireEvent.click(drawer.getByRole('button', { name: '应用粘贴数据' }));
+  fireEvent.click(drawer.getByRole('button', { name: /保\s*存/ }));
+  await waitFor(() => expect(message.error).toHaveBeenCalledWith('函数资产保存失败：二维曲面点：不允许重复的 (x, y) 点。'));
+  expect(mutation).toHaveBeenCalledTimes(1);
+  expect(drawer.getByLabelText('资产名称')).toHaveValue('保留未保存的曲面');
+  expect(drawer.getByDisplayValue('57')).toBeInTheDocument();
+  expect(screen.getByRole('dialog')).toBeInTheDocument();
+  expect(message.success).not.toHaveBeenCalled();
+  expect(invalidate).not.toHaveBeenCalled();
+  expect(apiMocks.getFunctionAssets).toHaveBeenCalledTimes(1);
+  expect(within(assetTable).queryByText('保留未保存的曲面')).not.toBeInTheDocument();
+
+  fireEvent.change(drawer.getByPlaceholderText(/0 0 1/), { target: { value: '0 0 7\n10 0 21\n0 10 31\n10 10 57' } });
+  fireEvent.click(drawer.getByRole('button', { name: '应用粘贴数据' }));
+  fireEvent.click(drawer.getByRole('button', { name: /保\s*存/ }));
+  await waitFor(() => expect(screen.queryByLabelText('资产名称')).not.toBeInTheDocument());
+  expect(mutation).toHaveBeenCalledTimes(2);
+  const retryPayload = mutation.mock.calls[1][operation === 'create' ? 0 : 1];
+  expect(retryPayload).toEqual(expect.objectContaining({ name: '保留未保存的曲面', points: [], points_2d: [[0, 0, 7], [10, 0, 21], [0, 10, 31], [10, 10, 57]] }));
+  expect(invalidate).toHaveBeenCalledTimes(1);
 });

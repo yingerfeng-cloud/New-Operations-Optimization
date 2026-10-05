@@ -125,6 +125,24 @@ function StrategyHelp({ strategy }: { strategy?: string }) {
   );
 }
 
+function saveErrorText(error: unknown) {
+  const detail = (error as { response?: { data?: { detail?: unknown } } })?.response?.data?.detail;
+  if (typeof detail === 'string' && detail.trim()) return detail;
+  if (detail && typeof detail === 'object' && !Array.isArray(detail)) {
+    const record = detail as Record<string, unknown>;
+    const errors = record.validation_errors || record.errors;
+    if (Array.isArray(errors)) {
+      const reasons = errors.filter(item => item && typeof item === 'object').map(item => {
+        const field = item.field ? `${validationFieldText(item.field)}：` : '';
+        return item.message || item.error ? `${field}${validationMessageText(item.message || item.error)}` : '';
+      }).filter(Boolean);
+      if (reasons.length) return reasons.join('；');
+    }
+    if (typeof record.message === 'string' && record.message.trim()) return record.message;
+  }
+  return '请确认 FastAPI 后端已启动且版本为最新';
+}
+
 function validationList(items?: Array<Record<string, unknown>>) {
   const rows = (items || []).map((item, index) => ({
     key: `${String(item.field || 'item')}-${index}`,
@@ -537,8 +555,8 @@ export function FunctionAssetsPage() {
       setEditing(false);
       done('函数资产已保存');
     },
-    onError: () => {
-      message.error('函数资产保存失败，请确认 FastAPI 后端已启动且版本为最新');
+    onError: error => {
+      message.error(`函数资产保存失败：${saveErrorText(error)}`);
     },
   });
 
