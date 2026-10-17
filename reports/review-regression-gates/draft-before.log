@@ -1,0 +1,55 @@
+
+ RUN  v4.1.9 /workspace/New-Operations-Optimization/frontend
+
+ ❯ src/tests/unit/ModelCreationPage.test.tsx (19 tests | 1 failed | 18 skipped) 6303ms
+   × scenario draft survives changed configuration and template responses 6298ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/tests/unit/ModelCreationPage.test.tsx > scenario draft survives changed configuration and template responses
+AssertionError: expected { Object (basic_info, semantic, ...) } to deeply equal { basic_info: { …(8) }, …(8) }
+
+- Expected
++ Received
+
+@@ -1,14 +1,14 @@
+  {
+    "advanced": {},
+    "basic_info": {
+      "builder_mode": "generic_linear",
+-     "model_code": "model_mvci7nsy_2woq",
++     "model_code": "model_mvci7rpi_gx76",
+      "modeling_skeleton": undefined,
+-     "name": "保留编辑内容",
+-     "scenario": "日前机组组合优化",
+-     "scenario_id": "day_ahead_unit_commitment",
++     "name": "",
++     "scenario": "",
++     "scenario_id": undefined,
+      "solver": "HiGHS",
+      "template_code": undefined,
+    },
+    "components": [],
+    "formulas": [],
+
+ ❯ src/tests/unit/ModelCreationPage.test.tsx:505:50
+    503|   // React Query delivers cache notifications on the next timer tick.
+    504|   await act(async () => { await new Promise(resolve => setTimeout(reso…
+    505|   expect(useModelCreationStore.getState().draft).toEqual(before.draft);
+       |                                                  ^
+    506|   expect(useModelCreationStore.getState().workspace.generation).toBe(b…
+    507|   expect(useModelCreationStore.getState().workspace.dirty).toBe(true);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 18 skipped (19)
+   Start at  14:40:39
+   Duration  13.36s (transform 2.00s, setup 869ms, import 2.77s, tests 6.30s, environment 2.56s)
+
+npm notice
+npm notice New major version of npm available! 11.9.0 -> 12.2.0
+npm notice Changelog: https://github.com/npm/cli/releases/tag/v12.2.0
+npm notice To update run: npm install -g npm@12.2.0
+npm notice
