@@ -15,7 +15,8 @@
     "test:watch": "vitest",
     "test:e2e": "playwright test -c playwright.frontend-mock.config.ts",
     "test:e2e:mock": "playwright test -c playwright.frontend-mock.config.ts",
-    "test:e2e:real": "playwright test -c playwright.real-backend.config.ts"
+    "test:e2e:real": "playwright test -c playwright.real-backend.config.ts && npm run test:e2e:review",
+    "test:e2e:review": "playwright test -c playwright.review.config.ts"
   },
   "dependencies": {
     "@ant-design/icons": "^6.1.0",

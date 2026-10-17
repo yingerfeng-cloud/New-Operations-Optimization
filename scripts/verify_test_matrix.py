@@ -33,6 +33,7 @@ REQUIRED_E2E_COVERAGE = {
 }
 
 REAL_E2E_SPECS = {
+    "review_recovery.spec.ts",
     "real_backend_smoke.spec.ts",
     "real_production_gate.spec.ts",
     "formula_real_backend_gate.spec.ts",

@@ -10,7 +10,7 @@ async function enter(page: Page, path: string) {
   await expect(page.getByRole('dialog', { name: '请输入平台访问令牌' })).not.toBeVisible();
 }
 
-test('review real browser protects a draft, retains it after save failure, then tests and publishes', async ({ page, request }, info) => {
+test('@real review real browser protects a draft, retains it after save failure, then tests and publishes', async ({ page, request }, info) => {
   await enter(page, '/models/create?mode=clone&source=MODEL-POWER-ECONOMIC-DISPATCH');
   const name = `评审浏览器模型 ${Date.now()}`;
   await page.getByRole('button', { name: /1 基础信息/ }).click();
@@ -54,7 +54,7 @@ test('review real browser protects a draft, retains it after save failure, then 
   await page.screenshot({ path: info.outputPath('published-model.png'), fullPage: true });
 });
 
-test('review real browser follows a 35-second real-solver task across refresh and network recovery without duplicating it', async ({ page, request }, info) => {
+test('@real review real browser follows a 35-second real-solver task across refresh and network recovery without duplicating it', async ({ page, request }, info) => {
   const code = `review_slow_${Date.now()}`;
   const name = `评审长任务 ${code}`;
   const created = await request.post('/api/models', { headers, data: {

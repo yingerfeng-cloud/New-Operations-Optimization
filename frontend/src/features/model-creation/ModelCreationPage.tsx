@@ -298,7 +298,9 @@ export function ModelCreationPage() {
       scenario: scenario?.name || '',
       scenario_id: scenarioId,
     };
-    initializeWorkspace({ mode: 'new', sessionId: `new:${Date.now()}` }, next);
+    // Scenario selection stays on this URL; retain its request identity so
+    // refreshed configuration cannot reinitialize an edited scenario draft.
+    initializeWorkspace({ mode: 'new', sessionId: requestKey }, next);
     setWorkspace({ dirty: true });
   };
 

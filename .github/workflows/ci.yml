@@ -79,6 +79,10 @@ jobs:
           tests/test_component_formula_contract_final.py
           tests/test_react_frontend_hosting.py
           tests/test_screenshot_fixture_contract.py
+          tests/test_review_math_contracts.py
+          tests/test_review_execution_contracts.py
+      - name: Synthetic review known-answer regression
+        run: python -m pytest -q -m slow tests/test_review_synthetic_poc.py
       - name: Audit fixed component formulas
         run: python scripts/audit_component_formulas.py --output reports/component_formula_audit.json
       - name: Upload component formula audit
@@ -117,6 +121,37 @@ jobs:
           path: |
             frontend/playwright-report/
             frontend/test-results/frontend-mock/
+
+  review-e2e:
+    name: Review Recovery Real E2E
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13.5'
+          cache: pip
+      - run: pip install -r requirements.txt
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.17.0'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+        working-directory: frontend
+      - run: npx playwright install --with-deps chromium
+        working-directory: frontend
+      - run: npm run test:e2e:review
+        working-directory: frontend
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: review-recovery-${{ github.run_id }}
+          path: |
+            frontend/playwright-report-review/
+            frontend/test-results/review/
+          retention-days: 14
 
   delivery-package:
     name: Delivery Package Self Check

@@ -9,15 +9,15 @@ test('dirty workspace confirms template switch and cancel preserves the draft', 
   const templateSelect = page.getByRole('combobox').first();
   await templateSelect.click();
   await page.locator('.ant-select-dropdown:visible .ant-select-item-option').first().click();
-  const confirmModal = page.getByRole('dialog', { name: '确认切换模型来源？' });
+  const confirmModal = page.getByRole('dialog', { name: '当前草稿尚未保存' });
   await expect(confirmModal).toBeVisible();
-  await confirmModal.getByRole('button', { name: /取\s*消/ }).click();
+  await confirmModal.getByRole('button', { name: '继续编辑' }).click();
   await expect(nameInput).toHaveValue('不得丢失的草稿');
   await expect(page).toHaveURL(/mode=new/);
 
   await templateSelect.click();
   await page.locator('.ant-select-dropdown:visible .ant-select-item-option').first().click();
-  await page.getByRole('dialog', { name: '确认切换模型来源？' }).getByRole('button', { name: '继续切换' }).click();
+  await page.getByRole('dialog', { name: '当前草稿尚未保存' }).getByRole('button', { name: '放弃并离开' }).click();
   await expect(page).toHaveURL(/mode=template&template=economic_dispatch/);
   await expect(page.getByText('从模板创建模型').first()).toBeVisible();
   await expect(page.locator('.ant-form-item').filter({ hasText: '模型名称' }).locator('input')).toHaveValue('经济调度');

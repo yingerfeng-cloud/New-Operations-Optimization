@@ -11,6 +11,7 @@ export default defineConfig({
   testDir: './src/tests/e2e',
   // The controlled backend gate executes only tests that declare their real dependency.
   grep: /@real/,
+  testIgnore: 'review_recovery.spec.ts', // Dedicated delayed-solver fixture: test:e2e:review.
   globalSetup: './src/tests/e2e/real-global-setup.mjs',
   workers: 1,
   timeout: 60_000,
