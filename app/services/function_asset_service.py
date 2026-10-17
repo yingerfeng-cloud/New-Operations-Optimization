@@ -3,6 +3,8 @@ from __future__ import annotations
 import csv
 import math
 import uuid
+import hashlib
+import json
 from copy import deepcopy
 from io import StringIO
 from typing import Any
@@ -103,7 +105,7 @@ class FunctionAssetService:
         self.seed_default_assets()
         with STORE.lock:
             raw_assets = [deepcopy(item) for item in STORE.function_assets.values()]
-        rows = [self._with_references(_normalize_schema_fields(item)) for item in raw_assets]
+        rows = [self._with_references({**_normalize_schema_fields(item), "revision": int(item.get("revision") or 1), "content_hash": function_asset_hash(item)}) for item in raw_assets]
         return sorted((FunctionAsset(**item) for item in rows), key=lambda item: item.updated_at or "", reverse=True)
 
     def seed_default_assets(self) -> None:
@@ -127,6 +129,12 @@ class FunctionAssetService:
                 existing = STORE.function_assets.get(asset["function_id"])
                 existing_meta = existing.get("metadata") if isinstance(existing, dict) else {}
                 if not existing or existing_meta.get("sample_asset") is True:
+                    if existing:
+                        previous = {key: deepcopy(value) for key, value in existing.items() if key != "_versions"}
+                        revision = int(previous.get("revision") or 1)
+                        previous.update(revision=revision, content_hash=function_asset_hash(previous))
+                        asset["revision"] = revision + 1
+                        asset["_versions"] = {**(existing.get("_versions") or {}), str(revision): previous}
                     STORE.function_assets[asset["function_id"]] = asset
                     created = True
             if created:
@@ -147,12 +155,30 @@ class FunctionAssetService:
             asset = deepcopy(STORE.function_assets.get(function_id) or {})
         if not asset:
             raise HTTPException(status_code=404, detail="Function asset not found")
+        asset["revision"] = int(asset.get("revision") or 1)
+        asset["content_hash"] = function_asset_hash(asset)
         return FunctionAsset(**self._with_references(asset))
 
-    def update_asset(self, function_id: str, payload: dict[str, Any]) -> FunctionAsset:
-        existing = self.get_asset(function_id)
-        asset = self._normalize({**existing.model_dump(), **payload, "function_id": function_id}, creating=False)
+    def list_versions(self, function_id: str) -> list[FunctionAsset]:
+        current = self.get_asset(function_id)
         with STORE.lock:
+            history = deepcopy(STORE.function_assets[function_id].get("_versions") or {})
+        return [FunctionAsset(**item) for _, item in sorted(history.items(), key=lambda pair: int(pair[0]))] + [current]
+
+    def get_version(self, function_id: str, revision: int) -> FunctionAsset:
+        version = next((item for item in self.list_versions(function_id) if item.revision == revision), None)
+        if version is None:
+            raise HTTPException(status_code=404, detail="Function asset revision not found")
+        return version
+
+    def update_asset(self, function_id: str, payload: dict[str, Any]) -> FunctionAsset:
+        with STORE.lock:
+            existing = self.get_asset(function_id).model_dump()
+            history = deepcopy((STORE.function_assets.get(function_id) or {}).get("_versions") or {})
+            history[str(existing["revision"])] = deepcopy(existing)
+            asset = self._normalize({**existing, **payload, "function_id": function_id}, creating=False)
+            asset["revision"] = existing["revision"] + 1
+            asset["_versions"] = history
             STORE.function_assets[function_id] = asset
             STORE.save_runtime()
         return FunctionAsset(**self._with_references(asset))
@@ -355,6 +381,9 @@ class FunctionAssetService:
         normalized["validation_status"] = validation["validation_status"]
         normalized["validation_errors"] = validation["errors"]
         normalized["validation_warnings"] = validation["warnings"]
+        normalized.pop("_versions", None)
+        normalized["revision"] = 1
+        normalized["content_hash"] = function_asset_hash(normalized)
         return normalized
 
     def _with_references(self, asset: dict[str, Any]) -> dict[str, Any]:
@@ -714,24 +743,24 @@ def function_asset_references(function_id: str) -> list[dict[str, Any]]:
     return rows
 
 
-def get_function_asset_points(function_id: str) -> list[list[float]]:
-    function_asset_service.seed_default_assets()
-    with STORE.lock:
-        asset = deepcopy(STORE.function_assets.get(function_id) or {})
-    if not asset:
-        raise RuntimeError(f"function asset not found: {function_id}")
+def function_asset_hash(asset: dict[str, Any]) -> str:
+    normalized = FunctionAsset.model_validate(asset).model_dump(mode="json")
+    content = {key: value for key, value in normalized.items() if key not in {
+        "revision", "content_hash", "_versions", "referenced_by", "created_at", "updated_at",
+    }}
+    return hashlib.sha256(json.dumps(content, sort_keys=True, ensure_ascii=False, separators=(",", ":")).encode()).hexdigest()
+
+
+def get_function_asset_points(function_id: str, snapshots: dict | None = None) -> list[list[float]]:
+    asset = get_function_asset(function_id, snapshots)
     validation = validate_function_asset(asset)
     if not validation["valid"]:
         raise RuntimeError(f"function asset {function_id} is invalid: {validation['errors']}")
     return [[float(point[0]), float(point[1])] for point in asset.get("points") or []]
 
 
-def get_function_asset_surface(function_id: str) -> dict[str, Any]:
-    function_asset_service.seed_default_assets()
-    with STORE.lock:
-        asset = deepcopy(STORE.function_assets.get(function_id) or {})
-    if not asset:
-        raise RuntimeError(f"function asset not found: {function_id}")
+def get_function_asset_surface(function_id: str, snapshots: dict | None = None) -> dict[str, Any]:
+    asset = get_function_asset(function_id, snapshots)
     validation = validate_function_asset(asset)
     if not validation["valid"]:
         raise RuntimeError(f"function asset {function_id} is invalid: {validation['errors']}")
@@ -741,17 +770,23 @@ def get_function_asset_surface(function_id: str) -> dict[str, Any]:
         "asset": asset,
         "points_2d": [[float(point[0]), float(point[1]), float(point[2])] for point in asset.get("points_2d") or []],
         "triangles": validation["diagnostics"].get("triangles") or asset.get("triangles") or [],
-        "domain": validation["domain"],
-        "diagnostics": validation["diagnostics"],
+        "domain": validation["domain"], "diagnostics": validation["diagnostics"],
     }
 
 
-def get_function_asset(function_id: str) -> dict[str, Any]:
+def get_function_asset(function_id: str, snapshots: dict | None = None) -> dict[str, Any]:
+    if snapshots is not None:
+        if function_id not in snapshots:
+            raise RuntimeError(f"function asset not locked by model: {function_id}; create and test a new model version")
+        return deepcopy(snapshots[function_id])
     function_asset_service.seed_default_assets()
     with STORE.lock:
         asset = deepcopy(STORE.function_assets.get(function_id) or {})
     if not asset:
         raise RuntimeError(f"function asset not found: {function_id}")
+    asset.pop("_versions", None)
+    asset.setdefault("revision", 1)
+    asset["content_hash"] = function_asset_hash(asset)
     return asset
 
 

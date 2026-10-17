@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import os
 import uuid
+import hashlib
+import json
 from copy import deepcopy
 
 from fastapi import HTTPException
@@ -19,11 +21,23 @@ from app.utils import now_text
 
 
 class JobService:
-    def create_task(self, req: SolveRequest) -> TaskRecord:
-        self._prepare_request(req)
-        task_id = f"OPT-{uuid.uuid4().hex[:10].upper()}"
-        record = TaskRecord(id=task_id, request=req, max_retries=max(0, req.max_retries))
+    def create_task(self, req: SolveRequest, *, testing_model=None) -> TaskRecord:
         with STORE.lock:
+            fingerprint = hashlib.sha256(json.dumps(req.model_dump(mode="json", exclude={"idempotency_key"}), sort_keys=True).encode()).hexdigest()
+            if req.idempotency_key:
+                previous = next((task for task in STORE.tasks.values() if task.request.idempotency_key == req.idempotency_key), None)
+                if previous:
+                    if previous.trace.get("request_fingerprint") != fingerprint:
+                        raise HTTPException(status_code=409, detail={"code": "IDEMPOTENCY_KEY_REUSED", "message": "同一提交标识不能用于不同参数，请先查看原任务。"})
+                    return previous
+            req.payload.pop("_model_test", None)
+            self._prepare_request(req, testing_model=testing_model)
+            if testing_model is not None:
+                original = model_service.get_model(testing_model.id)
+                req.payload["_model_test"] = {"source_hash": model_service._content_hash(original), "dependencies": deepcopy(testing_model.function_dependencies)}
+            task_id = f"OPT-{uuid.uuid4().hex[:10].upper()}"
+            record = TaskRecord(id=task_id, request=req, max_retries=max(0, req.max_retries))
+            record.trace["request_fingerprint"] = fingerprint
             STORE.tasks[task_id] = record
             STORE.save_runtime()
         if os.getenv("OPTIFORGE_SYNC_JOBS") == "true" or req.async_run is False:
@@ -44,10 +58,10 @@ class JobService:
         return task
 
     def cancel_task(self, task_id: str) -> TaskView:
-        task = self.get_task(task_id)
-        if task.status not in {"PENDING", "QUEUED", "RUNNING", "VALIDATING", "BUILDING_MODEL", "SOLVING", "FORMATTING_RESULT"}:
-            raise HTTPException(status_code=409, detail=f"Cannot cancel task in status {task.status}")
         with STORE.lock:
+            task = self.get_task(task_id)
+            if task.status not in {"PENDING", "QUEUED", "RUNNING", "VALIDATING", "BUILDING_MODEL", "SOLVING", "FORMATTING_RESULT"}:
+                raise HTTPException(status_code=409, detail=f"Cannot cancel task in status {task.status}")
             task.status = "CANCELLED"
             task.progress = 100
             task.finished_at = now_text()
@@ -56,10 +70,11 @@ class JobService:
         return task.view()
 
     def retry_task(self, task_id: str) -> TaskView:
-        task = self.get_task(task_id)
-        if task.status not in {"FAILED", "TIMEOUT", "CANCELLED", "INTERRUPTED"}:
-            raise HTTPException(status_code=409, detail=f"Cannot retry task in status {task.status}")
         with STORE.lock:
+            task = deepcopy(self.get_task(task_id))
+            if task.status not in {"FAILED", "TIMEOUT", "CANCELLED", "INTERRUPTED"}:
+                raise HTTPException(status_code=409, detail=f"Cannot retry task in status {task.status}")
+            task.attempt_id = uuid.uuid4().hex
             task.error = None
             task.result = None
             task.objective_value = None
@@ -76,6 +91,8 @@ class JobService:
             task.trace.pop("solver_progress", None)
             for key in ("validation_seconds", "model_build_seconds", "solve_seconds", "format_seconds"):
                 task.trace.pop(key, None)
+            STORE.tasks[task_id] = task
+            STORE.results.pop(task_id, None)
             STORE.save_runtime()
         if os.getenv("OPTIFORGE_SYNC_JOBS") == "true" or task.request.async_run is False:
             job_runner.run(task_id)
@@ -84,15 +101,15 @@ class JobService:
         return task.view()
 
     def delete_task(self, task_id: str) -> None:
-        task = self.get_task(task_id)
-        if task.status in {"PENDING", "QUEUED", "RUNNING", "VALIDATING", "BUILDING_MODEL", "SOLVING", "FORMATTING_RESULT"}:
-            raise HTTPException(status_code=409, detail="Running tasks must be cancelled before their records can be deleted")
         with STORE.lock:
+            task = self.get_task(task_id)
+            if task.status in {"PENDING", "QUEUED", "RUNNING", "VALIDATING", "BUILDING_MODEL", "SOLVING", "FORMATTING_RESULT"}:
+                raise HTTPException(status_code=409, detail="Running tasks must be cancelled before their records can be deleted")
             STORE.tasks.pop(task_id, None)
             STORE.results.pop(task_id, None)
             STORE.save_runtime()
 
-    def _prepare_request(self, req: SolveRequest) -> None:
+    def _prepare_request(self, req: SolveRequest, *, testing_model=None) -> None:
         user_parameter_keys = set(req.parameters or {})
         user_runtime_keys = set(req.runtime_parameters or {})
         user_payload_keys = set(req.payload or {})
@@ -179,8 +196,8 @@ class JobService:
                 return
             raise HTTPException(status_code=422, detail="model_id or model_code is required for semantic optimization")
 
-        model = model_service.get_model(req.model_id)
-        if model.status not in DIRECT_CALLABLE_STATUSES:
+        model = testing_model or model_service.get_model(req.model_id)
+        if testing_model is None and model.status not in DIRECT_CALLABLE_STATUSES:
             raise HTTPException(status_code=409, detail=f"Model is not callable in status: {model.status}")
         req.scene = model.scene
         req.model = model.name
@@ -196,6 +213,8 @@ class JobService:
         self._validate_set_references(semantic_spec, component_spec, generic_spec)
         runtime_parameters = map_business_parameters(semantic_spec, req.parameters)
         merged = {**self._default_parameters_from_model(model), **deepcopy(runtime_parameters), **deepcopy(req.payload)}
+        from app.services.function_dependencies import dependency_snapshots
+        merged["_function_asset_snapshots"] = dependency_snapshots(model, require_pinned=bool(model.published_at))
         if explicit_horizon is not None:
             merged["horizon"] = explicit_horizon
         if req.interval_minutes is not None:
@@ -254,6 +273,7 @@ class JobService:
             "scene": model.scene,
             "version": model.version,
             "content_hash": model.content_hash,
+            "function_dependencies": deepcopy(model.function_dependencies),
             "objective": model.objective,
             "tags": list(model.tags or []),
             "semantic_spec": deepcopy(semantic_spec),
@@ -291,6 +311,14 @@ class JobService:
 
     def _instantiate_generic_spec(self, template: dict, runtime_payload: dict) -> dict:
         spec = {**template}
+        from app.model_dimensions import extract_dimensions
+        spec["parameter_dimensions"] = {
+            **(spec.get("parameter_dimensions") or {}),
+            **{
+                str(item.get("math_param") or item.get("code") or item.get("key")): extract_dimensions(item)
+                for item in (runtime_payload.get("semantic_spec") or {}).get("parameters") or []
+            },
+        }
         params = dict(spec.get("parameters", {}))
         params.update({key: value for key, value in runtime_payload.items() if key not in {"generic_spec", "semantic_spec"}})
         spec["parameters"] = params

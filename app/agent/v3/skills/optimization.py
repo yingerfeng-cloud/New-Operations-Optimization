@@ -146,6 +146,7 @@ class OptimizationTaskEngine:
 
     @staticmethod
     def _public_result(task: dict[str, Any], response: dict[str, Any]) -> dict[str, Any]:
+        from app.agent.public_projection import public_projection
         public = copy.deepcopy(response)
         public["conversation_id"] = task["conversation_id"]
         public["task_id"] = task["task_id"]
@@ -157,7 +158,7 @@ class OptimizationTaskEngine:
         # Execution-context IDs are an implementation detail and must never be
         # rendered, returned to the model, or accepted back from a client.
         public.pop("execution_context_id", None)
-        return public
+        return public_projection(public)
 
     @staticmethod
     def _clarify_unavailable_defaults(

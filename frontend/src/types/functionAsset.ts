@@ -1,5 +1,7 @@
 export interface FunctionAsset {
   function_id: string;
+  revision?: number;
+  content_hash?: string;
   name: string;
   function_type: 'piecewise_1d' | 'piecewise_2d' | 'piecewise_nd' | 'formula';
   input_schema?: Array<Record<string, unknown>>;

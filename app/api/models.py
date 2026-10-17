@@ -69,6 +69,11 @@ def test_model(model_id: str, test_case: dict) -> ModelView:
     return model_service.run_model_test_case(model_id, test_case)
 
 
+@router.post("/models/{model_id}/test-jobs")
+def start_model_test(model_id: str, test_case: dict) -> dict:
+    return model_service.start_model_test(model_id, test_case).view().model_dump()
+
+
 @router.post("/models/{model_id}/offline", response_model=ModelView)
 def offline_model(model_id: str) -> ModelView:
     return model_service.offline_model(model_id)

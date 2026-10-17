@@ -2,8 +2,8 @@ from __future__ import annotations
 
 
 SOLVER_CAPABILITIES = {
-    "highs": ["LP", "MILP", "QP", "MIQP"],
-    "appsi_highs": ["LP", "MILP", "QP", "MIQP"],
+    "highs": ["LP", "MILP"],
+    "appsi_highs": ["LP", "MILP"],
     "ipopt": ["NLP"],
     "scip": ["MINLP"],
     "scip/bonmin": ["MINLP"],

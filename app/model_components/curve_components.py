@@ -85,10 +85,10 @@ class FunctionMappingComponent:
         function_id = _function_id(cfg, context, "function_asset_id", "curve_asset_id", "curve")
         if not function_id:
             raise RuntimeError("function_mapping_component requires function_asset_id")
-        asset = get_function_asset(function_id)
+        asset = get_function_asset(function_id, (context.get("runtime_parameters") or {}).get("_function_asset_snapshots"))
         if asset.get("function_type", "piecewise_1d") != "piecewise_1d":
             raise RuntimeError("function_mapping_component currently supports only piecewise_1d assets")
-        get_function_asset_points(function_id)
+        get_function_asset_points(function_id, (context.get("runtime_parameters") or {}).get("_function_asset_snapshots"))
         _validate_domain_coverage(cfg, asset, context, axes=("x",))
         if not cfg.get("x") or not cfg.get("y"):
             raise RuntimeError("function_mapping_component requires x and y expressions")
@@ -97,8 +97,8 @@ class FunctionMappingComponent:
         cfg = _component_config(spec)
         strategy = str(cfg.get("solve_strategy") or cfg.get("interpolation_mode") or "segment_binary")
         function_id = _function_id(cfg, context, "function_asset_id", "curve_asset_id", "curve")
-        asset = get_function_asset(function_id)
-        points = get_function_asset_points(function_id)
+        asset = get_function_asset(function_id, (context.get("runtime_parameters") or {}).get("_function_asset_snapshots"))
+        points = get_function_asset_points(function_id, (context.get("runtime_parameters") or {}).get("_function_asset_snapshots"))
         record = {
             "component": self.component_type,
             "function_asset_id": function_id,
@@ -186,7 +186,7 @@ class FunctionMapping2DComponent:
         function_id = _function_id(cfg, context, "function_asset_id")
         if not function_id:
             raise RuntimeError("function_mapping_2d_component requires function_asset_id")
-        asset = get_function_asset(function_id)
+        asset = get_function_asset(function_id, (context.get("runtime_parameters") or {}).get("_function_asset_snapshots"))
         if asset.get("function_type") != "piecewise_2d":
             raise RuntimeError("function_mapping_2d_component requires a piecewise_2d asset")
         if not cfg.get("x") or not cfg.get("y") or not cfg.get("z"):
@@ -196,7 +196,7 @@ class FunctionMapping2DComponent:
             return
         if strategy == "convex_hull_lp_approx":
             raise RuntimeError("convex_hull_lp_approx is diagnostic/display-only in this phase and cannot be used as an exact solve component")
-        surface = get_function_asset_surface(function_id)
+        surface = get_function_asset_surface(function_id, (context.get("runtime_parameters") or {}).get("_function_asset_snapshots"))
         if not surface["triangles"]:
             raise RuntimeError("function_mapping_2d_component requires triangles for triangulated_milp_exact")
         _validate_domain_coverage(cfg, {**asset, "domain": surface["domain"]}, context, axes=("x", "y"))
@@ -205,7 +205,7 @@ class FunctionMapping2DComponent:
         cfg = _component_config(spec)
         strategy = str(cfg.get("solve_strategy") or "triangulated_milp_exact")
         function_id = _function_id(cfg, context, "function_asset_id")
-        surface = get_function_asset_surface(function_id)
+        surface = get_function_asset_surface(function_id, (context.get("runtime_parameters") or {}).get("_function_asset_snapshots"))
         points: list[list[float]] = surface["points_2d"]
         triangles: list[list[int]] = surface["triangles"]
         indices = cfg.get("indices") or cfg.get("index") or [{"set": "time", "alias": "t"}]

@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { getResult, getResults } from '../../api/results';
 import { getModel } from '../../api/models';
+import { QueryState } from '../../components/QueryState';
 import { DataTable } from '../../components/DataTable';
 import { JsonViewer } from '../../components/JsonViewer';
 import { PageHeader } from '../../components/PageHeader';
@@ -70,11 +71,12 @@ export function ResultCenterPage() {
     <>
       <PageHeader title="结果报告库" description="查看求解结果、关键指标、变量曲线、业务解释和 JSON 结果。导出报告（预留）位于结果详情高级操作，不作为主流程按钮开放。" />
       <MetricGrid columns={3}>
-        <MetricCard title="归档报告" value={rows.length} description="可查看的求解结果" tone="blue" />
-        <MetricCard title="模型种类" value={coveredModels} description="当前归档涉及的模型" tone="green" />
+        <MetricCard title="归档报告" value={list.data === undefined ? '—' : rows.length} description="可查看的求解结果" tone="blue" />
+        <MetricCard title="模型种类" value={list.data === undefined ? '—' : coveredModels} description="当前归档涉及的模型" tone="green" />
         <MetricCard title="最近完成" value={latestFinishedText} description="最新报告归档时间" tone="amber" />
       </MetricGrid>
       <Card className="content-card section-gap" title="结果列表">
+        <QueryState query={list} title="结果列表">
         {rows.length ? (
           <DataTable<SolveResult>
             dataSource={rows}
@@ -91,6 +93,7 @@ export function ResultCenterPage() {
         ) : (
           <EmptyActionState title="暂无结果报告" description="发起求解任务并完成运行后，这里会展示结论摘要、关键指标和变量曲线。" action={<Button type="primary" href="/tasks">去发起求解任务</Button>} />
         )}
+        </QueryState>
       </Card>
       <Drawer
         size="large"
@@ -99,8 +102,10 @@ export function ResultCenterPage() {
         title={`结果报告 ${id || ''}`}
         footer={<Space style={{ width: '100%', justifyContent: 'flex-end' }}><span className="muted">高级操作：导出报告预留，未作为主流程能力开放。</span><Button onClick={() => setId(undefined)}>关闭</Button></Space>}
       >
+        <QueryState query={detail} title="结果报告">
         <ResultKpiStrip result={detail.data} labelMap={labelMap} />
         <Tabs className="section-gap" items={resultViews.map(view => ({ key: view.key, label: view.label, children: <div className="panel"><ResultView view={view} result={detail.data} labelMap={labelMap} /></div> }))} />
+        </QueryState>
       </Drawer>
     </>
   );

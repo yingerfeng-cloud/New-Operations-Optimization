@@ -140,12 +140,18 @@ class AgentV3Runtime:
         conversation_id: str | None,
         operation: Callable[[], dict[str, Any]],
     ) -> dict[str, Any]:
+        from app.agent.public_projection import public_projection
         if not conversation_id:
-            return operation()
+            return public_projection(operation())
+        from app.storage.memory_store import STORE
+        with STORE.lock:
+            existing = STORE.conversations.get(conversation_id) or {}
+            if existing.get("kind") == "task_context" or str(conversation_id).startswith("CTX-"):
+                raise HTTPException(status_code=404, detail="Conversation not found")
         with self._lock_guard:
             conversation_lock = self._conversation_locks.setdefault(conversation_id, threading.RLock())
         with conversation_lock:
-            return operation()
+            return public_projection(operation())
 
     def _run_turn_locked(
         self,
@@ -727,7 +733,8 @@ class AgentV3Runtime:
         conversation["turns"] = agent_v3_store.list_turns(conversation_id)
         conversation["events"] = agent_v3_store.list_events(conversation_id)
         response["conversation"] = conversation
-        return response
+        from app.agent.public_projection import public_projection
+        return public_projection(response)
 
     @staticmethod
     def _record_turn_failure(conversation_id: str, turn_id: str, prior_sequence: int, exc: Exception) -> None:
@@ -940,7 +947,8 @@ class AgentV3Runtime:
 
     @staticmethod
     def _bounded_json(value: Any, max_chars: int) -> str:
-        serialized = json.dumps(value, ensure_ascii=False, default=str)
+        from app.agent.public_projection import public_projection
+        serialized = json.dumps(public_projection(value), ensure_ascii=False, default=str)
         if len(serialized) <= max_chars:
             return serialized
         return json.dumps(

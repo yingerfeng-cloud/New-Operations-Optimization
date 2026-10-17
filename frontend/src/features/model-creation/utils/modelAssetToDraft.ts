@@ -402,7 +402,7 @@ export function modelAssetToDraft(asset: ModelAsset): ModelDraft {
       scenario: String(asset.scene || savedBasic.scenario || semanticSpec.scenario || base.basic_info.scenario),
       builder_mode: asBuildMode(asset.build_mode || savedBasic.builder_mode || semanticSpec.build_mode || componentSpec.build_mode),
       solver: String(asset.solver || savedBasic.solver || 'HiGHS'),
-      template_code: String(asset.template_id || savedBasic.template_code || semanticSpec.model_code || semanticSpec.code || asset.id),
+      template_code: String(savedBasic.template_code || semanticSpec.template_code || asset.template_id || semanticSpec.model_code || semanticSpec.code || asset.id),
     },
     semantic: {
       ui_metadata: objectValue(semanticSource.ui_metadata),

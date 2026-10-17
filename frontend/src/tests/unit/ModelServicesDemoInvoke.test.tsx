@@ -29,7 +29,8 @@ vi.mock('../../api/models', () => ({
   }],
   getModelAssetDetail: async () => ({ sample_runtime_parameters: { horizon: 3, time: [0, 1, 2], k: 0.9, flow_min: 10, flow_max: 100, head_min: 20, head_max: 80, power_max: 5000 } }),
 }));
-vi.mock('../../api/tasks', () => ({ createTask: state.createTask }));
+vi.mock('../../api/tasks', () => ({ createTask: state.createTask, getTask: async () => ({ id: 'TASK-NLP', status: 'SUCCESS', solver: 'Ipopt' }) }));
+vi.mock('../../api/results', () => ({ getResult: async () => ({ local_optimum_warning: true, problem_type: 'NLP', solver: 'Ipopt', termination_condition: 'locallyOptimal' }) }));
 
 beforeAll(async () => {
   vi.resetModules();
@@ -46,5 +47,5 @@ test('model services shows NLP sample and enriched debug response', async () => 
   fireEvent.click(within(debugPanel).getByRole('button', { name: '发起测试调用' }));
   await waitFor(() => expect(state.createTask).toHaveBeenCalled());
   expect(await screen.findByText('调试返回')).toBeInTheDocument();
-  expect(document.body.textContent).toContain('local_optimum_warning');
+  await waitFor(() => expect(document.body.textContent).toContain('local_optimum_warning'));
 });

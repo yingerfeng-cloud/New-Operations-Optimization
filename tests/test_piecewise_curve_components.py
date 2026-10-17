@@ -111,7 +111,7 @@ def test_piecewise_solve_active_model_dry_run_and_invoke_success() -> None:
     values = result.variable_values["cost"]
     assert math.isclose(values["cost[0]"], 100.0, abs_tol=1e-5)
     assert math.isclose(values["cost[1]"], 260.0, abs_tol=1e-5)
-    assert context["metadata"]["piecewise_constraints"][0]["compiler"] == "convex_combination_lp"
+    assert context["metadata"]["piecewise_constraints"][0]["compiler"] == "piecewise_1d_segment_binary"
 
 
 def test_piecewise_solve_active_rejects_missing_curve() -> None:

@@ -7,6 +7,7 @@ from fastapi import APIRouter, Header, Query
 from fastapi.responses import StreamingResponse
 
 from app.agent.conversation_store import conversation_store
+from app.agent.public_projection import public_projection
 from app.agent.orchestrator import agent_orchestrator
 from app.agent.platform_client import platform_client
 from app.agent.platform_gateway import service_mode
@@ -136,7 +137,7 @@ def agent_get_conversation(conversation_id: str) -> dict:
         active_run_id = str(detail.get("active_run_id") or "")
         active_run = next((run for run in runs if str(run.get("run_id") or "") == active_run_id), None)
         active_run = active_run or (legacy_runs[0] if legacy_runs else None)
-    return {
+    return public_projection({
         **{key: value for key, value in detail.items() if key not in {"model_messages", "turn_receipts"}},
         "agent_tasks": [agent_v3_store.public_task(task) for task in tasks],
         "turns": agent_v3_store.list_turns(conversation_id),
@@ -144,7 +145,7 @@ def agent_get_conversation(conversation_id: str) -> dict:
         "pending_approvals": agent_v3_store.list_approvals_for_conversation(conversation_id, pending_only=True),
         "active_run": active_run,
         "runs": runs,
-    }
+    })
 
 
 @router.patch("/conversations/{conversation_id}")
@@ -169,7 +170,7 @@ def agent_v3_create_turn(conversation_id: str, body: AgentTurnRequest) -> dict:
 
 @router.get("/v3/turns/{turn_id}")
 def agent_v3_get_turn(turn_id: str) -> dict:
-    return agent_v3_store.get_turn(turn_id)
+    return public_projection(agent_v3_store.get_turn(turn_id))
 
 
 @router.post("/v3/turns/{turn_id}/retry")
@@ -225,7 +226,7 @@ def agent_v3_cancel_task(task_id: str) -> dict:
 
 @router.get("/v3/approvals/{approval_id}")
 def agent_v3_get_approval(approval_id: str) -> dict:
-    return agent_v3_store.get_approval(approval_id)
+    return public_projection(agent_v3_store.get_approval(approval_id))
 
 
 @router.post("/v3/approvals/{approval_id}/resolve")
@@ -233,7 +234,7 @@ def agent_v3_resolve_approval(approval_id: str, body: AgentApprovalRequest) -> d
     response = agent_v3_runtime.resolve_approval(approval_id, body.decision, body.comment)
     if isinstance(response.get("task"), dict):
         response["task"] = agent_v3_store.public_task(response["task"])
-    return response
+    return public_projection(response)
 
 
 @router.get("/runs/{run_id}")

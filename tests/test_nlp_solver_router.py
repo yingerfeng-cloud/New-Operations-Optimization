@@ -121,13 +121,15 @@ def test_job_runner_resolves_auto_solver_to_ipopt_for_nlp(monkeypatch: pytest.Mo
 
     monkeypatch.setattr("app.jobs.job_runner.PyomoModelBuilder", FakeBuilder)
     monkeypatch.setattr("app.jobs.job_runner.solver_router.route", fake_route)
-    monkeypatch.setattr(runner, "_get_task", lambda task_id: task)
-    monkeypatch.setattr(runner, "_update", lambda current, status, progress: setattr(current, "status", status))
-    monkeypatch.setattr(runner, "_finish", lambda current, status, error=None: setattr(current, "status", status))
+    # Use the same store instance as this runner. Persistence tests reload the
+    # memory_store module, which deliberately creates another global instance.
+    from app.jobs.job_runner import STORE
+    STORE.tasks[task.id] = task
     monkeypatch.setattr(runner, "_log", lambda *args, **kwargs: None)
 
     runner.run(task.id)
 
+    assert "requested_solver" in captured, (STORE.tasks[task.id].status, STORE.tasks[task.id].error)
     assert captured["requested_solver"] is None
     assert task.request.solver == "Ipopt"
     assert task.status == "FAILED"

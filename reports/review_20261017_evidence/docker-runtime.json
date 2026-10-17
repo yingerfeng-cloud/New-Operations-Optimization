@@ -1,0 +1,10 @@
+{
+  "python": "3.12.15",
+  "node": "v22.23.2",
+  "packages": {
+    "pyomo": "6.10.1",
+    "highspy": "1.15.1",
+    "cryptography": "46.0.7"
+  },
+  "ipopt": "Ipopt 3.14.20 (Linux aarch64), ASL(20231111)"
+}

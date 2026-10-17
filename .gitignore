@@ -24,3 +24,5 @@ __pycache__/
 .pytest_cache/
 pytest_tmp/
 __chrome_*_profile*/
+.optiforge-config-secret
+reports/review_20261017_evidence/*.png

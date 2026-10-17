@@ -245,6 +245,16 @@ def _apply_horizon_metadata(params: dict, config: dict, horizon: int, provided_k
     expected_delta = _mapping_value(config.get("delta_t_by_horizon"), horizon) if allowed_horizons else config.get("delta_t")
     if expected_delta is None and expected_interval is not None:
         expected_delta = float(expected_interval) / 60
+    if expected_interval is None and expected_delta is not None:
+        expected_interval = float(expected_delta) * 60
+    if expected_interval is not None and "time_step_seconds" in params:
+        expected_seconds = float(expected_interval) * 60
+        if not _numbers_match(params["time_step_seconds"], expected_seconds):
+            _raise_detail(
+                "time_step_seconds 与模型时间维度契约不一致，请统一秒、分钟和小时配置。",
+                [{"field": "time_step_seconds", "error": "time_granularity_mismatch", "expected": expected_seconds, "actual": params["time_step_seconds"]}],
+            )
+        params["time_step_seconds"] = expected_seconds
     for field, expected in (("interval_minutes", expected_interval), ("delta_t", expected_delta)):
         if expected is None:
             continue

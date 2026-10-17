@@ -53,9 +53,36 @@ function metricRows(result?: SolveResult) {
   return Object.entries(metrics).slice(0, 4);
 }
 
-type NumericSeries = { name: string; values: number[]; labels: string[] };
+const isIndexField = (key: string) => /^(time|time_index|time_label|timestamp|date|datetime|index|id|step|period)$/i.test(key) || /(_index|_id)$/i.test(key);
 
-function numericSeries(result?: SolveResult, labelMap?: ResultLabelMap): NumericSeries[] {
+function rowsSeries(name: string, definition: Record<string, unknown>, labelMap?: ResultLabelMap): NumericSeries[] {
+  const rows = Array.isArray(definition.rows) ? definition.rows.filter((row): row is Record<string, unknown> => !!row && typeof row === 'object' && !Array.isArray(row)) : [];
+  if (rows.length < 2) return [];
+  const fields = Object.keys(rows[0]);
+  const x = String(definition.x_field || fields.find(key => /^(time|time_index|timestamp|date|datetime|step|period)$/i.test(key)) || '');
+  const group = String(definition.group_field || '');
+  const requested = Array.isArray(definition.y_fields) ? definition.y_fields.map(String) : definition.y_field ? [String(definition.y_field)] : fields.filter(key => key !== x && key !== group && !isIndexField(key)).sort();
+  const measures = requested.filter(key => key !== x && key !== group && rows.every(row => typeof row[key] === 'number' && Number.isFinite(row[key])));
+  const groups = new Map<string, typeof rows>();
+  rows.forEach(row => {
+    const label = group ? String(row[group] ?? '') : '';
+    groups.set(label, [...(groups.get(label) || []), row]);
+  });
+  const units = objectValue(definition.units);
+  return [...groups.entries()].flatMap(([label, points]) => measures.map(key => ({
+    name: [resultLabel(name, labelMap), resultLabel(key, labelMap), label].filter(Boolean).join(' · '),
+    values: points.map(row => Number(row[key])),
+    labels: points.map((row, index) => String(row[x] ?? index)),
+    unit: String(units[key] || definition.unit || ''),
+    xLabel: String(definition.x_label || (x ? resultLabel(x, labelMap) : '时段')),
+  })));
+}
+
+export type NumericSeries = { name: string; values: number[]; labels: string[]; unit?: string; xLabel?: string };
+
+export function numericSeries(result?: SolveResult, labelMap?: ResultLabelMap): NumericSeries[] {
+  const explicit = (result?.timeseries || []).flatMap((definition, index) => rowsSeries(definition.name || `曲线 ${index + 1}`, definition as unknown as Record<string, unknown>, labelMap));
+  if (explicit.length) return explicit;
   const candidates = [
     objectValue(result?.variables),
     objectValue(result?.variable_values),
@@ -63,19 +90,13 @@ function numericSeries(result?: SolveResult, labelMap?: ResultLabelMap): Numeric
   ];
   for (const source of candidates) {
     for (const [name, value] of Object.entries(source)) {
+      if (isIndexField(name)) continue;
       if (Array.isArray(value) && value.length > 1 && value.every(item => typeof item === 'number')) {
         return [{ name: resultLabel(name, labelMap), values: value as number[], labels: value.map((_, index) => String(index)) }];
       }
       if (value && typeof value === 'object') {
-        const rows = (value as Record<string, unknown>).rows;
-        if (Array.isArray(rows)) {
-          const numericKey = Object.keys(rows[0] || {}).find(key => rows.every(row => typeof row?.[key] === 'number'));
-          if (numericKey && rows.length > 1) return [{
-            name: `${resultLabel(name, labelMap)} · ${resultLabel(numericKey, labelMap)}`,
-            values: rows.map(row => row[numericKey] as number),
-            labels: rows.map((row, index) => String(row.time ?? row.time_index ?? index)),
-          }];
-        }
+        const rowSeries = rowsSeries(name, value as Record<string, unknown>, labelMap);
+        if (rowSeries.length) return rowSeries;
 
         const scalarEntries = Object.entries(value as Record<string, unknown>).filter((entry): entry is [string, number] => typeof entry[1] === 'number' && Number.isFinite(entry[1]));
         const groups = new Map<string, Array<{ time: number; label: string; value: number }>>();
@@ -120,8 +141,9 @@ export function ResultKpiStrip({ result, labelMap }: { result?: SolveResult; lab
 export function ResultChartPanel({ result, labelMap }: { result?: SolveResult; labelMap?: ResultLabelMap }) {
   const chartSeries = numericSeries(result, labelMap);
   if (!chartSeries.length) return <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="当前结果未返回可绘制的时序变量；目标函数值是单个汇总指标，不作为曲线展示。" />;
-  const labels = chartSeries.reduce((longest, series) => series.labels.length > longest.length ? series.labels : longest, [] as string[]);
   const hasLegend = chartSeries.length > 1;
+  const labels = [...new Set(chartSeries.flatMap(series => series.labels))];
+  const units = [...new Set(chartSeries.map(series => series.unit || ''))];
   return (
     <LazyEChart
       style={{ height: 400 }}
@@ -130,14 +152,15 @@ export function ResultChartPanel({ result, labelMap }: { result?: SolveResult; l
         grid: { top: hasLegend ? 78 : 52, right: 24, bottom: 36, left: 48 },
         tooltip: { trigger: 'axis' },
         legend: hasLegend ? { top: 36, left: 12, right: 16, type: 'scroll' } : undefined,
-        xAxis: { type: 'category', name: '时段', data: labels },
-        yAxis: { type: 'value' },
+        xAxis: { type: 'category', name: chartSeries[0].xLabel || '时段', data: labels },
+        yAxis: units.map((unit, index) => ({ type: 'value', name: unit, position: index % 2 ? 'right' : 'left', offset: Math.floor(index / 2) * 56 })),
         series: chartSeries.map((series, index) => ({
           name: series.name,
           type: 'line',
           smooth: true,
           symbolSize: 7,
-          data: series.values,
+          yAxisIndex: units.indexOf(series.unit || ''),
+          data: labels.map(label => { const point = series.labels.indexOf(label); return point < 0 ? null : series.values[point]; }),
           lineStyle: { width: 3 },
           areaStyle: chartSeries.length === 1 && index === 0 ? { opacity: 0.1 } : undefined,
         })),

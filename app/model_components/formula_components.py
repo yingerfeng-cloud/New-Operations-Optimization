@@ -381,18 +381,14 @@ class DynamicFormulaComponent:
         y_node, x_node, curve_name = parsed
         points = _curve_points_for_context(self.definition, curve_name, context)
         _assert_valid_curve_points(points, field=f"{curve_name}.points")
-        point_count = len(points)
-        point_set_name = _safe_name(f"{name}_points")
-        setattr(model, point_set_name, pyo.RangeSet(0, point_count - 1))
-        point_set = getattr(model, point_set_name)
+        from app.services.pwl_modeling_service import pwl_modeling_service
+
+        method = str(constraint.get("piecewise_method") or "binary_segment").lower()
+        methods = {"binary_segment": "segment_binary", "segment_binary": "segment_binary", "sos2": "sos2"}
+        if method not in methods:
+            raise RuntimeError(f"Unsupported exact piecewise_method: {method}; use binary_segment or sos2")
         index_specs = _normalize_index_specs(indices)
         index_sets = [getattr(model, item["set"]) for item in index_specs]
-        lambda_name = _safe_name(f"{name}_lambda")
-        if index_sets:
-            setattr(model, lambda_name, pyo.Var(*index_sets, point_set, bounds=(0, 1)))
-        else:
-            setattr(model, lambda_name, pyo.Var(point_set, bounds=(0, 1)))
-        lambda_var = getattr(model, lambda_name)
 
         def scoped_indices(values: tuple[Any, ...]) -> dict[str, Any]:
             scoped: dict[str, Any] = {}
@@ -401,43 +397,19 @@ class DynamicFormulaComponent:
                 scoped[item["alias"]] = value
             return scoped
 
-        def lam(values: tuple[Any, ...], point_index: int) -> Any:
-            return lambda_var[(*values, point_index)] if values else lambda_var[point_index]
-
-        def lambda_sum_rule(_m: Any, *values: Any) -> Any:
-            return sum(lam(values, i) for i in range(point_count)) == 1
-
-        def x_rule(_m: Any, *values: Any) -> Any:
-            scoped = scoped_indices(values)
-            return _eval_formula_node(x_node, model, context, scoped) == sum(float(points[i][0]) * lam(values, i) for i in range(point_count))
-
-        def y_rule(_m: Any, *values: Any) -> Any:
-            scoped = scoped_indices(values)
-            return _eval_formula_node(y_node, model, context, scoped) == sum(float(points[i][1]) * lam(values, i) for i in range(point_count))
-
-        sum_name = _safe_name(f"{name}_lambda_sum")
-        x_name = _safe_name(f"{name}_x_link")
-        y_name = _safe_name(f"{name}_y_link")
-        if index_sets:
-            setattr(model, sum_name, pyo.Constraint(*index_sets, rule=lambda_sum_rule))
-            setattr(model, x_name, pyo.Constraint(*index_sets, rule=x_rule))
-            setattr(model, y_name, pyo.Constraint(*index_sets, rule=y_rule))
-        else:
-            setattr(model, sum_name, pyo.Constraint(rule=lambda m: lambda_sum_rule(m)))
-            setattr(model, x_name, pyo.Constraint(rule=lambda m: x_rule(m)))
-            setattr(model, y_name, pyo.Constraint(rule=lambda m: y_rule(m)))
-        context["constraints"][sum_name] = getattr(model, sum_name)
-        context["constraints"][x_name] = getattr(model, x_name)
-        context["constraints"][y_name] = getattr(model, y_name)
-        context["metadata"].setdefault("piecewise_constraints", []).append(
-            {
-                "constraint_id": constraint.get("constraint_id") or name,
-                "curve": curve_name,
-                "interpolation": "linear",
-                "compiler": "convex_combination_lp",
-                "points": points,
-            }
+        metadata = pwl_modeling_service.add_piecewise_1d(
+            model, base_name=name, index_sets=index_sets, index_count=len(index_specs), points=points,
+            x_expr=lambda values: _eval_formula_node(x_node, model, context, scoped_indices(values)),
+            y_expr=lambda values: _eval_formula_node(y_node, model, context, scoped_indices(values)),
+            interpolation_mode=methods[method],
         )
+        for suffix in ("lambda_sum", "segment_sum", "adjacency", "x_link", "y_link"):
+            component_name = _safe_name(f"{name}_{suffix}")
+            context["constraints"][component_name] = getattr(model, component_name)
+        context["metadata"].setdefault("piecewise_constraints", []).append({
+            "constraint_id": constraint.get("constraint_id") or name, "curve": curve_name,
+            "interpolation": "linear", "requested_method": method, **metadata,
+        })
 
 
 def _eval_formula_node(node: ast.AST, model: Any, context: dict[str, Any], local_indices: dict[str, Any]) -> Any:
@@ -780,6 +752,9 @@ def _validate_piecewise_constraint(component: dict[str, Any], item: dict[str, An
         except ValueError as exc:
             errors.append(_error(f"constraints[{index}].curve", str(exc), "Fix curve points before publish."))
     interpolation = str(item.get("interpolation") or (curve or {}).get("interpolation") or "linear").lower()
+    method = str(item.get("piecewise_method") or "binary_segment").lower()
+    if method not in {"binary_segment", "segment_binary", "sos2"}:
+        errors.append(_error(f"constraints[{index}].piecewise_method", f"Unsupported exact piecewise_method: {method}", "Use binary_segment or sos2 (compiled as equivalent segment binaries on HiGHS)."))
     if interpolation != "linear":
         errors.append(_error(f"constraints[{index}].interpolation", "solve_active piecewise only supports linear interpolation", "Change to linear or mark the constraint display_only."))
     return errors

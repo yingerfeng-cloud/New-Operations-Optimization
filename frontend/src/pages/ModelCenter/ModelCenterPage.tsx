@@ -6,6 +6,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate, useParams } from 'react-router-dom';
 import { getModel, getModelAssetDetail, getModels, offlineModel, publishModel, returnModelToDraft, testModel } from '../../api/models';
 import { cloneTemplate, getTemplates } from '../../api/templates';
+import { QueryState } from '../../components/QueryState';
 import { DataTable } from '../../components/DataTable';
 import { PageHeader } from '../../components/PageHeader';
 import { StatusTag } from '../../components/StatusTag';
@@ -235,10 +236,10 @@ export function ModelCenterPage() {
         extra={<><Button onClick={() => setTemplateOpen(true)}>从模板克隆</Button><Button type="primary" onClick={() => nav('/models/create')}>创建模型</Button></>}
       />
       <MetricGrid>
-        <MetricCard title="模型资产数" value={rows.length} description="真实后端资产" tone="blue" />
-        <MetricCard title="正式服务" value={publishedCount} description="已发布，可被 API / Skill 调用" tone="green" />
-        <MetricCard title="试运行验收" value={trialCount} description="仅按 model_id 调试" tone="purple" />
-        <MetricCard title="草稿" value={developingCount} description="可直接编辑的未发布版本" tone="amber" />
+        <MetricCard title="模型资产数" value={models.data === undefined ? '—' : rows.length} description="真实后端资产" tone="blue" />
+        <MetricCard title="正式服务" value={models.data === undefined ? '—' : publishedCount} description="已发布，可被 API / Skill 调用" tone="green" />
+        <MetricCard title="试运行验收" value={models.data === undefined ? '—' : trialCount} description="仅按 model_id 调试" tone="purple" />
+        <MetricCard title="草稿" value={models.data === undefined ? '—' : developingCount} description="可直接编辑的未发布版本" tone="amber" />
       </MetricGrid>
       <Card className="content-card section-gap" title="模型资产列表">
         <FilterBar onReset={() => setFilters({})}>
@@ -248,7 +249,7 @@ export function ModelCenterPage() {
           <Select allowClear placeholder="状态" style={{ width: 140 }} value={filters.status} onChange={status => setFilters({ ...filters, status })} options={[...new Set(allRows.map(item => String(item.status)).filter(Boolean))].map(value => ({ value, label: statusText(value) }))} />
           <Select allowClear placeholder="业务场景" style={{ width: 160 }} value={filters.scene} onChange={scene => setFilters({ ...filters, scene })} options={[...new Set(allRows.map(item => String(item.scene || '')).filter(Boolean))].map(value => ({ value, label: value }))} />
         </FilterBar>
-        <DataTable<ModelAsset>
+        <QueryState query={models} title="模型列表"><DataTable<ModelAsset>
           className="model-asset-table"
           loading={models.isLoading}
           dataSource={rows}
@@ -368,6 +369,7 @@ export function ModelCenterPage() {
             },
           ]}
         />
+        </QueryState>
       </Card>
       <Drawer
         size="large"
@@ -403,7 +405,7 @@ export function ModelCenterPage() {
           </Space>
         )}
       >
-        {!current && viewId && (detail.isLoading || detail.isFetching) && <Card loading />}
+        {!current && viewId && <QueryState query={detail} title="模型详情"><span /></QueryState>}
         {current && (
           <Tabs
             items={[

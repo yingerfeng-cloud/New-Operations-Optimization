@@ -4,6 +4,8 @@ import threading
 import time
 import traceback
 from datetime import datetime
+from copy import deepcopy
+from uuid import uuid4
 from typing import Any
 
 from app.builders.pyomo_builder import PyomoModelBuilder
@@ -28,18 +30,34 @@ MAX_SOLVER_PROGRESS_EVENTS = 80
 GAP_MILESTONES = (0.1, 0.05, 0.01, 0.001)
 
 
+ACTIVE_STATUSES = {"PENDING", "QUEUED", "RUNNING", "VALIDATING", "BUILDING_MODEL", "SOLVING", "FORMATTING_RESULT"}
+
+
+class AttemptAbandoned(Exception):
+    """The execution lost ownership after cancellation, deletion or retry."""
+
+
 class JobRunner:
     def start(self, task_id: str) -> None:
-        threading.Thread(target=self.run, args=(task_id,), daemon=True).start()
+        with STORE.lock:
+            task = STORE.tasks.get(task_id)
+            if task is None:
+                return
+            attempt_id = task.attempt_id
+        threading.Thread(target=self.run, args=(task_id, attempt_id), daemon=True).start()
 
-    def run(self, task_id: str) -> None:
-        task = self._get_task(task_id)
-        if task.status == "CANCELLED":
-            return
+    def run(self, task_id: str, attempt_id: str | None = None) -> None:
+        with STORE.lock:
+            current = STORE.tasks.get(task_id)
+            if current is None or current.status not in {"PENDING", "QUEUED"} or attempt_id is not None and current.attempt_id != attempt_id:
+                return
+            current.status = "RUNNING"
+            # Workers never mutate the authoritative record outside guarded commits.
+            task = deepcopy(current)
+            task._worker_attempt = True
         try:
             with STORE.scheduler:
-                if task.status == "CANCELLED":
-                    return
+                self._assert_current(task)
                 started = time.monotonic()
                 task.started_at = now_text()
                 self._log(task, "INFO", "任务已进入执行队列")
@@ -146,6 +164,7 @@ class JobRunner:
                 task.trace["format_seconds"] = round(time.monotonic() - format_started, 4)
                 result = {
                     "job_id": task.id,
+                    "attempt_id": task.attempt_id,
                     "model_id": task.request.model_id,
                     "model_code": str(model_code),
                     "status": "SUCCESS",
@@ -202,21 +221,25 @@ class JobRunner:
                     }
                 )
                 result = apply_result_presentation(result)
-                task.result = result
-                task.objective_value = float(solver_result.objective_value) if solver_result.objective_value is not None else None
-                result_metrics = result.get("metrics") if isinstance(result.get("metrics"), dict) else {}
-                business_cost = result_metrics.get("total_cost")
-                if business_cost is None:
-                    business_cost = result_metrics.get("total_operating_cost")
-                if business_cost is None:
-                    business_cost = task.objective_value
-                task.cost = float(business_cost) if business_cost is not None else 0.0
-                task.gap = str(result.get("metrics", {}).get("gap") or "0.00%")
-                task.risk = str(result.get("metrics", {}).get("risk") or "low")
-                self._log(task, "INFO", f"业务结果格式化完成，耗时={task.trace['format_seconds']}s")
-                self._log(task, "INFO", "结果保存开始")
-                self._finish(task, status="SUCCESS")
                 with STORE.lock:
+                    self._assert_current(task)
+                    task.result = result
+                    task.objective_value = float(solver_result.objective_value) if solver_result.objective_value is not None else None
+                    result_metrics = result.get("metrics") if isinstance(result.get("metrics"), dict) else {}
+                    business_cost = result_metrics.get("total_cost")
+                    if business_cost is None:
+                        business_cost = result_metrics.get("total_operating_cost")
+                    if business_cost is None:
+                        business_cost = task.objective_value
+                    task.cost = float(business_cost) if business_cost is not None else 0.0
+                    task.gap = str(result.get("metrics", {}).get("gap") or "0.00%")
+                    task.risk = str(result.get("metrics", {}).get("risk") or "low")
+                    if runtime.get("_model_test"):
+                        from app.services.model_service import model_service
+                        model_service.complete_model_test(task)
+                    self._log(task, "INFO", f"业务结果格式化完成，耗时={task.trace['format_seconds']}s")
+                    self._log(task, "INFO", "结果保存开始")
+                    self._finish(task, status="SUCCESS")
                     STORE.results[task.id] = {
                         "summary": {
                             "model": task.request.model,
@@ -233,7 +256,11 @@ class JobRunner:
                     }
                     STORE.save_runtime()
                 self._log(task, "INFO", "结果保存完成")
+        except AttemptAbandoned:
+            return
         except Exception as exc:
+            if not self._is_current(task):
+                return
             self._fail_solver_progress(task, str(exc))
             diagnosis = diagnose_infeasible(self._model_code(task), task.request.payload or {})
             if isinstance(exc, SolverRouteError):
@@ -245,7 +272,13 @@ class JobRunner:
             if task.retry_count < task.max_retries:
                 task.retry_count += 1
                 task.error = str(exc)
-                self._update(task, status="PENDING", progress=5)
+                with STORE.lock:
+                    if not self._is_current(task):
+                        return
+                    task.attempt_id = uuid4().hex
+                    task.status = "PENDING"
+                    STORE.tasks[task_id] = deepcopy(task)
+                    STORE.save_runtime()
                 self.start(task_id)
                 return
             detail = {"message": str(exc), "diagnosis": diagnosis}
@@ -253,6 +286,21 @@ class JobRunner:
             self._log(task, "ERROR", f"任务失败：{exc}")
             self._log(task, "ERROR", task.trace["exception_summary"])
             self._finish(task, status="INFEASIBLE" if diagnosis else "FAILED", error=str(detail))
+
+    def _is_current(self, task: TaskRecord) -> bool:
+        with STORE.lock:
+            current = STORE.tasks.get(task.id)
+            return current is not None and current.attempt_id == task.attempt_id and current.status in ACTIVE_STATUSES
+
+    def _assert_current(self, task: TaskRecord) -> None:
+        if not self._is_current(task):
+            raise AttemptAbandoned()
+
+    def _commit(self, task: TaskRecord) -> None:
+        self._assert_current(task)
+        current = STORE.tasks[task.id]
+        for key in TaskRecord.__dataclass_fields__:
+            setattr(current, key, deepcopy(getattr(task, key)))
 
     def _get_task(self, task_id: str) -> TaskRecord:
         with STORE.lock:
@@ -282,15 +330,19 @@ class JobRunner:
     def _update(self, task: TaskRecord, *, status: TaskStatus, progress: int) -> None:
         changed_at = now_text()
         with STORE.lock:
+            self._assert_current(task)
             previous_status = task.status
             if previous_status != status:
                 self._finish_stage(task, previous_status, changed_at)
                 self._start_stage(task, status, changed_at)
             task.status = status
             task.progress = progress
+            self._commit(task)
             STORE.save_runtime()
 
     def _finish(self, task: TaskRecord, *, status: TaskStatus, error: str | None = None) -> None:
+        if not self._is_current(task):
+            return
         processed_failure: dict[str, Any] | None = None
         if status in {"FAILED", "INFEASIBLE", "TIMEOUT", "CANCELLED", "INTERRUPTED"}:
             runtime = dict(task.request.payload or {})
@@ -320,6 +372,8 @@ class JobRunner:
                 # Explanation must never mask the original solve failure.
                 processed_failure = failure_result
         with STORE.lock:
+            if not self._is_current(task):
+                return
             if processed_failure is not None:
                 task.result = processed_failure
             active_stage = self._active_stage(task)
@@ -334,6 +388,7 @@ class JobRunner:
                 started = datetime.strptime(task.started_at, "%Y-%m-%d %H:%M:%S")
                 finished = datetime.strptime(task.finished_at, "%Y-%m-%d %H:%M:%S")
                 task.duration_seconds = round((finished - started).total_seconds(), 3)
+            self._commit(task)
             STORE.save_runtime()
 
     @staticmethod
@@ -385,6 +440,14 @@ class JobRunner:
             }
 
     def _record_solver_progress(self, task: TaskRecord, sample: dict[str, Any]) -> None:
+        with STORE.lock:
+            if getattr(task, "_worker_attempt", False) and not self._is_current(task):
+                return
+            self._record_local_solver_progress(task, sample)
+            if getattr(task, "_worker_attempt", False):
+                self._commit(task)
+
+    def _record_local_solver_progress(self, task: TaskRecord, sample: dict[str, Any]) -> None:
         with STORE.lock:
             progress = task.trace.get("solver_progress")
             if not isinstance(progress, dict):
@@ -559,7 +622,10 @@ class JobRunner:
             message = level
             level = "INFO"
         with STORE.lock:
+            if not self._is_current(task):
+                return
             task.logs.append(f"{now_text()} [{level}] {message}")
+            self._commit(task)
 
     def _model_size(self, model: Any) -> dict[str, int]:
         import pyomo.environ as pyo

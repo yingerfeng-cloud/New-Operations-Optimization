@@ -13,8 +13,8 @@ from app.services.nonlinear_analyzer import analyze_component_spec, analyze_draf
 
 INTEGER_DOMAINS = {"BINARY", "BOOL", "BOOLEAN", "INTEGER", "INTEGERS", "INT", "NONNEGATIVEINTEGERS"}
 SOLVER_CAPABILITIES = {
-    "highs": ["LP", "MILP", "QP", "MIQP"],
-    "appsi_highs": ["LP", "MILP", "QP", "MIQP"],
+    "highs": ["LP", "MILP"],
+    "appsi_highs": ["LP", "MILP"],
     "ipopt": ["NLP"],
     "scip": [],
     "scip/bonmin": [],
@@ -149,7 +149,7 @@ def infer_problem_type(
     ):
         expression_class = "nonlinear"
     active_piecewise = [item for item in constraints if _is_active_piecewise(item)]
-    if any(str(item.get("piecewise_method") or item.get("compiler") or "").lower() in {"binary_segment", "dcc", "sos2", "milp", "triangulated_milp_exact"} for item in active_piecewise):
+    if active_piecewise:
         has_integer = True
     if expression_class == "nonlinear":
         inferred = "MINLP_RESERVED" if has_integer else "NLP"
@@ -254,7 +254,7 @@ def component_problem_type_fields(payload: dict[str, Any]) -> dict[str, Any]:
         for item in constraints
         if _is_active_piecewise(item)
     ]
-    if any(str(item.get("piecewise_method") or item.get("compiler") or "").lower() in {"binary_segment", "dcc", "sos2", "milp", "triangulated_milp_exact"} for item in active_piecewise):
+    if active_piecewise:
         has_integer = True
     if expression_class == "nonlinear":
         effect = "MINLP_RESERVED" if has_integer else "NLP"

@@ -141,15 +141,30 @@ class GenericLinearBuilder:
         def var_label(base_name: str, keys: list[Any]) -> str:
             return f"{base_name}[{','.join(map(str, keys))}]" if keys else base_name
 
-        def param(name: str, keys: list[Any]) -> float:
+        def param(name: str, tokens: list[Any], context: dict[str, Any]) -> float:
             if name not in parameters:
                 raise RuntimeError(f"Unknown parameter: {name}")
+            keys = resolve(tokens, context)
+            dimensions = (spec.get("parameter_dimensions") or {}).get(name)
+            if dimensions is not None and len(dimensions) != len(keys):
+                raise RuntimeError(f"Parameter {name} expects axes {dimensions}, got {keys}")
             value: Any = parameters[name]
-            for key in keys:
+            for axis, key in enumerate(keys):
                 if isinstance(value, dict):
                     value = value.get(str(key), value.get(key))
                 elif isinstance(value, list):
-                    position = self._resolve_list_position(key, set_positions)
+                    token = tokens[axis]
+                    dimension = dimensions[axis] if dimensions is not None else (
+                        token.get("target_set") or token.get("set") if isinstance(token, dict) else token if token in sets else None
+                    )
+                    if dimension is not None:
+                        if dimension not in set_positions:
+                            raise RuntimeError(f"Parameter {name} references unknown axis {dimension}")
+                        position = set_positions[dimension].get(str(key))
+                    else:
+                        # Legacy untyped arrays only support literal positional indices.
+                        # Business labels must have a declared axis; never scan other sets.
+                        position = int(key) if isinstance(key, int) or isinstance(key, str) and key.isdigit() else None
                     if position is None or position < 0 or position >= len(value):
                         raise RuntimeError(f"Parameter {name} missing key {key}")
                     value = value[position]
@@ -165,7 +180,7 @@ class GenericLinearBuilder:
             if not factors and payload.get("param"):
                 factors = [{"parameter": payload["param"], "indices": payload.get("key", payload.get("param_key", [])), "power": 1}]
             for factor in factors:
-                factor_value = param(str(factor.get("parameter")), resolve(list(factor.get("indices") or []), context))
+                factor_value = param(str(factor.get("parameter")), list(factor.get("indices") or []), context)
                 power = int(factor.get("power", 1))
                 if power < 0 and factor_value == 0:
                     raise RuntimeError(f"Parameter {factor.get('parameter')} is zero in denominator")
@@ -186,9 +201,9 @@ class GenericLinearBuilder:
                 lb = var.get("lb")
                 ub = var.get("ub")
                 if "lb_param" in var:
-                    lb = param(str(var["lb_param"]), resolve(list(var.get("lb_key", indices)), context))
+                    lb = param(str(var["lb_param"]), list(var.get("lb_key", indices)), context)
                 if "ub_param" in var:
-                    ub = param(str(var["ub_param"]), resolve(list(var.get("ub_key", indices)), context))
+                    ub = param(str(var["ub_param"]), list(var.get("ub_key", indices)), context)
                 component = pyo.Var(domain=domain, bounds=(lb, ub))
                 component_name = "var_" + label.replace("[", "_").replace("]", "").replace(",", "_")
                 setattr(model, component_name, component)
@@ -215,7 +230,7 @@ class GenericLinearBuilder:
                     elif term.get("coef_factors"):
                         coef = scalar_value({"numeric": term.get("coef", 1.0), "factors": term.get("coef_factors")}, context)
                     elif "coef_param" in term:
-                        coef = float(term.get("coef", 1.0)) * param(str(term["coef_param"]), resolve(list(term.get("param_key", key_tokens)), context))
+                        coef = float(term.get("coef", 1.0)) * param(str(term["coef_param"]), list(term.get("param_key", key_tokens)), context)
                     else:
                         coef = float(term.get("coef", 1.0))
                     coef *= float(term.get("weight", 1.0))
@@ -232,7 +247,7 @@ class GenericLinearBuilder:
                     value = scalar_value(term, outer)
                 else:
                     key_tokens = list(term.get("key", term.get("param_key", [])))
-                    value = param(str(term["param"]), resolve(key_tokens, outer))
+                    value = param(str(term["param"]), key_tokens, outer)
                     value *= float(term.get("coef", 1.0))
                 if term.get("sign") == "-":
                     value *= -1.0
@@ -248,7 +263,7 @@ class GenericLinearBuilder:
                 if cons.get("rhs_terms"):
                     rhs = param_expr(list(cons.get("rhs_terms") or []), float(cons.get("rhs", 0.0)), context)
                 else:
-                    rhs = param(str(cons["rhs_param"]), resolve(list(cons.get("rhs_key", foreach)), context)) if "rhs_param" in cons else float(cons.get("rhs", 0.0))
+                    rhs = param(str(cons["rhs_param"]), list(cons.get("rhs_key", foreach)), context) if "rhs_param" in cons else float(cons.get("rhs", 0.0))
                 cons_sense = str(cons.get("sense", "<="))
                 relation = lhs <= rhs if cons_sense == "<=" else lhs >= rhs if cons_sense == ">=" else lhs == rhs
                 suffix = "_" + "_".join(map(str, resolve(foreach, context))) if foreach else ""
@@ -265,14 +280,3 @@ class GenericLinearBuilder:
         model._business_variable_labels = business_var_map
         model._formula_trace = formula_trace
         return model, {"model_code": "generic_linear", "spec": spec, "var_map": var_map, "business_var_map": business_var_map, "formula_trace": formula_trace}
-
-    def _resolve_list_position(self, key: Any, set_positions: dict[str, dict[str, int]]) -> int | None:
-        if isinstance(key, int):
-            return key
-        if isinstance(key, str) and key.isdigit():
-            return int(key)
-        key_text = str(key)
-        for positions in set_positions.values():
-            if key_text in positions:
-                return positions[key_text]
-        return None

@@ -1,4 +1,4 @@
-import { apiClient, unwrap } from './client';
+import { apiClient, unwrap, platformAuthorization } from './client';
 import type {
   AgentAnalyzePayload,
   AgentAnalyzeResponse,
@@ -94,3 +94,36 @@ export const agentRunEventStreamUrl = (runId: string, after = 0) => {
   const base = String(apiClient.defaults.baseURL || '').replace(/\/$/, '');
   return `${base}/api/agent/runs/${encodeURIComponent(runId)}/events/stream?after=${after}`;
 };
+
+export function subscribeAgentEvents(url: string, eventType: string, onEvent: () => void) {
+  const controller = new AbortController();
+  let reconnect: number | undefined;
+  let cursor = '';
+  const connect = async () => {
+    try {
+      const response = await fetch(url, { signal: controller.signal, headers: { ...platformAuthorization(), ...(cursor ? { 'Last-Event-ID': cursor } : {}) } });
+      if (response.status === 401) { window.dispatchEvent(new Event('optiforge:auth-required')); return; }
+      if (!response.ok || !response.body) throw new Error('Event stream unavailable');
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+      let type = '';
+      while (!controller.signal.aborted) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true }).replace(/\r/g, '');
+        let end: number;
+        while ((end = buffer.indexOf('\n')) >= 0) {
+          const line = buffer.slice(0, end);
+          buffer = buffer.slice(end + 1);
+          if (line.startsWith('id:')) cursor = line.slice(3).trim();
+          else if (line.startsWith('event:')) type = line.slice(6).trim();
+          else if (!line) { if (type === eventType) onEvent(); type = ''; }
+        }
+      }
+    } catch { /* Ordinary reads continue to recover state while the stream reconnects. */ }
+    if (!controller.signal.aborted) reconnect = window.setTimeout(connect, 2000);
+  };
+  void connect();
+  return { close: () => { controller.abort(); if (reconnect !== undefined) window.clearTimeout(reconnect); } };
+}

@@ -12,10 +12,12 @@ from app.agent.platform_gateway import service_mode
 from app.services.model_service import model_service
 from app.frontend import mount_frontends
 from app.utils import has_highspy, has_pyomo
+from app.security import platform_token_middleware
 
 
 def create_app() -> FastAPI:
     app = FastAPI(title="Power Semantic OR Platform", version="0.2.0")
+    app.middleware("http")(platform_token_middleware)
     app.add_middleware(
         CORSMiddleware,
         allow_origins=["*"],

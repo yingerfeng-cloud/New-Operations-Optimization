@@ -780,7 +780,7 @@ export function FunctionAssetsPage() {
           dataSource={rows}
           pagination={false}
           columns={[
-            { title: '名称', render: (_, row) => <Space orientation="vertical" size={0}><Typography.Text strong>{row.name || row.function_id}</Typography.Text><Typography.Text type="secondary">{row.function_id}</Typography.Text></Space> },
+            { title: '名称', render: (_, row) => <Space orientation="vertical" size={0}><Typography.Text strong>{row.name || row.function_id}</Typography.Text><Typography.Text type="secondary">{row.function_id} · 修订 {row.revision || 1}</Typography.Text></Space> },
             { title: '类型', render: (_, row) => functionTypeText(row.function_type) },
             { title: '校验状态', render: (_, row) => <Tag color={validationColor(row.validation_status)}>{validationText(row.validation_status)}</Tag> },
             { title: '求解策略', render: (_, row) => solveStrategyText(row.solve_strategy) },

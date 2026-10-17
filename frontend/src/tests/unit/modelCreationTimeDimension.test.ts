@@ -75,6 +75,7 @@ test('data_derived recognizes the dimensions alias', () => {
 
 test('save payload and model asset round trip preserve one authoritative contract', () => {
   const draft = applyTimeDimensionToDraft(createInitialDraft(), choiceConfig);
+  draft.basic_info.builder_mode = 'component_based';
   const payload = buildModelDraftPayload(draft);
   expect(payload.ui_metadata.time_dimension).toEqual(expect.objectContaining(choiceConfig));
   expect((payload.model_draft as unknown as { time_dimension: unknown }).time_dimension).toEqual(payload.ui_metadata.time_dimension);

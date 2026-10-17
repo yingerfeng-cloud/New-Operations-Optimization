@@ -1,0 +1,12 @@
+{
+  "time_step_seconds": 900,
+  "independent_energy_mwh": 350.0,
+  "independent_revenue": 105000.0,
+  "weighted_load_deviation": 150000.0,
+  "weighted_terminal_storage": 2655.9350000000004,
+  "weighted_spill": 0.0,
+  "independent_objective": 47305.935,
+  "solver_objective": 47305.93498452013,
+  "absolute_error": 1.5479869034606963e-05,
+  "status": "SUCCESS"
+}

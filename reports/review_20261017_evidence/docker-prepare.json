@@ -1,0 +1,1 @@
+{"mode": "prepare", "authentication_http_status": [401, 401, 200], "model_status": "offline", "template_status": "offline", "llm_key_recovered": true, "healthcheck": "passed", "nlp": {"solver": "Ipopt", "termination": "optimal", "objective": 15000.00000245, "max_independent_power_residual": 1.3503176887752488e-07, "local_optimum_warning": true}}

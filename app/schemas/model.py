@@ -141,6 +141,7 @@ class ModelPackage(BaseModel):
     required_solver_capabilities: list[str] = Field(default_factory=lambda: ["LP"])
     ui_metadata: dict[str, Any] = Field(default_factory=dict)
     parameters: dict[str, Any] = Field(default_factory=dict)
+    function_dependencies: dict[str, dict[str, Any]] = Field(default_factory=dict)
     parameter_bindings: list[dict[str, Any]] = Field(default_factory=list)
     parameter_schema: dict[str, Any] = Field(default_factory=dict)
     input_contract: dict[str, Any] = Field(default_factory=dict)

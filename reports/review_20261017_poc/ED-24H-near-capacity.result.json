@@ -1,0 +1,947 @@
+{
+  "job_id": "OPT-876338A7A1",
+  "attempt_id": "81dacc75f33a486f9635bb84d7eaaf78",
+  "model_id": "MODEL-AE422E3C",
+  "model_code": "economic_dispatch",
+  "status": "SUCCESS",
+  "solver": "HiGHS",
+  "solver_name": "HiGHS",
+  "solver_type": "LP",
+  "solver_available": true,
+  "problem_type": "LP",
+  "termination_condition": "optimal",
+  "raw_termination_condition": "optimal",
+  "constraint_violation_summary": {},
+  "local_optimum_warning": false,
+  "solver_config": {
+    "backend": "HiGHS",
+    "problem_type": "LP",
+    "mip_gap": 1e-06,
+    "time_limit_seconds": 60,
+    "thread_num": null,
+    "presolve": true,
+    "nlp_tolerance": null,
+    "max_iter": null,
+    "acceptable_tol": null
+  },
+  "objective_value": 1782720.0,
+  "solve_time": 0.0013,
+  "variable_values": {
+    "unit_output": {
+      "unit_output[U1,0]": 120.0,
+      "unit_output[U1,1]": 120.0,
+      "unit_output[U1,2]": 120.0,
+      "unit_output[U1,3]": 120.0,
+      "unit_output[U1,4]": 120.0,
+      "unit_output[U1,5]": 120.0,
+      "unit_output[U1,6]": 120.0,
+      "unit_output[U1,7]": 120.0,
+      "unit_output[U1,8]": 120.0,
+      "unit_output[U1,9]": 120.0,
+      "unit_output[U1,10]": 120.0,
+      "unit_output[U1,11]": 120.0,
+      "unit_output[U1,12]": 120.0,
+      "unit_output[U1,13]": 120.0,
+      "unit_output[U1,14]": 120.0,
+      "unit_output[U1,15]": 120.0,
+      "unit_output[U1,16]": 120.0,
+      "unit_output[U1,17]": 120.0,
+      "unit_output[U1,18]": 120.0,
+      "unit_output[U1,19]": 120.0,
+      "unit_output[U1,20]": 120.0,
+      "unit_output[U1,21]": 120.0,
+      "unit_output[U1,22]": 120.0,
+      "unit_output[U1,23]": 120.0,
+      "unit_output[U2,0]": 90.0,
+      "unit_output[U2,1]": 90.0,
+      "unit_output[U2,2]": 90.0,
+      "unit_output[U2,3]": 90.0,
+      "unit_output[U2,4]": 90.0,
+      "unit_output[U2,5]": 90.0,
+      "unit_output[U2,6]": 90.0,
+      "unit_output[U2,7]": 90.0,
+      "unit_output[U2,8]": 90.0,
+      "unit_output[U2,9]": 90.0,
+      "unit_output[U2,10]": 90.0,
+      "unit_output[U2,11]": 90.0,
+      "unit_output[U2,12]": 90.0,
+      "unit_output[U2,13]": 90.0,
+      "unit_output[U2,14]": 90.0,
+      "unit_output[U2,15]": 90.0,
+      "unit_output[U2,16]": 90.0,
+      "unit_output[U2,17]": 90.0,
+      "unit_output[U2,18]": 90.0,
+      "unit_output[U2,19]": 90.0,
+      "unit_output[U2,20]": 90.0,
+      "unit_output[U2,21]": 90.0,
+      "unit_output[U2,22]": 90.0,
+      "unit_output[U2,23]": 90.0,
+      "unit_output[U3,0]": 68.0,
+      "unit_output[U3,1]": 68.0,
+      "unit_output[U3,2]": 68.0,
+      "unit_output[U3,3]": 68.0,
+      "unit_output[U3,4]": 68.0,
+      "unit_output[U3,5]": 68.0,
+      "unit_output[U3,6]": 68.0,
+      "unit_output[U3,7]": 68.0,
+      "unit_output[U3,8]": 68.0,
+      "unit_output[U3,9]": 68.0,
+      "unit_output[U3,10]": 68.0,
+      "unit_output[U3,11]": 68.0,
+      "unit_output[U3,12]": 68.0,
+      "unit_output[U3,13]": 68.0,
+      "unit_output[U3,14]": 68.0,
+      "unit_output[U3,15]": 68.0,
+      "unit_output[U3,16]": 68.0,
+      "unit_output[U3,17]": 68.0,
+      "unit_output[U3,18]": 68.0,
+      "unit_output[U3,19]": 68.0,
+      "unit_output[U3,20]": 68.0,
+      "unit_output[U3,21]": 68.0,
+      "unit_output[U3,22]": 68.0,
+      "unit_output[U3,23]": 68.0
+    }
+  },
+  "solver_log": "HiGHS termination_condition=optimal",
+  "diagnosis": [],
+  "trace": {
+    "request_fingerprint": "31685ab33f58e1162e000052c16ab89e0287cd1602a2bd1320c4bb8c663ef777",
+    "stage_timings": {
+      "RUNNING": {
+        "started_at": "2026-10-17 17:53:40",
+        "finished_at": "2026-10-17 17:53:40"
+      },
+      "VALIDATING": {
+        "started_at": "2026-10-17 17:53:40",
+        "finished_at": "2026-10-17 17:53:41",
+        "duration_seconds": 0.001
+      },
+      "BUILDING_MODEL": {
+        "started_at": "2026-10-17 17:53:41",
+        "finished_at": "2026-10-17 17:53:41",
+        "duration_seconds": 0.0018
+      },
+      "SOLVING": {
+        "started_at": "2026-10-17 17:53:41",
+        "finished_at": "2026-10-17 17:53:42",
+        "duration_seconds": 0.0093
+      },
+      "FORMATTING_RESULT": {
+        "started_at": "2026-10-17 17:53:42"
+      }
+    },
+    "validation_seconds": 0.001,
+    "model_build_seconds": 0.0018,
+    "problem_type": "LP",
+    "solver_progress": {
+      "schema_version": "1.1",
+      "solver": "HiGHS",
+      "problem_type": "LP",
+      "search_mode": "LP_ITERATION",
+      "status": "COMPLETED",
+      "supported": true,
+      "message": "该连续模型快速完成，共执行 0 次预处理/直接求解迭代；求解时间过短，未产生可绘制的分段采样轨迹。",
+      "points": [
+        {
+          "elapsed_seconds": 0.001257,
+          "incumbent_objective": null,
+          "best_bound": null,
+          "gap": null,
+          "node_count": null,
+          "iteration_count": 0,
+          "algorithm": "预处理/直接求解",
+          "kind": "iteration_final"
+        },
+        {
+          "elapsed_seconds": 0.0093,
+          "incumbent_objective": 1782720.0,
+          "best_bound": null,
+          "gap": 0.0,
+          "node_count": null,
+          "iteration_count": null,
+          "algorithm": null,
+          "kind": "final"
+        }
+      ],
+      "events": [
+        {
+          "kind": "search_started",
+          "label": "开始搜索最优解",
+          "elapsed_seconds": 0.0
+        },
+        {
+          "kind": "gap_milestone",
+          "label": "Gap 降至 0.1% 以下",
+          "elapsed_seconds": 0.0093,
+          "value": 0.0
+        },
+        {
+          "kind": "optimality_proven",
+          "label": "求解器已证明当前解最优",
+          "elapsed_seconds": 0.0093,
+          "value": 1782720.0
+        }
+      ],
+      "latest": {
+        "elapsed_seconds": 0.0093,
+        "iteration_count": 0,
+        "algorithm": "预处理/直接求解",
+        "incumbent_objective": 1782720.0,
+        "gap": 0.0
+      },
+      "gap_milestones": [
+        0.001
+      ],
+      "point_count": 2,
+      "final_status": "optimal"
+    },
+    "solve_seconds": 0.0093,
+    "format_seconds": 0.001
+  },
+  "logs": [
+    "2026-10-17 17:53:40 [INFO] 任务已进入执行队列",
+    "2026-10-17 17:53:41 [INFO] 参数校验开始",
+    "2026-10-17 17:53:41 [INFO] 参数校验完成，耗时=0.001s",
+    "2026-10-17 17:53:41 [INFO] 开始构建模型 model_code=economic_dispatch, build_mode=template_based",
+    "2026-10-17 17:53:41 [INFO] 模型构建完成，变量数=72，约束数=240，耗时=0.0018s",
+    "2026-10-17 17:53:42 [INFO] 开始调用路由求解器，time_limit_seconds=60",
+    "2026-10-17 17:53:42 [INFO] 求解完成，HiGHS termination_condition=optimal，耗时=0.0093s",
+    "2026-10-17 17:53:43 [INFO] 开始格式化业务结果"
+  ],
+  "run_metrics": {
+    "variable_count": 72,
+    "constraint_count": 240,
+    "solver_status": "optimal",
+    "objective_value": 1782720.0,
+    "solver_gap": null
+  },
+  "model": "Synthetic acceptance economic",
+  "scene": "经济负荷分配",
+  "submitted_at": "2026-10-17 17:53:40",
+  "started_at": "2026-10-17 17:53:40",
+  "finished_at": "2026-10-17 17:53:43",
+  "series": [],
+  "chart": {},
+  "metrics": {
+    "objective_value": 1782720.0,
+    "total_cost": 1782720.0,
+    "gap": "0.00%",
+    "risk": "low"
+  },
+  "business_output": {
+    "variable_values": {
+      "unit_output": {
+        "unit_output[U1,0]": 120.0,
+        "unit_output[U1,1]": 120.0,
+        "unit_output[U1,2]": 120.0,
+        "unit_output[U1,3]": 120.0,
+        "unit_output[U1,4]": 120.0,
+        "unit_output[U1,5]": 120.0,
+        "unit_output[U1,6]": 120.0,
+        "unit_output[U1,7]": 120.0,
+        "unit_output[U1,8]": 120.0,
+        "unit_output[U1,9]": 120.0,
+        "unit_output[U1,10]": 120.0,
+        "unit_output[U1,11]": 120.0,
+        "unit_output[U1,12]": 120.0,
+        "unit_output[U1,13]": 120.0,
+        "unit_output[U1,14]": 120.0,
+        "unit_output[U1,15]": 120.0,
+        "unit_output[U1,16]": 120.0,
+        "unit_output[U1,17]": 120.0,
+        "unit_output[U1,18]": 120.0,
+        "unit_output[U1,19]": 120.0,
+        "unit_output[U1,20]": 120.0,
+        "unit_output[U1,21]": 120.0,
+        "unit_output[U1,22]": 120.0,
+        "unit_output[U1,23]": 120.0,
+        "unit_output[U2,0]": 90.0,
+        "unit_output[U2,1]": 90.0,
+        "unit_output[U2,2]": 90.0,
+        "unit_output[U2,3]": 90.0,
+        "unit_output[U2,4]": 90.0,
+        "unit_output[U2,5]": 90.0,
+        "unit_output[U2,6]": 90.0,
+        "unit_output[U2,7]": 90.0,
+        "unit_output[U2,8]": 90.0,
+        "unit_output[U2,9]": 90.0,
+        "unit_output[U2,10]": 90.0,
+        "unit_output[U2,11]": 90.0,
+        "unit_output[U2,12]": 90.0,
+        "unit_output[U2,13]": 90.0,
+        "unit_output[U2,14]": 90.0,
+        "unit_output[U2,15]": 90.0,
+        "unit_output[U2,16]": 90.0,
+        "unit_output[U2,17]": 90.0,
+        "unit_output[U2,18]": 90.0,
+        "unit_output[U2,19]": 90.0,
+        "unit_output[U2,20]": 90.0,
+        "unit_output[U2,21]": 90.0,
+        "unit_output[U2,22]": 90.0,
+        "unit_output[U2,23]": 90.0,
+        "unit_output[U3,0]": 68.0,
+        "unit_output[U3,1]": 68.0,
+        "unit_output[U3,2]": 68.0,
+        "unit_output[U3,3]": 68.0,
+        "unit_output[U3,4]": 68.0,
+        "unit_output[U3,5]": 68.0,
+        "unit_output[U3,6]": 68.0,
+        "unit_output[U3,7]": 68.0,
+        "unit_output[U3,8]": 68.0,
+        "unit_output[U3,9]": 68.0,
+        "unit_output[U3,10]": 68.0,
+        "unit_output[U3,11]": 68.0,
+        "unit_output[U3,12]": 68.0,
+        "unit_output[U3,13]": 68.0,
+        "unit_output[U3,14]": 68.0,
+        "unit_output[U3,15]": 68.0,
+        "unit_output[U3,16]": 68.0,
+        "unit_output[U3,17]": 68.0,
+        "unit_output[U3,18]": 68.0,
+        "unit_output[U3,19]": 68.0,
+        "unit_output[U3,20]": 68.0,
+        "unit_output[U3,21]": 68.0,
+        "unit_output[U3,22]": 68.0,
+        "unit_output[U3,23]": 68.0
+      }
+    },
+    "constraint_check": {},
+    "mccormick_relaxations": []
+  },
+  "business_explanation": {
+    "explanation_schema_version": "2.0",
+    "facts": [
+      "经济调度已完成，系统在满足负荷和机组边界约束下最小化发电成本。",
+      "机组出力计划中 U1 承担主要出力，各时段出力合计 6672MW。其余机组补足剩余负荷，出力合计 3792MW。",
+      "求解状态为 success。",
+      "Min total generation cost的求解值为 1782720.0。",
+      "平台不会自动下发生产控制指令。所有方案须经人工复核。",
+      "Min total generation cost为 1782720.0。",
+      "机组出力 · min_value为 68.0MW。",
+      "机组出力 · max_value为 120.0MW。",
+      "机组出力 · sum_value为 6672.0MW。",
+      "机组出力 · non_zero_count为 72count。",
+      "变量“机组出力”摘要：min=68.0, max=120.0, sum=6672.0, non_zero_count=72。"
+    ],
+    "fact_items": [
+      {
+        "text": "经济调度已完成，系统在满足负荷和机组边界约束下最小化发电成本。",
+        "evidence_refs": [
+          "formatter.summary",
+          "formatter.metrics"
+        ]
+      },
+      {
+        "text": "机组出力计划中 U1 承担主要出力，各时段出力合计 6672MW。其余机组补足剩余负荷，出力合计 3792MW。",
+        "evidence_refs": [
+          "business_outcomes.unit_output",
+          "variables_summary.unit_output"
+        ]
+      },
+      {
+        "text": "求解状态为 success。",
+        "evidence_refs": [
+          "solver.status",
+          "solver.termination_condition"
+        ]
+      },
+      {
+        "text": "Min total generation cost的求解值为 1782720.0。",
+        "evidence_refs": [
+          "solver.objective_value",
+          "model.objective"
+        ]
+      },
+      {
+        "text": "平台不会自动下发生产控制指令。所有方案须经人工复核。",
+        "evidence_refs": [
+          "model.execution_policy",
+          "model.requires_human_review"
+        ]
+      },
+      {
+        "text": "Min total generation cost为 1782720.0。",
+        "evidence_refs": [
+          "derived_metrics.objective_value"
+        ]
+      },
+      {
+        "text": "机组出力 · min_value为 68.0MW。",
+        "evidence_refs": [
+          "derived_metrics.variable_unit_output_min_value"
+        ]
+      },
+      {
+        "text": "机组出力 · max_value为 120.0MW。",
+        "evidence_refs": [
+          "derived_metrics.variable_unit_output_max_value"
+        ]
+      },
+      {
+        "text": "机组出力 · sum_value为 6672.0MW。",
+        "evidence_refs": [
+          "derived_metrics.variable_unit_output_sum_value"
+        ]
+      },
+      {
+        "text": "机组出力 · non_zero_count为 72count。",
+        "evidence_refs": [
+          "derived_metrics.variable_unit_output_non_zero_count"
+        ]
+      },
+      {
+        "text": "变量“机组出力”摘要：min=68.0, max=120.0, sum=6672.0, non_zero_count=72。",
+        "evidence_refs": [
+          "variables_summary.unit_output"
+        ]
+      }
+    ],
+    "inferences": [],
+    "inference_items": [],
+    "recommendations": [
+      "Verify input provenance, freshness, units, and dimensional completeness.",
+      "Review constraint satisfaction, violations, and binding margins against the declared model contract.",
+      "Confirm the recommendation with an authorized reviewer before operational use."
+    ],
+    "recommendation_items": [
+      {
+        "text": "Verify input provenance, freshness, units, and dimensional completeness.",
+        "evidence_refs": [
+          "manual_review_points"
+        ]
+      },
+      {
+        "text": "Review constraint satisfaction, violations, and binding margins against the declared model contract.",
+        "evidence_refs": [
+          "manual_review_points"
+        ]
+      },
+      {
+        "text": "Confirm the recommendation with an authorized reviewer before operational use.",
+        "evidence_refs": [
+          "manual_review_points"
+        ]
+      }
+    ],
+    "risk_notes": [],
+    "manual_review_points": [
+      "Verify input provenance, freshness, units, and dimensional completeness.",
+      "Review constraint satisfaction, violations, and binding margins against the declared model contract.",
+      "Confirm the recommendation with an authorized reviewer before operational use."
+    ],
+    "limitations": [
+      "结果未返回可核验的约束检查明细。",
+      "The explanation describes the returned solver evidence and does not prove real-world causality.",
+      "The platform does not infer undeclared thresholds, business rules, or external actions.",
+      "本结果仅用于辅助分析和决策参考，不构成自动控制指令。实际生产调度、交易申报或安全生产处置需结合现场规程、业务审批和人工复核后执行。"
+    ],
+    "summary": "经济调度已完成，系统在满足负荷和机组边界约束下最小化发电成本。 机组出力计划中 U1 承担主要出力，各时段出力合计 6672MW。其余机组补足剩余负荷，出力合计 3792MW。 求解状态为 success。 Min total generation cost的求解值为 1782720.0。 平台不会自动下发生产控制指令。所有方案须经人工复核。",
+    "disclaimer": "本结果仅用于辅助分析和决策参考，不构成自动控制指令。实际生产调度、交易申报或安全生产处置需结合现场规程、业务审批和人工复核后执行。",
+    "grounded_on": "evidence_package"
+  },
+  "evidence_package": {
+    "evidence_schema_version": "2.0",
+    "solver": {
+      "status": "success",
+      "termination_condition": "optimal",
+      "objective_value": 1782720.0,
+      "solver_name": "HiGHS",
+      "error": null,
+      "problem_type": "LP",
+      "local_optimum_warning": false,
+      "constraint_violation_summary": {}
+    },
+    "model": {
+      "model_id": "MODEL-AE422E3C",
+      "model_version": "v0.1",
+      "skill_name": "run_economic_dispatch",
+      "schema_version": "unknown",
+      "profile_name": "generic",
+      "skill_definition_revision": 1,
+      "skill_definition_hash": "0ad599fb3cfd59ec2620d44844a049d8343257dcda838edb004926af1f0c834a",
+      "explanation_spec_version": "1.0",
+      "objective": {
+        "key": "total_generation_cost_min",
+        "name": "Min total generation cost",
+        "sense": "minimize",
+        "unit": "",
+        "description": "",
+        "expression_declared": true
+      },
+      "execution_policy": "advisory_only",
+      "requires_human_review": true
+    },
+    "inputs_summary": {
+      "parameters": {
+        "load_forecast": [
+          278,
+          278,
+          278,
+          278,
+          278,
+          278,
+          278,
+          278,
+          278,
+          278,
+          278,
+          278,
+          278,
+          278,
+          278,
+          278,
+          278,
+          278,
+          278,
+          278,
+          278,
+          278,
+          278,
+          278
+        ],
+        "unit_min_output": {
+          "U1": 30,
+          "U2": 20,
+          "U3": 10
+        },
+        "unit_max_output": {
+          "U1": 120,
+          "U2": 90,
+          "U3": 70
+        },
+        "fuel_cost": {
+          "U1": 220,
+          "U2": 260,
+          "U3": 360
+        },
+        "ramp_up_limit": {
+          "U1": 80,
+          "U2": 60,
+          "U3": 50
+        },
+        "ramp_down_limit": {
+          "U1": 80,
+          "U2": 60,
+          "U3": 50
+        }
+      },
+      "parameter_sources": {
+        "load_forecast": "RUNTIME_VALUE",
+        "unit_min_output": "RUNTIME_VALUE",
+        "unit_max_output": "RUNTIME_VALUE",
+        "fuel_cost": "RUNTIME_VALUE",
+        "ramp_up_limit": "RUNTIME_VALUE",
+        "ramp_down_limit": "RUNTIME_VALUE"
+      },
+      "missing_params": []
+    },
+    "variables_summary": [
+      {
+        "name": "unit_output",
+        "business_name": "机组出力",
+        "unit": "MW",
+        "dimension": [
+          "unit",
+          "time"
+        ],
+        "min": 68.0,
+        "max": 120.0,
+        "sum": 6672.0,
+        "non_zero_count": 72,
+        "max_period": "unit_output[U1,0]",
+        "evidence_ref": "variables_summary.unit_output"
+      }
+    ],
+    "constraint_checks": [],
+    "derived_metrics": {
+      "objective_value": {
+        "label": "Min total generation cost",
+        "value": 1782720.0,
+        "unit": "",
+        "function": "identity",
+        "source": {
+          "kind": "objective",
+          "key": null
+        },
+        "evidence_ref": "derived_metrics.objective_value"
+      },
+      "variable_unit_output_min_value": {
+        "label": "机组出力 · min_value",
+        "value": 68.0,
+        "unit": "MW",
+        "function": "min_value",
+        "source": {
+          "kind": "variable",
+          "key": "unit_output"
+        },
+        "evidence_ref": "derived_metrics.variable_unit_output_min_value"
+      },
+      "variable_unit_output_max_value": {
+        "label": "机组出力 · max_value",
+        "value": 120.0,
+        "unit": "MW",
+        "function": "max_value",
+        "source": {
+          "kind": "variable",
+          "key": "unit_output"
+        },
+        "evidence_ref": "derived_metrics.variable_unit_output_max_value"
+      },
+      "variable_unit_output_sum_value": {
+        "label": "机组出力 · sum_value",
+        "value": 6672.0,
+        "unit": "MW",
+        "function": "sum_value",
+        "source": {
+          "kind": "variable",
+          "key": "unit_output"
+        },
+        "evidence_ref": "derived_metrics.variable_unit_output_sum_value"
+      },
+      "variable_unit_output_non_zero_count": {
+        "label": "机组出力 · non_zero_count",
+        "value": 72,
+        "unit": "count",
+        "function": "non_zero_count",
+        "source": {
+          "kind": "variable",
+          "key": "unit_output"
+        },
+        "evidence_ref": "derived_metrics.variable_unit_output_non_zero_count"
+      }
+    },
+    "formatter": {
+      "source": "SolveResultFormatter",
+      "summary": "经济调度已完成，系统在满足负荷和机组边界约束下最小化发电成本。",
+      "explanation": {
+        "summary": "经济调度已完成，系统在满足负荷和机组边界约束下最小化发电成本。",
+        "model_code": "economic_dispatch",
+        "relaxation_advisory": null
+      },
+      "metrics": {
+        "objective_value": {
+          "value": 1782720.0,
+          "unit": "",
+          "label": "objective_value",
+          "source": "result.metrics.objective_value"
+        },
+        "total_cost": {
+          "value": 1782720.0,
+          "unit": "",
+          "label": "total_cost",
+          "source": "result.metrics.total_cost"
+        },
+        "gap": {
+          "value": "0.00%",
+          "unit": "",
+          "label": "gap",
+          "source": "result.metrics.gap"
+        },
+        "risk": {
+          "value": "low",
+          "unit": "",
+          "label": "risk",
+          "source": "result.metrics.risk"
+        }
+      }
+    },
+    "business_outcomes": {
+      "facts": [
+        {
+          "text": "机组出力计划中 U1 承担主要出力，各时段出力合计 6672MW。其余机组补足剩余负荷，出力合计 3792MW。",
+          "evidence_refs": [
+            "business_outcomes.unit_output",
+            "variables_summary.unit_output"
+          ]
+        }
+      ],
+      "unit_output": {
+        "by_unit": {
+          "U1": 2880.0,
+          "U2": 2160.0,
+          "U3": 1632.0
+        },
+        "leading_unit": "U1",
+        "total_output": 6672.0,
+        "remaining_output": 3792.0,
+        "unit": "MW"
+      }
+    },
+    "risk_notes": [],
+    "manual_review_points": [
+      "Verify input provenance, freshness, units, and dimensional completeness.",
+      "Review constraint satisfaction, violations, and binding margins against the declared model contract.",
+      "Confirm the recommendation with an authorized reviewer before operational use."
+    ],
+    "data_quality_notes": [],
+    "explanation_limits": [
+      "结果未返回可核验的约束检查明细。",
+      "The explanation describes the returned solver evidence and does not prove real-world causality.",
+      "The platform does not infer undeclared thresholds, business rules, or external actions."
+    ],
+    "evidence_index": {
+      "formatter": [
+        "formatter.summary",
+        "formatter.metrics"
+      ],
+      "solver": [
+        "solver.status",
+        "solver.termination_condition",
+        "solver.objective_value",
+        "solver.local_optimum_warning",
+        "solver.constraint_violation_summary"
+      ],
+      "variables": [
+        "variables_summary.unit_output"
+      ],
+      "constraints": [],
+      "metrics": [
+        "derived_metrics.objective_value",
+        "derived_metrics.variable_unit_output_min_value",
+        "derived_metrics.variable_unit_output_max_value",
+        "derived_metrics.variable_unit_output_sum_value",
+        "derived_metrics.variable_unit_output_non_zero_count"
+      ],
+      "business_outcomes": [
+        "business_outcomes.unit_output"
+      ]
+    }
+  },
+  "explanation_structured": {
+    "explanation_schema_version": "2.0",
+    "facts": [
+      "经济调度已完成，系统在满足负荷和机组边界约束下最小化发电成本。",
+      "机组出力计划中 U1 承担主要出力，各时段出力合计 6672MW。其余机组补足剩余负荷，出力合计 3792MW。",
+      "求解状态为 success。",
+      "Min total generation cost的求解值为 1782720.0。",
+      "平台不会自动下发生产控制指令。所有方案须经人工复核。",
+      "Min total generation cost为 1782720.0。",
+      "机组出力 · min_value为 68.0MW。",
+      "机组出力 · max_value为 120.0MW。",
+      "机组出力 · sum_value为 6672.0MW。",
+      "机组出力 · non_zero_count为 72count。",
+      "变量“机组出力”摘要：min=68.0, max=120.0, sum=6672.0, non_zero_count=72。"
+    ],
+    "fact_items": [
+      {
+        "text": "经济调度已完成，系统在满足负荷和机组边界约束下最小化发电成本。",
+        "evidence_refs": [
+          "formatter.summary",
+          "formatter.metrics"
+        ]
+      },
+      {
+        "text": "机组出力计划中 U1 承担主要出力，各时段出力合计 6672MW。其余机组补足剩余负荷，出力合计 3792MW。",
+        "evidence_refs": [
+          "business_outcomes.unit_output",
+          "variables_summary.unit_output"
+        ]
+      },
+      {
+        "text": "求解状态为 success。",
+        "evidence_refs": [
+          "solver.status",
+          "solver.termination_condition"
+        ]
+      },
+      {
+        "text": "Min total generation cost的求解值为 1782720.0。",
+        "evidence_refs": [
+          "solver.objective_value",
+          "model.objective"
+        ]
+      },
+      {
+        "text": "平台不会自动下发生产控制指令。所有方案须经人工复核。",
+        "evidence_refs": [
+          "model.execution_policy",
+          "model.requires_human_review"
+        ]
+      },
+      {
+        "text": "Min total generation cost为 1782720.0。",
+        "evidence_refs": [
+          "derived_metrics.objective_value"
+        ]
+      },
+      {
+        "text": "机组出力 · min_value为 68.0MW。",
+        "evidence_refs": [
+          "derived_metrics.variable_unit_output_min_value"
+        ]
+      },
+      {
+        "text": "机组出力 · max_value为 120.0MW。",
+        "evidence_refs": [
+          "derived_metrics.variable_unit_output_max_value"
+        ]
+      },
+      {
+        "text": "机组出力 · sum_value为 6672.0MW。",
+        "evidence_refs": [
+          "derived_metrics.variable_unit_output_sum_value"
+        ]
+      },
+      {
+        "text": "机组出力 · non_zero_count为 72count。",
+        "evidence_refs": [
+          "derived_metrics.variable_unit_output_non_zero_count"
+        ]
+      },
+      {
+        "text": "变量“机组出力”摘要：min=68.0, max=120.0, sum=6672.0, non_zero_count=72。",
+        "evidence_refs": [
+          "variables_summary.unit_output"
+        ]
+      }
+    ],
+    "inferences": [],
+    "inference_items": [],
+    "recommendations": [
+      "Verify input provenance, freshness, units, and dimensional completeness.",
+      "Review constraint satisfaction, violations, and binding margins against the declared model contract.",
+      "Confirm the recommendation with an authorized reviewer before operational use."
+    ],
+    "recommendation_items": [
+      {
+        "text": "Verify input provenance, freshness, units, and dimensional completeness.",
+        "evidence_refs": [
+          "manual_review_points"
+        ]
+      },
+      {
+        "text": "Review constraint satisfaction, violations, and binding margins against the declared model contract.",
+        "evidence_refs": [
+          "manual_review_points"
+        ]
+      },
+      {
+        "text": "Confirm the recommendation with an authorized reviewer before operational use.",
+        "evidence_refs": [
+          "manual_review_points"
+        ]
+      }
+    ],
+    "risk_notes": [],
+    "manual_review_points": [
+      "Verify input provenance, freshness, units, and dimensional completeness.",
+      "Review constraint satisfaction, violations, and binding margins against the declared model contract.",
+      "Confirm the recommendation with an authorized reviewer before operational use."
+    ],
+    "limitations": [
+      "结果未返回可核验的约束检查明细。",
+      "The explanation describes the returned solver evidence and does not prove real-world causality.",
+      "The platform does not infer undeclared thresholds, business rules, or external actions.",
+      "本结果仅用于辅助分析和决策参考，不构成自动控制指令。实际生产调度、交易申报或安全生产处置需结合现场规程、业务审批和人工复核后执行。"
+    ],
+    "summary": "经济调度已完成，系统在满足负荷和机组边界约束下最小化发电成本。 机组出力计划中 U1 承担主要出力，各时段出力合计 6672MW。其余机组补足剩余负荷，出力合计 3792MW。 求解状态为 success。 Min total generation cost的求解值为 1782720.0。 平台不会自动下发生产控制指令。所有方案须经人工复核。",
+    "disclaimer": "本结果仅用于辅助分析和决策参考，不构成自动控制指令。实际生产调度、交易申报或安全生产处置需结合现场规程、业务审批和人工复核后执行。",
+    "grounded_on": "evidence_package"
+  },
+  "explanation_audit": {
+    "processor": "result_post_processor_v2",
+    "definition_source": "ephemeral_contract_compiler",
+    "skill_name": "run_economic_dispatch",
+    "skill_definition_revision": 1,
+    "skill_definition_hash": "0ad599fb3cfd59ec2620d44844a049d8343257dcda838edb004926af1f0c834a",
+    "explanation_spec_version": "1.0",
+    "fallback": {
+      "used": false,
+      "reason": null
+    },
+    "llm": {
+      "enabled": false,
+      "attempted": false,
+      "fallback_used": false,
+      "reason": "LLM_SUMMARY_NOT_REQUESTED"
+    }
+  },
+  "profile_name": "generic",
+  "disclaimer": "本结果仅用于辅助分析和决策参考，不构成自动控制指令。实际生产调度、交易申报或安全生产处置需结合现场规程、业务审批和人工复核后执行。",
+  "execution_policy": "advisory_only",
+  "requires_human_review": true,
+  "explanation": "经济调度已完成，系统在满足负荷和机组边界约束下最小化发电成本。 机组出力计划中 U1 承担主要出力，各时段出力合计 6672MW。其余机组补足剩余负荷，出力合计 3792MW。 求解状态为 success。 Min total generation cost的求解值为 1782720.0。 平台不会自动下发生产控制指令。所有方案须经人工复核。",
+  "result_metadata": {
+    "problem_type": "LP",
+    "explanation_type": null,
+    "capabilities": [
+      "metrics",
+      "timeseries",
+      "business_output",
+      "explanation",
+      "raw"
+    ],
+    "presentation_schema_version": "1.0",
+    "views": [
+      {
+        "key": "overview",
+        "label": "结果概览",
+        "kind": "metrics",
+        "source": "metrics"
+      },
+      {
+        "key": "curves",
+        "label": "变量曲线",
+        "kind": "timeseries",
+        "source": "variable_values"
+      },
+      {
+        "key": "business_output",
+        "label": "业务输出",
+        "kind": "business_output",
+        "source": "business_output"
+      },
+      {
+        "key": "advice",
+        "label": "业务建议",
+        "kind": "explanation",
+        "source": "business_explanation"
+      },
+      {
+        "key": "raw",
+        "label": "原始结果",
+        "kind": "raw",
+        "source": "$"
+      }
+    ]
+  },
+  "result_views": [
+    {
+      "key": "overview",
+      "label": "结果概览",
+      "kind": "metrics",
+      "source": "metrics"
+    },
+    {
+      "key": "curves",
+      "label": "变量曲线",
+      "kind": "timeseries",
+      "source": "variable_values"
+    },
+    {
+      "key": "business_output",
+      "label": "业务输出",
+      "kind": "business_output",
+      "source": "business_output"
+    },
+    {
+      "key": "advice",
+      "label": "业务建议",
+      "kind": "explanation",
+      "source": "business_explanation"
+    },
+    {
+      "key": "raw",
+      "label": "原始结果",
+      "kind": "raw",
+      "source": "$"
+    }
+  ],
+  "result_capabilities": [
+    "metrics",
+    "timeseries",
+    "business_output",
+    "explanation",
+    "raw"
+  ]
+}

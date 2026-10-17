@@ -17,6 +17,8 @@ class PyomoModelBuilder:
             or runtime_parameters.get("build_mode")
             or model_template.get("semantic_spec", {}).get("build_mode")
         )
+        if build_mode == "template_based" and model_template.get("template_code"):
+            model_code = model_template["template_code"]
         if model_code == "nonlinear_hydro_power_demo":
             return NonlinearHydroPowerDemoBuilder().build(model_template, runtime_parameters)
         if build_mode == "component_based":

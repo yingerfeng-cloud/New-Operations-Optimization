@@ -1,3 +1,4 @@
+import { subscribeAgentEvents } from '../../api/agents';
 import { Alert, App as AntApp, Button, Card, Drawer, Dropdown, Empty, Input, Modal, Space, Spin, Tag, Typography } from 'antd';
 import type { MenuProps } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -239,24 +240,22 @@ export function AgentWorkbenchPage() {
     : inspectorStatusBusy;
 
   useEffect(() => {
-    if (!activeRun?.run_id || typeof EventSource === 'undefined' || import.meta.env.MODE === 'test') return undefined;
-    const source = new EventSource(agentRunEventStreamUrl(activeRun.run_id, activeRun.events?.at(-1)?.sequence || 0));
+    if (!activeRun?.run_id || typeof fetch === 'undefined' || import.meta.env.MODE === 'test') return undefined;
     const refreshRun = () => {
       void qc.invalidateQueries({ queryKey: ['agent-conversation', activeRun.conversation_id] });
       void qc.invalidateQueries({ queryKey: ['agent-conversations'] });
     };
-    source.addEventListener('run-event', refreshRun);
+    const source = subscribeAgentEvents(agentRunEventStreamUrl(activeRun.run_id, activeRun.events?.at(-1)?.sequence || 0), 'run-event', refreshRun);
     return () => source.close();
   }, [activeRun?.conversation_id, activeRun?.events, activeRun?.run_id, qc]);
 
   useEffect(() => {
-    if (!conversationId || typeof EventSource === 'undefined' || import.meta.env.MODE === 'test') return undefined;
-    const source = new EventSource(agentConversationEventStreamUrl(conversationId));
+    if (!conversationId || typeof fetch === 'undefined' || import.meta.env.MODE === 'test') return undefined;
     const refreshConversation = () => {
       void qc.invalidateQueries({ queryKey: ['agent-conversation', conversationId] });
       void qc.invalidateQueries({ queryKey: ['agent-conversations'] });
     };
-    source.addEventListener('agent-event', refreshConversation);
+    const source = subscribeAgentEvents(agentConversationEventStreamUrl(conversationId), 'agent-event', refreshConversation);
     return () => source.close();
   }, [conversationId, qc]);
 

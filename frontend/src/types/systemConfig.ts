@@ -29,6 +29,7 @@ export interface LlmConfig {
   max_tokens: number;
   enabled: boolean;
   api_key_configured: boolean;
+  api_key_recovery_error?: string | null;
   supported_providers: string[];
   persistence_path?: string;
   config_source?: string;

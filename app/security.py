@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import secrets
 from typing import Callable
 
 from fastapi import Request
@@ -13,10 +14,13 @@ def platform_api_token() -> str:
 
 async def platform_token_middleware(request: Request, call_next: Callable):
     token = platform_api_token()
-    if not token or request.url.path in {"/health", "/api/health", "/openapi.json", "/docs", "/redoc"}:
+    path = request.url.path
+    # The public UI shell lets a browser collect the token. All data APIs and
+    # generated reports remain protected, across every supported entry point.
+    if not token or request.method == "OPTIONS" or path in {"/health", "/api/health"} or not (path.startswith("/api/") or path.startswith("/reports")):
         return await call_next(request)
     auth = request.headers.get("Authorization", "")
     expected = f"Bearer {token}"
-    if auth != expected:
+    if not secrets.compare_digest(auth, expected):
         return JSONResponse(status_code=401, content={"detail": "Invalid or missing optimization platform API token"})
     return await call_next(request)

@@ -168,7 +168,7 @@ def apply_time_dimension_metadata(template: dict[str, Any]) -> dict[str, Any]:
             "default_horizon": horizon or None,
             "time_set": "time",
             "state_time_set": "time_volume" if has_state_time else None,
-            "interval_minutes": 60,
+            "interval_minutes": float(sample["time_step_seconds"]) / 60 if sample.get("time_step_seconds") is not None else float(sample.get("delta_t", 1)) * 60,
             "editable": True,
             "derive_from": None,
         }
@@ -343,7 +343,7 @@ def _economic_dispatch() -> dict[str, Any]:
         constraints=[
             _constraint("power_balance", "功率平衡", "sum(unit_output[unit,time]) == load_forecast[time]", ["time"]),
             _constraint("output_bounds", "Output bounds", "unit_min_output[unit] <= unit_output[unit,time] <= unit_max_output[unit]", ["unit", "time"]),
-            _constraint("ramp_limit", "爬坡约束", "delta(unit_output) within ramp limits", ["unit", "time"], True),
+            {**_constraint("ramp_limit", "爬坡约束", "-ramp_down_limit[u] <= unit_output[u,t] - unit_output[u,t-1] <= ramp_up_limit[u]", ["unit", "time"], True), "boundary_strategy": "skip_first"},
         ],
         objectives=[_objective("total_generation_cost_min", "Min total generation cost", "minimize", "sum(fuel_cost[unit]*unit_output[unit,time])")],
         sample_runtime_parameters=sample,

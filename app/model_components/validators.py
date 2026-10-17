@@ -28,7 +28,13 @@ def normalize_hydro_runtime_parameters(raw: dict[str, Any]) -> dict[str, Any]:
 
     if "time_step_seconds" not in params:
         params["time_step_seconds"] = int(float(params.get("delta_t", 1.0) or 1.0) * 3600)
-    params.setdefault("delta_t", float(params["time_step_seconds"]) / 3600.0)
+    seconds = float(params["time_step_seconds"])
+    if seconds <= 0:
+        raise RuntimeError("time_step_seconds must be positive")
+    for field, expected in (("delta_t", seconds / 3600), ("interval_minutes", seconds / 60), ("delta_v", seconds / 1_000_000)):
+        if field in params and abs(float(params[field]) - expected) > 1e-8:
+            raise RuntimeError(f"{field} conflicts with time_step_seconds: expected {expected}, got {params[field]}")
+        params[field] = expected
     params.setdefault("spill_max", deepcopy(params.get("outflow_max") or {station: 0 for station in stations}))
     params.setdefault("power_conversion", {station: 0.4 for station in stations})
     params.setdefault("gen_flow_min", {station: 0.0 for station in stations})

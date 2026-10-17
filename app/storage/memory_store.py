@@ -108,6 +108,7 @@ class MemoryStore:
                 "system_config": self.system_config,
                 "custom_components": self.custom_components,
                 "function_assets": self.function_assets,
+                "template_status": self.template_status,
             }
             payload = self._normalize_deprecated_markers(payload)
             payload = self._redact_secrets(payload)
@@ -139,7 +140,7 @@ class MemoryStore:
                 "models", "model_versions", "active_model_versions", "assets", "tasks", "results",
                 "invocations", "skills", "conversations", "agent_runs", "agent_tasks", "agent_turns", "agent_events",
                 "tool_invocations", "agent_approvals", "llm_config", "system_config",
-                "custom_components", "function_assets",
+                "custom_components", "function_assets", "template_status",
             )
             sections: dict[str, dict[str, Any]] = {}
             for name in section_names:
@@ -172,6 +173,7 @@ class MemoryStore:
             self.system_config.update(sections["system_config"])
             self.custom_components.update(sections["custom_components"])
             self.function_assets.update(sections["function_assets"])
+            self.template_status.update(sections["template_status"])
             tasks_interrupted = self._interrupt_recovered_tasks()
             agent_runs_interrupted = self._interrupt_recovered_agent_runs()
             agent_v3_interrupted = self._interrupt_recovered_agent_v3_work()

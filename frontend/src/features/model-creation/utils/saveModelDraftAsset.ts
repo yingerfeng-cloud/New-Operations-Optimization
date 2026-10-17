@@ -68,7 +68,12 @@ export function collectModelParameterBindings(draft: ModelDraft) {
   });
 }
 
-export function buildComponentSpecFromDraft(normalizedDraft: ModelDraft) {
+export function buildComponentSpecFromDraft(normalizedDraft: ModelDraft): Record<string, unknown> {
+  // Other builders execute their own formulas; an incidental component objective
+  // would make the server validate a different model than the editor selected.
+  if (normalizedDraft.basic_info.builder_mode !== 'component_based') {
+    return {};
+  }
   const current = normalizedDraft.advanced.component_spec || {};
   const enabledComponents = normalizedDraft.components
     .filter(component => component.enabled !== false)
@@ -100,6 +105,9 @@ export function buildModelDraftPayload(draft: ModelDraft) {
   const description = String(normalized.advanced.description || existingUiMetadata.description || '').trim();
   const semanticSpec = {
     ...normalized.semantic,
+    model_code: normalized.basic_info.model_code,
+    template_code: normalized.basic_info.template_code,
+    build_mode: normalized.basic_info.builder_mode,
     scenario_id: normalized.basic_info.scenario_id,
     ui_metadata: { ...(normalized.semantic.ui_metadata || {}), time_dimension: normalized.time_dimension },
   };

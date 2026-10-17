@@ -90,6 +90,7 @@ class ModelTemplateLibrary:
         published = model_service.publish_model(model.id)
         with STORE.lock:
             STORE.template_status[template_code] = "published"
+            STORE.save_runtime()
         template = self.get_template(template_code)
         template["publish_validation"] = {"clone_status": "passed", "publish_status": "passed", "test_status": "passed"}
         return template
@@ -116,6 +117,7 @@ class ModelTemplateLibrary:
         self.get_template(template_code)
         with STORE.lock:
             STORE.template_status[template_code] = "offline"
+            STORE.save_runtime()
         return self.get_template(template_code)
 
     def parameter_schema(self, template_code: str) -> list[dict[str, Any]]:

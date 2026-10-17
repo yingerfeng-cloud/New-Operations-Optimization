@@ -1,0 +1,125 @@
+{
+  "baseline_sha": "9f35c9f50562b946bfaf65e66a03cdc4c84094fb",
+  "source_document": {
+    "path": "/Users/joiefu/Downloads/OptiForge_Review_20261017.docx",
+    "sha256": "3a3fccfb8687ddedaf05811588271dac2380ddd7e440a8cc8e867e538c3d5624"
+  },
+  "local_environment": {
+    "python": "3.12.14",
+    "node": "v24.19.0",
+    "packages": {
+      "pyomo": "6.10.1",
+      "highspy": "1.15.1",
+      "fastapi": "0.141.1",
+      "pytest": "8.4.2",
+      "cryptography": "46.0.7"
+    }
+  },
+  "validation": {
+    "backend": {
+      "passed": 612,
+      "skipped": 5
+    },
+    "integration": {
+      "passed": 159,
+      "skipped": 0
+    },
+    "frontend_unit": {
+      "passed": 463,
+      "files": 80
+    },
+    "frontend_build": "passed",
+    "browser_journeys": {
+      "passed": 2
+    },
+    "docker_nlp_tests": {
+      "passed": 9
+    },
+    "synthetic_poc": {
+      "passed": 11,
+      "total": 11,
+      "real_customer_data": false,
+      "successful": 6,
+      "expected_infeasible": 2,
+      "expected_invalid": 3
+    }
+  },
+  "boundaries": [
+    "No live customer dataset",
+    "No live LLM provider call",
+    "No production capacity/SLA proof",
+    "No changes to user business runtime",
+    "No push, merge, or production deployment"
+  ],
+  "preexisting_modified_documents_preserved": [
+    "README.md",
+    "OPERATION_MANUAL.md",
+    "docs/user-manual.md"
+  ],
+  "evidence_sha256": {
+    "README.md": "14125115f2816b62e1915bb2fe3392269de50617b13227db857fbbff9ed055aa",
+    "backend.log": "8854365b5bd486e3bd0dd2c3e2a0dfc783d2643e66b0976739b490655c9b9c57",
+    "backend.xml": "44f5c8c544e4d204f1c57d6d2cb0bb5f6d4b54869d05d40985b92b1002063af2",
+    "browser.log": "b688fbb24fa0f1376b418efd7a401ac26762ab1642a7cebd3cddd439ccb0095c",
+    "docker-build.log": "bb81ee554d78cc15f254347ff5a63d9427f99abbf1e4ef8f513512be01eaba6a",
+    "docker-final-verify.json": "f3d766fadd7ae8ca410b569b747ccb8979452554780b0f6dcb622d05148299de",
+    "docker-image.json": "3f6e7e0056e08ff07d08af57bae511471060be7833beba90b7057e01e0147bb7",
+    "docker-ipopt-tests.log": "5be0497b70fd0f1f766e9d381facfbbffff4fcb24b55e990b906cfa3232af95b",
+    "docker-prepare.json": "0f5d1119c674732f27c612b6c4cd20a31460fc46a5adbb4e6ed2de974d9c4c2c",
+    "docker-recreated-verify.json": "f3d766fadd7ae8ca410b569b747ccb8979452554780b0f6dcb622d05148299de",
+    "docker-runtime.json": "3c1dd9f827254236dcedfa18940c5e174f2eb65431d4aa59000a9eb51befa753",
+    "frontend-build.log": "f852447df2eb54d51650676fb95cd4bc3e9165b8720338b2a7195f499d412c1c",
+    "frontend-unit.log": "0528ecbaf8510362ce8c2e17495f4de6abdc99f75900fa075cc79e8af7f731bd",
+    "integration.log": "d496e2001e89e4695da46a0eace2f096d157a87c8b8941700c43cc69cf9b03e0",
+    "integration.xml": "1480d48faf746fd1ece8cfda72c573298aa1e2189db1f73dd02a0f7a4f94aad3",
+    "math-before-fix.log": "5e33ea163adf808670000ed6fbd00e7ef9bd40ac14a5be4ffe10fae7d20f8163",
+    "synthetic-poc.log": "7050b658f9df26ab7c336746cf43755d9ef2cf23757f15711cb5a3f6449d2f65"
+  },
+  "docker_image": {
+    "image_id": "sha256:6a2de71072b03012309e2dc903d9f3a7c59a124315225af58c80ffe78991af0a",
+    "created": "2026-10-17T09:53:47.616597678Z",
+    "os": "linux",
+    "architecture": "arm64",
+    "tags": [
+      "optiforge-review:20261017"
+    ]
+  },
+  "docker_runtime": {
+    "python": "3.12.15",
+    "node": "v22.23.2",
+    "packages": {
+      "pyomo": "6.10.1",
+      "highspy": "1.15.1",
+      "cryptography": "46.0.7"
+    },
+    "ipopt": "Ipopt 3.14.20 (Linux aarch64), ASL(20231111)"
+  },
+  "poc_sha256": {
+    "reports/review_20261017_poc/ED-24H-infeasible.result.json": "df6e3928659c4127c7b46beefac41a19f629bd0d9ba8e4136380d28b02be5469",
+    "reports/review_20261017_poc/ED-24H-near-capacity.result.json": "fde720bcb59e4679bbd8c4086593847d1a7290734c3fbfcd68731a72b4be2a30",
+    "reports/review_20261017_poc/ED-24H-normal.result.json": "465e77cf0b6e78b83a7f3a4d55781784dcbe4786f28d414e375520f60056bf30",
+    "reports/review_20261017_poc/HYDRO-96QH-hard-load-infeasible.result.json": "27d151027b1d01d9cb34362f41079d0e30000206fcc76af6930cdad6d7f3d3db",
+    "reports/review_20261017_poc/HYDRO-96QH-low-inflow.result.json": "75d97ffb13c5105a7f185cd6ec2c41ff02d3c9ac7d8accdf50d450366e233a6e",
+    "reports/review_20261017_poc/HYDRO-96QH-maintenance-delay.result.json": "69c07f135fabb9eaa65ec09f1e2f69d0023941c1ee5e681ceecdcc03c6d63166",
+    "reports/review_20261017_poc/PV-96QH-arbitrage.result.json": "cfed7fffa0ae1702395fa092eb2463fa2b2580cac6f8a666f175194db7da7a0d",
+    "reports/review_20261017_poc/PV-96QH-grid-congestion.result.json": "0c53399fd87e6adc168618a4754f3344e7095680eaa8db140229cca2cc2b398c",
+    "reports/review_20261017_poc/acceptance.json": "c4bb4b6e25d5c391d389fb8ae20332d207cb1e1f83bb4f9b1dcf8b0a89c4e2ab"
+  },
+  "fixture_sha256": "a6313e770220dde79519b204961f0345464e2ef39b6b126825d2e54aaa2629a9",
+  "log_formatting": {
+    "normalization": "Only trailing line whitespace and final blank lines removed for Git; test content and outcomes unchanged.",
+    "original_sha256": {
+      "docker-build.log": "5cf554a9bc30cb650c3ce456aa1b1a531a05acbd89a4fa30840a599902b193eb",
+      "frontend-unit.log": "a8c27f977a25e2c579bb47595067fadd5abd33c78a8a59b577bff46119954d41",
+      "math-before-fix.log": "8562f67b060177c24b3970ec4866c7e4d49b686dd0afdbeb9512af37f6ff611f"
+    }
+  },
+  "local_only_screenshots": {
+    "publication": "Excluded from remote commits and history at the user request; local files retained.",
+    "sha256": {
+      "result-recovered.png": "f03368c4e21b3b8d76a5d2ec145d7f40f844fcaea8e3d7d146a298d27e405434",
+      "published-model.png": "c87ade13571d4ddd8609b53fb271348889a3a26ab8a435e2c128ceffc7659a46",
+      "long-task-tracking.png": "1b71ff86539b6fdc3cdd3341bf9f5721c5c3bec363f636f335d6ab74431ade34"
+    }
+  }
+}

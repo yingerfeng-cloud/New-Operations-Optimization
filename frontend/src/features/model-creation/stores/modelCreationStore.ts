@@ -12,6 +12,7 @@ export interface ModelWorkspaceContext {
   modelFamilyId?: string;
   currentAssetId?: string;
   sessionId: string;
+  generation?: string;
   initialized: boolean;
   dirty: boolean;
 }
@@ -230,7 +231,7 @@ export const useModelCreationStore = create<State>()((set) => ({
   initializeWorkspace: (context, draft, step = 0) => set({
     draft,
     modelDraft: draft,
-    workspace: { ...context, initialized: true, dirty: false },
+    workspace: { ...context, generation: createSessionId(), initialized: true, dirty: false },
     step,
     builderMode: draft.basic_info.builder_mode,
     loadedTemplate: null,

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from typing import Any, Literal
+from uuid import uuid4
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -41,6 +42,7 @@ class SolveRequest(BaseModel):
     thread_num: int | None = None
     presolve: bool = True
     async_run: bool = True
+    idempotency_key: str | None = None
     max_retries: int = 0
     objective_config: dict[str, Any] = Field(default_factory=dict)
     constraint_config: dict[str, Any] = Field(default_factory=dict)
@@ -54,6 +56,7 @@ class TaskView(BaseModel):
     model_config = ConfigDict(protected_namespaces=())
 
     id: str
+    attempt_id: str = ""
     model_id: str | None = None
     resolved_model_id: str | None = None
     resolved_model_code: str | None = None
@@ -81,6 +84,7 @@ class TaskView(BaseModel):
 class TaskRecord:
     id: str
     request: SolveRequest
+    attempt_id: str = field(default_factory=lambda: uuid4().hex)
     status: TaskStatus = "PENDING"
     progress: int = 5
     gap: str = "-"
@@ -116,6 +120,7 @@ class TaskRecord:
         objective_value = self.resolved_objective_value()
         return TaskView(
             id=self.id,
+            attempt_id=self.attempt_id,
             model_id=self.request.model_id,
             resolved_model_id=self.request.model_id,
             resolved_model_code=(self.request.payload or {}).get("resolved_model_code") or self.request.model_code,
@@ -143,6 +148,7 @@ class TaskRecord:
 class TaskRecordState(BaseModel):
     id: str
     request: SolveRequest
+    attempt_id: str = Field(default_factory=lambda: uuid4().hex)
     status: TaskStatus = "PENDING"
     progress: int = 5
     gap: str = "-"

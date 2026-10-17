@@ -10,7 +10,7 @@ from app.solvers.base import SolverProgressCallback
 
 class HiGHSAdapter:
     name = "HiGHS"
-    supported_problem_types = ["LP", "MILP", "QP", "MIQP"]
+    supported_problem_types = ["LP", "MILP"]
 
     def available(self) -> bool:
         import pyomo.environ as pyo

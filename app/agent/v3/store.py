@@ -8,6 +8,7 @@ from typing import Any
 from fastapi import HTTPException
 
 from app.agent.v3.models import TaskStatus
+from app.agent.public_projection import public_projection
 from app.storage.memory_store import STORE
 from app.utils import now_text
 
@@ -15,9 +16,7 @@ from app.utils import now_text
 class AgentV3Store:
     @staticmethod
     def public_task(task: dict[str, Any]) -> dict[str, Any]:
-        result = copy.deepcopy(task)
-        result.pop("execution_context_id", None)
-        return result
+        return public_projection(task)
 
     def append_event(
         self,
@@ -49,7 +48,7 @@ class AgentV3Store:
     def list_events(self, conversation_id: str, after: int = 0) -> list[dict[str, Any]]:
         self._require_conversation(conversation_id)
         with STORE.lock:
-            return copy.deepcopy([
+            return public_projection([
                 event
                 for event in STORE.agent_events.get(conversation_id, [])
                 if int(event.get("sequence") or 0) > after
@@ -621,7 +620,8 @@ class AgentV3Store:
     @staticmethod
     def _require_conversation(conversation_id: str) -> None:
         with STORE.lock:
-            exists = conversation_id in STORE.conversations
+            conversation = STORE.conversations.get(conversation_id)
+            exists = bool(conversation and conversation.get("kind") != "task_context")
         if not exists:
             raise HTTPException(status_code=404, detail="Conversation not found")
 

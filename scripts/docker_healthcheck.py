@@ -1,12 +1,15 @@
 from __future__ import annotations
 
 import json
+import os
 import sys
-from urllib.request import urlopen
+from urllib.request import Request, urlopen
 
 
 def _read_json(url: str) -> dict:
-    with urlopen(url, timeout=5) as response:  # noqa: S310 - fixed loopback URL
+    token = os.getenv("OPTIMIZATION_PLATFORM_API_TOKEN", "").strip()
+    request = Request(url, headers={"Authorization": f"Bearer {token}"} if token else {})
+    with urlopen(request, timeout=5) as response:  # noqa: S310 - fixed loopback URL
         if response.status != 200:
             raise RuntimeError(f"health endpoint returned HTTP {response.status}")
         return json.load(response)

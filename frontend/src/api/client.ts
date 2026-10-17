@@ -10,6 +10,21 @@ declare module 'axios' {
 const configuredBase = import.meta.env.VITE_API_BASE_URL?.replace(/\/$/, '');
 export const apiClient = axios.create({ baseURL: configuredBase || '', timeout: 30000 });
 
+export function setPlatformApiToken(token: string) {
+  sessionStorage.setItem('optiforge-platform-token', token.trim());
+}
+
+export function platformAuthorization(): Record<string, string> {
+  try { const token = sessionStorage.getItem('optiforge-platform-token'); return token ? { Authorization: `Bearer ${token}` } : {}; }
+  catch { return {}; }
+}
+
+apiClient.interceptors.request.use(config => {
+  const headers = platformAuthorization();
+  if (headers.Authorization) config.headers.set('Authorization', headers.Authorization);
+  return config;
+});
+
 function formatErrorItem(item: unknown): string {
   if (typeof item === 'string') return item;
   if (!item || typeof item !== 'object' || Array.isArray(item)) return '';
@@ -45,6 +60,7 @@ function extractErrorText(error: AxiosError<{ detail?: unknown; message?: string
 apiClient.interceptors.response.use(
   response => response,
   (error: AxiosError<{ detail?: unknown; message?: string }>) => {
+    if (error.response?.status === 401) window.dispatchEvent(new Event('optiforge:auth-required'));
     const method = String(error.config?.method || 'get').toUpperCase();
     const passiveRead = ['GET', 'HEAD', 'OPTIONS'].includes(method);
     if (error.config?.suppressErrorToast || passiveRead) {

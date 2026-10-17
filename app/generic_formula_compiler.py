@@ -25,6 +25,11 @@ def compile_generic_formula_spec(generic_spec: dict[str, Any], semantic_spec: di
     if not spec:
         return spec
     symbols = _symbols(spec, semantic_spec or {})
+    # Keep each parameter's axis identity all the way to numeric compilation.
+    spec["parameter_dimensions"] = {
+        **(spec.get("parameter_dimensions") or {}),
+        **{item["code"]: list(item.get("dimension") or item.get("indices") or []) for item in symbols["parameters"] if item.get("dimension") or item.get("indices")},
+    }
     definitions = [item for item in (spec.get("formula_definitions") or []) if isinstance(item, dict)]
     if definitions:
         spec["constraints"] = [

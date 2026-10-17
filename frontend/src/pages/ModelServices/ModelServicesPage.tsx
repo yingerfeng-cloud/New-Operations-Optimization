@@ -4,7 +4,10 @@ import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { getModelAssetDetail, getModels } from '../../api/models';
-import { createTask } from '../../api/tasks';
+import { createTask, getTask } from '../../api/tasks';
+import { getResult } from '../../api/results';
+import { readSession, writeSession, terminalTask } from '../../api/taskTracking';
+import { QueryState } from '../../components/QueryState';
 import { JsonViewer } from '../../components/JsonViewer';
 import { PageHeader } from '../../components/PageHeader';
 import { StatusTag } from '../../components/StatusTag';
@@ -108,6 +111,11 @@ export function ModelServicesPage() {
   const [selectedId, setSelectedId] = useState<string>();
   const [debugPayload, setDebugPayload] = useState('');
   const [debugResult, setDebugResult] = useState<Record<string, unknown>>();
+  const [trackedId, setTrackedId] = useState<string>();
+  const trackedTask = useQuery({ queryKey: ['task', trackedId], queryFn: () => getTask(trackedId!), enabled: !!trackedId,
+    refetchInterval: query => terminalTask(query.state.data?.status) ? false : 1500,
+  });
+  const trackedResult = useQuery({ queryKey: ['result', trackedId], queryFn: () => getResult(trackedId!), enabled: !!trackedId && trackedTask.data?.status === 'SUCCESS' });
   const filteredServices = useMemo(() => services.filter(model => {
     const text = `${model.name || ''} ${model.id || ''} ${model.problem_type || model.model_problem_type || ''}`.toLowerCase();
     const matchesKeyword = !keyword || text.includes(keyword.toLowerCase());
@@ -124,7 +132,7 @@ export function ModelServicesPage() {
   const endpoint = selected ? '/api/tasks' : '';
   const example = selected ? `curl -X POST http://localhost:8000/api/tasks \\
   -H "Content-Type: application/json" \\
-  -d '${JSON.stringify({ model_id: selected.id, model_code: selected.template_id || selected.id, problem_type: selectedCapability.problemType, solver: selectedCapability.solver, runtime_parameters: selectedSamplePayload, async_run: false }, null, 2)}'` : '';
+  -d '${JSON.stringify({ model_id: selected.id, model_code: selected.template_id || selected.id, problem_type: selectedCapability.problemType, solver: selectedCapability.solver, runtime_parameters: selectedSamplePayload, async_run: true }, null, 2)}'` : '';
 
   useEffect(() => {
     if (!selectedId && filteredServices[0]) setSelectedId(filteredServices[0].id);
@@ -134,6 +142,7 @@ export function ModelServicesPage() {
     if (selected) {
       setDebugPayload(JSON.stringify(selectedSamplePayload, null, 2));
       setDebugResult(undefined);
+      setTrackedId(readSession<{ taskId?: string }>(`optiforge-service-debug:${selected.id}`)?.taskId);
     }
   }, [selected, selectedSamplePayload]);
 
@@ -154,36 +163,29 @@ export function ModelServicesPage() {
       }
       if (!runtime_parameters || typeof runtime_parameters !== 'object' || Array.isArray(runtime_parameters)) throw new Error('运行参数 JSON 必须是对象');
       const capability = capabilityOrFallback(selected);
-      return createTask({ model_id: selected.id, model: selected.id, model_code: selected.template_id || selected.id, solver: capability.solver, runtime_parameters, parameters: runtime_parameters, async_run: false });
+      const storageKey = `optiforge-service-debug:${selected.id}`;
+      const previous = readSession<{ key: string; payload: Record<string, unknown>; taskId?: string }>(storageKey);
+      if (previous?.taskId) return getTask(previous.taskId);
+      const pending = previous || { key: crypto.randomUUID(), payload: { model_id: selected.id, model: selected.id, model_code: selected.template_id || selected.id, solver: capability.solver, runtime_parameters, parameters: runtime_parameters, async_run: true } };
+      writeSession(storageKey, pending);
+      const task = await createTask({ ...pending.payload, idempotency_key: pending.key });
+      writeSession(storageKey, { ...pending, taskId: task.id });
+      return task;
     },
-    onSuccess: task => {
-      const row = task as Record<string, unknown>;
-      const result = objectValue(row.result);
-      const trace = objectValue(row.trace);
-      setDebugResult({
-        task_id: row.id || row.task_id,
-        status: row.status,
-        model_code: selected.template_id || selected.id,
-        problem_type: result.problem_type || selectedCapability.problemType,
-        solver: result.solver || row.solver || selectedCapability.solver,
-        solver_available: result.solver_available ?? trace.solver_available ?? '按后端状态为准',
-        termination_condition: result.termination_condition || result.raw_termination_condition || trace.termination_condition || '-',
-        objective: row.objective_value ?? result.objective_value ?? row.cost,
-        runtime: row.duration_seconds ?? result.solve_time ?? trace.solve_seconds ?? '-',
-        constraint_violation_summary: result.constraint_violation_summary || '未返回约束违反摘要',
-        local_optimum_warning: result.local_optimum_warning ?? (selectedCapability.problemType === 'NLP' ? 'NLP/Ipopt 结果不承诺全局最优。' : undefined),
-        gap: row.gap || result.gap,
-        error: row.error || row.message || result.error || null,
-      });
-    },
+    onSuccess: task => { if (task.model_id && task.model_id !== selected?.id) return; setTrackedId(task.id); setDebugResult(undefined); },
     onError: error => {
+      const httpStatus = (error as { response?: { status?: number } }).response?.status;
+      if (selected && httpStatus && httpStatus < 500) writeSession(`optiforge-service-debug:${selected.id}`, undefined);
       const messageText = error instanceof Error ? error.message : String(error);
       const businessHint = messageText.includes('Ipopt') ? 'Ipopt 不可用，请检查 NLP 求解器环境。'
         : messageText.includes('JSON') ? messageText
-        : '调用失败：请检查必填运行参数、参数维度和函数资产引用。';
+        : '提交或连接暂未确认，请重试恢复原任务，或到任务中心查询。';
       setDebugResult({ status: 'ERROR', error: businessHint, raw_error: messageText });
     },
   });
+
+  const trackingActive = !!trackedId && !terminalTask(trackedTask.data?.status);
+  const debugDisplay = trackedTask.data ? { ...trackedTask.data, ...(trackedResult.data ? { result: trackedResult.data } : {}) } : debugResult;
 
   return (
     <>
@@ -197,7 +199,7 @@ export function ModelServicesPage() {
               <Select allowClear placeholder="问题类型" value={problemFilter} onChange={setProblemFilter} options={[...new Set(services.map(item => String(item.problem_type || item.model_problem_type || '')).filter(Boolean))].map(value => ({ value, label: value }))} />
             </FilterBar>
           </div>
-          <div className="service-list">
+          <QueryState query={models} title="服务列表"><div className="service-list">
             {filteredServices.map(model => (
               <button type="button" className={`service-list-item ${model.id === selected?.id ? 'active' : ''}`} key={model.id} onClick={() => setSelectedId(model.id)}>
                 <span className="service-list-title">{model.name}</span>
@@ -205,10 +207,10 @@ export function ModelServicesPage() {
                 <span className="service-list-meta"><StatusTag status={String(model.status)} /><Tag>{capabilityOrFallback(model).solver || 'HiGHS'}</Tag></span>
               </button>
             ))}
-          </div>
+          </div></QueryState>
         </Card>
         {!selected ? (
-          <EmptyActionState title="暂无已发布模型服务" description="发布模型后会自动出现在服务治理台。" />
+          <QueryState query={models} title="服务列表"><EmptyActionState title="暂无已发布模型服务" description="发布模型后会自动出现在服务治理台。" /></QueryState>
         ) : (
           <Card className="content-card" title={selected.name}>
             <Tabs
@@ -254,14 +256,17 @@ export function ModelServicesPage() {
                         <Input.TextArea aria-label="运行参数 JSON" rows={8} value={debugPayload} onChange={event => setDebugPayload(event.target.value)} />
                       </Form.Item>
                       <Space>
-                        <Button type="primary" loading={debugInvoke.isPending} onClick={() => debugInvoke.mutate()}>发起测试调用</Button>
-                        <Typography.Text type="secondary">调用现有任务接口并回显任务状态。</Typography.Text>
+                        <Button type="primary" disabled={trackingActive} loading={debugInvoke.isPending} onClick={() => debugInvoke.mutate()}>{trackedId ? '恢复任务' : '发起测试调用'}</Button>
+                        {trackedId && terminalTask(trackedTask.data?.status) && <Button onClick={() => { writeSession(`optiforge-service-debug:${selected.id}`, undefined); setTrackedId(undefined); setDebugResult(undefined); }}>新建测试调用</Button>}
+                        <Typography.Text type="secondary">提交后自动跟踪任务，可返回本页继续查看。</Typography.Text>
                       </Space>
-                      {debugResult && <Card className="section-gap" size="small" title="调试返回"><JsonViewer value={debugResult} /></Card>}
-                      {debugResult && (
+                      {trackedId && <QueryState query={trackedTask} title="调试任务"><span>任务编号：{trackedId} · 状态：{trackedTask.data?.status || '读取中'}</span></QueryState>}
+                      {debugDisplay && <Card className="section-gap" size="small" title="调试返回"><JsonViewer value={debugDisplay} /></Card>}
+                      {trackedTask.data?.status === 'SUCCESS' && <QueryState query={trackedResult} title="调试结果"><span /></QueryState>}
+                      {(debugDisplay || trackedId) && (
                         <Space className="section-gap" wrap>
-                          <Button onClick={() => nav('/tasks')}>跳转任务中心</Button>
-                          <Button onClick={() => nav('/results')}>跳转结果中心</Button>
+                          <Button onClick={() => nav(trackedId ? `/tasks?task=${encodeURIComponent(trackedId)}` : '/tasks')}>跳转任务中心</Button>
+                          <Button onClick={() => nav(trackedId ? `/results?task=${encodeURIComponent(trackedId)}` : '/results')}>跳转结果中心</Button>
                         </Space>
                       )}
                     </Form>

@@ -31,6 +31,5 @@ test('generic payload never serializes stale active components', () => {
 
   expect(active.components).toEqual([]);
   expect(payload.model_draft.components).toEqual([]);
-  expect(payload.component_spec.components).toEqual([]);
-  expect(payload.component_spec.build_mode).toBe('generic_linear');
+  expect(payload.component_spec).toEqual({});
 });

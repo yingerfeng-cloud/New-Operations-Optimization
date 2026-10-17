@@ -32,6 +32,16 @@ def update_function_asset(function_id: str, payload: dict) -> FunctionAsset:
     return function_asset_service.update_asset(function_id, payload)
 
 
+@router.get("/{function_id}/versions", response_model=list[FunctionAsset])
+def list_function_asset_versions(function_id: str) -> list[FunctionAsset]:
+    return function_asset_service.list_versions(function_id)
+
+
+@router.get("/{function_id}/versions/{revision}", response_model=FunctionAsset)
+def get_function_asset_version(function_id: str, revision: int) -> FunctionAsset:
+    return function_asset_service.get_version(function_id, revision)
+
+
 @router.post("/{function_id}/validate")
 def validate_function_asset(function_id: str, payload: dict | None = None) -> dict:
     return function_asset_service.validate_asset(function_id, payload)

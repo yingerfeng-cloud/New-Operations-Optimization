@@ -1,8 +1,9 @@
 import { Button, Dropdown, Modal, Space, message } from 'antd';
 import { MoreOutlined } from '@ant-design/icons';
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { UNSAFE_DataRouterContext, useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { DraftLeaveDialog, DraftLeaveGuard } from './components/DraftLeaveGuard';
 import { createModel, createModelVersion, getModel, publishModel, testModel, updateModel } from '../../api/models';
 import { getSystemConfig } from '../../api/systemConfig';
 import { getTemplateDetail, getTemplates } from '../../api/templates';
@@ -60,6 +61,9 @@ interface ModelTestSuccessContext {
 }
 
 export function ModelCreationPage() {
+  const dataRouter = useContext(UNSAFE_DataRouterContext);
+  const [sourceLeaveOpen, setSourceLeaveOpen] = useState(false);
+  const sourceLeaveResolver = useRef<((leave: boolean) => void) | undefined>(undefined);
   const [modal, modalContextHolder] = Modal.useModal();
   const nav = useNavigate();
   const { id: routeModelId } = useParams();
@@ -139,8 +143,13 @@ export function ModelCreationPage() {
 
   useEffect(() => {
     let active = true;
+    const existing = useModelCreationStore.getState().workspace;
+    if (existing.initialized && existing.dirty && existing.sessionId === requestKey) {
+      initializedKeyRef.current = requestKey;
+      return () => { active = false; };
+    }
     initializedKeyRef.current = '';
-    setWorkspace({ mode: resolvedMode, sourceModelId: request.sourceModelId, templateCode: request.templateCode, initialized: false, dirty: false });
+    setWorkspace({ mode: resolvedMode, generation: crypto.randomUUID(), sourceModelId: request.sourceModelId, templateCode: request.templateCode, initialized: false, dirty: false });
 
     if (request.legacySource) return () => { active = false; };
     if (systemConfig.isPending) return () => { active = false; };
@@ -202,17 +211,23 @@ export function ModelCreationPage() {
   }, []);
 
   useEffect(() => () => {
+    testRequestSequenceRef.current += 1;
     if (issueNavigationTimerRef.current !== undefined) window.clearTimeout(issueNavigationTimerRef.current);
   }, []);
 
   const saveDraftModel = async (requireValid = false, draftOverride?: ReturnType<typeof normalizeModelDraft>) => {
     const state = useModelCreationStore.getState();
+    const generation = state.workspace.generation;
+    const submittedDraft = normalizeModelDraft(draftOverride || state.draft);
     const createAsset = state.workspace.mode === 'version' && state.workspace.sourceModelId
       ? (payload: Parameters<typeof createModel>[0]) => createModelVersion(state.workspace.sourceModelId!, payload)
       : createModel;
-    const model = await saveModelDraftAsset(draftOverride || state.draft, state.currentDraftModelId, { createModel: createAsset, updateModel }, requireValid);
-    state.setCurrentDraftModelId(model.id);
-    state.setWorkspace({ dirty: false, currentAssetId: model.id });
+    const model = await saveModelDraftAsset(submittedDraft, state.currentDraftModelId, { createModel: createAsset, updateModel }, requireValid);
+    const current = useModelCreationStore.getState();
+    if (current.workspace.generation === generation) {
+      current.setCurrentDraftModelId(model.id);
+      current.setWorkspace({ dirty: JSON.stringify(normalizeModelDraft(current.draft)) !== JSON.stringify(submittedDraft), currentAssetId: model.id });
+    }
     return model;
   };
   const saveDraft = useMutation({ mutationFn: () => saveDraftModel(false), onSuccess: () => { setLastSavedAt(new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })); message.success('草稿已保存'); } });
@@ -266,14 +281,8 @@ export function ModelCreationPage() {
       resolve(true);
       return;
     }
-    modal.confirm({
-      title: '确认切换模型来源？',
-      content: '切换后将清空当前模型语义、组件、公式和运行参数，是否继续？',
-      okText: '继续切换',
-      cancelText: '取消',
-      onOk: () => resolve(true),
-      onCancel: () => resolve(false),
-    });
+    sourceLeaveResolver.current = resolve;
+    setSourceLeaveOpen(true);
   });
 
   const handleScenarioSelection = async (scenarioId: string) => {
@@ -432,6 +441,8 @@ export function ModelCreationPage() {
   return (
     <PageShell className="model-creation-page">
       {modalContextHolder}
+      {dataRouter && <DraftLeaveGuard onSave={() => saveDraftModel(false)} />}
+      {sourceLeaveOpen && <DraftLeaveDialog open onSave={() => saveDraftModel(false)} onContinue={() => { setSourceLeaveOpen(false); sourceLeaveResolver.current?.(false); }} onLeave={() => { setSourceLeaveOpen(false); sourceLeaveResolver.current?.(true); }} onDiscard={() => { reset(); setSourceLeaveOpen(false); sourceLeaveResolver.current?.(true); }} />}
       <PageHeader
         title={workspaceTitles[resolvedMode]}
         description={resolvedMode === 'version' ? '创建同一模型族的新草稿并继承选定版本；原试运行、已发布或已下线版本不会被直接覆盖。' : '当前工作台仅使用本模式指定的数据源，模式之间不会自动恢复其他草稿。'}

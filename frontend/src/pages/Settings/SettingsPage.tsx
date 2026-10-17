@@ -240,6 +240,7 @@ function LlmConfigPanel({ config }: { config?: LlmConfig }) {
             </Row>
           </section>
           <section className="settings-field-group settings-field-group-secret">
+            {config?.api_key_recovery_error && <Alert type="error" showIcon title="保存的密钥无法恢复" description={String(config.api_key_recovery_error)} />}
             <header><strong>访问凭证</strong><span>密钥仅用于服务端调用，不会回显</span></header>
             <Row gutter={16}>
               <Col xs={24} md={16}><Form.Item name="api_key" label={`API Key${config?.api_key_configured ? '（已配置，留空则保持不变）' : ''}`}><Input.Password autoComplete="new-password" disabled={provider === 'disabled'} /></Form.Item></Col>

@@ -1,0 +1,309 @@
+FFF...F.FFFFFF                                                           [100%]
+=================================== FAILURES ===================================
+________ test_parameter_axes_ignore_unrelated_set_order[False-labels0] _________
+
+client = <tests.conftest.ManagedTestClient object at 0x10d4413a0>
+labels = ['B', 'A'], mapping = False
+
+    @pytest.mark.parametrize("labels", [["B", "A"], [20, 10], ["20", "10"]])
+    @pytest.mark.parametrize("mapping", [False, True])
+    def test_parameter_axes_ignore_unrelated_set_order(client, labels, mapping):
+        for unrelated in (labels, list(reversed(labels))):
+            code = "review_cost_" + uuid4().hex[:8]
+            costs = {str(labels[0]): 10, str(labels[1]): 20} if mapping else [10, 20]
+            payload = {
+                "name": "Review parameter axes", "scene": "review", "problem_type": "LP",
+                "semantic_spec": {
+                    "model_code": code,
+                    "sets": [{"code": "unrelated", "values": unrelated}, {"code": "site", "values": labels}],
+                    "parameters": [{"code": "cost", "dimension": ["site"], "sample_value": costs, "validation": {"required": True}}],
+                    "variables": [{"code": "allocation", "dimension": ["site"], "domain": "NonNegativeReals"}],
+                },
+                "parameters": {"cost": costs},
+                "generic_spec": {
+                    "sense": "minimize", "sets": {"unrelated": unrelated, "site": labels}, "parameters": {},
+                    "variables": [{"name": "allocation", "indices": ["site"]}],
+                    "constraints": [{"name": "one", "terms": [{"var": "allocation", "foreach": ["site"], "key": ["site"]}], "sense": "==", "rhs": 1}],
+                    "objective": {"terms": [{"var": "allocation", "foreach": ["site"], "key": ["site"], "coef_param": "cost", "param_key": ["site"]}]},
+                },
+            }
+            created = client.post("/api/models", json=payload)
+            assert created.status_code == 200, created.text
+            model_id = created.json()["id"]
+            test_and_publish_model(client, model_id, {"cost": costs})
+            result = client.post(f"/api/models/{model_id}/invoke", json={"parameters": {"cost": costs}, "options": {"mode": "sync", "explain": False}})
+            assert result.status_code == 200, result.text
+            data = result.json()
+            allocation = data["variable_values"]["allocation"]
+            # Independent accounting in the declared site order.
+>           assert allocation[str(labels[0])] == pytest.approx(1)
+E           assert 0.0 == 1 ± 1.0e-06
+E
+E             comparison failed
+E             Obtained: 0.0
+E             Expected: 1 ± 1.0e-06
+
+tests/test_review_math_contracts.py:49: AssertionError
+________ test_parameter_axes_ignore_unrelated_set_order[False-labels1] _________
+
+client = <tests.conftest.ManagedTestClient object at 0x10c4991f0>
+labels = [20, 10], mapping = False
+
+    @pytest.mark.parametrize("labels", [["B", "A"], [20, 10], ["20", "10"]])
+    @pytest.mark.parametrize("mapping", [False, True])
+    def test_parameter_axes_ignore_unrelated_set_order(client, labels, mapping):
+        for unrelated in (labels, list(reversed(labels))):
+            code = "review_cost_" + uuid4().hex[:8]
+            costs = {str(labels[0]): 10, str(labels[1]): 20} if mapping else [10, 20]
+            payload = {
+                "name": "Review parameter axes", "scene": "review", "problem_type": "LP",
+                "semantic_spec": {
+                    "model_code": code,
+                    "sets": [{"code": "unrelated", "values": unrelated}, {"code": "site", "values": labels}],
+                    "parameters": [{"code": "cost", "dimension": ["site"], "sample_value": costs, "validation": {"required": True}}],
+                    "variables": [{"code": "allocation", "dimension": ["site"], "domain": "NonNegativeReals"}],
+                },
+                "parameters": {"cost": costs},
+                "generic_spec": {
+                    "sense": "minimize", "sets": {"unrelated": unrelated, "site": labels}, "parameters": {},
+                    "variables": [{"name": "allocation", "indices": ["site"]}],
+                    "constraints": [{"name": "one", "terms": [{"var": "allocation", "foreach": ["site"], "key": ["site"]}], "sense": "==", "rhs": 1}],
+                    "objective": {"terms": [{"var": "allocation", "foreach": ["site"], "key": ["site"], "coef_param": "cost", "param_key": ["site"]}]},
+                },
+            }
+            created = client.post("/api/models", json=payload)
+            assert created.status_code == 200, created.text
+            model_id = created.json()["id"]
+            test_and_publish_model(client, model_id, {"cost": costs})
+            result = client.post(f"/api/models/{model_id}/invoke", json={"parameters": {"cost": costs}, "options": {"mode": "sync", "explain": False}})
+            assert result.status_code == 200, result.text
+            data = result.json()
+>           allocation = data["variable_values"]["allocation"]
+                         ^^^^^^^^^^^^^^^^^^^^^^^
+E           KeyError: 'variable_values'
+
+tests/test_review_math_contracts.py:47: KeyError
+________ test_parameter_axes_ignore_unrelated_set_order[False-labels2] _________
+
+client = <tests.conftest.ManagedTestClient object at 0x10d4410a0>
+labels = ['20', '10'], mapping = False
+
+    @pytest.mark.parametrize("labels", [["B", "A"], [20, 10], ["20", "10"]])
+    @pytest.mark.parametrize("mapping", [False, True])
+    def test_parameter_axes_ignore_unrelated_set_order(client, labels, mapping):
+        for unrelated in (labels, list(reversed(labels))):
+            code = "review_cost_" + uuid4().hex[:8]
+            costs = {str(labels[0]): 10, str(labels[1]): 20} if mapping else [10, 20]
+            payload = {
+                "name": "Review parameter axes", "scene": "review", "problem_type": "LP",
+                "semantic_spec": {
+                    "model_code": code,
+                    "sets": [{"code": "unrelated", "values": unrelated}, {"code": "site", "values": labels}],
+                    "parameters": [{"code": "cost", "dimension": ["site"], "sample_value": costs, "validation": {"required": True}}],
+                    "variables": [{"code": "allocation", "dimension": ["site"], "domain": "NonNegativeReals"}],
+                },
+                "parameters": {"cost": costs},
+                "generic_spec": {
+                    "sense": "minimize", "sets": {"unrelated": unrelated, "site": labels}, "parameters": {},
+                    "variables": [{"name": "allocation", "indices": ["site"]}],
+                    "constraints": [{"name": "one", "terms": [{"var": "allocation", "foreach": ["site"], "key": ["site"]}], "sense": "==", "rhs": 1}],
+                    "objective": {"terms": [{"var": "allocation", "foreach": ["site"], "key": ["site"], "coef_param": "cost", "param_key": ["site"]}]},
+                },
+            }
+            created = client.post("/api/models", json=payload)
+            assert created.status_code == 200, created.text
+            model_id = created.json()["id"]
+            test_and_publish_model(client, model_id, {"cost": costs})
+            result = client.post(f"/api/models/{model_id}/invoke", json={"parameters": {"cost": costs}, "options": {"mode": "sync", "explain": False}})
+            assert result.status_code == 200, result.text
+            data = result.json()
+>           allocation = data["variable_values"]["allocation"]
+                         ^^^^^^^^^^^^^^^^^^^^^^^
+E           KeyError: 'variable_values'
+
+tests/test_review_math_contracts.py:47: KeyError
+______ test_hydro_published_objective_matches_independent_accounting[900] ______
+
+client = <tests.conftest.ManagedTestClient object at 0x10d646810>, seconds = 900
+
+    @pytest.mark.parametrize("seconds", [900, 3600])
+    def test_hydro_published_objective_matches_independent_accounting(client, seconds):
+        copied = client.post("/api/models/MODEL-POWER-CASCADE-HYDRO-DISPATCH/copy").json()
+        params = deepcopy(get_template("cascade_hydro_dispatch")["sample_runtime_parameters"])
+        params.update(time_step_seconds=seconds, ramp_smoothing_enabled=False)
+        copied["parameters"] = params
+        if seconds == 3600:
+            for source in (copied, copied["semantic_spec"], copied["component_spec"]):
+                source.setdefault("ui_metadata", {}).setdefault("time_dimension", {})["interval_minutes"] = 60
+        updated = client.put(f"/api/models/{copied['id']}", json=copied)
+        assert updated.status_code == 200, updated.text
+        test_and_publish_model(client, copied["id"], params)
+        response = client.post(f"/api/models/{copied['id']}/invoke", json={"parameters": params, "options": {"mode": "sync", "explain": False}})
+        assert response.status_code == 200, response.text
+        body = response.json()
+        values = body["variable_values"]
+        energy = sum(values["station_power"].values()) * seconds / 3600
+        revenue = energy * params["electricity_price"]
+        weights = params["weights"]
+        expected = (
+            weights["load_deviation"] * (sum(values["load_dev_pos"].values()) + sum(values["load_dev_neg"].values()))
+            + weights["spill"] * sum(values["q_spill"].values())
+            + weights["terminal_volume"] * (sum(values["terminal_dev_pos"].values()) + sum(values["terminal_dev_neg"].values()))
+            - weights["generation"] * energy - weights["revenue"] * revenue
+        )
+>       assert body["objective_value"] == pytest.approx(expected, abs=0.01)
+E       assert -268744.06501547986 == 47305.935 ± 0.01
+E
+E         comparison failed
+E         Obtained: -268744.06501547986
+E         Expected: 47305.935 ± 0.01
+
+tests/test_review_math_contracts.py:79: AssertionError
+___________ test_dynamic_piecewise_is_exact[10-100-points0-minimize] ___________
+
+points = [[0, 0], [10, 100], [20, 110]], sense = 'minimize', power = 10
+expected = 100
+
+    @pytest.mark.parametrize("points,sense", [([[0, 0], [10, 100], [20, 110]], "minimize"), ([[0, 0], [10, 100], [20, 260]], "maximize")])
+    @pytest.mark.parametrize("power,expected", [(10, 100), (5, 50)])
+    def test_dynamic_piecewise_is_exact(points, sense, power, expected):
+        component = _piecewise_component(points)
+        definition = normalize_component_payload(component)
+        with STORE.lock:
+            STORE.custom_components[component["component_id"]] = {**definition, "status": "published"}
+        spec = _model_spec(component)
+        spec["objective"]["sense"] = sense
+        model, context = ComponentModelBuilder().build(spec, {"time": [0, 1], "cost_curve": points})
+        for t in model.time:
+            model.p[t].fix(power)
+        solved = HiGHSAdapter().solve(model)
+        assert solved.status == "optimal"
+>       assert pyo.value(model.cost[0]) == pytest.approx(expected)
+E       assert 55.0 == 100 ± 1.0e-04
+E
+E         comparison failed
+E         Obtained: 55.0
+E         Expected: 100 ± 1.0e-04
+
+tests/test_review_math_contracts.py:96: AssertionError
+___________ test_dynamic_piecewise_is_exact[10-100-points1-maximize] ___________
+
+points = [[0, 0], [10, 100], [20, 260]], sense = 'maximize', power = 10
+expected = 100
+
+    @pytest.mark.parametrize("points,sense", [([[0, 0], [10, 100], [20, 110]], "minimize"), ([[0, 0], [10, 100], [20, 260]], "maximize")])
+    @pytest.mark.parametrize("power,expected", [(10, 100), (5, 50)])
+    def test_dynamic_piecewise_is_exact(points, sense, power, expected):
+        component = _piecewise_component(points)
+        definition = normalize_component_payload(component)
+        with STORE.lock:
+            STORE.custom_components[component["component_id"]] = {**definition, "status": "published"}
+        spec = _model_spec(component)
+        spec["objective"]["sense"] = sense
+        model, context = ComponentModelBuilder().build(spec, {"time": [0, 1], "cost_curve": points})
+        for t in model.time:
+            model.p[t].fix(power)
+        solved = HiGHSAdapter().solve(model)
+        assert solved.status == "optimal"
+>       assert pyo.value(model.cost[0]) == pytest.approx(expected)
+E       assert 130.0 == 100 ± 1.0e-04
+E
+E         comparison failed
+E         Obtained: 130.0
+E         Expected: 100 ± 1.0e-04
+
+tests/test_review_math_contracts.py:96: AssertionError
+____________ test_dynamic_piecewise_is_exact[5-50-points0-minimize] ____________
+
+points = [[0, 0], [10, 100], [20, 110]], sense = 'minimize', power = 5
+expected = 50
+
+    @pytest.mark.parametrize("points,sense", [([[0, 0], [10, 100], [20, 110]], "minimize"), ([[0, 0], [10, 100], [20, 260]], "maximize")])
+    @pytest.mark.parametrize("power,expected", [(10, 100), (5, 50)])
+    def test_dynamic_piecewise_is_exact(points, sense, power, expected):
+        component = _piecewise_component(points)
+        definition = normalize_component_payload(component)
+        with STORE.lock:
+            STORE.custom_components[component["component_id"]] = {**definition, "status": "published"}
+        spec = _model_spec(component)
+        spec["objective"]["sense"] = sense
+        model, context = ComponentModelBuilder().build(spec, {"time": [0, 1], "cost_curve": points})
+        for t in model.time:
+            model.p[t].fix(power)
+        solved = HiGHSAdapter().solve(model)
+        assert solved.status == "optimal"
+>       assert pyo.value(model.cost[0]) == pytest.approx(expected)
+E       assert 27.5 == 50 ± 5.0e-05
+E
+E         comparison failed
+E         Obtained: 27.5
+E         Expected: 50 ± 5.0e-05
+
+tests/test_review_math_contracts.py:96: AssertionError
+____________ test_dynamic_piecewise_is_exact[5-50-points1-maximize] ____________
+
+points = [[0, 0], [10, 100], [20, 260]], sense = 'maximize', power = 5
+expected = 50
+
+    @pytest.mark.parametrize("points,sense", [([[0, 0], [10, 100], [20, 110]], "minimize"), ([[0, 0], [10, 100], [20, 260]], "maximize")])
+    @pytest.mark.parametrize("power,expected", [(10, 100), (5, 50)])
+    def test_dynamic_piecewise_is_exact(points, sense, power, expected):
+        component = _piecewise_component(points)
+        definition = normalize_component_payload(component)
+        with STORE.lock:
+            STORE.custom_components[component["component_id"]] = {**definition, "status": "published"}
+        spec = _model_spec(component)
+        spec["objective"]["sense"] = sense
+        model, context = ComponentModelBuilder().build(spec, {"time": [0, 1], "cost_curve": points})
+        for t in model.time:
+            model.p[t].fix(power)
+        solved = HiGHSAdapter().solve(model)
+        assert solved.status == "optimal"
+>       assert pyo.value(model.cost[0]) == pytest.approx(expected)
+E       assert 65.0 == 50 ± 5.0e-05
+E
+E         comparison failed
+E         Obtained: 65.0
+E         Expected: 50 ± 5.0e-05
+
+tests/test_review_math_contracts.py:96: AssertionError
+___________ test_unverified_quadratic_adapter_is_not_advertised[QP] ____________
+
+kind = 'QP'
+
+    @pytest.mark.parametrize("kind", ["QP", "MIQP"])
+    def test_unverified_quadratic_adapter_is_not_advertised(kind):
+        route = solver_router.route(kind, "HiGHS")
+>       assert not route["ok"]
+E       assert not True
+
+tests/test_review_math_contracts.py:104: AssertionError
+__________ test_unverified_quadratic_adapter_is_not_advertised[MIQP] ___________
+
+kind = 'MIQP'
+
+    @pytest.mark.parametrize("kind", ["QP", "MIQP"])
+    def test_unverified_quadratic_adapter_is_not_advertised(kind):
+        route = solver_router.route(kind, "HiGHS")
+>       assert not route["ok"]
+E       assert not True
+
+tests/test_review_math_contracts.py:104: AssertionError
+=============================== warnings summary ===============================
+.venv-mac/lib/python3.12/site-packages/fastapi/testclient.py:1
+  /Users/joiefu/Project/OPTIFORGE/.venv-mac/lib/python3.12/site-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+    from starlette.testclient import TestClient as TestClient  # noqa
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/test_review_math_contracts.py::test_parameter_axes_ignore_unrelated_set_order[False-labels0]
+FAILED tests/test_review_math_contracts.py::test_parameter_axes_ignore_unrelated_set_order[False-labels1]
+FAILED tests/test_review_math_contracts.py::test_parameter_axes_ignore_unrelated_set_order[False-labels2]
+FAILED tests/test_review_math_contracts.py::test_hydro_published_objective_matches_independent_accounting[900]
+FAILED tests/test_review_math_contracts.py::test_dynamic_piecewise_is_exact[10-100-points0-minimize]
+FAILED tests/test_review_math_contracts.py::test_dynamic_piecewise_is_exact[10-100-points1-maximize]
+FAILED tests/test_review_math_contracts.py::test_dynamic_piecewise_is_exact[5-50-points0-minimize]
+FAILED tests/test_review_math_contracts.py::test_dynamic_piecewise_is_exact[5-50-points1-maximize]
+FAILED tests/test_review_math_contracts.py::test_unverified_quadratic_adapter_is_not_advertised[QP]
+FAILED tests/test_review_math_contracts.py::test_unverified_quadratic_adapter_is_not_advertised[MIQP]
+10 failed, 4 passed, 1 warning in 18.20s

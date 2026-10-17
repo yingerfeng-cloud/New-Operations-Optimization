@@ -53,6 +53,7 @@ LOGGER = logging.getLogger(__name__)
 class ModelService:
     def create_model(self, model: ModelPackage) -> ModelView:
         model = model.model_copy(update={
+            "function_dependencies": {},
             "status": "developing",
             "is_active_version": False,
             "published_by": None,
@@ -105,6 +106,7 @@ class ModelService:
         existing = self.get_model(model_id)
         if existing.status in IMMUTABLE_MODEL_STATUSES or existing.published_at:
             raise HTTPException(status_code=409, detail="Online and historical model versions are immutable; create a new version before editing")
+        model = model.model_copy(update={"function_dependencies": {}})
         model = self._normalize_component_model(model)
         model = self._normalize_generic_formula_model(model)
         model = self._apply_generalized_top_level_fields(model)
@@ -122,6 +124,8 @@ class ModelService:
 
     def publish_model(self, model_id: str) -> ModelView:
         model = self.get_model(model_id)
+        from app.services.function_dependencies import assert_dependencies_current
+        assert_dependencies_current(model)
         current_hash = self._content_hash(ModelPackage.model_validate(model.model_dump()))
         self._validate_publish_code_ownership(model)
         normalized_model = self._normalize_component_model(ModelPackage(**model.model_dump()))
@@ -262,6 +266,8 @@ class ModelService:
                     self._record_model_version_locked(inactive)
             STORE.models[model_id] = updated
             STORE.active_model_versions[str(updated.model_family_id)] = model_id
+            if self._is_managed_default(updated):
+                STORE.template_status[f"model:{model_id}"] = "published"
             self._record_model_version_locked(updated)
             STORE.save_runtime()
         return updated
@@ -282,6 +288,8 @@ class ModelService:
         updated = model.model_copy(update={"status": "offline", "is_active_version": False, "updated_at": now_text()})
         with STORE.lock:
             STORE.models[model_id] = updated
+            if self._is_managed_default(updated):
+                STORE.template_status[f"model:{model_id}"] = "offline"
             if updated.model_family_id and STORE.active_model_versions.get(updated.model_family_id) == model_id:
                 STORE.active_model_versions.pop(updated.model_family_id, None)
             self._record_model_version_locked(updated)
@@ -367,6 +375,8 @@ class ModelService:
             }
         }
         copied.template_id = new_code
+        if copied.build_mode == "template_based":
+            copied.semantic_spec["template_code"] = self._template_code(model)
         self._replace_model_code(copied.semantic_spec, new_code)
         self._replace_model_code(copied.component_spec, new_code)
         nested_component = (copied.semantic_spec or {}).get("component_spec")
@@ -423,14 +433,16 @@ class ModelService:
         )
 
     def _is_template_backed_model(self, model: ModelPackage | ModelView) -> bool:
-        semantic = model.semantic_spec or {}
-        template_id = model.template_id or semantic.get("model_code") or semantic.get("code")
-        return bool(template_id and template_id in power_template_library() and not model.generic_spec)
+        return bool(self._template_code(model) and not model.generic_spec)
 
     def _is_known_template_model(self, model: ModelPackage | ModelView) -> bool:
+        return bool(self._template_code(model))
+
+    def _template_code(self, model: ModelPackage | ModelView) -> str | None:
         semantic = model.semantic_spec or {}
-        template_id = model.template_id or semantic.get("model_code") or semantic.get("code")
-        return bool(template_id and template_id in power_template_library())
+        basic = (model.model_draft or {}).get("basic_info") or {}
+        known = power_template_library()
+        return next((code for code in (semantic.get("template_code"), basic.get("template_code"), model.template_id, semantic.get("model_code"), semantic.get("code")) if isinstance(code, str) and code in known), None)
 
     def _is_component_based_model(self, model: ModelPackage | ModelView) -> bool:
         semantic = model.semantic_spec or {}
@@ -787,6 +799,9 @@ class ModelService:
 
     def run_model_test_case(self, model_id: str, test_case: dict[str, Any]) -> ModelView:
         model = self.get_model(model_id)
+        from app.services.function_dependencies import capture_dependencies
+        if not model.published_at or not model.function_dependencies:
+            model = model.model_copy(update={"function_dependencies": capture_dependencies(model)})
         params = test_case.get("parameters") if "parameters" in test_case else test_case
         if not isinstance(params, dict) or not params:
             params = self._default_test_parameters(model)
@@ -803,6 +818,41 @@ class ModelService:
             self._record_model_version_locked(updated)
             STORE.save_runtime()
         return updated
+
+    def start_model_test(self, model_id: str, test_case: dict[str, Any]):
+        from app.schemas.solve import SolveRequest
+        from app.services.function_dependencies import capture_dependencies
+        from app.services.job_service import job_service
+        model = self.get_model(model_id)
+        if not model.published_at or not model.function_dependencies:
+            model = model.model_copy(update={"function_dependencies": capture_dependencies(model)})
+        parameters = test_case.get("parameters") or self._default_test_parameters(model)
+        return job_service.create_task(SolveRequest(
+            model_id=model_id, parameters=parameters, async_run=True,
+            idempotency_key=test_case.get("idempotency_key"),
+        ), testing_model=model)
+
+    def complete_model_test(self, task) -> None:
+        """Called inside the job's guarded atomic result commit."""
+        context = task.request.payload.get("_model_test")
+        if not context:
+            return
+        model = self.get_model(task.request.model_id)
+        if self._content_hash(model) != context["source_hash"]:
+            raise RuntimeError("MODEL_TEST_OUTDATED: 模型在测试期间发生修改，请测试当前版本。")
+        model = model.model_copy(update={"function_dependencies": context["dependencies"]})
+        content_hash = self._content_hash(model)
+        updated = model.model_copy(update={
+            "status": "published" if model.status == "published" else "trial",
+            "content_hash": content_hash, "tested_content_hash": content_hash,
+            "tested_model_id": model.id, "tested_at": now_text(), "updated_at": now_text(),
+            "dry_run_result": {"structure_check": {"status": "passed", "errors": []}, "solver_check": {
+                "status": "passed", "warnings": [], "objective_value": task.objective_value,
+                "problem_type": task.result.get("problem_type"), "solver_status": task.result.get("termination_condition"),
+            }},
+        })
+        STORE.models[model.id] = updated
+        self._record_model_version_locked(updated)
 
     def _default_test_parameters(self, model: ModelPackage | ModelView) -> dict[str, Any]:
         semantic = deepcopy(model.semantic_spec or {})
@@ -872,7 +922,8 @@ class ModelService:
                 errors.append({"field": "component_spec", "error": "component_spec is required before publish"})
             if is_component_based:
                 errors.extend(self._validate_component_sets(model))
-                function_errors, function_warnings = self._validate_function_asset_bindings(component_spec)
+                from app.services.function_dependencies import dependency_snapshots
+                function_errors, function_warnings = self._validate_function_asset_bindings(component_spec, dependency_snapshots(model) if model.function_dependencies else None)
                 has_function_binding_errors = bool(function_errors)
                 errors.extend(function_errors)
                 warnings.extend(function_warnings)
@@ -1264,21 +1315,32 @@ class ModelService:
                 semantic["build_mode"] = "component_based"
                 semantic["component_spec"] = deepcopy(component_spec)
                 dry_parameters = {
-                    **(model.parameters or {}),
                     **(semantic.get("sample_runtime_parameters") or {}),
+                    **(model.parameters or {}),
                     **(test_parameters or {}),
                     "semantic_spec": semantic,
                 }
+                from app.services.function_dependencies import dependency_snapshots
+                if model.function_dependencies:
+                    dry_parameters["_function_asset_snapshots"] = dependency_snapshots(model)
                 self._fill_component_dry_parameters(dry_parameters, component_spec)
                 self._normalize_component_dry_parameters(dry_parameters, str(component_spec.get("model_code") or semantic.get("model_code") or ""))
+                from app.services.time_dimension_service import normalize_runtime_time_dimension, resolve_time_dimension_config
+                dry_parameters, normalized_component, _, _ = normalize_runtime_time_dimension(
+                    semantic_spec=semantic, component_spec=component_spec, generic_spec=None,
+                    runtime_parameters=dry_parameters, explicit_horizon=(test_parameters or {}).get("horizon"),
+                    explicitly_provided_keys=set(test_parameters or {}),
+                    time_dimension=resolve_time_dimension_config(model=model, semantic_spec=semantic, component_spec=component_spec, generic_spec=None, runtime_parameters=dry_parameters),
+                )
+                semantic["component_spec"] = normalized_component
                 pyomo_model, _ = PyomoModelBuilder().build(semantic, dry_parameters)
             elif is_template_backed and not model.generic_spec:
                 from app.builders.pyomo_builder import PyomoModelBuilder
 
                 semantic = deepcopy(model.semantic_spec or {})
                 dry_parameters = {
-                    **(model.parameters or {}),
                     **(semantic.get("sample_runtime_parameters") or {}),
+                    **(model.parameters or {}),
                     **(test_parameters or {}),
                 }
                 dry_parameters.setdefault("model_code", model.template_id or semantic.get("model_code") or semantic.get("code"))
@@ -1329,7 +1391,7 @@ class ModelService:
                 return index
         return None
 
-    def _validate_function_asset_bindings(self, component_spec: dict[str, Any]) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    def _validate_function_asset_bindings(self, component_spec: dict[str, Any], snapshots: dict | None = None) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
         errors: list[dict[str, Any]] = []
         warnings: list[dict[str, Any]] = []
         variables = {
@@ -1348,7 +1410,7 @@ class ModelService:
                 errors.append({"field": field, "error": "function_asset_id is required"})
                 continue
             try:
-                asset = get_function_asset(function_id)
+                asset = get_function_asset(function_id, snapshots)
             except RuntimeError as exc:
                 errors.append({"field": field, "error": "function asset does not exist", "actual": function_id, "suggestion": str(exc)})
                 continue
@@ -1749,6 +1811,14 @@ class ModelService:
     def seed_default_templates(self) -> None:
         self._ensure_default_component_library()
         self._ensure_default_template_models_published()
+        from app.services.function_dependencies import capture_dependencies
+        with STORE.lock:
+            for model_id, model in list(STORE.models.items()):
+                if self._is_managed_default(model) and not model.function_dependencies:
+                    model = model.model_copy(update={"function_dependencies": capture_dependencies(model)})
+                    STORE.models[model_id] = model
+                if self._is_managed_default(model) and STORE.template_status.get(f"model:{model_id}") == "offline":
+                    STORE.models[model_id] = model.model_copy(update={"status": "offline", "is_active_version": False})
         self._ensure_default_template_skills_enabled()
         self.reconcile_version_state()
         with STORE.lock:

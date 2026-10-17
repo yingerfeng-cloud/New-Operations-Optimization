@@ -5,6 +5,7 @@ from typing import Any
 from app.agent.conversation_store import conversation_store
 from app.agent.orchestrator import agent_orchestrator
 from app.agent.run_store import TERMINAL_RUN_STATUSES, agent_run_store
+from app.agent.public_projection import public_projection
 
 
 class AgentRuntimeService:
@@ -71,10 +72,10 @@ class AgentRuntimeService:
         return rows
 
     def get_run(self, run_id: str) -> dict[str, Any]:
-        return agent_run_store.get(run_id)
+        return public_projection(agent_run_store.get(run_id))
 
     def get_run_events(self, run_id: str, after: int = 0) -> list[dict[str, Any]]:
-        return [event for event in agent_run_store.get(run_id).get("events", []) if int(event.get("sequence") or 0) > after]
+        return public_projection([event for event in agent_run_store.get(run_id).get("events", []) if int(event.get("sequence") or 0) > after])
 
     def cancel_run(self, run_id: str) -> dict[str, Any]:
         return agent_run_store.cancel(run_id)

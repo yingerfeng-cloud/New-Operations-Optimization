@@ -7,10 +7,12 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api import agent, agent_skills, llm
 from app.services.llm_service import llm_service
+from app.security import platform_token_middleware
 
 
 def create_agent_app() -> FastAPI:
     app = FastAPI(title="Optimization Agent", version="0.3.0")
+    app.middleware("http")(platform_token_middleware)
     app.add_middleware(
         CORSMiddleware,
         allow_origins=["*"],

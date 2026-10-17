@@ -10,6 +10,8 @@ import socket
 import threading
 import time
 import random
+import secrets
+from pathlib import Path
 from datetime import datetime, timezone
 from typing import Any
 
@@ -595,6 +597,7 @@ class LLMService:
             "http2": str(self._override("http2", os.getenv("LLM_HTTP2", "false"))).strip().lower() in {"1", "true", "yes", "on"},
             "enabled": enabled,
             "api_key_configured": api_key_configured,
+            "api_key_recovery_error": getattr(self, "_key_recovery_error", None),
             "supported_providers": sorted(SUPPORTED_PROVIDERS),
             "persistence_path": str(STORE.persistence_path),
             "config_source": self._config_source(),
@@ -931,27 +934,60 @@ class LLMService:
         ciphertext = self._override("key_ciphertext", "")
         return self._decrypt_key(str(ciphertext or ""))
 
-    def _key_material(self) -> bytes:
-        seed = "|".join([socket.gethostname(), getpass.getuser(), str(STORE.persistence_path.parent)])
-        return hashlib.sha256(seed.encode("utf-8")).digest()
+    def _key_material(self, *, create: bool = False) -> bytes:
+        secret = os.getenv("OPTIFORGE_CONFIG_SECRET", "")
+        if not secret:
+            explicit_path = os.getenv("OPTIFORGE_CONFIG_SECRET_FILE", "")
+            path = Path(explicit_path) if explicit_path else STORE.persistence_path.parent / ".optiforge-config-secret"
+            if not path.exists() and create and not explicit_path:
+                path.parent.mkdir(parents=True, exist_ok=True)
+                try:
+                    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+                except FileExistsError:
+                    pass
+                else:
+                    with os.fdopen(fd, "w") as stream:
+                        stream.write(secrets.token_urlsafe(48))
+                        stream.flush()
+                        os.fsync(stream.fileno())
+            if not path.is_file():
+                raise ValueError("LLM 密钥恢复材料缺失；请恢复原 OPTIFORGE_CONFIG_SECRET / Secret 文件，或重新填写 API Key。迁移时需同时保留数据目录中的 .optiforge-config-secret。")
+            secret = path.read_text().strip()
+        if not secret:
+            raise ValueError("LLM 配置 Secret 为空，请恢复原 Secret 或重新配置 API Key。")
+        return base64.urlsafe_b64encode(hashlib.sha256(secret.encode()).digest())
 
     def _encrypt_key(self, value: str) -> str:
         if not value:
             return ""
-        raw = value.encode("utf-8")
-        key = self._key_material()
-        encrypted = bytes(byte ^ key[index % len(key)] for index, byte in enumerate(raw))
-        return base64.urlsafe_b64encode(encrypted).decode("ascii")
+        from cryptography.fernet import Fernet
+        self._key_recovery_error = None
+        return "fernet:v1:" + Fernet(self._key_material(create=True)).encrypt(value.encode()).decode("ascii")
 
     def _decrypt_key(self, value: str) -> str:
+        self._key_recovery_error = None
         if not value:
             return ""
         try:
+            if value.startswith("fernet:v1:"):
+                from cryptography.fernet import Fernet
+                return Fernet(self._key_material()).decrypt(value[len("fernet:v1:"):].encode()).decode()
+            # Migrate old host-bound XOR only while its original environment is
+            # still available. Preserve the ciphertext on recovery failure.
             raw = base64.urlsafe_b64decode(value.encode("ascii"))
-            key = self._key_material()
-            decrypted = bytes(byte ^ key[index % len(key)] for index, byte in enumerate(raw))
-            return decrypted.decode("utf-8")
+            seed = "|".join([socket.gethostname(), getpass.getuser(), str(STORE.persistence_path.parent)])
+            material = hashlib.sha256(seed.encode()).digest()
+            key = bytes(byte ^ material[index % len(material)] for index, byte in enumerate(raw)).decode()
+            if not key or not key.isprintable():
+                raise ValueError("legacy key cannot be decoded")
+            migrated = self._encrypt_key(key)
+            with STORE.lock:
+                if STORE.llm_config.get("key_ciphertext") == value:
+                    STORE.llm_config["key_ciphertext"] = migrated
+                    STORE.save_runtime()
+            return key
         except Exception:
+            self._key_recovery_error = "保存的 API Key 无法解密。请恢复保存时的 OPTIFORGE_CONFIG_SECRET 或 Secret 文件；旧版配置须在原环境迁移，或重新填写 API Key。"
             return ""
 
     def _config_source(self) -> str:

@@ -1,0 +1,384 @@
+{
+  "job_id": "OPT-50B5F37694",
+  "model_id": "MODEL-AE422E3C",
+  "model_code": "economic_dispatch",
+  "status": "INFEASIBLE",
+  "error": "模型不可行，请检查硬负荷目标、库容边界、生态流量和函数资产定义域。",
+  "trace": {
+    "request_fingerprint": "9193a225cd5af0f6d23d72e973b9a3c08db8c07a6287faa96d6a79b5e8d9e242",
+    "stage_timings": {
+      "RUNNING": {
+        "started_at": "2026-10-17 17:53:44",
+        "finished_at": "2026-10-17 17:53:44"
+      },
+      "VALIDATING": {
+        "started_at": "2026-10-17 17:53:44",
+        "finished_at": "2026-10-17 17:53:45",
+        "duration_seconds": 0.001
+      },
+      "BUILDING_MODEL": {
+        "started_at": "2026-10-17 17:53:45",
+        "finished_at": "2026-10-17 17:53:46",
+        "duration_seconds": 0.0018
+      },
+      "SOLVING": {
+        "started_at": "2026-10-17 17:53:46"
+      }
+    },
+    "validation_seconds": 0.001,
+    "model_build_seconds": 0.0018,
+    "problem_type": "LP",
+    "solver_progress": {
+      "schema_version": "1.1",
+      "solver": "HiGHS",
+      "problem_type": "LP",
+      "search_mode": "LP_ITERATION",
+      "status": "COMPLETED",
+      "supported": true,
+      "message": "该连续模型快速完成，共执行 0 次预处理/直接求解迭代；求解时间过短，未产生可绘制的分段采样轨迹。",
+      "points": [
+        {
+          "elapsed_seconds": 0.000728,
+          "incumbent_objective": null,
+          "best_bound": null,
+          "gap": null,
+          "node_count": null,
+          "iteration_count": 0,
+          "algorithm": "预处理/直接求解",
+          "kind": "iteration_final"
+        }
+      ],
+      "events": [
+        {
+          "kind": "search_started",
+          "label": "开始搜索最优解",
+          "elapsed_seconds": 0.0
+        },
+        {
+          "kind": "infeasible_proven",
+          "label": "求解器判定模型不可行",
+          "elapsed_seconds": 0.0084
+        }
+      ],
+      "latest": {
+        "elapsed_seconds": 0.000728,
+        "iteration_count": 0,
+        "algorithm": "预处理/直接求解"
+      },
+      "gap_milestones": [],
+      "point_count": 1,
+      "final_status": "infeasible"
+    },
+    "solve_seconds": 0.0084
+  },
+  "logs": [
+    "2026-10-17 17:53:44 [INFO] 任务已进入执行队列",
+    "2026-10-17 17:53:45 [INFO] 参数校验开始",
+    "2026-10-17 17:53:45 [INFO] 参数校验完成，耗时=0.001s",
+    "2026-10-17 17:53:46 [INFO] 开始构建模型 model_code=economic_dispatch, build_mode=template_based",
+    "2026-10-17 17:53:46 [INFO] 模型构建完成，变量数=72，约束数=240，耗时=0.0018s",
+    "2026-10-17 17:53:46 [INFO] 开始调用路由求解器，time_limit_seconds=60",
+    "2026-10-17 17:53:46 [INFO] 求解完成，HiGHS termination_condition=infeasible，耗时=0.0084s",
+    "2026-10-17 17:53:46 [ERROR] 模型不可行，请检查硬负荷目标、库容边界、生态流量和函数资产定义域。"
+  ],
+  "run_metrics": {
+    "variable_count": 72,
+    "constraint_count": 240,
+    "solver_status": "infeasible",
+    "objective_value": null,
+    "solver_gap": null
+  },
+  "evidence_package": {
+    "evidence_schema_version": "2.0",
+    "solver": {
+      "status": "infeasible",
+      "termination_condition": "infeasible",
+      "objective_value": null,
+      "solver_name": "unknown",
+      "error": "模型不可行，请检查硬负荷目标、库容边界、生态流量和函数资产定义域。",
+      "problem_type": null,
+      "local_optimum_warning": false,
+      "constraint_violation_summary": null
+    },
+    "model": {
+      "model_id": "MODEL-AE422E3C",
+      "model_version": "v0.1",
+      "skill_name": "run_economic_dispatch",
+      "schema_version": "unknown",
+      "profile_name": "generic",
+      "skill_definition_revision": 1,
+      "skill_definition_hash": "6b74cee7bd1cc48cfa5ea01b3216a99b635a6f55a4cf8e299436b8cd63613be2",
+      "explanation_spec_version": "1.0",
+      "objective": {
+        "key": "total_generation_cost_min",
+        "name": "Min total generation cost",
+        "sense": "minimize",
+        "unit": "",
+        "description": "",
+        "expression_declared": true
+      },
+      "execution_policy": "advisory_only",
+      "requires_human_review": true
+    },
+    "inputs_summary": {
+      "parameters": {
+        "load_forecast": [
+          290,
+          290,
+          290,
+          290,
+          290,
+          290,
+          290,
+          290,
+          290,
+          290,
+          290,
+          290,
+          290,
+          290,
+          290,
+          290,
+          290,
+          290,
+          290,
+          290,
+          290,
+          290,
+          290,
+          290
+        ],
+        "unit_min_output": {
+          "U1": 30,
+          "U2": 20,
+          "U3": 10
+        },
+        "unit_max_output": {
+          "U1": 120,
+          "U2": 90,
+          "U3": 70
+        },
+        "fuel_cost": {
+          "U1": 220,
+          "U2": 260,
+          "U3": 360
+        },
+        "ramp_up_limit": {
+          "U1": 80,
+          "U2": 60,
+          "U3": 50
+        },
+        "ramp_down_limit": {
+          "U1": 80,
+          "U2": 60,
+          "U3": 50
+        }
+      },
+      "parameter_sources": {
+        "load_forecast": "RUNTIME_VALUE",
+        "unit_min_output": "RUNTIME_VALUE",
+        "unit_max_output": "RUNTIME_VALUE",
+        "fuel_cost": "RUNTIME_VALUE",
+        "ramp_up_limit": "RUNTIME_VALUE",
+        "ramp_down_limit": "RUNTIME_VALUE"
+      },
+      "missing_params": []
+    },
+    "variables_summary": [],
+    "constraint_checks": [],
+    "derived_metrics": {},
+    "formatter": {},
+    "business_outcomes": {},
+    "risk_notes": [],
+    "manual_review_points": [
+      "Verify input provenance, freshness, units, and dimensional completeness.",
+      "Review constraint satisfaction, violations, and binding margins against the declared model contract.",
+      "Confirm the recommendation with an authorized reviewer before operational use."
+    ],
+    "data_quality_notes": [],
+    "explanation_limits": [
+      "本次求解未形成可直接采用的有效优化方案。",
+      "结果未返回可核验的约束检查明细。",
+      "指标“Min total generation cost”无法计算：所需结果字段为空",
+      "指标“机组出力 · min_value”无法计算：'缺少结果字段 variable:unit_output'",
+      "指标“机组出力 · max_value”无法计算：'缺少结果字段 variable:unit_output'",
+      "指标“机组出力 · sum_value”无法计算：'缺少结果字段 variable:unit_output'",
+      "指标“机组出力 · non_zero_count”无法计算：'缺少结果字段 variable:unit_output'",
+      "The explanation describes the returned solver evidence and does not prove real-world causality.",
+      "The platform does not infer undeclared thresholds, business rules, or external actions."
+    ],
+    "evidence_index": {
+      "formatter": [
+        "formatter.summary",
+        "formatter.metrics"
+      ],
+      "solver": [
+        "solver.status",
+        "solver.termination_condition",
+        "solver.objective_value",
+        "solver.local_optimum_warning",
+        "solver.constraint_violation_summary"
+      ],
+      "variables": [],
+      "constraints": [],
+      "metrics": [],
+      "business_outcomes": []
+    }
+  },
+  "explanation_structured": {
+    "explanation_schema_version": "2.0",
+    "facts": [
+      "模型不可行，本次未形成有效优化方案。请复核输入边界和冲突约束。"
+    ],
+    "fact_items": [
+      {
+        "text": "模型不可行，本次未形成有效优化方案。请复核输入边界和冲突约束。",
+        "evidence_refs": [
+          "solver.status",
+          "solver.error"
+        ]
+      }
+    ],
+    "inferences": [],
+    "inference_items": [],
+    "recommendations": [],
+    "recommendation_items": [],
+    "risk_notes": [],
+    "manual_review_points": [
+      "Verify input provenance, freshness, units, and dimensional completeness.",
+      "Review constraint satisfaction, violations, and binding margins against the declared model contract.",
+      "Confirm the recommendation with an authorized reviewer before operational use."
+    ],
+    "limitations": [
+      "本次求解未形成可直接采用的有效优化方案。",
+      "结果未返回可核验的约束检查明细。",
+      "指标“Min total generation cost”无法计算：所需结果字段为空",
+      "指标“机组出力 · min_value”无法计算：'缺少结果字段 variable:unit_output'",
+      "指标“机组出力 · max_value”无法计算：'缺少结果字段 variable:unit_output'",
+      "指标“机组出力 · sum_value”无法计算：'缺少结果字段 variable:unit_output'",
+      "指标“机组出力 · non_zero_count”无法计算：'缺少结果字段 variable:unit_output'",
+      "The explanation describes the returned solver evidence and does not prove real-world causality.",
+      "The platform does not infer undeclared thresholds, business rules, or external actions.",
+      "本结果仅用于辅助分析和决策参考，不构成自动控制指令。实际生产调度、交易申报或安全生产处置需结合现场规程、业务审批和人工复核后执行。"
+    ],
+    "summary": "模型不可行，本次未形成有效优化方案。请复核输入边界和冲突约束。",
+    "disclaimer": "本结果仅用于辅助分析和决策参考，不构成自动控制指令。实际生产调度、交易申报或安全生产处置需结合现场规程、业务审批和人工复核后执行。",
+    "grounded_on": "evidence_package"
+  },
+  "business_explanation": {
+    "explanation_schema_version": "2.0",
+    "facts": [
+      "模型不可行，本次未形成有效优化方案。请复核输入边界和冲突约束。"
+    ],
+    "fact_items": [
+      {
+        "text": "模型不可行，本次未形成有效优化方案。请复核输入边界和冲突约束。",
+        "evidence_refs": [
+          "solver.status",
+          "solver.error"
+        ]
+      }
+    ],
+    "inferences": [],
+    "inference_items": [],
+    "recommendations": [],
+    "recommendation_items": [],
+    "risk_notes": [],
+    "manual_review_points": [
+      "Verify input provenance, freshness, units, and dimensional completeness.",
+      "Review constraint satisfaction, violations, and binding margins against the declared model contract.",
+      "Confirm the recommendation with an authorized reviewer before operational use."
+    ],
+    "limitations": [
+      "本次求解未形成可直接采用的有效优化方案。",
+      "结果未返回可核验的约束检查明细。",
+      "指标“Min total generation cost”无法计算：所需结果字段为空",
+      "指标“机组出力 · min_value”无法计算：'缺少结果字段 variable:unit_output'",
+      "指标“机组出力 · max_value”无法计算：'缺少结果字段 variable:unit_output'",
+      "指标“机组出力 · sum_value”无法计算：'缺少结果字段 variable:unit_output'",
+      "指标“机组出力 · non_zero_count”无法计算：'缺少结果字段 variable:unit_output'",
+      "The explanation describes the returned solver evidence and does not prove real-world causality.",
+      "The platform does not infer undeclared thresholds, business rules, or external actions.",
+      "本结果仅用于辅助分析和决策参考，不构成自动控制指令。实际生产调度、交易申报或安全生产处置需结合现场规程、业务审批和人工复核后执行。"
+    ],
+    "summary": "模型不可行，本次未形成有效优化方案。请复核输入边界和冲突约束。",
+    "disclaimer": "本结果仅用于辅助分析和决策参考，不构成自动控制指令。实际生产调度、交易申报或安全生产处置需结合现场规程、业务审批和人工复核后执行。",
+    "grounded_on": "evidence_package"
+  },
+  "explanation_audit": {
+    "processor": "result_post_processor_v2",
+    "definition_source": "ephemeral_contract_compiler",
+    "skill_name": "run_economic_dispatch",
+    "skill_definition_revision": 1,
+    "skill_definition_hash": "6b74cee7bd1cc48cfa5ea01b3216a99b635a6f55a4cf8e299436b8cd63613be2",
+    "explanation_spec_version": "1.0",
+    "fallback": {
+      "used": false,
+      "reason": null
+    },
+    "llm": {
+      "enabled": false,
+      "attempted": false,
+      "fallback_used": false,
+      "reason": "LLM_SUMMARY_NOT_REQUESTED"
+    }
+  },
+  "profile_name": "generic",
+  "disclaimer": "本结果仅用于辅助分析和决策参考，不构成自动控制指令。实际生产调度、交易申报或安全生产处置需结合现场规程、业务审批和人工复核后执行。",
+  "execution_policy": "advisory_only",
+  "requires_human_review": true,
+  "explanation": "模型不可行，本次未形成有效优化方案。请复核输入边界和冲突约束。",
+  "result_views": [
+    {
+      "key": "overview",
+      "label": "结果概览",
+      "kind": "metrics",
+      "source": "metrics"
+    },
+    {
+      "key": "advice",
+      "label": "业务建议",
+      "kind": "explanation",
+      "source": "business_explanation"
+    },
+    {
+      "key": "raw",
+      "label": "原始结果",
+      "kind": "raw",
+      "source": "$"
+    }
+  ],
+  "result_capabilities": [
+    "metrics",
+    "explanation",
+    "raw"
+  ],
+  "result_metadata": {
+    "capabilities": [
+      "metrics",
+      "explanation",
+      "raw"
+    ],
+    "presentation_schema_version": "1.0",
+    "views": [
+      {
+        "key": "overview",
+        "label": "结果概览",
+        "kind": "metrics",
+        "source": "metrics"
+      },
+      {
+        "key": "advice",
+        "label": "业务建议",
+        "kind": "explanation",
+        "source": "business_explanation"
+      },
+      {
+        "key": "raw",
+        "label": "原始结果",
+        "kind": "raw",
+        "source": "$"
+      }
+    ]
+  }
+}

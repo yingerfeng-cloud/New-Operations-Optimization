@@ -19,6 +19,8 @@ SolveStrategy = Literal[
 
 class FunctionAsset(BaseModel):
     function_id: str
+    revision: int = 1
+    content_hash: str = ""
     name: str
     function_type: FunctionType = "piecewise_1d"
     input_schema: list[dict[str, Any]] = Field(default_factory=list)

@@ -17,3 +17,6 @@ reports
 data
 docker-data
 *.zip
+.env
+.env.*
+**/.optiforge-config-secret

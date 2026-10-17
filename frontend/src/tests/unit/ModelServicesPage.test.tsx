@@ -45,7 +45,7 @@ const testState = vi.hoisted(() => {
       recent_invocations: [],
       recent_tasks: [],
     },
-    createTask: vi.fn(async () => ({ task_id: 'TASK-ONLINE-001', status: 'SUCCESS', objective_value: 1280 })),
+    createTask: vi.fn(async () => ({ id: 'TASK-ONLINE-001', status: 'SUCCESS', objective_value: 1280 })),
   };
 });
 
@@ -56,7 +56,9 @@ vi.mock('../../api/models', () => ({
 
 vi.mock('../../api/tasks', () => ({
   createTask: testState.createTask,
+  getTask: async () => ({ id: 'TASK-ONLINE-001', status: 'SUCCESS', objective_value: 1280 }),
 }));
+vi.mock('../../api/results', () => ({ getResult: async () => ({ status: 'SUCCESS', objective_value: 1280 }) }));
 
 beforeAll(async () => {
   vi.resetModules();
@@ -100,7 +102,8 @@ test('runs online debug call with JSON payload', async () => {
   await waitFor(() => expect(testState.createTask).toHaveBeenCalledWith(expect.objectContaining({
     model_id: 'model_service_001',
     runtime_parameters: { load: [80, 90], price: [0.3, 0.35] },
-    async_run: false,
+    async_run: true,
+    idempotency_key: expect.any(String),
   })));
   await waitFor(() => expectJsonViewerIncludes('TASK-ONLINE-001'));
   expectJsonViewerIncludes('SUCCESS');
