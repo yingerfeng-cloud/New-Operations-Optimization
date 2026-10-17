@@ -481,3 +481,30 @@ test('asset load failure blocks the workspace and never displays the previous dr
   expect(screen.getByRole('button', { name: '重新加载' })).toBeInTheDocument();
   expect(screen.getByRole('button', { name: '返回模型资产' })).toBeInTheDocument();
 });
+
+test.each(['/models/create', '/models/create?mode=template&template=template_a'])(
+  'scenario draft survives changed configuration and template responses from %s', async (entry) => {
+  const { queryClient } = renderPage([entry]);
+  await waitFor(() => expect(useModelCreationStore.getState().workspace.initialized).toBe(true));
+  const select = screen.getByTestId('scenario-select').querySelector('input')!;
+  fireEvent.mouseDown(select);
+  fireEvent.click(await screen.findByText('日前机组组合优化', { selector: '.ant-select-item-option-content' }));
+  await waitFor(() => expect(useModelCreationStore.getState().draft.basic_info.scenario_id).toBe('day_ahead_unit_commitment'));
+  act(() => {
+    const state = useModelCreationStore.getState();
+    state.setDraft({ ...state.draft, basic_info: { ...state.draft.basic_info, name: '保留编辑内容' } });
+  });
+  const before = useModelCreationStore.getState();
+  await act(async () => {
+    queryClient.setQueryData(['system-config'], { dictionaries: { business_scenarios: [
+      ...systemApi.scenarioItems, { code: 'new_scenario', label: '新配置场景', enabled: true, sort_order: 2 },
+    ] } });
+    queryClient.setQueryData(['model-workspace-template', 'template_a'], { ...queryClient.getQueryData(['model-workspace-template', 'template_a']) as object, code: 'template_a', name: 'Updated template' });
+    queryClient.setQueryData(['templates'], [{ code: 'new_template', name: '新模板' }]);
+  });
+  // React Query delivers cache notifications on the next timer tick.
+  await act(async () => { await new Promise(resolve => setTimeout(resolve, 50)); });
+  expect(useModelCreationStore.getState().draft).toEqual(before.draft);
+  expect(useModelCreationStore.getState().workspace.generation).toBe(before.workspace.generation);
+  expect(useModelCreationStore.getState().workspace.dirty).toBe(true);
+});

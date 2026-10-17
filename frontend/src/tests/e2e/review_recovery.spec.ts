@@ -10,7 +10,7 @@ async function enter(page: Page, path: string) {
   await expect(page.getByRole('dialog', { name: '请输入平台访问令牌' })).not.toBeVisible();
 }
 
-test('review real browser protects a draft, retains it after save failure, then tests and publishes', async ({ page, request }, info) => {
+test('@real review real browser protects a draft, retains it after save failure, then tests and publishes', async ({ page, request }, info) => {
   await enter(page, '/models/create?mode=clone&source=MODEL-POWER-ECONOMIC-DISPATCH');
   const name = `评审浏览器模型 ${Date.now()}`;
   await page.getByRole('button', { name: /1 基础信息/ }).click();
@@ -54,7 +54,7 @@ test('review real browser protects a draft, retains it after save failure, then 
   await page.screenshot({ path: info.outputPath('published-model.png'), fullPage: true });
 });
 
-test('review real browser follows a 35-second real-solver task across refresh and network recovery without duplicating it', async ({ page, request }, info) => {
+test('@real review real browser follows a 35-second real-solver task across refresh and network recovery without duplicating it', async ({ page, request }, info) => {
   const code = `review_slow_${Date.now()}`;
   const name = `评审长任务 ${code}`;
   const created = await request.post('/api/models', { headers, data: {
@@ -72,22 +72,26 @@ test('review real browser follows a 35-second real-solver task across refresh an
   await page.locator('.service-list-item').filter({ hasText: name }).click();
   await page.getByRole('tab', { name: '在线调试' }).click();
   const editor = page.getByLabel('运行参数 JSON');
+  // Ant Design's exiting spinner can remain in the accessible name.
+  const invoke = page.getByRole('button').filter({ hasText: /^发起测试调用$/ });
   await editor.fill('{bad json');
-  await page.getByRole('button', { name: '发起测试调用', exact: true }).click();
+  await expect(invoke).not.toHaveClass(/ant-btn-loading/);
+  await invoke.click();
   await expect(page.getByText(/运行参数 JSON 格式错误/).last()).toBeVisible();
   await editor.fill('{}');
   let submissions = 0;
   page.on('request', call => { if (call.method() === 'POST' && call.url().endsWith('/api/tasks')) submissions += 1; });
   const submission = page.waitForResponse(response => response.url().endsWith('/api/tasks') && response.request().method() === 'POST');
   const started = Date.now();
-  await page.getByRole('button', { name: '发起测试调用', exact: true }).click();
+  await expect(invoke).not.toHaveClass(/ant-btn-loading/);
+  await invoke.click();
   const accepted = await submission;
   expect(accepted.ok(), await accepted.text()).toBeTruthy();
   expect(accepted.request().postDataJSON().async_run).toBe(true);
   const task = await accepted.json();
   expect(Date.now() - started).toBeLessThan(10_000);
   await expect(page.getByText(new RegExp(`任务编号：${task.id}`))).toBeVisible();
-  await expect(page.getByRole('button', { name: '恢复任务', exact: true })).toBeDisabled();
+  await expect(page.getByRole('button').filter({ hasText: /^恢复任务$/ })).toBeDisabled();
   await page.reload();
   await page.locator('.service-list-item').filter({ hasText: name }).click();
   await page.getByRole('tab', { name: '在线调试' }).click();

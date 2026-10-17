@@ -97,7 +97,7 @@ test('@real real backend smoke creates generic model draft and runs backend test
   const saveResponse = await saveResponsePromise;
   expect(saveResponse.ok(), await saveResponse.text()).toBeTruthy();
 
-  const testResponsePromise = page.waitForResponse(response => /\/api\/models\/[^/]+\/test$/.test(response.url()));
+  const testResponsePromise = page.waitForResponse(response => /\/api\/models\/[^/]+\/test-jobs$/.test(response.url()));
   await page.getByTestId('model-test-run-button').click();
   const testResponse = await testResponsePromise;
   expect(testResponse.ok(), await testResponse.text()).toBeTruthy();
