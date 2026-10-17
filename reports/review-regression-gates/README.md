@@ -38,3 +38,6 @@ Local environment: Python 3.12.14 / Node 24.19.0 / system Chromium; CI uses Pyth
 Backend runs emit five Starlette/httpx deprecation warnings. Builds emit the existing large-chunk warning. Neither was hidden. Final recovery and broader real-backend results, including any unrelated limitations, are reported in the PR and handoff.
 
 No main merge, deployment, customer data, or paid LLM calls.
+
+
+Additional real-gate compatibility check: the existing formula UI closure and browser smoke specs still waited for `/api/models/:id/test`, while `testModel()` now submits `/test-jobs`. Their response waits are migrated to the actual async endpoint; publication, Builder/HiGHS accounting and objective assertions remain unchanged. The isolated production-build recovery run passed both journeys in 54.1 seconds. Local Mock E2E passed all 43 after the FFmpeg setup. Final complete real-suite results are recorded on the PR.
