@@ -91,7 +91,7 @@ test('@real review real browser follows a 35-second real-solver task across refr
   const task = await accepted.json();
   expect(Date.now() - started).toBeLessThan(10_000);
   await expect(page.getByText(new RegExp(`任务编号：${task.id}`))).toBeVisible();
-  await expect(page.getByRole('button', { name: '恢复任务', exact: true })).toBeDisabled();
+  await expect(page.getByRole('button').filter({ hasText: /^恢复任务$/ })).toBeDisabled();
   await page.reload();
   await page.locator('.service-list-item').filter({ hasText: name }).click();
   await page.getByRole('tab', { name: '在线调试' }).click();
