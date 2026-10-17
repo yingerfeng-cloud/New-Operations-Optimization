@@ -72,15 +72,19 @@ test('@real review real browser follows a 35-second real-solver task across refr
   await page.locator('.service-list-item').filter({ hasText: name }).click();
   await page.getByRole('tab', { name: '在线调试' }).click();
   const editor = page.getByLabel('运行参数 JSON');
+  // Ant Design's exiting spinner can remain in the accessible name.
+  const invoke = page.getByRole('button').filter({ hasText: /^发起测试调用$/ });
   await editor.fill('{bad json');
-  await page.getByRole('button', { name: '发起测试调用', exact: true }).click();
+  await expect(invoke).not.toHaveClass(/ant-btn-loading/);
+  await invoke.click();
   await expect(page.getByText(/运行参数 JSON 格式错误/).last()).toBeVisible();
   await editor.fill('{}');
   let submissions = 0;
   page.on('request', call => { if (call.method() === 'POST' && call.url().endsWith('/api/tasks')) submissions += 1; });
   const submission = page.waitForResponse(response => response.url().endsWith('/api/tasks') && response.request().method() === 'POST');
   const started = Date.now();
-  await page.getByRole('button', { name: '发起测试调用', exact: true }).click();
+  await expect(invoke).not.toHaveClass(/ant-btn-loading/);
+  await invoke.click();
   const accepted = await submission;
   expect(accepted.ok(), await accepted.text()).toBeTruthy();
   expect(accepted.request().postDataJSON().async_run).toBe(true);
