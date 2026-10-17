@@ -23,7 +23,8 @@ export default defineConfig({
       reuseExistingServer: false, timeout: 120_000,
       env: {
         PORT: '8000', RUNTIME_STORE_PATH: runtimeStorePath, OPTIFORGE_RUNTIME_STORE: runtimeStorePath,
-        OPTIFORGE_SYNC_JOBS: 'true', LLM_ENABLED: 'false', OPTIMIZATION_PLATFORM_API_TOKEN: 'synthetic-review-token',
+        // Recovery assertions require background execution, even when CI defaults to sync.
+        OPTIFORGE_SYNC_JOBS: 'false', LLM_ENABLED: 'false', OPTIMIZATION_PLATFORM_API_TOKEN: 'synthetic-review-token',
         AGENT_ALLOW_IN_PROCESS_PLATFORM_FALLBACK: 'true',
       },
     },
