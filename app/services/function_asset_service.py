@@ -163,7 +163,7 @@ class FunctionAssetService:
         current = self.get_asset(function_id)
         with STORE.lock:
             history = deepcopy(STORE.function_assets[function_id].get("_versions") or {})
-        return [FunctionAsset(**item) for _, item in sorted(history.items(), key=lambda pair: int(pair[0]))] + [current]
+        return [FunctionAsset(**{**item, "referenced_by": function_asset_references(function_id, int(key))}) for key, item in sorted(history.items(), key=lambda pair: int(pair[0]))] + [current]
 
     def get_version(self, function_id: str, revision: int) -> FunctionAsset:
         version = next((item for item in self.list_versions(function_id) if item.revision == revision), None)
@@ -349,7 +349,7 @@ class FunctionAssetService:
             "triangulation_status": payload.get("triangulation_status"),
             "surface_diagnostics": dict(payload.get("surface_diagnostics") or {}),
             "monotonicity": payload.get("monotonicity"),
-            "solve_strategy": payload.get("solve_strategy") or ("triangulated_milp_exact" if function_type == "piecewise_2d" else "convex_combination_lp"),
+            "solve_strategy": payload.get("solve_strategy") or ("triangulated_milp_exact" if function_type == "piecewise_2d" else "segment_binary"),
             "status": payload.get("status") or "draft",
             "description": payload.get("description") or "",
             "metadata": dict(payload.get("metadata") or {}),
@@ -718,28 +718,32 @@ def _surface_shape_diagnostics(points: list[list[float]], triangles: list[list[i
     }
 
 
-def function_asset_references(function_id: str) -> list[dict[str, Any]]:
+def function_asset_references(function_id: str, revision: int | None = None) -> list[dict[str, Any]]:
+    """One row per model version or task; component use counts are separate."""
+    from app.services.function_dependencies import dependency_ids
     rows: list[dict[str, Any]] = []
     with STORE.lock:
-        models = list(STORE.models.values())
+        models, tasks = list(STORE.models.values()), list(STORE.tasks.values())
     for model in models:
-        component_spec = model.component_spec or {}
-        for component in component_spec.get("components") or []:
-            config = component.get("config") if isinstance(component.get("config"), dict) else {}
-            if str(component.get("function_asset_id") or component.get("curve_asset_id") or config.get("function_asset_id") or config.get("curve_asset_id") or "") == function_id:
-                rows.append(
-                    {
-                        "asset_type": "model",
-                        "model_id": model.id,
-                        "model_name": model.name,
-                        "component_id": component.get("component_id") or component.get("type"),
-                        "constraint_id": component.get("constraint_id") or config.get("constraint_id"),
-                        "referenced_at": model.updated_at or model.published_at or model.created_at,
-                    }
-                )
-        for binding in component_spec.get("parameter_bindings") or model.parameter_bindings or []:
-            if str(binding.get("function_asset_id") or binding.get("asset_id") or binding.get("value") or "") == function_id:
-                rows.append({"asset_type": "binding", "model_id": model.id, "model_name": model.name, "parameter": binding.get("parameter") or binding.get("code")})
+        dependency = model.function_dependencies.get(function_id)
+        if not dependency and function_id not in dependency_ids(model):
+            continue
+        used_revision = (dependency or {}).get("revision")
+        if revision is not None and used_revision != revision:
+            continue
+        components = [item for item in (model.component_spec or {}).get("components") or []
+                      if function_id in str(item)]
+        rows.append({"asset_type": "model", "model_id": model.id, "model_name": model.name,
+            "model_version": model.version, "model_status": model.status, "is_active_version": model.is_active_version,
+            "function_revision": used_revision, "function_hash": (dependency or {}).get("content_hash"),
+            "component_use_count": len(components), "component_id": (components[0].get("type") or components[0].get("component_id")) if components else None, "referenced_at": model.updated_at})
+    for task in tasks:
+        dependency = ((task.request.payload.get("_result_context") or {}).get("function_dependencies") or {}).get(function_id)
+        if dependency and (revision is None or dependency.get("revision") == revision):
+            rows.append({"asset_type": "task", "task_id": task.id, "model_id": task.request.model_id,
+                "model_name": task.request.model, "model_version": (task.request.payload.get("_result_context") or {}).get("version"),
+                "function_revision": dependency.get("revision"), "function_hash": dependency.get("content_hash"),
+                "referenced_at": task.created_at})
     return rows
 
 

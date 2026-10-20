@@ -152,6 +152,8 @@ class ModelPackage(BaseModel):
     tested_content_hash: str | None = None
     tested_model_id: str | None = None
     tested_at: str | None = None
+    test_task_id: str | None = None
+    last_test_parameters: dict[str, Any] = Field(default_factory=dict)
     created_at: str | None = None
     updated_at: str | None = None
     published_at: str | None = None
@@ -177,3 +179,15 @@ class AssetPackage(BaseModel):
 class AssetView(AssetPackage):
     id: str
     created_at: str
+
+
+from pydantic import BaseModel, Field, PositiveInt
+
+
+class FunctionUpdateRequest(BaseModel):
+    revisions: dict[str, PositiveInt]
+    idempotency_key: str = Field(min_length=1, max_length=200)
+
+
+class DependencySelectionRequest(BaseModel):
+    revisions: dict[str, PositiveInt]

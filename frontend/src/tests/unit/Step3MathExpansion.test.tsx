@@ -239,7 +239,7 @@ test('Step3 opens Add Function Mapping modal and saves complete component config
   renderWithQueryClient(<Harness initial={componentDraft()} />);
   fireEvent.click(screen.getByRole('button', { name: '添加函数映射' }));
   expect((await screen.findAllByRole('dialog')).at(-1)).toBeInTheDocument();
-  expect(screen.getByText(/binary_segment_milp/)).toBeInTheDocument();
+  expect(screen.getByText('segment_binary', { exact: true })).toBeInTheDocument();
   expect(await screen.findByText(/水位库容曲线/)).toBeInTheDocument();
   const submitButton = screen.getAllByRole('button', { name: /添\s*加/ }).find(button => button.getAttribute('type') === 'submit');
   expect(submitButton).toBeTruthy();
@@ -249,7 +249,7 @@ test('Step3 opens Add Function Mapping modal and saves complete component config
   expect(json).toContain('"function_asset_id":"curve_storage_level"');
   expect(json).toContain('"x":"volume[t]"');
   expect(json).toContain('"y":"level[t]"');
-  expect(json).toContain('"solve_strategy":"convex_combination_lp"');
+  expect(json).toContain('"solve_strategy":"segment_binary"');
 });
 
 test('Step3 disables display-only assets in the function mapping picker', async () => {

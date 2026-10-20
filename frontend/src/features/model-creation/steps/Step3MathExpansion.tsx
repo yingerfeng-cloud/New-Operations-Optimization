@@ -1,3 +1,4 @@
+import { effective1dStrategy } from '../utils/functionStrategy';
 import { Alert, Button, Card, Descriptions, Empty, Form, Input, Modal, Popover, Select, Space, Table, Tag, Tooltip, Typography, message } from 'antd';
 import { useEffect, useState } from 'react';
 import { Collapse } from 'antd';
@@ -256,7 +257,6 @@ export function Step3MathExpansion({ draft, onChange }: { draft: ModelDraft; onC
   const matchingFunctionAssets = targetMappingType
     ? (functionAssets.data || []).filter(asset => asset.function_type === targetMappingType)
     : (functionAssets.data || []);
-  const selectedConvexity = selectedAsset?.convexity || selectedAsset?.diagnostics?.convexity;
   const legacyDisplayOnlyStrategy = selectedStrategy === 'display_only'
     ? [{ value: 'display_only', label: 'display_only - 仅展示（不可用于求解）', disabled: true }]
     : [];
@@ -329,7 +329,7 @@ export function Step3MathExpansion({ draft, onChange }: { draft: ModelDraft; onC
     if (selectedAsset.function_type === 'piecewise_2d') {
       mappingForm.setFieldsValue({ mapping_type: 'piecewise_2d', solve_strategy: 'triangulated_milp_exact' });
     } else if (selectedAsset.function_type === 'piecewise_1d') {
-      mappingForm.setFieldsValue({ mapping_type: 'piecewise_1d', solve_strategy: 'convex_combination_lp' });
+      mappingForm.setFieldsValue({ mapping_type: 'piecewise_1d', solve_strategy: 'segment_binary' });
     }
   }, [mappingForm, mappingOpen, selectedAsset]);
 
@@ -449,7 +449,7 @@ export function Step3MathExpansion({ draft, onChange }: { draft: ModelDraft; onC
       z_pick: existing?.z || variables[2]?.value || variables[1]?.value || variables[0]?.value,
       index_set: existingIndex?.set || sets.find(item => item.value === 'time')?.value || sets[0]?.value,
       index_alias: existingIndex?.alias || 't',
-      solve_strategy: existing?.solve_strategy || (existingMappingType === 'piecewise_2d' ? 'triangulated_milp_exact' : 'convex_combination_lp'),
+      solve_strategy: existingMappingType === 'piecewise_2d' ? existing?.solve_strategy || 'triangulated_milp_exact' : effective1dStrategy(existing?.solve_strategy),
       constraint_id: existing?.constraint_id || `function_mapping_${Date.now()}`,
     });
     setMappingTargetIndex(targetIndex ?? null);
@@ -582,7 +582,7 @@ export function Step3MathExpansion({ draft, onChange }: { draft: ModelDraft; onC
   const componentStatus = (component: Record<string, unknown>) => {
     if (functionMappingType(component) && !component.function_asset_id) return { color: 'red', text: '未绑定函数资产' };
     if (component.solve_strategy === 'display_only') return { color: 'default', text: '不参与求解' };
-    if (component.solve_strategy === 'binary_segment_milp' || component.solve_strategy === 'convex_hull_lp_approx') return { color: 'orange', text: '有风险' };
+    if (component.solve_strategy === 'convex_hull_lp_approx') return { color: 'orange', text: '有风险' };
     if (component.function_asset_id && (!component.x || !component.y || (String(component.type || component.component_id) === 'function_mapping_2d_component' && !component.z))) return { color: 'red', text: '缺少配置' };
     return { color: 'green', text: '已配置' };
   };
@@ -626,10 +626,6 @@ export function Step3MathExpansion({ draft, onChange }: { draft: ModelDraft; onC
           { key: 'indices', label: '索引集合', children: JSON.stringify(component.indices || []) },
           { key: 'dependencies', label: '依赖项', children: Array.isArray(component.dependencies) && component.dependencies.length ? component.dependencies.join(', ') : '-' },
         ]} />
-        {component.solve_strategy === 'binary_segment_milp' && <Alert className="section-gap" type="warning" showIcon title="预留能力，当前不可发布为可求解模型。" />}
-        {Boolean(component.metadata) && ['unknown', 'nonconvex'].includes(String((component.metadata as Record<string, unknown>).convexity || '')) && component.solve_strategy === 'convex_combination_lp' && (
-          <Alert className="section-gap compact-step-note" type="warning" showIcon title="凸组合 LP 风险" description="当前曲线凸性未知或非凸，结果可能不严格落在原始折线上。" />
-        )}
         {component.solve_strategy === 'convex_hull_lp_approx' && (
           <Alert className="section-gap compact-step-note" type="warning" showIcon title="convex_hull_lp_approx 非精确近似" description="该策略不是一般二维曲面的精确表达，只适用于凸包近似或特定凸/凹函数边界。" />
         )}
@@ -814,14 +810,14 @@ export function Step3MathExpansion({ draft, onChange }: { draft: ModelDraft; onC
               notFoundContent="暂无函数/曲线资产"
             />
           </Form.Item>
-          <Descriptions size="small" column={1} items={[{ key: 'binary', label: '精确分段 MILP', children: '该策略需要二进制变量选择具体曲线分段，目前作为预留能力展示，暂不能发布为可求解模型。' }]} />
+          <Descriptions size="small" column={1} items={[{ key: 'binary', label: '精确分段 MILP', children: '二进制变量选择相邻分段，严格贴合一维折线，可测试发布；实际问题类型为 MILP。' }]} />
           {isDisplayOnlyAsset(selectedAsset) && (
             <Alert
               className="section-gap compact-step-note"
               type="warning"
               showIcon
               title="当前资产仅用于展示"
-              description="该资产不能参与模型求解，请更换为 LP 凸组合或 MILP 分段资产。"
+              description="该资产不能参与模型求解，请更换为严格分段 MILP 资产。"
             />
           )}
           <Form.Item name="mapping_type" label="函数映射类型" rules={[{ required: true }]}>
@@ -833,7 +829,7 @@ export function Step3MathExpansion({ draft, onChange }: { draft: ModelDraft; onC
               ]}
               onChange={value => {
                 if (value === 'piecewise_2d') mappingForm.setFieldValue('solve_strategy', 'triangulated_milp_exact');
-                if (value === 'piecewise_1d') mappingForm.setFieldValue('solve_strategy', 'convex_combination_lp');
+                if (value === 'piecewise_1d') mappingForm.setFieldValue('solve_strategy', 'segment_binary');
               }}
             />
           </Form.Item>
@@ -844,24 +840,12 @@ export function Step3MathExpansion({ draft, onChange }: { draft: ModelDraft; onC
             title="求解策略说明"
             description={(
               <div className="function-mapping-strategy-hints">
-                <span><strong>convex_combination_lp</strong>：当前可求解，LP 凸组合近似</span>
+                <span><strong>segment_binary</strong>：严格分段 MILP，可测试发布</span>
                 <span><strong>display_only</strong>：仅展示，不参与模型求解</span>
-                <span><strong>binary_segment_milp</strong>：精确分段 MILP，当前暂不可发布</span>
+                <span><strong>sos2</strong>：HiGHS 编译为等价分段二进制 MILP</span>
               </div>
             )}
           />
-          {selectedAsset?.function_type === 'piecewise_1d'
-            && effectiveMappingType === 'piecewise_1d'
-            && selectedStrategy === 'convex_combination_lp'
-            && ['unknown', 'nonconvex'].includes(String(selectedConvexity || '')) && (
-            <Alert
-              className="section-gap compact-step-note"
-              type="warning"
-              showIcon
-              title="曲线形态存在求解风险"
-              description="当前选择凸组合 LP 策略，但曲线凸性未知或非凸，求解结果可能落在非相邻断点的组合上。需要严格贴合原始分段时，请先修正曲线形态或等待精确分段 MILP 能力。"
-            />
-          )}
           {selectedStrategy === 'convex_hull_lp_approx' && (
             <Alert
               className="section-gap compact-step-note"
@@ -943,8 +927,8 @@ export function Step3MathExpansion({ draft, onChange }: { draft: ModelDraft; onC
               { value: 'convex_hull_lp_approx', label: 'convex_hull_lp_approx - LP 近似，非精确' },
             ] : [
               ...legacyDisplayOnlyStrategy,
-              { value: 'convex_combination_lp', label: 'convex_combination_lp - LP 凸组合近似' },
-              { value: 'binary_segment_milp', label: 'binary_segment_milp - 精确分段 MILP（预留，暂不可发布）' },
+              { value: 'segment_binary', label: 'segment_binary - 严格分段 MILP，可发布' },
+              { value: 'sos2', label: 'sos2 - 严格相邻分段（HiGHS 等价 MILP）' },
             ]} />
           </Form.Item>
           <Form.Item name="constraint_id" label="约束名称" rules={[{ required: true }]}>
@@ -1089,5 +1073,3 @@ export function Step3MathExpansion({ draft, onChange }: { draft: ModelDraft; onC
     </>
   );
 }
-
-

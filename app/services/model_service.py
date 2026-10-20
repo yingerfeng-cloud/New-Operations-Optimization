@@ -51,9 +51,10 @@ LOGGER = logging.getLogger(__name__)
 
 
 class ModelService:
-    def create_model(self, model: ModelPackage) -> ModelView:
+    def create_model(self, model: ModelPackage, *, inherited_dependencies: dict | None = None) -> ModelView:
         model = model.model_copy(update={
-            "function_dependencies": {},
+            "function_dependencies": deepcopy(inherited_dependencies or {}),
+            "test_task_id": None, "last_test_parameters": {},
             "status": "developing",
             "is_active_version": False,
             "published_by": None,
@@ -93,7 +94,10 @@ class ModelService:
         with STORE.lock:
             source = self.get_model(model_id)
             package = model_version_service.new_version_package(source, overrides, STORE.models.values())
-            return self.create_model(package)
+            from app.services.function_dependencies import dependency_ids, dependency_snapshots
+            dependency_snapshots(source, require_pinned=bool(source.published_at))
+            inherited = {key: value for key, value in source.function_dependencies.items() if key in dependency_ids(package)}
+            return self.create_model(package, inherited_dependencies=inherited)
 
     def get_model(self, model_id: str) -> ModelView:
         with STORE.lock:
@@ -106,7 +110,8 @@ class ModelService:
         existing = self.get_model(model_id)
         if existing.status in IMMUTABLE_MODEL_STATUSES or existing.published_at:
             raise HTTPException(status_code=409, detail="Online and historical model versions are immutable; create a new version before editing")
-        model = model.model_copy(update={"function_dependencies": {}})
+        from app.services.function_dependencies import dependency_ids
+        model = model.model_copy(update={"function_dependencies": {key: deepcopy(value) for key, value in existing.function_dependencies.items() if key in dependency_ids(model)}, "last_test_parameters": deepcopy(existing.last_test_parameters), "test_task_id": existing.test_task_id})
         model = self._normalize_component_model(model)
         model = self._normalize_generic_formula_model(model)
         model = self._apply_generalized_top_level_fields(model)
@@ -123,9 +128,12 @@ class ModelService:
         return updated
 
     def publish_model(self, model_id: str) -> ModelView:
+        with STORE.lock:
+            return self._publish_model_locked(model_id)
+
+    def _publish_model_locked(self, model_id: str) -> ModelView:
         model = self.get_model(model_id)
         from app.services.function_dependencies import assert_dependencies_current
-        assert_dependencies_current(model)
         current_hash = self._content_hash(ModelPackage.model_validate(model.model_dump()))
         self._validate_publish_code_ownership(model)
         normalized_model = self._normalize_component_model(ModelPackage(**model.model_dump()))
@@ -178,6 +186,7 @@ class ModelService:
                 self._validate_model_package(normalized_model, require_publish_ready=True, run_solver=False)
             except HTTPException:
                 raise
+        assert_dependencies_current(model)
         if model.tested_model_id and model.tested_model_id != model.id:
             raise HTTPException(status_code=409, detail={"code": "MODEL_TEST_MISMATCH", "message": "测试资产与发布资产不一致，请重新测试当前模型。"})
         if not model.tested_model_id or not model.tested_content_hash:
@@ -371,7 +380,7 @@ class ModelService:
             for key, value in (copied.ui_metadata or {}).items()
             if key not in {
                 "supersedes_model_id", "model_family_id", "publish_info", "version_info",
-                "managed_default_template", "managed_template_version",
+                "managed_default_template", "managed_template_version", "function_update",
             }
         }
         copied.template_id = new_code
@@ -388,7 +397,7 @@ class ModelService:
         draft_advanced_component = ((copied.model_draft or {}).get("advanced") or {}).get("component_spec")
         if isinstance(draft_advanced_component, dict):
             self._replace_model_code(draft_advanced_component, new_code)
-        return self.create_model(copied)
+        return self.create_model(copied, inherited_dependencies=deepcopy(model.function_dependencies))
 
     def find_model_by_code(self, model_code: str) -> ModelView:
         return self.resolve_model(model_code=model_code)
@@ -639,7 +648,7 @@ class ModelService:
                 "id", "status", "model_family_id", "supersedes_model_id", "is_active_version",
                 "scenario_id",
                 "published_by", "published_at", "tested_at", "created_at", "updated_at",
-                "validation_warnings", "dry_run_result", "content_hash", "tested_content_hash", "tested_model_id",
+                "validation_warnings", "dry_run_result", "content_hash", "tested_content_hash", "tested_model_id", "test_task_id", "last_test_parameters",
             },
         )
         metadata = deepcopy(payload.get("ui_metadata") or {})
@@ -702,6 +711,7 @@ class ModelService:
         }
 
     def asset_detail(self, model_id: str) -> dict[str, Any]:
+        from app.services.invocation_service import invocation_service
         model = self.get_model(model_id)
         invocations = []
         with STORE.lock:
@@ -753,6 +763,7 @@ class ModelService:
             "mathematical_expansion": model.mathematical_expansion,
             "parameters": model.parameters,
             "parameter_schema": self._runtime_parameter_schema(model),
+            "runtime_input_schema": invocation_service.input_schema(model.semantic_spec),
             "component_schema": model.component_schema,
             "ui_metadata": model.ui_metadata,
             "publish_info": {
@@ -799,9 +810,9 @@ class ModelService:
 
     def run_model_test_case(self, model_id: str, test_case: dict[str, Any]) -> ModelView:
         model = self.get_model(model_id)
+        source_hash = self._content_hash(model)
         from app.services.function_dependencies import capture_dependencies
-        if not model.published_at or not model.function_dependencies:
-            model = model.model_copy(update={"function_dependencies": capture_dependencies(model)})
+        model = model.model_copy(update={"function_dependencies": capture_dependencies(model)})
         params = test_case.get("parameters") if "parameters" in test_case else test_case
         if not isinstance(params, dict) or not params:
             params = self._default_test_parameters(model)
@@ -812,8 +823,10 @@ class ModelService:
             raise HTTPException(status_code=422, detail={"message": "模型测试用例执行失败", **dry_run_result})
         content_hash = self._content_hash(ModelPackage.model_validate(model.model_dump()))
         next_status = model.status if model.status == "published" else "trial"
-        updated = model.model_copy(update={"status": next_status, "content_hash": content_hash, "tested_content_hash": content_hash, "tested_model_id": model.id, "updated_at": now_text(), "tested_at": now_text(), "dry_run_result": dry_run_result, "validation_warnings": dry_run_result["solver_check"].get("warnings", [])})
+        updated = model.model_copy(update={"status": next_status, "content_hash": content_hash, "tested_content_hash": content_hash, "tested_model_id": model.id, "updated_at": now_text(), "tested_at": now_text(), "last_test_parameters": deepcopy(params), "dry_run_result": dry_run_result, "validation_warnings": dry_run_result["solver_check"].get("warnings", [])})
         with STORE.lock:
+            if self._content_hash(self.get_model(model_id)) != source_hash:
+                raise HTTPException(status_code=409, detail={"code": "MODEL_TEST_OUTDATED", "message": "Model changed during test; test the current content."})
             STORE.models[model_id] = updated
             self._record_model_version_locked(updated)
             STORE.save_runtime()
@@ -824,13 +837,18 @@ class ModelService:
         from app.services.function_dependencies import capture_dependencies
         from app.services.job_service import job_service
         model = self.get_model(model_id)
-        if not model.published_at or not model.function_dependencies:
-            model = model.model_copy(update={"function_dependencies": capture_dependencies(model)})
+        model = model.model_copy(update={"function_dependencies": capture_dependencies(model)})
         parameters = test_case.get("parameters") or self._default_test_parameters(model)
-        return job_service.create_task(SolveRequest(
+        task = job_service.create_task(SolveRequest(
             model_id=model_id, parameters=parameters, async_run=True,
             idempotency_key=test_case.get("idempotency_key"),
         ), testing_model=model)
+        with STORE.lock:
+            current = self.get_model(model_id)
+            if self._content_hash(current) in {task.request.payload["_model_test"]["source_hash"], self._content_hash(model)}:
+                STORE.models[model_id] = current.model_copy(update={"test_task_id": task.id})
+                STORE.save_runtime()
+        return task
 
     def complete_model_test(self, task) -> None:
         """Called inside the job's guarded atomic result commit."""
@@ -846,6 +864,7 @@ class ModelService:
             "status": "published" if model.status == "published" else "trial",
             "content_hash": content_hash, "tested_content_hash": content_hash,
             "tested_model_id": model.id, "tested_at": now_text(), "updated_at": now_text(),
+            "test_task_id": task.id, "last_test_parameters": deepcopy(task.request.parameters),
             "dry_run_result": {"structure_check": {"status": "passed", "errors": []}, "solver_check": {
                 "status": "passed", "warnings": [], "objective_value": task.objective_value,
                 "problem_type": task.result.get("problem_type"), "solver_status": task.result.get("termination_condition"),
@@ -1809,13 +1828,14 @@ class ModelService:
         return f"{int(value) if value.is_integer() else value}min"
 
     def seed_default_templates(self) -> None:
+        existing_model_ids = set(STORE.models)
         self._ensure_default_component_library()
         self._ensure_default_template_models_published()
         from app.services.function_dependencies import capture_dependencies
         with STORE.lock:
             for model_id, model in list(STORE.models.items()):
-                if self._is_managed_default(model) and not model.function_dependencies:
-                    model = model.model_copy(update={"function_dependencies": capture_dependencies(model)})
+                if self._is_managed_default(model) and model_id not in existing_model_ids and not model.function_dependencies:
+                    model = model.model_copy(update={"function_dependencies": capture_dependencies(model.model_copy(update={"published_at": None}))})
                     STORE.models[model_id] = model
                 if self._is_managed_default(model) and STORE.template_status.get(f"model:{model_id}") == "offline":
                     STORE.models[model_id] = model.model_copy(update={"status": "offline", "is_active_version": False})

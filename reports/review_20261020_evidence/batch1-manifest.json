@@ -1,0 +1,16 @@
+{
+  "baseline": "bb9a95ac351a677117428447df09585af3b711f2",
+  "synthetic_data": true,
+  "backend_passed": 130,
+  "frontend_passed": 69,
+  "evidence": {
+    "reports/review_20261020_evidence/batch1-backend.log": "f32a472dd0aaf8312b362151a503c32e499e8c538dde45c5f06fcbd60b97d405",
+    "reports/review_20261020_evidence/batch1-backend.xml": "1be047c975aedd965c36422f2543b93375494ff97293f70d35f36d0f15e4f640",
+    "reports/review_20261020_evidence/batch1-build.log": "5ac20024900b9ee5d2d7d6c5702f813c8660ad8f0a37f8fbe12825bce898c8ca",
+    "reports/review_20261020_evidence/batch1-frontend.log": "9c04a6ee509901cd2d984087a982b6588a72450c298f50a2991977311c08ae45",
+    "reports/review_20261020_evidence/batch1-function-ui.log": "be4c69f10edeb9e366ea151f0edac63bd7393392894c6d109a7193151a07f885",
+    "reports/review_20261020_evidence/batch1-typecheck.log": "6fe4f90e33c39ab446ab3a95ec032449f66b97f0b84a574bc4098e756064e2b5",
+    "reports/review_20261020_evidence/environment.json": "7cff75bafcf4e483dfecacfd91f59ad9a01712db5a2e865b46b1959518d49fad"
+  },
+  "log_normalization": "Only trailing blank lines/whitespace removed; test output content unchanged."
+}

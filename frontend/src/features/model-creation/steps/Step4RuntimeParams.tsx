@@ -293,7 +293,7 @@ export function Step4RuntimeParams({ draft, onChange }: { draft: ModelDraft; onC
               { title: '函数资产', width: 300, ellipsis: true, render: (_, row) => String(row.function_asset_id || row.curve_asset_id || '-') },
               { title: 'x', width: 170, ellipsis: true, render: (_, row) => String(row.x || '-') },
               { title: 'y', width: 200, ellipsis: true, render: (_, row) => String(row.y || '-') },
-              { title: '求解策略', width: 240, render: (_, row) => <Tag color="blue">{String(row.solve_strategy || 'convex_combination_lp')}</Tag> },
+              { title: '求解策略', width: 240, render: (_, row) => <Tag color="blue">{String(['convex_combination_lp', 'binary_segment_milp'].includes(String(row.solve_strategy)) ? 'segment_binary（旧编码兼容）' : row.solve_strategy || 'segment_binary')}</Tag> },
             ]}
           />
         </Card>

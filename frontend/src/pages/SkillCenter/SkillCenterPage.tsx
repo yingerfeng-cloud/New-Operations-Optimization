@@ -293,7 +293,7 @@ export function SkillCenterPage() {
                 children: <Table rowKey={row => String(row.key)} size="small" pagination={false} dataSource={detail.input_schema || []} columns={[
                   { title: '参数', dataIndex: 'key' },
                   { title: '名称', dataIndex: 'name' },
-                  { title: '类型', dataIndex: 'type' },
+                  { title: '格式与轴顺序', render: (_, row) => String(row.format_description || row.type || '-') },
                   { title: '必填', dataIndex: 'required', render: (value: unknown) => value === false ? <Tag>可选</Tag> : <Tag color="red">必填</Tag> },
                   { title: '单位', dataIndex: 'unit' },
                   { title: '维度', dataIndex: 'dimension', render: (value: unknown) => Array.isArray(value) ? value.join(', ') : '-' },

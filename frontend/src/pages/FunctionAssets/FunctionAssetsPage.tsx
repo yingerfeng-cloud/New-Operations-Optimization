@@ -82,9 +82,9 @@ function functionTypeText(type?: string) {
 
 const solveStrategyInfo: Record<string, { label: string; description: string }> = {
   display_only: { label: '仅展示', description: '只用于查看和诊断，不生成求解约束，也不参与模型求解。' },
-  convex_combination_lp: { label: 'LP 凸组合', description: '用连续权重对断点做凸组合，保持 LP；适合凸/凹曲线，但一般是近似表达。' },
+  convex_combination_lp: { label: '严格分段 MILP（旧编码）', description: '实际执行 segment_binary，通过二进制变量选择相邻分段，严格贴合一维折线。' },
   segment_binary: { label: 'MILP 分段', description: '用二进制变量选择相邻分段，严格按一维 PWL 曲线求解，但会引入 MILP 二进制变量。' },
-  sos2: { label: 'SOS2 分段', description: '用 SOS2 约束选择相邻断点，保持分段表达；需要求解器支持 SOS2。' },
+  sos2: { label: '严格分段 MILP（SOS2 等价）', description: 'HiGHS 路径编译为等价的分段二进制 MILP。' },
   binary_segment_milp: { label: 'MILP 分段（兼容值）', description: '历史兼容编码，语义等同于 MILP 分段；新资产建议使用 segment_binary。' },
   convex_hull_lp_approx: { label: 'LP 凸包近似', description: '对二维曲面使用 LP 凸包近似，不保证精确落在原始曲面三角片上。' },
   triangulated_milp_exact: { label: 'MILP 三角剖分', description: '用二进制变量选择二维曲面的三角片，精确表达三角剖分 PWL，但会增加 MILP 规模。' },
@@ -107,7 +107,7 @@ export function solveStrategyDescription(strategy?: string) {
 function strategyOptions(type: FunctionAsset['function_type'], current?: string) {
   const base = type === 'piecewise_2d'
     ? ['display_only', 'triangulated_milp_exact', 'convex_hull_lp_approx']
-    : ['display_only', 'convex_combination_lp', 'segment_binary'];
+    : ['display_only', 'segment_binary', 'sos2'];
   const values = current && !base.includes(current) ? [...base, current] : base;
   return values.map(value => ({ value, label: solveStrategyText(value) }));
 }
@@ -636,7 +636,7 @@ export function FunctionAssetsPage() {
       function_type: type,
       interpolation: 'linear',
       status: 'draft',
-      solve_strategy: type === 'piecewise_2d' ? 'triangulated_milp_exact' : 'convex_combination_lp',
+      solve_strategy: type === 'piecewise_2d' ? 'triangulated_milp_exact' : 'segment_binary',
       x_name: 'x',
       y_name: type === 'piecewise_2d' ? 'y' : undefined,
       z_name: type === 'piecewise_2d' ? 'z' : 'y',
@@ -660,7 +660,7 @@ export function FunctionAssetsPage() {
     form.setFieldsValue({
       function_type: type,
       function_id: selected ? selected.function_id : generatedId(type),
-      solve_strategy: type === 'piecewise_2d' ? 'triangulated_milp_exact' : 'convex_combination_lp',
+      solve_strategy: type === 'piecewise_2d' ? 'triangulated_milp_exact' : 'segment_binary',
       y_name: type === 'piecewise_2d' ? 'y' : undefined,
       z_name: type === 'piecewise_2d' ? 'z' : 'y',
     });
@@ -716,7 +716,7 @@ export function FunctionAssetsPage() {
       x_field: undefined,
       y_field: undefined,
       z_field: undefined,
-      solve_strategy: 'convex_combination_lp',
+      solve_strategy: 'segment_binary',
     });
     setImporting(true);
   };
@@ -735,7 +735,7 @@ export function FunctionAssetsPage() {
     importForm.setFieldsValue({
       function_type: type,
       function_id: generatedId(type),
-      solve_strategy: type === 'piecewise_2d' ? 'triangulated_milp_exact' : 'convex_combination_lp',
+      solve_strategy: type === 'piecewise_2d' ? 'triangulated_milp_exact' : 'segment_binary',
       ...recommendations,
     });
   };
@@ -746,7 +746,7 @@ export function FunctionAssetsPage() {
     importForm.setFieldsValue({
       function_type: type,
       function_id: generatedId(type),
-      solve_strategy: type === 'piecewise_2d' ? 'triangulated_milp_exact' : 'convex_combination_lp',
+      solve_strategy: type === 'piecewise_2d' ? 'triangulated_milp_exact' : 'segment_binary',
     });
     applyCsvText(text, type);
   };
@@ -785,7 +785,7 @@ export function FunctionAssetsPage() {
             { title: '校验状态', render: (_, row) => <Tag color={validationColor(row.validation_status)}>{validationText(row.validation_status)}</Tag> },
             { title: '求解策略', render: (_, row) => solveStrategyText(row.solve_strategy) },
             { title: '状态', dataIndex: 'status', render: value => <StatusTag status={String(value || 'draft')} /> },
-            { title: '引用数', render: (_, row) => <Tag color={(row.referenced_by || []).length ? 'blue' : undefined}>{(row.referenced_by || []).length}</Tag> },
+            { title: '引用模型版本数', render: (_, row) => <Tag>{new Set((row.referenced_by || []).filter(ref => ref.asset_type === 'model').map(ref => ref.model_id)).size}</Tag> },
             {
               title: '操作',
               fixed: 'right',
@@ -1001,7 +1001,7 @@ export function FunctionAssetsPage() {
               <Descriptions.Item label="类型">{functionTypeText(selected.function_type)}</Descriptions.Item>
               <Descriptions.Item label="校验状态"><Tag color={validationColor(selected.validation_status)}>{validationText(selected.validation_status)}</Tag></Descriptions.Item>
               <Descriptions.Item label="求解策略">{solveStrategyText(selected.solve_strategy)}</Descriptions.Item>
-              <Descriptions.Item label="引用数">{(selected.referenced_by || []).length}</Descriptions.Item>
+              <Descriptions.Item label="引用记录数（模型版本与任务）">{(selected.referenced_by || []).length}</Descriptions.Item>
               <Descriptions.Item label="错误 / 警告">{(selected.validation_errors || []).length} / {(selected.validation_warnings || []).length}</Descriptions.Item>
             </Descriptions>
 
@@ -1092,12 +1092,15 @@ export function FunctionAssetsPage() {
               <Table
                 size="small"
                 pagination={false}
-                rowKey={row => `${row.model_id || ''}-${row.component_id || row.component || row.parameter || ''}-${row.constraint_id || row.referenced_at || ''}`}
+                rowKey={row => `${row.asset_type}-${row.model_id}-${row.task_id || ''}-${row.function_revision}`}
                 dataSource={selected.referenced_by || []}
                 columns={[
                   { title: '模型', dataIndex: 'model_name' },
                   { title: '模型 ID', dataIndex: 'model_id' },
-                  { title: '引用组件', render: (_, row) => row.component_id || row.component || row.parameter || '-' },
+                  { title: '模型版本', dataIndex: 'model_version' },
+                  { title: '使用函数修订', dataIndex: 'function_revision' },
+                  { title: '状态', render: (_, row) => row.asset_type === 'task' ? `任务 ${row.task_id}` : row.is_active_version ? '当前正式版本' : row.model_status || '历史记录' },
+                  { title: '组件使用次数', dataIndex: 'component_use_count' },
                   { title: '引用时间', dataIndex: 'referenced_at' },
                 ]}
               />

@@ -593,7 +593,7 @@ def test_binary_segment_function_mapping_config_shape_infers_milp() -> None:
     )
     assert diagnosis["inferred_problem_type"] == "MILP"
     assert diagnosis["function_assets_used"][0]["function_asset_id"] == "curve_binary_config"
-    assert diagnosis["function_assets_used"][0]["solve_strategy"] == "binary_segment_milp"
+    assert diagnosis["function_assets_used"][0]["solve_strategy"] == "segment_binary"
 
 
 def test_solver_router_returns_structured_error_without_highs_fallback_for_nlp() -> None:

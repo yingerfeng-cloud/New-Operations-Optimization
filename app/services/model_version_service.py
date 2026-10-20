@@ -99,7 +99,7 @@ class ModelVersionService:
             }
         )
         metadata = deepcopy(data.get("ui_metadata") or {})
-        for key in ("publish_info", "test_result", "version_info"):
+        for key in ("publish_info", "test_result", "version_info", "function_update"):
             metadata.pop(key, None)
         metadata["supersedes_model_id"] = source.id
         metadata["model_family_id"] = data["model_family_id"]

@@ -42,6 +42,23 @@ def get_function_asset_version(function_id: str, revision: int) -> FunctionAsset
     return function_asset_service.get_version(function_id, revision)
 
 
+@router.delete("/{function_id}/versions/{revision}")
+def delete_function_asset_version(function_id: str, revision: int) -> dict:
+    from fastapi import HTTPException
+    from app.services.function_asset_service import function_asset_references
+    from app.storage.memory_store import STORE
+    with STORE.lock:
+        function_asset_service.get_version(function_id, revision)
+        references = function_asset_references(function_id, revision)
+        if references:
+            raise HTTPException(status_code=409, detail={"code": "FUNCTION_REVISION_REFERENCED", "message": "模型或任务仍在使用此修订，必须保留历史内容。", "references": references})
+        if function_asset_service.get_asset(function_id).revision == revision:
+            raise HTTPException(status_code=409, detail="当前修订不能作为历史修订清理。")
+        STORE.function_assets[function_id].get("_versions", {}).pop(str(revision), None)
+        STORE.save_runtime()
+    return {"status": "deleted"}
+
+
 @router.post("/{function_id}/validate")
 def validate_function_asset(function_id: str, payload: dict | None = None) -> dict:
     return function_asset_service.validate_asset(function_id, payload)

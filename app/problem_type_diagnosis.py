@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from app.function_strategy import effective_1d_strategy
+
 import ast
 import re
 import sys
@@ -359,12 +361,12 @@ def _resolve_component_definition(component: dict[str, Any]) -> dict[str, Any]:
             definition = {}
     if definition:
         if component_id in {"function_mapping_component", "piecewise_linear_curve"}:
-            strategy = str(cfg.get("solve_strategy") or definition.get("linearization_strategy") or "convex_combination_lp")
+            strategy = effective_1d_strategy(cfg.get("solve_strategy") or definition.get("linearization_strategy"))
             for row in definition.get("generated_constraints") or []:
                 row["piecewise_method"] = strategy
                 row["compiler"] = strategy
                 row.update(participation_fields("preview_only" if strategy == "display_only" else row))
-            if strategy == "binary_segment_milp":
+            if strategy != "display_only":
                 definition["variable_types"] = ["continuous", "binary"]
                 definition["problem_type"] = "MILP"
                 definition["problem_types"] = ["MILP"]
@@ -402,8 +404,10 @@ def _function_asset_usage(components: list[dict[str, Any]]) -> dict[str, Any]:
         cfg = _component_cfg(component)
         function_id = cfg.get("function_asset_id") or cfg.get("curve_asset_id") or definition.get("function_asset_id")
         strategy = str(cfg.get("solve_strategy") or definition.get("linearization_strategy") or "")
+        if component_id in {"function_mapping_component", "piecewise_linear_curve"}:
+            strategy = effective_1d_strategy(strategy)
         if function_id:
-            assets.append({"function_asset_id": str(function_id), "component": component_id, "solve_strategy": strategy or "convex_combination_lp"})
+            assets.append({"function_asset_id": str(function_id), "component": component_id, "solve_strategy": strategy or "segment_binary"})
         if strategy:
             strategies.append(strategy)
     return {"function_assets_used": assets, "linearization_strategy": sorted(set(strategies))}

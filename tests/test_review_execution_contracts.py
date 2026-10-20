@@ -150,18 +150,19 @@ with TestClient(app) as client:
     assert client.get(f"/api/models/{model_id}").json()["content_hash"] == original_model["content_hash"]
     new = client.post(f"/api/models/{model_id}/versions", json={}).json()
     assert "id" in new, new
+    selected = client.put(f"/api/models/{new['id']}/function-dependencies", json={"revisions": {asset_id: 2}})
+    assert selected.status_code == 200, selected.text
     test_and_publish_model(client, new["id"], {"horizon": 1})
     assert invoke(new["id"])["objective_value"] == pytest.approx(20)
 
 
-def test_changed_dependency_invalidates_unpublished_test_evidence(client):
+def test_library_update_does_not_invalidate_selected_test_evidence(client):
     asset_id, model_id = _curve_model(client)
     assert client.post(f"/api/models/{model_id}/test", json={"parameters": {"horizon": 1}}).status_code == 200
     assert client.put(f"/api/function-assets/{asset_id}", json={"points": [[0, 0], [20, 40]]}).status_code == 200
     published = client.post(f"/api/models/{model_id}/publish")
-    assert published.status_code == 409
-    assert published.json()["detail"]["code"] == "MODEL_DEPENDENCY_OUTDATED"
-    test_and_publish_model(client, model_id, {"horizon": 1})
+    assert published.status_code == 200, published.text
+    assert published.json()["function_dependencies"][asset_id]["revision"] == 1
 
 
 def test_all_http_entry_points_enforce_configured_token(monkeypatch):

@@ -23,7 +23,10 @@ from app.utils import now_text
 class JobService:
     def create_task(self, req: SolveRequest, *, testing_model=None) -> TaskRecord:
         with STORE.lock:
-            fingerprint = hashlib.sha256(json.dumps(req.model_dump(mode="json", exclude={"idempotency_key"}), sort_keys=True).encode()).hexdigest()
+            fingerprint_data = req.model_dump(mode="json", exclude={"idempotency_key"})
+            if testing_model is not None:
+                fingerprint_data["tested_content_hash"] = model_service._content_hash(testing_model)
+            fingerprint = hashlib.sha256(json.dumps(fingerprint_data, sort_keys=True).encode()).hexdigest()
             if req.idempotency_key:
                 previous = next((task for task in STORE.tasks.values() if task.request.idempotency_key == req.idempotency_key), None)
                 if previous:
@@ -74,6 +77,7 @@ class JobService:
             task = deepcopy(self.get_task(task_id))
             if task.status not in {"FAILED", "TIMEOUT", "CANCELLED", "INTERRUPTED"}:
                 raise HTTPException(status_code=409, detail=f"Cannot retry task in status {task.status}")
+            self._validate_historical_dependencies(task)
             task.attempt_id = uuid.uuid4().hex
             task.error = None
             task.result = None
@@ -98,6 +102,53 @@ class JobService:
             job_runner.run(task_id)
         else:
             job_runner.start(task_id)
+        return task.view()
+
+    @staticmethod
+    def _validate_historical_dependencies(task: TaskRecord) -> None:
+        from app.schemas.model import ModelPackage
+        from app.services.function_dependencies import dependency_snapshots
+        payload = task.request.payload
+        context = payload.get("_result_context") or {}
+        model = ModelPackage(name=task.request.model, scene=task.request.scene,
+            semantic_spec=payload.get("semantic_spec") or {}, component_spec=payload.get("component_spec") or {},
+            parameters={"function_asset_bindings": payload.get("function_asset_bindings") or {}},
+            function_dependencies=context.get("function_dependencies") or {})
+        expected = dependency_snapshots(model, require_pinned=True)
+        actual = payload.get("_function_asset_snapshots") or {}
+        from app.services.function_asset_service import function_asset_hash
+        if expected.keys() != actual.keys() or any(function_asset_hash(actual[key]) != function_asset_hash(value) for key, value in expected.items()):
+            raise HTTPException(status_code=409, detail={"code": "TASK_HISTORY_UNREPLAYABLE", "message": "任务缺少完整且一致的历史函数快照，保留原结果；请明确选择函数修订后重新计算。"})
+
+    def replay_task(self, task_id: str) -> TaskView:
+        """A new task from server-held prepared inputs, without re-resolving a model."""
+        with STORE.lock:
+            original = self.get_task(task_id)
+            self._validate_historical_dependencies(original)
+            request = original.request.model_copy(deep=True, update={"idempotency_key": None})
+            request.payload.pop("_model_test", None)
+            record = TaskRecord(id=f"OPT-{uuid.uuid4().hex[:10].upper()}", request=request, max_retries=original.max_retries)
+            record.trace.update(history_action="replay", source_task_id=task_id, source_attempt_id=original.attempt_id)
+            STORE.tasks[record.id] = record
+            STORE.save_runtime()
+        if os.getenv("OPTIFORGE_SYNC_JOBS") == "true" or request.async_run is False:
+            job_runner.run(record.id)
+        else:
+            job_runner.start(record.id)
+        return self.get_task(record.id).view()
+
+    def recalculate_task(self, task_id: str, revisions: dict[str, int], idempotency_key: str) -> TaskView:
+        """Explicit adoption creates a candidate and a new task, never a retry."""
+        from app.services.function_update_service import prepare_candidate
+        original = self.get_task(task_id)
+        if not original.request.model_id:
+            raise HTTPException(status_code=409, detail="旧任务没有具体模型版本，请先选定模型。")
+        candidate = prepare_candidate(original.request.model_id, revisions, idempotency_key)
+        task = model_service.start_model_test(candidate.id, {"parameters": deepcopy(original.request.parameters),
+            "idempotency_key": f"recalculate:{candidate.id}:{task_id}"})
+        with STORE.lock:
+            task.trace.update(history_action="recalculate", source_task_id=task_id, selected_revisions=deepcopy(revisions))
+            STORE.save_runtime()
         return task.view()
 
     def delete_task(self, task_id: str) -> None:

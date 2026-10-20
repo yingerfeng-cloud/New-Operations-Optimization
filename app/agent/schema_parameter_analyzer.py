@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 from app.agent.default_value_resolver import default_value_resolver
+from app.parameter_input_contract import validate_parameter_input
 from app.agent.parameter_contract import infer_parameter_dimensions, validate_business_semantics, schema_time_dimension, validate_time_contract
 
 
@@ -85,6 +86,11 @@ class SchemaParameterAnalyzer:
         value: Any,
         supplied: dict[str, Any],
     ) -> dict[str, Any] | None:
+        contract_error = validate_parameter_input(item, value, supplied)
+        if contract_error:
+            return contract_error
+        if item.get("allowed_formats"):
+            return None
         key = item.get("key")
         dimensions = list(item.get("dimension") or [])
         expected_type = str(item.get("type") or "").lower()

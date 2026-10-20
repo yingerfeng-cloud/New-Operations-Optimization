@@ -65,6 +65,10 @@ function parameterRows(model?: ModelAsset, detail?: Record<string, unknown>) {
       });
     }
   }
+  for (const item of asRecords(detail?.runtime_input_schema)) {
+    const code = String(item.key || item.code || '');
+    if (code) rows.set(code, { ...rows.get(code), ...item, code, example: item.sample_value ?? item.default_value ?? rows.get(code)?.example });
+  }
   return [...rows.values()];
 }
 
@@ -241,6 +245,8 @@ export function ModelServicesPage() {
                           { title: '编码', dataIndex: 'code' },
                           { title: '名称', dataIndex: 'name' },
                           { title: '必填', dataIndex: 'required', render: value => value ? <Tag color="red">必填</Tag> : <Tag>可选</Tag> },
+                          { title: '单位', dataIndex: 'unit' },
+                          { title: '格式与轴顺序', dataIndex: 'format_description', render: value => value || '以模型 schema 为准' },
                           { title: '示例', dataIndex: 'example', render: value => value === undefined ? '-' : JSON.stringify(value) },
                         ]}
                       />

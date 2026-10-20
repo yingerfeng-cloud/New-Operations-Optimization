@@ -20,6 +20,7 @@ from app.explainers.base import ADVISORY_DISCLAIMER
 from app.agent.schema_parameter_analyzer import schema_parameter_analyzer
 from app.variable_contract import normalize_variables
 from app.model_dimensions import extract_dimensions
+from app.parameter_input_contract import parameter_input_contract
 from app.services.time_dimension_service import resolve_time_dimension_config
 
 
@@ -81,7 +82,7 @@ class InvocationService:
                     "key": code,
                     "name": param.get("name") or code,
                     "dimension": dimensions,
-                    "type": validation.get("type") or self._infer_type(param),
+                    **parameter_input_contract(param, sets),
                     "unit": param.get("unit", ""),
                     "required": bool(validation.get("required", param.get("required", True))),
                     "description": param.get("meaning") or param.get("description") or "",

@@ -245,7 +245,7 @@ test('runs model asset operations from list', async () => {
   expect(screen.getByText('创建新版本并修改')).toBeInTheDocument();
   expect(screen.getByText('复制为独立模型')).toBeInTheDocument();
   fireEvent.click((await screen.findAllByText('验证运行（状态不变）')).at(-1) as HTMLElement);
-  await waitFor(() => expect(testState.testModel).toHaveBeenCalledWith('model_001', { parameters: { load: [10, 12] } }));
+  await waitFor(() => expect(testState.testModel).toHaveBeenCalledWith('model_001', { load: [10, 12] }));
 
   fireEvent.click(screen.getByRole('button', { name: /更多/ }));
   fireEvent.click((await screen.findAllByText('下线模型')).at(-1) as HTMLElement);

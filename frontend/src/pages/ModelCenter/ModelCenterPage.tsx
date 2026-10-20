@@ -1,3 +1,4 @@
+import { FunctionUpdatesPanel } from '../../features/model-center/FunctionUpdatesPanel';
 import { MoreOutlined } from '@ant-design/icons';
 import { Button, Card, Drawer, Dropdown, Input, Modal, Select, Space, Tabs, Tag, Tooltip, message } from 'antd';
 import type { MenuProps } from 'antd';
@@ -146,7 +147,7 @@ export function ModelCenterPage() {
     onError: error => message.error(`发布失败：${errorMessage(error)}`),
   });
   const test = useMutation({
-    mutationFn: ({ model, detail: testDetail = {} }: { model: ModelAsset; detail?: Record<string, unknown> }) => testModel(model.id, { parameters: defaultTestParameters(model, testDetail) }),
+    mutationFn: ({ model, detail: testDetail = {} }: { model: ModelAsset; detail?: Record<string, unknown> }) => testModel(model.id, defaultTestParameters(model, testDetail)),
     onSuccess: model => {
       message.success(lifecycleStatus(model.status) === 'published' ? '验证运行通过，模型保持已发布' : '模型测试通过，状态已更新为试运行');
       refresh(model.id);
@@ -415,6 +416,7 @@ export function ModelCenterPage() {
                 { key: 'generic', label: 'generic_spec', children: <ModelGenericPanel model={current} detail={currentAssetDetail} /> },
                 { key: 'component', label: '组件装配', children: <ModelComponentPanel model={current} detail={currentAssetDetail} /> },
               ] : []),
+              ...(Object.keys(current.function_dependencies || {}).length ? [{ key: 'functions', label: '函数更新与修订', children: <FunctionUpdatesPanel key={current.id} model={current} onApplied={model => { refresh(model.id); refresh(current.id); nav(`/models/${encodeURIComponent(model.id)}`); }} /> }] : []),
               { key: 'runtime', label: '运行参数', children: <ModelRuntimePanel model={current} detail={currentAssetDetail} /> },
               { key: 'documentation', label: '模型说明', children: <ModelDemoPanel model={current} detail={currentAssetDetail} /> },
               { key: 'governance', label: '发布治理', children: <ModelGovernancePanel model={current} detail={currentAssetDetail} /> },

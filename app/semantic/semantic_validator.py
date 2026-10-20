@@ -5,6 +5,7 @@ from typing import Any
 
 from app.services.time_dimension_service import resolve_state_time_set
 from app.model_dimensions import extract_dimensions
+from app.parameter_input_contract import parameter_input_contract, validate_parameter_input
 from app.model_components.formula_contracts import formula_expression, participates_in_solve
 
 FORMULA_NOT_GENERATED = "公式未生成，请检查左端变量、右端参数和索引配置"
@@ -294,6 +295,21 @@ class RuntimeParameterValidator:
                 )
         if errors:
             return errors
+        if semantic_spec.get("build_mode") == "component_based":
+            try:
+                self._validate_fixed_runtime_sets(semantic_spec, runtime_parameters)
+            except RuntimeError as exc:
+                return [{"field": "runtime_parameters", "error": str(exc)}]
+        members = self._semantic_set_members(semantic_spec, runtime_parameters)
+        for param in parameter_definitions:
+            code = str(param.get("math_param") or param.get("code") or param.get("key") or "")
+            if code and code in runtime_parameters:
+                contract = {"key": code, **parameter_input_contract(param, members)}
+                error = validate_parameter_input(contract, runtime_parameters[code], runtime_parameters)
+                if error:
+                    errors.append(error)
+        if errors:
+            return errors
         build_mode = semantic_spec.get("build_mode") or (semantic_spec.get("component_spec") or {}).get("build_mode")
         if build_mode == "component_based":
             return self._validate_component_based(semantic_spec, runtime_parameters)
@@ -514,8 +530,8 @@ class RuntimeParameterValidator:
             if expected_type == "array":
                 if not isinstance(value, list):
                     errors.append({"field": code, "error": "type mismatch", "expected": "array", "actual": type(value).__name__})
-                elif dimensions and set_lengths.get(str(dimensions[-1])) is not None and len(value) != int(set_lengths[str(dimensions[-1])]):
-                    expected = int(set_lengths[str(dimensions[-1])])
+                elif dimensions and set_lengths.get(str(dimensions[0])) is not None and len(value) != int(set_lengths[str(dimensions[0])]):
+                    expected = int(set_lengths[str(dimensions[0])])
                     errors.append(
                         {
                             "field": code,
@@ -532,8 +548,8 @@ class RuntimeParameterValidator:
                     continue
                 self._check_dimension_keys(errors, code, value, dimensions, set_values, horizon)
                 continue
-            if dimensions and dimensions[-1] in set_lengths:
-                expected = int(set_lengths[str(dimensions[-1])])
+            if dimensions and dimensions[0] in set_lengths:
+                expected = int(set_lengths[str(dimensions[0])])
                 if isinstance(value, list):
                     if len(value) != expected:
                         errors.append(

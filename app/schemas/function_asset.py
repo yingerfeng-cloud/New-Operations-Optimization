@@ -42,7 +42,7 @@ class FunctionAsset(BaseModel):
     surface_diagnostics: dict[str, Any] = Field(default_factory=dict)
     monotonicity: str | dict[str, Any] | None = None
     convexity: str | dict[str, Any] | None = None
-    solve_strategy: SolveStrategy = "convex_combination_lp"
+    solve_strategy: SolveStrategy = "segment_binary"
     status: str = "draft"
     description: str = ""
     metadata: dict[str, Any] = Field(default_factory=dict)

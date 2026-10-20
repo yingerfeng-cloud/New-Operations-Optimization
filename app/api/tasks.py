@@ -3,6 +3,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Response
 
 from app.schemas.solve import SolveRequest, TaskView
+from app.schemas.model import FunctionUpdateRequest
 from app.services.job_service import job_service
 
 router = APIRouter(prefix="/api", tags=["tasks"])
@@ -31,6 +32,16 @@ def cancel_task(task_id: str) -> TaskView:
 @router.post("/tasks/{task_id}/retry", response_model=TaskView)
 def retry_task(task_id: str) -> TaskView:
     return job_service.retry_task(task_id)
+
+
+@router.post("/tasks/{task_id}/replay", response_model=TaskView)
+def replay_task(task_id: str) -> TaskView:
+    return job_service.replay_task(task_id)
+
+
+@router.post("/tasks/{task_id}/recalculate", response_model=TaskView)
+def recalculate_task(task_id: str, body: FunctionUpdateRequest) -> TaskView:
+    return job_service.recalculate_task(task_id, body.revisions, body.idempotency_key)
 
 
 @router.delete("/tasks/{task_id}", status_code=204, response_class=Response)

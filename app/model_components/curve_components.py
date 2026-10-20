@@ -5,6 +5,7 @@ from typing import Any
 
 import pyomo.environ as pyo
 
+from app.function_strategy import effective_1d_strategy
 from app.model_components.formula_components import _eval_formula_node, _normalize_index_specs, _safe_name
 from app.model_components.registry import register_component
 from app.services.function_asset_service import get_function_asset, get_function_asset_points, get_function_asset_surface
@@ -79,7 +80,7 @@ class FunctionMappingComponent:
 
     def validate(self, spec: dict[str, Any], context: dict[str, Any]) -> None:
         cfg = _component_config(spec)
-        strategy = str(cfg.get("solve_strategy") or cfg.get("interpolation_mode") or "segment_binary")
+        strategy = effective_1d_strategy(cfg.get("solve_strategy") or cfg.get("interpolation_mode"))
         if strategy not in {"display_only", "segment_binary", "sos2", "binary_segment_milp", "convex_combination_lp"}:
             raise RuntimeError(f"unsupported function mapping solve_strategy: {strategy}")
         function_id = _function_id(cfg, context, "function_asset_id", "curve_asset_id", "curve")
@@ -95,7 +96,7 @@ class FunctionMappingComponent:
 
     def build(self, model: Any, spec: dict[str, Any], context: dict[str, Any]) -> None:
         cfg = _component_config(spec)
-        strategy = str(cfg.get("solve_strategy") or cfg.get("interpolation_mode") or "segment_binary")
+        strategy = effective_1d_strategy(cfg.get("solve_strategy") or cfg.get("interpolation_mode"))
         function_id = _function_id(cfg, context, "function_asset_id", "curve_asset_id", "curve")
         asset = get_function_asset(function_id, (context.get("runtime_parameters") or {}).get("_function_asset_snapshots"))
         points = get_function_asset_points(function_id, (context.get("runtime_parameters") or {}).get("_function_asset_snapshots"))
@@ -105,6 +106,9 @@ class FunctionMappingComponent:
             "x": cfg.get("x"),
             "y": cfg.get("y"),
             "solve_strategy": strategy,
+            "requested_solve_strategy": cfg.get("solve_strategy"),
+            "exact": strategy != "display_only",
+            "problem_type": "MILP" if strategy != "display_only" else None,
             "domain": asset.get("domain") or {},
             "monotonicity": asset.get("monotonicity"),
         }
@@ -160,12 +164,12 @@ class FunctionMappingComponent:
                     "type": "piecewise",
                     "formula": "y[index] == piecewise(x[index], function_asset_id)",
                     "expression": "y[index] == piecewise(x[index], function_asset_id)",
-                    "piecewise_method": "convex_combination_lp",
+                    "piecewise_method": "segment_binary",
                     "solve_participation": "solve_active",
                 }
             ],
-            "problem_types": ["LP", "MILP"],
-            "solver_capabilities": ["LP", "MILP"],
+            "problem_types": ["MILP"],
+            "solver_capabilities": ["MILP"],
             "linearization_strategy": "segment_binary",
             "function_asset_binding": True,
         }

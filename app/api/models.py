@@ -5,7 +5,7 @@ from typing import Any
 
 from fastapi import APIRouter
 
-from app.schemas.model import AssetPackage, AssetView, ModelPackage, ModelView
+from app.schemas.model import AssetPackage, AssetView, ModelPackage, ModelView, FunctionUpdateRequest, DependencySelectionRequest
 from app.services.invocation_service import invocation_service
 from app.services.model_service import model_service
 
@@ -122,3 +122,27 @@ def create_asset(asset: AssetPackage) -> AssetView:
 @router.get("/assets", response_model=list[AssetView])
 def list_assets() -> list[AssetView]:
     return model_service.list_assets()
+
+
+@router.get("/models/{model_id}/function-updates")
+def function_updates(model_id: str):
+    from app.services.function_update_service import model_function_updates
+    return model_function_updates(model_id)
+
+
+@router.post("/models/{model_id}/function-updates/test")
+def test_function_updates(model_id: str, body: FunctionUpdateRequest):
+    from app.services.function_update_service import test_candidate
+    return test_candidate(model_id, body.revisions, body.idempotency_key)
+
+
+@router.put("/models/{model_id}/function-dependencies", response_model=ModelView)
+def select_function_revisions(model_id: str, body: DependencySelectionRequest):
+    from app.services.function_update_service import select_candidate_revisions
+    return select_candidate_revisions(model_id, body.revisions)
+
+
+@router.post("/models/{model_id}/function-updates/apply", response_model=ModelView)
+def apply_function_updates(model_id: str):
+    from app.services.function_update_service import apply_candidate
+    return apply_candidate(model_id)
