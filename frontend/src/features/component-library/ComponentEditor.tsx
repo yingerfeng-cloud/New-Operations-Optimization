@@ -495,7 +495,7 @@ export function ComponentEditor({ component, availableComponents = [], dictionar
     selectedCategory,
   );
   const handleSave = (value: Partial<ComponentDef>) => {
-    const componentContract = { ...value };
+    const componentContract = { ...normalizedComponent, ...form.getFieldsValue(true), ...value };
     delete componentContract.parameter_bindings;
     delete componentContract.status;
     delete componentContract.enabled;

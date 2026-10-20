@@ -153,7 +153,7 @@ function normalizeSets(rows: unknown): ModelDraft['semantic']['sets'] {
       sourceType: sourceType(row.sourceType || row.source_type || row.source_system),
       source_type: sourceType(row.sourceType || row.source_type || row.source_system),
       defaultSize: Number(row.defaultSize ?? (Array.isArray(row.values) ? row.values.length : 0)),
-      values: Array.isArray(row.values) ? row.values : [],
+      values: Array.isArray(row.values) ? row.values : Array.isArray(row.members) ? row.members : [],
     };
   }).filter(row => row.code);
 }

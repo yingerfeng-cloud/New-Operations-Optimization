@@ -1,0 +1,82 @@
+[
+  {
+    "synthetic_inputs": true,
+    "phase": "cancel",
+    "model_id": "MODEL-93857FA4",
+    "task_id": "OPT-3A68F6E8AB",
+    "observed_native_process": {
+      "pid": 263,
+      "state": "R",
+      "cpu_ticks": 1
+    },
+    "observed_before_status": "SOLVING",
+    "terminated_status": "CANCELLED",
+    "recovery_wall_seconds": 0.673,
+    "before_attempt": "101b20b99f5b40569bab5329af667f6d",
+    "after_attempt": "4c724f946a554d908a8d99d75a6bd2b3",
+    "same_task_id": true,
+    "frozen_runtime_inputs": {
+      "delta_t": 1,
+      "flow_max": 5,
+      "flow_min": 1,
+      "head_max": 10,
+      "head_min": 1,
+      "horizon": 4096,
+      "interval_minutes": 60,
+      "k": 2,
+      "power_max": 25
+    },
+    "frozen_inputs_equal_after_retry": true,
+    "historical_request_sha256": "1acbaab4437f48ae31bb351761957f7a7372d475496bb6318de05d3ba5720a96",
+    "archived_status": "CANCELLED",
+    "actual_objective": 102400.00033513,
+    "expected_objective": 102400,
+    "physical_assertions": 28672,
+    "container_image": "sha256:af2c6f43ca3d600913ce98135e764d98e17b79a1ea545a5e067fb1d4fbb2e684",
+    "image_limits": {
+      "cpu": 1,
+      "memory_GiB": 2
+    },
+    "process_was_not_paused_or_synthetically_marked": true
+  },
+  {
+    "synthetic_inputs": true,
+    "phase": "crash",
+    "model_id": "MODEL-93857FA4",
+    "task_id": "OPT-5F2F356E97",
+    "observed_native_process": {
+      "pid": 336,
+      "state": "R",
+      "cpu_ticks": 1
+    },
+    "observed_before_status": "SOLVING",
+    "terminated_status": "INTERRUPTED",
+    "recovery_wall_seconds": 4.285,
+    "before_attempt": "26168c910cef46668a11b7d2de36edc3",
+    "after_attempt": "f3db637edd4544fd8dcb73074a7308df",
+    "same_task_id": true,
+    "frozen_runtime_inputs": {
+      "delta_t": 1,
+      "flow_max": 5,
+      "flow_min": 1,
+      "head_max": 10,
+      "head_min": 1,
+      "horizon": 4096,
+      "interval_minutes": 60,
+      "k": 2,
+      "power_max": 25
+    },
+    "frozen_inputs_equal_after_retry": true,
+    "historical_request_sha256": "c57708add10b2df917b2a20c70c1bc4f47a6b700547bb78d3f25c0eb8ff3e260",
+    "archived_status": "INTERRUPTED",
+    "actual_objective": 102400.00033513,
+    "expected_objective": 102400,
+    "physical_assertions": 28672,
+    "container_image": "sha256:af2c6f43ca3d600913ce98135e764d98e17b79a1ea545a5e067fb1d4fbb2e684",
+    "image_limits": {
+      "cpu": 1,
+      "memory_GiB": 2
+    },
+    "process_was_not_paused_or_synthetically_marked": true
+  }
+]

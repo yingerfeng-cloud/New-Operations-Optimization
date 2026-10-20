@@ -1,0 +1,12 @@
+
+> optiforge-platform-frontend@1.0.0 test
+> vitest run --run
+
+
+ RUN  v4.1.12 <workspace>/frontend
+
+
+ Test Files  86 passed (86)
+      Tests  482 passed (482)
+   Start at  01:29:37
+   Duration  186.33s (transform 1.32s, setup 8.89s, import 8.16s, tests 336.16s, environment 15.08s)

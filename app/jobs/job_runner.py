@@ -75,6 +75,8 @@ class JobRunner:
                 self._log(task, "INFO", f"开始构建模型 model_code={model_code}, build_mode={build_mode}")
                 builder = PyomoModelBuilder()
                 model, context = builder.build(semantic_spec, runtime)
+                from app.solvers.run_settings import apply_initial_values
+                apply_initial_values(model, task.request.solver_config)
                 task.trace["model_build_seconds"] = round(time.monotonic() - build_started, 4)
                 task.run_metrics.update(self._model_size(model))
                 self._log(
@@ -98,9 +100,17 @@ class JobRunner:
                     )
                 declared_solver = runtime.get("solver") or semantic_spec.get("solver")
                 request_solver = str(task.request.solver or "").strip()
-                requested_solver = declared_solver or (
-                    request_solver if request_solver.lower() not in {"", "auto", "routed"} else None
-                )
+                requested_solver = request_solver if request_solver.lower() not in {"", "auto", "routed"} else None
+                if requested_solver and declared_problem_type and declared_problem_type != problem_type:
+                    if solver_router.route(problem_type, requested_solver).get("status") == "solver_unsupported_problem_type":
+                        self._log(task, "INFO", f"实际结构为 {problem_type}，原 {declared_problem_type} 求解器偏好不适用，按实际结构自动路由。")
+                        requested_solver = None
+                if requested_solver is None and declared_solver:
+                    declared_route = solver_router.route(problem_type, declared_solver)
+                    # Inherited template solver metadata is a preference. The
+                    # actual structure can become LP when k=0, or NLP in a clone.
+                    if declared_route.get("status") != "solver_unsupported_problem_type":
+                        requested_solver = declared_solver
                 route = solver_router.route(problem_type, requested_solver)
                 task.request.solver = str(route.get("selected_solver") or requested_solver or route.get("recommended_solver") or "auto")
                 if not route["ok"]:
@@ -138,8 +148,9 @@ class JobRunner:
                 )
                 self._log(task, "INFO", f"求解完成，{solver_result.solver_log}，耗时={task.trace['solve_seconds']}s")
                 if solver_result.status == "infeasible":
-                    reason = solver_result.message or "模型不可行，请检查硬负荷目标、库容边界、生态流量和函数资产定义域。"
+                    reason = solver_result.message or "模型不可行，请检查当前业务供需平衡、变量边界与约束。"
                     self._log(task, "ERROR", reason)
+                    task.result = self._solver_failure_result(task, solver_result)
                     self._finish(task, status="INFEASIBLE", error=reason)
                     return
                 successful_solver_statuses = {"optimal", "local_optimal", "feasible"}
@@ -148,7 +159,10 @@ class JobRunner:
                         f"求解器 {solver_result.solver_name or route['selected_solver']} 未返回可用解：{solver_result.status}"
                     )
                     self._log(task, "ERROR", reason)
-                    self._finish(task, status="FAILED", error=reason)
+                    task.result = self._solver_failure_result(task, solver_result)
+                    raw = str(solver_result.raw_termination_condition or "").lower()
+                    timed_out = solver_result.status == "timeout" or "time" in raw and ("max" in raw or "limit" in raw)
+                    self._finish(task, status="TIMEOUT" if timed_out else "FAILED", error=reason)
                     return
                 elapsed = time.monotonic() - started
                 raw_termination = str(getattr(solver_result, "raw_termination_condition", "") or "").lower()
@@ -160,7 +174,7 @@ class JobRunner:
                 format_started = time.monotonic()
                 self._log(task, "INFO", "开始格式化业务结果")
                 diagnosis = [] if solver_result.status in successful_solver_statuses else diagnose_infeasible(str(model_code), runtime)
-                formatted = SolveResultFormatter().format(str(model_code), solver_result, context)
+                formatted = SolveResultFormatter().format(str(context.get("model_code") or model_code), solver_result, context)
                 task.trace["format_seconds"] = round(time.monotonic() - format_started, 4)
                 result = {
                     "job_id": task.id,
@@ -262,7 +276,13 @@ class JobRunner:
             if not self._is_current(task):
                 return
             self._fail_solver_progress(task, str(exc))
-            diagnosis = diagnose_infeasible(self._model_code(task), task.request.payload or {})
+            # A malformed historic input must still reach a durable terminal
+            # state even if the optional business diagnostic cannot parse it.
+            try:
+                diagnosis = diagnose_infeasible(self._model_code(task), task.request.payload or {})
+            except Exception as diagnostic_error:
+                diagnosis = []
+                task.trace["diagnostic_error"] = type(diagnostic_error).__name__
             if isinstance(exc, SolverRouteError):
                 task.result = {"status": "FAILED", "solver_route_error": exc.payload, "trace": task.trace, "logs": task.logs, "run_metrics": task.run_metrics}
                 self._finish(task, status="FAILED", error=str(exc.payload))
@@ -270,6 +290,8 @@ class JobRunner:
             if diagnosis and task.result is None:
                 task.result = {"status": "INFEASIBLE", "diagnosis": diagnosis, "solver": (task.request.payload or {}).get("solver") or "routed", "trace": task.trace, "logs": task.logs, "run_metrics": task.run_metrics}
             if task.retry_count < task.max_retries:
+                from app.jobs.attempt_history import archive_attempt
+                archive_attempt(task, status="FAILED", error=str(exc))
                 task.retry_count += 1
                 task.error = str(exc)
                 with STORE.lock:
@@ -286,6 +308,14 @@ class JobRunner:
             self._log(task, "ERROR", f"任务失败：{exc}")
             self._log(task, "ERROR", task.trace["exception_summary"])
             self._finish(task, status="INFEASIBLE" if diagnosis else "FAILED", error=str(detail))
+
+    @staticmethod
+    def _solver_failure_result(task: TaskRecord, result: Any) -> dict[str, Any]:
+        return {"status": result.status.upper(), "solver_status": result.status,
+                "solver_name": result.solver_name, "solver_type": result.solver_type,
+                "termination_condition": result.raw_termination_condition,
+                "solver_log": result.solver_log, "message": result.message,
+                "trace": task.trace, "logs": task.logs, "run_metrics": task.run_metrics}
 
     def _is_current(self, task: TaskRecord) -> bool:
         with STORE.lock:

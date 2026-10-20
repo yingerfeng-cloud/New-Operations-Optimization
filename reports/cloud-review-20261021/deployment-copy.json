@@ -1,0 +1,15 @@
+{
+  "input_sha256": "a6670dd26b4ffbe5ce61b810c762d7f1654980f642ba47d1ec682c552907b622",
+  "read_only": true,
+  "summary": {
+    "model_count": 0,
+    "models_requiring_review": 0,
+    "task_count": 20,
+    "tasks_with_unknown_history": 2
+  },
+  "historical_models_persisted": 0,
+  "historical_results_retained": 20,
+  "original_runtime_unchanged": true,
+  "original_llm_configuration_not_modified": true,
+  "missing_historical_snapshots_not_fabricated": true
+}

@@ -1,5 +1,6 @@
 import { defineConfig } from 'vitest/config';
 import react from '@vitejs/plugin-react';
+declare const process: { env: Record<string, string | undefined> };
 
 const localPath = (url: URL) => decodeURIComponent(url.pathname).replace(/^\/([A-Za-z]:)/, '$1');
 const antdEsmEntry = localPath(new URL('./node_modules/antd/es/index.js', import.meta.url));
@@ -17,7 +18,7 @@ export default defineConfig(({ mode }) => ({
         ]
       : [],
   },
-  server: { port: 5173, proxy: { '/api': { target: 'http://localhost:8000', changeOrigin: true } } },
+  server: { port: 5173, headers: process.env.OPTIFORGE_INSTANCE_ID ? { 'X-OptiForge-Instance': process.env.OPTIFORGE_INSTANCE_ID } : {}, proxy: { '/api': { target: process.env.VITE_API_BASE_URL || 'http://localhost:8000', changeOrigin: true } } },
   build: {
     rollupOptions: {
       output: {

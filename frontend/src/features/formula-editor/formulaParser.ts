@@ -33,15 +33,30 @@ function findTopLevelRelation(dsl: string) {
 }
 
 function parseAggregate(text: string, symbols: FormulaSymbols): FormulaToken[] | undefined {
-  const aggregate = /^(sum|min|max)\((.*)\s+for\s+([A-Za-z_]\w*)\s+in\s+([A-Za-z_]\w*)\)$/s.exec(text.trim());
+  const aggregate = /^(sum|min|max)\((.*)\)$/s.exec(text.trim());
   if (!aggregate) return undefined;
-  return [{
-    type: 'aggregate',
-    fn: aggregate[1] as 'sum' | 'min' | 'max',
-    setCode: aggregate[4],
-    alias: aggregate[3],
-    bodyTokens: parseFormulaDsl(aggregate[2], symbols),
-  }];
+  const inner = aggregate[2];
+  let depth = 0;
+  let quote = '';
+  let split = -1;
+  for (let index = 0; index < inner.length; index += 1) {
+    const char = inner[index];
+    if (quote) { if (char === quote && inner[index - 1] !== '\\') quote = ''; continue; }
+    if (char === '"' || char === "'") { quote = char; continue; }
+    if (char === '(' || char === '[') depth += 1;
+    else if (char === ')' || char === ']') depth -= 1;
+    if (depth === 0 && /^\s+for\s+/.test(inner.slice(index))) { split = index; break; }
+  }
+  if (split < 0) return undefined;
+  const suffix = inner.slice(split).trim();
+  const generators = [...suffix.matchAll(/for\s+([A-Za-z_]\w*)\s+in\s+([A-Za-z_]\w*)/g)];
+  if (!generators.length || suffix.replace(/for\s+([A-Za-z_]\w*)\s+in\s+([A-Za-z_]\w*)/g, '').trim()) return undefined;
+  let body = parseFormulaDsl(inner.slice(0, split), symbols);
+  for (const generator of generators.reverse()) {
+    body = [{ type: 'aggregate', fn: aggregate[1] as 'sum' | 'min' | 'max',
+      setCode: generator[2], alias: generator[1], bodyTokens: body }];
+  }
+  return body;
 }
 
 function findClosingParenthesis(text: string, openIndex: number) {

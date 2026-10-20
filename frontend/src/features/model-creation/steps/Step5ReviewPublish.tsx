@@ -6,6 +6,7 @@ import type { DraftValidation } from '../utils/validateModelDraft';
 import { JsonViewer } from '../../../components/JsonViewer';
 import { analyzeDraftNonlinear } from '../utils/nonlinearDiagnostics';
 import { getSolverStatus, type SolverStatusResponse } from '../../../api/solvers';
+import { SolverRunSettings } from '../../../components/SolverRunSettings';
 
 const sectionLabels: Record<string, string> = {
   basic_info: '基础信息校验',
@@ -70,6 +71,7 @@ export function Step5ReviewPublish({
   testRevisionState = 'untested',
   onFixStep,
   solverStatus: solverStatusOverride,
+  onChange,
 }: {
   draft: ModelDraft;
   validation: DraftValidation;
@@ -78,6 +80,7 @@ export function Step5ReviewPublish({
   testRevisionState?: 'untested' | 'current' | 'outdated';
   onFixStep?: (step: number) => void;
   solverStatus?: SolverStatusResponse;
+  onChange?: (draft: ModelDraft) => void;
 }) {
   const [testResult, setTestResult] = useState<unknown>();
   const [error, setError] = useState('');
@@ -154,6 +157,7 @@ export function Step5ReviewPublish({
 
   return (
     <>
+      {onChange && <SolverRunSettings value={draft.advanced.solver_config} disabled={pending} onChange={solver_config => onChange({ ...draft, advanced: { ...draft.advanced, solver_config } })} />}
       <Alert
         className="compact-step-note"
         showIcon

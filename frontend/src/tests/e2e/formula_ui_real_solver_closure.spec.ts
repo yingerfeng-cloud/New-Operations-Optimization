@@ -122,7 +122,7 @@ test('@real UI authoritative artifacts preserve four boundary semantics through 
   await page.getByRole('button', { name: '下一步' }).click();
   await page.getByRole('button', { name: '下一步' }).click();
   await expect(page.getByTestId('model-test-run-button')).toBeEnabled();
-  const testResponsePromise = page.waitForResponse(response => response.url().endsWith(`/api/models/${seeded.id}/test`) && response.request().method() === 'POST');
+  const testResponsePromise = page.waitForResponse(response => response.url().endsWith(`/api/models/${seeded.id}/test-jobs`) && response.request().method() === 'POST');
   await page.getByTestId('model-test-run-button').click();
   const testResponse = await testResponsePromise;
   expect(testResponse.ok(), await testResponse.text()).toBeTruthy();

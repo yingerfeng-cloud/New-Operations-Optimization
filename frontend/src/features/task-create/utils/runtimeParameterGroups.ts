@@ -33,6 +33,17 @@ function hasEmptyRequiredLeaf(value: unknown): boolean {
 }
 
 export function requiredRuntimeValueError(field: RuntimeField, value: unknown): string {
+  if (field.required && isRuntimeValueEmpty(value)) return '必填值为空';
+  if (field.required && hasEmptyRequiredLeaf(value)) return '必填结构中存在未填写项';
+  if (!isRuntimeValueEmpty(value) && (field.valueType === 'number' || field.valueType === 'integer' || field.type === 'number' || field.type === 'integer') && field.role !== 'set_members' && field.role !== 'time_labels') {
+    const invalid = (node: unknown, path: string): string => {
+      if (Array.isArray(node)) return node.map((item, index) => invalid(item, `${path}[${index}]`)).find(Boolean) || '';
+      if (node && typeof node === 'object') return Object.entries(node).map(([key, item]) => invalid(item, `${path}[${key}]`)).find(Boolean) || '';
+      return typeof node === 'number' && Number.isFinite(node) ? '' : `${path} 必须为有限数值`;
+    };
+    const numericError = invalid(value, field.code);
+    if (numericError) return numericError;
+  }
   if (!field.required) return '';
   if (isRuntimeValueEmpty(value)) return '必填值为空';
   return hasEmptyRequiredLeaf(value) ? '必填结构中存在未填写项' : '';

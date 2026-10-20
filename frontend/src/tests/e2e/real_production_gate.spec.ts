@@ -158,6 +158,8 @@ test('@real candidate horizon and data-derived horizon use real published contra
   const candidateSchema = await schema(request, candidate);
   const candidateParameters = structuredClone(candidateSchema.semantic_spec.sample_runtime_parameters);
   candidateParameters.horizon = 96;
+  candidateParameters.interval_minutes = 15;
+  candidateParameters.delta_t = 0.25;
   for (const field of candidateSchema.input_schema || []) {
     if (Array.isArray(field.dimension) && field.dimension.includes('time') && Array.isArray(candidateParameters[field.key])) {
       const values = candidateParameters[field.key];
@@ -182,6 +184,12 @@ test('@real candidate horizon and data-derived horizon use real published contra
   const derivedParameters = structuredClone(derivedSchema.semantic_spec.sample_runtime_parameters);
   delete derivedParameters.horizon;
   derivedParameters.load_forecast = [160, 190, 175, 150];
+  for (const field of derivedSchema.input_schema || []) {
+    const values = derivedParameters[field.key];
+    if (field.key !== 'load_forecast' && field.dimension?.includes('time') && Array.isArray(values)) {
+      derivedParameters[field.key] = Array.from({ length: 4 }, (_, index) => values[index % values.length]);
+    }
+  }
   const derivedTask = await solve(request, derived, derivedParameters);
   expect(derivedTask.status).toBe('SUCCESS');
   const derivedResult = await json<Record<string, any>>(await request.get(`/api/tasks/${derivedTask.id}/result`));

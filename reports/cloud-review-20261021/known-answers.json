@@ -1,0 +1,773 @@
+{
+  "synthetic_inputs": true,
+  "customer_data": false,
+  "linear_abs_tolerance": 1e-06,
+  "nlp_abs_tolerance": 0.001,
+  "cases": [
+    {
+      "case": "concurrent-ED",
+      "task_id": "OPT-28B294390F",
+      "attempt_id": "2c2858375ebb40c48d4692796b710056",
+      "model_id": "MODEL-POWER-ECONOMIC-DISPATCH",
+      "status": "SUCCESS",
+      "solver": "HiGHS",
+      "expected": 3300,
+      "actual": 3300.0,
+      "source_evidence": "cloud-native-api-final.json",
+      "variables": {
+        "unit_output": {
+          "unit_output[U1,0]": 50.0,
+          "unit_output[U1,1]": 60.0,
+          "unit_output[U1,2]": 60.0,
+          "unit_output[U1,3]": 40.0,
+          "unit_output[U2,0]": 0.0,
+          "unit_output[U2,1]": 20.0,
+          "unit_output[U2,2]": 40.0,
+          "unit_output[U2,3]": 0.0,
+          "unit_output[U3,0]": 0.0,
+          "unit_output[U3,1]": 0.0,
+          "unit_output[U3,2]": 0.0,
+          "unit_output[U3,3]": 0.0
+        }
+      },
+      "metrics": {
+        "objective_value": 3300.0,
+        "total_cost": 3300.0,
+        "gap": "0.00%",
+        "risk": "low"
+      },
+      "solver_type": "LP"
+    },
+    {
+      "case": "concurrent-ED",
+      "task_id": "OPT-E125A93336",
+      "attempt_id": "43e7f0652e0440ce9ddb788db15d638e",
+      "model_id": "MODEL-POWER-ECONOMIC-DISPATCH",
+      "status": "SUCCESS",
+      "solver": "HiGHS",
+      "expected": 3300,
+      "actual": 3300.0,
+      "source_evidence": "cloud-native-api-final.json",
+      "variables": {
+        "unit_output": {
+          "unit_output[U1,0]": 50.0,
+          "unit_output[U1,1]": 60.0,
+          "unit_output[U1,2]": 60.0,
+          "unit_output[U1,3]": 40.0,
+          "unit_output[U2,0]": 0.0,
+          "unit_output[U2,1]": 20.0,
+          "unit_output[U2,2]": 40.0,
+          "unit_output[U2,3]": 0.0,
+          "unit_output[U3,0]": 0.0,
+          "unit_output[U3,1]": 0.0,
+          "unit_output[U3,2]": 0.0,
+          "unit_output[U3,3]": 0.0
+        }
+      },
+      "metrics": {
+        "objective_value": 3300.0,
+        "total_cost": 3300.0,
+        "gap": "0.00%",
+        "risk": "low"
+      },
+      "solver_type": "LP"
+    },
+    {
+      "case": "editor-test-MODEL-E11993FD",
+      "task_id": "OPT-15CE224961",
+      "attempt_id": "15bdc3db161d4e12ae9ed204a2a2e7fd",
+      "model_id": "MODEL-E11993FD",
+      "status": "SUCCESS",
+      "solver": "HiGHS",
+      "expected": 1650,
+      "actual": 1650.0,
+      "source_evidence": "cloud-native-api-final.json",
+      "variables": {
+        "unit_output": {
+          "unit_output[U1,0]": 50.0,
+          "unit_output[U1,1]": 60.0,
+          "unit_output[U1,2]": 60.0,
+          "unit_output[U1,3]": 40.0,
+          "unit_output[U2,0]": 0.0,
+          "unit_output[U2,1]": 20.0,
+          "unit_output[U2,2]": 40.0,
+          "unit_output[U2,3]": 0.0,
+          "unit_output[U3,0]": 0.0,
+          "unit_output[U3,1]": 0.0,
+          "unit_output[U3,2]": 0.0,
+          "unit_output[U3,3]": 0.0
+        }
+      },
+      "metrics": {
+        "objective_value": 1650.0,
+        "total_cost": 1650.0,
+        "gap": "0.00%",
+        "risk": "low"
+      },
+      "solver_type": "LP"
+    },
+    {
+      "case": "formal-service-MODEL-E11993FD",
+      "task_id": "OPT-E330F76629",
+      "attempt_id": "b5da6e278fa14b219098f98b5632955a",
+      "model_id": "MODEL-E11993FD",
+      "status": "SUCCESS",
+      "solver": "HiGHS",
+      "expected": 1650,
+      "actual": 1650.0,
+      "source_evidence": "cloud-native-api-final.json",
+      "variables": {
+        "unit_output": {
+          "unit_output[U1,0]": 50.0,
+          "unit_output[U1,1]": 60.0,
+          "unit_output[U1,2]": 60.0,
+          "unit_output[U1,3]": 40.0,
+          "unit_output[U2,0]": 0.0,
+          "unit_output[U2,1]": 20.0,
+          "unit_output[U2,2]": 40.0,
+          "unit_output[U2,3]": 0.0,
+          "unit_output[U3,0]": 0.0,
+          "unit_output[U3,1]": 0.0,
+          "unit_output[U3,2]": 0.0,
+          "unit_output[U3,3]": 0.0
+        }
+      },
+      "metrics": {
+        "objective_value": 1650.0,
+        "total_cost": 1650.0,
+        "gap": "0.00%",
+        "risk": "low"
+      },
+      "solver_type": "LP"
+    },
+    {
+      "case": "editor-test-MODEL-BD3C0A0A",
+      "task_id": "OPT-FD2EC53C9C",
+      "attempt_id": "2c2205d1b5d149fda6caee22f0839f5a",
+      "model_id": "MODEL-BD3C0A0A",
+      "status": "SUCCESS",
+      "solver": "HiGHS",
+      "expected": 300,
+      "actual": 300.0,
+      "source_evidence": "cloud-native-api-final.json",
+      "variables": {
+        "unit_output": {
+          "unit_output[U1,0]": 0.0,
+          "unit_output[U2,0]": 20.0,
+          "unit_output[U3,0]": 0.0
+        },
+        "unit_on": {
+          "unit_on[U1,0]": -0.0,
+          "unit_on[U2,0]": 1.0,
+          "unit_on[U3,0]": 0.0
+        },
+        "unit_startup": {
+          "unit_startup[U1,0]": 0.0,
+          "unit_startup[U2,0]": 1.0,
+          "unit_startup[U3,0]": 0.0
+        }
+      },
+      "metrics": {
+        "objective_value": 300.0,
+        "total_cost": 300.0,
+        "fuel_cost": 200.0,
+        "startup_cost": 100.0,
+        "gap": "0.00%",
+        "risk": "low"
+      },
+      "solver_type": "MILP"
+    },
+    {
+      "case": "formal-service-MODEL-BD3C0A0A",
+      "task_id": "OPT-B5626A0E2B",
+      "attempt_id": "d194f20fbb1e4782bae83c7347a18b86",
+      "model_id": "MODEL-BD3C0A0A",
+      "status": "SUCCESS",
+      "solver": "HiGHS",
+      "expected": 300,
+      "actual": 300.0,
+      "source_evidence": "cloud-native-api-final.json",
+      "variables": {
+        "unit_output": {
+          "unit_output[U1,0]": 0.0,
+          "unit_output[U2,0]": 20.0,
+          "unit_output[U3,0]": 0.0
+        },
+        "unit_on": {
+          "unit_on[U1,0]": -0.0,
+          "unit_on[U2,0]": 1.0,
+          "unit_on[U3,0]": 0.0
+        },
+        "unit_startup": {
+          "unit_startup[U1,0]": 0.0,
+          "unit_startup[U2,0]": 1.0,
+          "unit_startup[U3,0]": 0.0
+        }
+      },
+      "metrics": {
+        "objective_value": 300.0,
+        "total_cost": 300.0,
+        "fuel_cost": 200.0,
+        "startup_cost": 100.0,
+        "gap": "0.00%",
+        "risk": "low"
+      },
+      "solver_type": "MILP"
+    },
+    {
+      "case": "editor-test-MODEL-2EFECF36",
+      "task_id": "OPT-E7B42C92C2",
+      "attempt_id": "cfcd5eeabc904a0daa66907cfca7146f",
+      "model_id": "MODEL-2EFECF36",
+      "status": "SUCCESS",
+      "solver": "HiGHS",
+      "expected": 500,
+      "actual": 500.0,
+      "source_evidence": "cloud-native-api-final.json",
+      "variables": {
+        "unit_output": {
+          "unit_output[U1,0]": 0.0,
+          "unit_output[U2,0]": 20.0,
+          "unit_output[U3,0]": 0.0
+        },
+        "unit_on": {
+          "unit_on[U1,0]": -0.0,
+          "unit_on[U2,0]": 1.0,
+          "unit_on[U3,0]": 0.0
+        },
+        "unit_startup": {
+          "unit_startup[U1,0]": 0.0,
+          "unit_startup[U2,0]": 1.0,
+          "unit_startup[U3,0]": 0.0
+        }
+      },
+      "metrics": {
+        "objective_value": 500.0,
+        "total_cost": 500.0,
+        "fuel_cost": 400.0,
+        "startup_cost": 100.0,
+        "gap": "0.00%",
+        "risk": "low"
+      },
+      "solver_type": "MILP"
+    },
+    {
+      "case": "formal-service-MODEL-2EFECF36",
+      "task_id": "OPT-8EFBCD5EB6",
+      "attempt_id": "400d7e8d6dc243c2bafa0daa0987aeac",
+      "model_id": "MODEL-2EFECF36",
+      "status": "SUCCESS",
+      "solver": "HiGHS",
+      "expected": 500,
+      "actual": 500.0,
+      "source_evidence": "cloud-native-api-final.json",
+      "variables": {
+        "unit_output": {
+          "unit_output[U1,0]": 0.0,
+          "unit_output[U2,0]": 20.0,
+          "unit_output[U3,0]": 0.0
+        },
+        "unit_on": {
+          "unit_on[U1,0]": -0.0,
+          "unit_on[U2,0]": 1.0,
+          "unit_on[U3,0]": 0.0
+        },
+        "unit_startup": {
+          "unit_startup[U1,0]": 0.0,
+          "unit_startup[U2,0]": 1.0,
+          "unit_startup[U3,0]": 0.0
+        }
+      },
+      "metrics": {
+        "objective_value": 500.0,
+        "total_cost": 500.0,
+        "fuel_cost": 400.0,
+        "startup_cost": 100.0,
+        "gap": "0.00%",
+        "risk": "low"
+      },
+      "solver_type": "MILP"
+    },
+    {
+      "case": "editor-test-MODEL-9B944B7C",
+      "task_id": "OPT-B757557787",
+      "attempt_id": "d5279035460c40c4aed418d7adff4c68",
+      "model_id": "MODEL-9B944B7C",
+      "status": "SUCCESS",
+      "solver": "HiGHS",
+      "expected": 700,
+      "actual": 700.0,
+      "source_evidence": "cloud-native-api-final.json",
+      "variables": {
+        "unit_output": {
+          "unit_output[U1,0]": 20.0,
+          "unit_output[U2,0]": 0.0,
+          "unit_output[U3,0]": 0.0
+        },
+        "unit_on": {
+          "unit_on[U1,0]": 1.0,
+          "unit_on[U2,0]": -0.0,
+          "unit_on[U3,0]": 0.0
+        },
+        "unit_startup": {
+          "unit_startup[U1,0]": 1.0,
+          "unit_startup[U2,0]": 0.0,
+          "unit_startup[U3,0]": 0.0
+        }
+      },
+      "metrics": {
+        "objective_value": 700.0,
+        "total_cost": 700.0,
+        "fuel_cost": 200.0,
+        "startup_cost": 500.0,
+        "gap": "0.00%",
+        "risk": "low"
+      },
+      "solver_type": "MILP"
+    },
+    {
+      "case": "formal-service-MODEL-9B944B7C",
+      "task_id": "OPT-0F2977100C",
+      "attempt_id": "2101fef42de14658b4a76a455f653651",
+      "model_id": "MODEL-9B944B7C",
+      "status": "SUCCESS",
+      "solver": "HiGHS",
+      "expected": 700,
+      "actual": 700.0,
+      "source_evidence": "cloud-native-api-final.json",
+      "variables": {
+        "unit_output": {
+          "unit_output[U1,0]": 20.0,
+          "unit_output[U2,0]": 0.0,
+          "unit_output[U3,0]": 0.0
+        },
+        "unit_on": {
+          "unit_on[U1,0]": 1.0,
+          "unit_on[U2,0]": -0.0,
+          "unit_on[U3,0]": 0.0
+        },
+        "unit_startup": {
+          "unit_startup[U1,0]": 1.0,
+          "unit_startup[U2,0]": 0.0,
+          "unit_startup[U3,0]": 0.0
+        }
+      },
+      "metrics": {
+        "objective_value": 700.0,
+        "total_cost": 700.0,
+        "fuel_cost": 200.0,
+        "startup_cost": 500.0,
+        "gap": "0.00%",
+        "risk": "low"
+      },
+      "solver_type": "MILP"
+    },
+    {
+      "case": "editor-test-MODEL-1F848903",
+      "task_id": "OPT-F4045257CA",
+      "attempt_id": "cc0dc51c9f524a41a7a7f76226888cff",
+      "model_id": "MODEL-1F848903",
+      "status": "SUCCESS",
+      "solver": "HiGHS",
+      "expected": 10000,
+      "actual": 10000.0,
+      "source_evidence": "cloud-physical-api-final-r2.json",
+      "variables": {
+        "renewable_used": {
+          "renewable_used[PV1,0]": 0.0
+        },
+        "renewable_curtailment": {
+          "renewable_curtailment[PV1,0]": 10.0
+        },
+        "storage_charge": {
+          "storage_charge[B1,0]": 0.0
+        },
+        "storage_discharge": {
+          "storage_discharge[B1,0]": 0.0
+        },
+        "storage_soc": {
+          "storage_soc[B1,0]": 10.0
+        },
+        "charging": {
+          "charging[B1,0]": 0.0
+        }
+      },
+      "metrics": {
+        "objective_value": 10000.0,
+        "total_cost": 10000.0,
+        "gap": "0.00%",
+        "risk": "low"
+      },
+      "solver_type": "MILP"
+    },
+    {
+      "case": "formal-service-MODEL-1F848903",
+      "task_id": "OPT-D741B0F71A",
+      "attempt_id": "a7252965892349c8a794357ad9a833b3",
+      "model_id": "MODEL-1F848903",
+      "status": "SUCCESS",
+      "solver": "HiGHS",
+      "expected": 10000,
+      "actual": 10000.0,
+      "source_evidence": "cloud-physical-api-final-r2.json",
+      "variables": {
+        "renewable_used": {
+          "renewable_used[PV1,0]": 0.0
+        },
+        "renewable_curtailment": {
+          "renewable_curtailment[PV1,0]": 10.0
+        },
+        "storage_charge": {
+          "storage_charge[B1,0]": 0.0
+        },
+        "storage_discharge": {
+          "storage_discharge[B1,0]": 0.0
+        },
+        "storage_soc": {
+          "storage_soc[B1,0]": 10.0
+        },
+        "charging": {
+          "charging[B1,0]": 0.0
+        }
+      },
+      "metrics": {
+        "objective_value": 10000.0,
+        "total_cost": 10000.0,
+        "gap": "0.00%",
+        "risk": "low"
+      },
+      "solver_type": "MILP"
+    },
+    {
+      "case": "editor-test-MODEL-DC4BF60D",
+      "task_id": "OPT-AF967FF286",
+      "attempt_id": "59f628e7315e451798503117b4bc3f8b",
+      "model_id": "MODEL-DC4BF60D",
+      "status": "SUCCESS",
+      "solver": "HiGHS",
+      "expected": -25,
+      "actual": -25.0,
+      "source_evidence": "cloud-physical-api-final-r2.json",
+      "variables": {
+        "p_pv_used": {
+          "p_pv_used[0]": 10.0,
+          "p_pv_used[1]": -0.0
+        },
+        "p_pv_curtail": {
+          "p_pv_curtail[0]": -0.0,
+          "p_pv_curtail[1]": 0.0
+        },
+        "p_ch": {
+          "p_ch[0]": 10.0,
+          "p_ch[1]": 0.0
+        },
+        "p_dis": {
+          "p_dis[0]": 0.0,
+          "p_dis[1]": 10.0
+        },
+        "soc": {
+          "soc[0]": 0.0,
+          "soc[1]": 2.5,
+          "soc[2]": 0.0
+        },
+        "p_grid": {
+          "p_grid[0]": -0.0,
+          "p_grid[1]": 10.0
+        },
+        "deviation_pos": {
+          "deviation_pos[0]": -0.0,
+          "deviation_pos[1]": -0.0
+        },
+        "deviation_neg": {
+          "deviation_neg[0]": 0.0,
+          "deviation_neg[1]": 0.0
+        },
+        "terminal_soc_dev_pos": {
+          "terminal_soc_dev_pos": 0.0
+        },
+        "terminal_soc_dev_neg": {
+          "terminal_soc_dev_neg": -0.0
+        }
+      },
+      "metrics": {
+        "objective_value": -25.0,
+        "total_pv_generation_used": 10.0,
+        "total_pv_curtailment": 0.0,
+        "curtailment_rate": 0.0,
+        "storage_charge_energy": 2.5,
+        "storage_discharge_energy": 2.5,
+        "soc_start": 0.0,
+        "soc_end": 0.0,
+        "schedule_deviation": 0.0,
+        "total_deviation": 0.0,
+        "total_deviation_penalty_energy": 0.0,
+        "market_revenue": 25.0,
+        "deviation_penalty_cost": 0.0,
+        "storage_degradation_cost": 0.0,
+        "net_objective_proxy": 25.0,
+        "soc_min_actual": 0.0,
+        "soc_max_actual": 2.5,
+        "revenue": 25.0,
+        "investment_cost": 15000.0,
+        "total_cost": -25.0,
+        "payback_period_years": 1.643836,
+        "storage_power_capacity": 10.0,
+        "storage_energy_capacity": 10.0
+      },
+      "solver_type": "LP"
+    },
+    {
+      "case": "formal-service-MODEL-DC4BF60D",
+      "task_id": "OPT-7D153136E3",
+      "attempt_id": "6865adf777194ed2ae9652a5ea1e4f6b",
+      "model_id": "MODEL-DC4BF60D",
+      "status": "SUCCESS",
+      "solver": "HiGHS",
+      "expected": -25,
+      "actual": -25.0,
+      "source_evidence": "cloud-physical-api-final-r2.json",
+      "variables": {
+        "p_pv_used": {
+          "p_pv_used[0]": 10.0,
+          "p_pv_used[1]": -0.0
+        },
+        "p_pv_curtail": {
+          "p_pv_curtail[0]": -0.0,
+          "p_pv_curtail[1]": 0.0
+        },
+        "p_ch": {
+          "p_ch[0]": 10.0,
+          "p_ch[1]": 0.0
+        },
+        "p_dis": {
+          "p_dis[0]": 0.0,
+          "p_dis[1]": 10.0
+        },
+        "soc": {
+          "soc[0]": 0.0,
+          "soc[1]": 2.5,
+          "soc[2]": 0.0
+        },
+        "p_grid": {
+          "p_grid[0]": -0.0,
+          "p_grid[1]": 10.0
+        },
+        "deviation_pos": {
+          "deviation_pos[0]": -0.0,
+          "deviation_pos[1]": -0.0
+        },
+        "deviation_neg": {
+          "deviation_neg[0]": 0.0,
+          "deviation_neg[1]": 0.0
+        },
+        "terminal_soc_dev_pos": {
+          "terminal_soc_dev_pos": 0.0
+        },
+        "terminal_soc_dev_neg": {
+          "terminal_soc_dev_neg": -0.0
+        }
+      },
+      "metrics": {
+        "objective_value": -25.0,
+        "total_pv_generation_used": 10.0,
+        "total_pv_curtailment": 0.0,
+        "curtailment_rate": 0.0,
+        "storage_charge_energy": 2.5,
+        "storage_discharge_energy": 2.5,
+        "soc_start": 0.0,
+        "soc_end": 0.0,
+        "schedule_deviation": 0.0,
+        "total_deviation": 0.0,
+        "total_deviation_penalty_energy": 0.0,
+        "market_revenue": 25.0,
+        "deviation_penalty_cost": 0.0,
+        "storage_degradation_cost": 0.0,
+        "net_objective_proxy": 25.0,
+        "soc_min_actual": 0.0,
+        "soc_max_actual": 2.5,
+        "revenue": 25.0,
+        "investment_cost": 15000.0,
+        "total_cost": -25.0,
+        "payback_period_years": 1.643836,
+        "storage_power_capacity": 10.0,
+        "storage_energy_capacity": 10.0
+      },
+      "solver_type": "LP"
+    },
+    {
+      "case": "editor-test-MODEL-1FC20E40",
+      "task_id": "OPT-AC47D8BC9F",
+      "attempt_id": "ce16f6c6227140ada418e922084ef0db",
+      "model_id": "MODEL-1FC20E40",
+      "status": "SUCCESS",
+      "solver": "Ipopt",
+      "expected": 75,
+      "actual": 75.00000025,
+      "source_evidence": "cloud-nlp-api-r3.json",
+      "variables": {
+        "flow": {
+          "flow[0]": 2.70043706,
+          "flow[1]": 2.70043706,
+          "flow[2]": 2.70043706
+        },
+        "head": {
+          "head[0]": 4.62888035,
+          "head[1]": 4.62888035,
+          "head[2]": 4.62888035
+        },
+        "power": {
+          "power[0]": 25.00000008,
+          "power[1]": 25.00000008,
+          "power[2]": 25.00000008
+        }
+      },
+      "metrics": {
+        "objective_value": 75.0,
+        "total_cost": 75.0,
+        "gap": "0.00%",
+        "risk": "low"
+      },
+      "solver_type": "NLP"
+    },
+    {
+      "case": "formal-service-MODEL-1FC20E40",
+      "task_id": "OPT-7A47D4CE1E",
+      "attempt_id": "a736942f61f142218a6c855cbdda698d",
+      "model_id": "MODEL-1FC20E40",
+      "status": "SUCCESS",
+      "solver": "Ipopt",
+      "expected": 75,
+      "actual": 75.00000025,
+      "source_evidence": "cloud-nlp-api-r3.json",
+      "variables": {
+        "flow": {
+          "flow[0]": 2.70043706,
+          "flow[1]": 2.70043706,
+          "flow[2]": 2.70043706
+        },
+        "head": {
+          "head[0]": 4.62888035,
+          "head[1]": 4.62888035,
+          "head[2]": 4.62888035
+        },
+        "power": {
+          "power[0]": 25.00000008,
+          "power[1]": 25.00000008,
+          "power[2]": 25.00000008
+        }
+      },
+      "metrics": {
+        "objective_value": 75.0,
+        "total_cost": 75.0,
+        "gap": "0.00%",
+        "risk": "low"
+      },
+      "solver_type": "NLP"
+    },
+    {
+      "case": "NLP-k-zero-is-LP",
+      "task_id": "OPT-637675C105",
+      "attempt_id": "8b25b2503b3142189bb82691eef09d70",
+      "model_id": "MODEL-1FC20E40",
+      "status": "SUCCESS",
+      "solver": "HiGHS",
+      "expected": 0,
+      "actual": -0.0,
+      "source_evidence": "cloud-nlp-api-r3.json",
+      "variables": {
+        "flow": {
+          "flow[0]": 1.0,
+          "flow[1]": 1.0,
+          "flow[2]": 1.0
+        },
+        "head": {
+          "head[0]": 1.0,
+          "head[1]": 1.0,
+          "head[2]": 1.0
+        },
+        "power": {
+          "power[0]": -0.0,
+          "power[1]": -0.0,
+          "power[2]": -0.0
+        }
+      },
+      "metrics": {
+        "objective_value": 0.0,
+        "total_cost": 0.0,
+        "gap": "0.00%",
+        "risk": "low"
+      },
+      "solver_type": "LP"
+    },
+    {
+      "case": "NLP-out-of-bound-initial",
+      "task_id": "OPT-70A1C7D587",
+      "attempt_id": "722b3a30bee3460092a35fe833a3e7e5",
+      "model_id": "MODEL-1FC20E40",
+      "status": "FAILED",
+      "solver": "auto",
+      "expected": null,
+      "actual": null,
+      "source_evidence": "cloud-nlp-api-r3.json",
+      "diagnosis": "{'message': '初值 flow[0]=0 超出变量边界 [1.0, 5.0]', 'diagnosis': []}"
+    },
+    {
+      "case": "NLP-CPU-timeout",
+      "task_id": "OPT-FEF40C3E5F",
+      "attempt_id": "7843da8d6e6d4b6b948ad0df8eb69204",
+      "model_id": "MODEL-1FC20E40",
+      "status": "TIMEOUT",
+      "solver": "Ipopt",
+      "expected": null,
+      "actual": null,
+      "source_evidence": "cloud-nlp-api-r3.json",
+      "diagnosis": "Ipopt termination_condition=maxTimeLimit. Ipopt 3.14.20\\x3a Maximum CPU Time Exceeded.. NLP solve is a local optimum search; results depend on initial values, bounds, and model scaling.\nSolver command line: ['/opt/conda/bin/ipopt', '/tmp/tmp0dspsq9p.pyomo.nl', '-AMPL', 'max_cpu_time=0.001', 'tol=1e-07', 'constr_viol_tol=1e-07', 'max_iter=500']\n\nIpopt 3.14.20: max_cpu_time=0.001\ntol=1e-07\nconstr_viol_tol=1e-07\nmax_iter=500\n\n\n******************************************************************************\nThis program contains Ipopt, a library for large-scale nonlinear optimization.\n Ipopt is released as open source code under the Eclipse Public License (EPL).\n         For more information visit https://github.com/coin-or/Ipopt\n******************************************************************************\n\nThis is Ipopt version 3.14.20, running with linear solver MUMPS 5.8.2.\n\nNumber of nonzeros in equality constraint Jacobian...:        9\nNumber of nonzeros in inequality constraint Jacobian.:        3\nNumber of nonzeros in Lagrangian Hessian.............:        3\n\nTotal number of variables............................:        9\n                     variables with only lower bounds:        0\n                variables with lower and upper bounds:        9\n                     variables with only upper bounds:        0\nTotal number of equality constraints.................:        3\nTotal number of inequality constraints...............:        3\n        inequality constraints with only lower bounds:        0\n   inequality constraints with lower and upper bounds:        0\n        inequality constraints with only upper bounds:        3\n\niter    objective    inf_pr   inf_du lg(mu)  ||d||  lg(rg) alpha_du alpha_pr  ls\n   0 -7.4250000e+01 2.50e-01 0.00e+00  -1.0 0.00e+00    -  0.00e+00 0.00e+00   0\n\nNumber of Iterations....: 0\n\n                                   (scaled)                 (unscaled)\nObjective...............:  -7.4250000297000000e+01   -7.4250000297000000e+01\nDual infeasibility......:   0.0000000000000000e+00    0.0000000000000000e+00\nConstraint violation....:   2.4999990099999891e-01    2.4999990099999891e-01\nVariable bound violation:   0.0000000000000000e+00    0.0000000000000000e+00\nComplementarity.........:   2.4750000109000002e+01    2.4750000109000002e+01\nOverall NLP error.......:   2.4750000109000002e+01    2.4750000109000002e+01\n\n\nNumber of objective function evaluations             = 1\nNumber of objective gradient evaluations             = 1\nNumber of equality constraint evaluations            = 1\nNumber of inequality constraint evaluations          = 1\nNumber of equality constraint Jacobian evaluations   = 1\nNumber of inequality constraint Jacobian evaluations = 1\nNumber of Lagrangian Hessian evaluations             = 0\nTotal seconds in IPOPT                               = 0.203\n\nEXIT: Maximum CPU time exceeded.\n\n"
+    },
+    {
+      "case": "NLP-new-call-recovery",
+      "task_id": "OPT-D87DB8C818",
+      "attempt_id": "28406501333646049eca50f24300be73",
+      "model_id": "MODEL-1FC20E40",
+      "status": "SUCCESS",
+      "solver": "Ipopt",
+      "expected": 75,
+      "actual": 75.00000025,
+      "source_evidence": "cloud-nlp-api-r3.json",
+      "variables": {
+        "flow": {
+          "flow[0]": 2.70043706,
+          "flow[1]": 2.70043706,
+          "flow[2]": 2.70043706
+        },
+        "head": {
+          "head[0]": 4.62888035,
+          "head[1]": 4.62888035,
+          "head[2]": 4.62888035
+        },
+        "power": {
+          "power[0]": 25.00000008,
+          "power[1]": 25.00000008,
+          "power[2]": 25.00000008
+        }
+      },
+      "metrics": {
+        "objective_value": 75.0,
+        "total_cost": 75.0,
+        "gap": "0.00%",
+        "risk": "low"
+      },
+      "solver_type": "NLP"
+    }
+  ],
+  "concurrent_get_max_seconds": 0.05836420797277242,
+  "independent_oracles": {
+    "ED": "sum([500,1000,1400,400])*delta_t = 3300*delta_t",
+    "UC": "min(500+20*10*delta_t,100+20*40*delta_t); delta=.25/.5/1 -> 300/500/700",
+    "transport": "primal 1/1/0/1, cost 7; dual u=(0,-4),v=(1,5), bound 7",
+    "generic": "3 units*4 time steps, each >=1; min sum=12",
+    "storage": "5*eta*(12.75+2.5*eta)-.5*2.5 -> 75/57.75; reconstructed synthetic inputs, not original report raw fixture",
+    "quarter_hour": "10 MW*.25h=2.5 MWh; revenue=-10*2.5=-25",
+    "single_device_full_SOC": "no sink, no simultaneous charge/discharge -> 10MWh curtailment*1000=10000",
+    "NLP": "each p<=25, p=2*q*h; q=2.5,h=5 feasible -> 3*25=75 or 4096*25=102400; no general global NLP claim"
+  }
+}

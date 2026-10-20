@@ -62,6 +62,8 @@ class InvocationService:
             validation = param.get("validation") or {}
             default_policy = param.get("default_policy") or validation.get("default_policy") or self._default_policy_for_param(param)
             sample_value = param.get("sample_value", param.get("sample", param.get("default_value")))
+            if sample_value is None:
+                sample_value = (semantic_spec.get("sample_runtime_parameters") or {}).get(code)
             default_value = param.get("default_value", param.get("default"))
             if default_policy == "default_allowed" and default_value is None:
                 default_value = sample_value
@@ -341,14 +343,8 @@ class InvocationService:
 
     def _default_policy_for_param(self, param: dict[str, Any]) -> str:
         """Derive policy from the model contract, never from field or model names."""
-        validation = param.get("validation") or {}
-        if param.get("runtime_injected") is False:
-            return "default_allowed"
-        if param.get("default_value", param.get("default")) is not None:
-            return "default_allowed"
-        if bool(validation.get("required", param.get("required", True))):
-            return "user_required"
-        return "sample_only"
+        from app.parameter_input_contract import parameter_default_policy
+        return parameter_default_policy(param)
 
     def _parameter_summary(self, parameters: dict[str, Any]) -> dict[str, Any]:
         summary: dict[str, Any] = {}

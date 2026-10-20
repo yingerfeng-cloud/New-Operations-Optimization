@@ -6,12 +6,41 @@
       "time"
     ],
     "type": "array",
+    "allowed_formats": [
+      "array"
+    ],
+    "value_type": "number",
+    "axis_order": [
+      "time"
+    ],
+    "axes": [
+      {
+        "set": "time",
+        "members": [
+          0,
+          1,
+          2,
+          3
+        ]
+      }
+    ],
+    "format_description": "允许格式：array；轴顺序：time；数组逐轴按声明集合顺序；映射逐轴按业务键匹配",
+    "format_examples": {},
     "unit": "MW",
     "required": true,
     "description": "",
     "default_value": null,
-    "sample_value": null,
+    "sample_value": [
+      120,
+      180,
+      210,
+      160
+    ],
     "default_policy": "user_required",
+    "source_system": "forecast",
+    "runtime_injected": true,
+    "field_role": "parameter",
+    "runtime_editable": true,
     "sets": {
       "time": [
         0,
@@ -20,6 +49,19 @@
         3
       ]
     },
+    "time_dimension": {
+      "schema_version": 1,
+      "enabled": true,
+      "policy": "runtime_variable",
+      "default_horizon": 4,
+      "time_set": "time",
+      "state_time_set": null,
+      "interval_minutes": 60.0,
+      "editable": true,
+      "derive_from": null,
+      "allowed_horizons": []
+    },
+    "dispatch_mode": "unit_commitment",
     "validation": {
       "type": "array",
       "length_ref": "horizon",
@@ -33,12 +75,41 @@
       "time"
     ],
     "type": "array",
+    "allowed_formats": [
+      "array"
+    ],
+    "value_type": "number",
+    "axis_order": [
+      "time"
+    ],
+    "axes": [
+      {
+        "set": "time",
+        "members": [
+          0,
+          1,
+          2,
+          3
+        ]
+      }
+    ],
+    "format_description": "允许格式：array；轴顺序：time；数组逐轴按声明集合顺序；映射逐轴按业务键匹配",
+    "format_examples": {},
     "unit": "MW",
     "required": true,
     "description": "",
     "default_value": null,
-    "sample_value": null,
+    "sample_value": [
+      20,
+      30,
+      40,
+      20
+    ],
     "default_policy": "user_required",
+    "source_system": "renewable_forecast",
+    "runtime_injected": true,
+    "field_role": "parameter",
+    "runtime_editable": true,
     "sets": {
       "time": [
         0,
@@ -47,6 +118,19 @@
         3
       ]
     },
+    "time_dimension": {
+      "schema_version": 1,
+      "enabled": true,
+      "policy": "runtime_variable",
+      "default_horizon": 4,
+      "time_set": "time",
+      "state_time_set": null,
+      "interval_minutes": 60.0,
+      "editable": true,
+      "derive_from": null,
+      "allowed_horizons": []
+    },
+    "dispatch_mode": "unit_commitment",
     "validation": {
       "type": "array",
       "length_ref": "horizon",
@@ -60,6 +144,31 @@
       "unit"
     ],
     "type": "dict",
+    "allowed_formats": [
+      "dict"
+    ],
+    "value_type": "number",
+    "axis_order": [
+      "unit"
+    ],
+    "axes": [
+      {
+        "set": "unit",
+        "members": [
+          "U1",
+          "U2",
+          "U3"
+        ]
+      }
+    ],
+    "format_description": "允许格式：dict；轴顺序：unit；数组逐轴按声明集合顺序；映射逐轴按业务键匹配",
+    "format_examples": {
+      "dict": {
+        "U1": 50,
+        "U2": 30,
+        "U3": 20
+      }
+    },
     "unit": "MW",
     "required": false,
     "description": "",
@@ -74,6 +183,10 @@
       "U3": 20
     },
     "default_policy": "default_allowed",
+    "source_system": "EAM",
+    "runtime_injected": false,
+    "field_role": "parameter",
+    "runtime_editable": true,
     "sets": {
       "unit": [
         "U1",
@@ -81,6 +194,19 @@
         "U3"
       ]
     },
+    "time_dimension": {
+      "schema_version": 1,
+      "enabled": true,
+      "policy": "runtime_variable",
+      "default_horizon": 4,
+      "time_set": "time",
+      "state_time_set": null,
+      "interval_minutes": 60.0,
+      "editable": true,
+      "derive_from": null,
+      "allowed_horizons": []
+    },
+    "dispatch_mode": "unit_commitment",
     "validation": {
       "type": "dict",
       "min": 0
@@ -93,6 +219,31 @@
       "unit"
     ],
     "type": "dict",
+    "allowed_formats": [
+      "dict"
+    ],
+    "value_type": "number",
+    "axis_order": [
+      "unit"
+    ],
+    "axes": [
+      {
+        "set": "unit",
+        "members": [
+          "U1",
+          "U2",
+          "U3"
+        ]
+      }
+    ],
+    "format_description": "允许格式：dict；轴顺序：unit；数组逐轴按声明集合顺序；映射逐轴按业务键匹配",
+    "format_examples": {
+      "dict": {
+        "U1": 180,
+        "U2": 120,
+        "U3": 80
+      }
+    },
     "unit": "MW",
     "required": false,
     "description": "",
@@ -107,6 +258,10 @@
       "U3": 80
     },
     "default_policy": "default_allowed",
+    "source_system": "EAM",
+    "runtime_injected": false,
+    "field_role": "parameter",
+    "runtime_editable": true,
     "sets": {
       "unit": [
         "U1",
@@ -114,6 +269,19 @@
         "U3"
       ]
     },
+    "time_dimension": {
+      "schema_version": 1,
+      "enabled": true,
+      "policy": "runtime_variable",
+      "default_horizon": 4,
+      "time_set": "time",
+      "state_time_set": null,
+      "interval_minutes": 60.0,
+      "editable": true,
+      "derive_from": null,
+      "allowed_horizons": []
+    },
+    "dispatch_mode": "unit_commitment",
     "validation": {
       "type": "dict",
       "min": 0
@@ -126,6 +294,31 @@
       "unit"
     ],
     "type": "dict",
+    "allowed_formats": [
+      "dict"
+    ],
+    "value_type": "number",
+    "axis_order": [
+      "unit"
+    ],
+    "axes": [
+      {
+        "set": "unit",
+        "members": [
+          "U1",
+          "U2",
+          "U3"
+        ]
+      }
+    ],
+    "format_description": "允许格式：dict；轴顺序：unit；数组逐轴按声明集合顺序；映射逐轴按业务键匹配",
+    "format_examples": {
+      "dict": {
+        "U1": 80,
+        "U2": 60,
+        "U3": 40
+      }
+    },
     "unit": "MW/h",
     "required": false,
     "description": "",
@@ -140,6 +333,10 @@
       "U3": 40
     },
     "default_policy": "default_allowed",
+    "source_system": "EAM",
+    "runtime_injected": false,
+    "field_role": "parameter",
+    "runtime_editable": true,
     "sets": {
       "unit": [
         "U1",
@@ -147,6 +344,19 @@
         "U3"
       ]
     },
+    "time_dimension": {
+      "schema_version": 1,
+      "enabled": true,
+      "policy": "runtime_variable",
+      "default_horizon": 4,
+      "time_set": "time",
+      "state_time_set": null,
+      "interval_minutes": 60.0,
+      "editable": true,
+      "derive_from": null,
+      "allowed_horizons": []
+    },
+    "dispatch_mode": "unit_commitment",
     "validation": {
       "type": "dict",
       "min": 0
@@ -159,6 +369,31 @@
       "unit"
     ],
     "type": "dict",
+    "allowed_formats": [
+      "dict"
+    ],
+    "value_type": "number",
+    "axis_order": [
+      "unit"
+    ],
+    "axes": [
+      {
+        "set": "unit",
+        "members": [
+          "U1",
+          "U2",
+          "U3"
+        ]
+      }
+    ],
+    "format_description": "允许格式：dict；轴顺序：unit；数组逐轴按声明集合顺序；映射逐轴按业务键匹配",
+    "format_examples": {
+      "dict": {
+        "U1": 80,
+        "U2": 60,
+        "U3": 40
+      }
+    },
     "unit": "MW/h",
     "required": false,
     "description": "",
@@ -173,6 +408,10 @@
       "U3": 40
     },
     "default_policy": "default_allowed",
+    "source_system": "EAM",
+    "runtime_injected": false,
+    "field_role": "parameter",
+    "runtime_editable": true,
     "sets": {
       "unit": [
         "U1",
@@ -180,6 +419,19 @@
         "U3"
       ]
     },
+    "time_dimension": {
+      "schema_version": 1,
+      "enabled": true,
+      "policy": "runtime_variable",
+      "default_horizon": 4,
+      "time_set": "time",
+      "state_time_set": null,
+      "interval_minutes": 60.0,
+      "editable": true,
+      "derive_from": null,
+      "allowed_horizons": []
+    },
+    "dispatch_mode": "unit_commitment",
     "validation": {
       "type": "dict",
       "min": 0
@@ -192,6 +444,31 @@
       "unit"
     ],
     "type": "dict",
+    "allowed_formats": [
+      "dict"
+    ],
+    "value_type": "number",
+    "axis_order": [
+      "unit"
+    ],
+    "axes": [
+      {
+        "set": "unit",
+        "members": [
+          "U1",
+          "U2",
+          "U3"
+        ]
+      }
+    ],
+    "format_description": "允许格式：dict；轴顺序：unit；数组逐轴按声明集合顺序；映射逐轴按业务键匹配",
+    "format_examples": {
+      "dict": {
+        "U1": 280,
+        "U2": 330,
+        "U3": 420
+      }
+    },
     "unit": "元/MWh",
     "required": false,
     "description": "",
@@ -206,6 +483,10 @@
       "U3": 420
     },
     "default_policy": "default_allowed",
+    "source_system": "cost_system",
+    "runtime_injected": false,
+    "field_role": "parameter",
+    "runtime_editable": true,
     "sets": {
       "unit": [
         "U1",
@@ -213,6 +494,19 @@
         "U3"
       ]
     },
+    "time_dimension": {
+      "schema_version": 1,
+      "enabled": true,
+      "policy": "runtime_variable",
+      "default_horizon": 4,
+      "time_set": "time",
+      "state_time_set": null,
+      "interval_minutes": 60.0,
+      "editable": true,
+      "derive_from": null,
+      "allowed_horizons": []
+    },
+    "dispatch_mode": "unit_commitment",
     "validation": {
       "type": "dict",
       "min": 0
@@ -225,6 +519,31 @@
       "unit"
     ],
     "type": "dict",
+    "allowed_formats": [
+      "dict"
+    ],
+    "value_type": "number",
+    "axis_order": [
+      "unit"
+    ],
+    "axes": [
+      {
+        "set": "unit",
+        "members": [
+          "U1",
+          "U2",
+          "U3"
+        ]
+      }
+    ],
+    "format_description": "允许格式：dict；轴顺序：unit；数组逐轴按声明集合顺序；映射逐轴按业务键匹配",
+    "format_examples": {
+      "dict": {
+        "U1": 6000,
+        "U2": 3500,
+        "U3": 1500
+      }
+    },
     "unit": "元/次",
     "required": false,
     "description": "",
@@ -239,6 +558,10 @@
       "U3": 1500
     },
     "default_policy": "default_allowed",
+    "source_system": "cost_system",
+    "runtime_injected": false,
+    "field_role": "parameter",
+    "runtime_editable": true,
     "sets": {
       "unit": [
         "U1",
@@ -246,6 +569,19 @@
         "U3"
       ]
     },
+    "time_dimension": {
+      "schema_version": 1,
+      "enabled": true,
+      "policy": "runtime_variable",
+      "default_horizon": 4,
+      "time_set": "time",
+      "state_time_set": null,
+      "interval_minutes": 60.0,
+      "editable": true,
+      "derive_from": null,
+      "allowed_horizons": []
+    },
+    "dispatch_mode": "unit_commitment",
     "validation": {
       "type": "dict",
       "min": 0
@@ -258,6 +594,31 @@
       "unit"
     ],
     "type": "dict",
+    "allowed_formats": [
+      "dict"
+    ],
+    "value_type": "number",
+    "axis_order": [
+      "unit"
+    ],
+    "axes": [
+      {
+        "set": "unit",
+        "members": [
+          "U1",
+          "U2",
+          "U3"
+        ]
+      }
+    ],
+    "format_description": "允许格式：dict；轴顺序：unit；数组逐轴按声明集合顺序；映射逐轴按业务键匹配",
+    "format_examples": {
+      "dict": {
+        "U1": 1,
+        "U2": 0,
+        "U3": 0
+      }
+    },
     "unit": "0/1",
     "required": false,
     "description": "",
@@ -272,6 +633,10 @@
       "U3": 0
     },
     "default_policy": "default_allowed",
+    "source_system": "realtime",
+    "runtime_injected": true,
+    "field_role": "parameter",
+    "runtime_editable": true,
     "sets": {
       "unit": [
         "U1",
@@ -279,6 +644,19 @@
         "U3"
       ]
     },
+    "time_dimension": {
+      "schema_version": 1,
+      "enabled": true,
+      "policy": "runtime_variable",
+      "default_horizon": 4,
+      "time_set": "time",
+      "state_time_set": null,
+      "interval_minutes": 60.0,
+      "editable": true,
+      "derive_from": null,
+      "allowed_horizons": []
+    },
+    "dispatch_mode": "unit_commitment",
     "validation": {
       "type": "dict",
       "binary": true
@@ -291,6 +669,31 @@
       "unit"
     ],
     "type": "dict",
+    "allowed_formats": [
+      "dict"
+    ],
+    "value_type": "number",
+    "axis_order": [
+      "unit"
+    ],
+    "axes": [
+      {
+        "set": "unit",
+        "members": [
+          "U1",
+          "U2",
+          "U3"
+        ]
+      }
+    ],
+    "format_description": "允许格式：dict；轴顺序：unit；数组逐轴按声明集合顺序；映射逐轴按业务键匹配",
+    "format_examples": {
+      "dict": {
+        "U1": 80,
+        "U2": 0,
+        "U3": 0
+      }
+    },
     "unit": "MW",
     "required": false,
     "description": "",
@@ -305,6 +708,10 @@
       "U3": 0
     },
     "default_policy": "default_allowed",
+    "source_system": "realtime",
+    "runtime_injected": true,
+    "field_role": "parameter",
+    "runtime_editable": true,
     "sets": {
       "unit": [
         "U1",
@@ -312,8 +719,65 @@
         "U3"
       ]
     },
+    "time_dimension": {
+      "schema_version": 1,
+      "enabled": true,
+      "policy": "runtime_variable",
+      "default_horizon": 4,
+      "time_set": "time",
+      "state_time_set": null,
+      "interval_minutes": 60.0,
+      "editable": true,
+      "derive_from": null,
+      "allowed_horizons": []
+    },
+    "dispatch_mode": "unit_commitment",
     "validation": {
       "type": "dict",
+      "min": 0
+    }
+  },
+  {
+    "key": "delta_t",
+    "name": "时间步长",
+    "dimension": [],
+    "type": "number",
+    "allowed_formats": [
+      "number"
+    ],
+    "value_type": "number",
+    "axis_order": [],
+    "axes": [],
+    "format_description": "允许格式：number；标量",
+    "format_examples": {
+      "number": 1
+    },
+    "unit": "h",
+    "required": false,
+    "description": "",
+    "default_value": 1,
+    "sample_value": 1,
+    "default_policy": "derived",
+    "source_system": null,
+    "runtime_injected": false,
+    "field_role": "parameter",
+    "runtime_editable": false,
+    "sets": {},
+    "time_dimension": {
+      "schema_version": 1,
+      "enabled": true,
+      "policy": "runtime_variable",
+      "default_horizon": 4,
+      "time_set": "time",
+      "state_time_set": null,
+      "interval_minutes": 60.0,
+      "editable": true,
+      "derive_from": null,
+      "allowed_horizons": []
+    },
+    "dispatch_mode": "unit_commitment",
+    "validation": {
+      "type": "number",
       "min": 0
     }
   }

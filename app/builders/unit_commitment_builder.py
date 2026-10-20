@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from app.services.time_dimension_service import duration_hours
+
 
 def unit_commitment_template() -> dict[str, Any]:
     return {
@@ -68,6 +70,7 @@ def build_unit_commitment_model(data: dict[str, Any]) -> tuple[Any, dict[str, An
     initial_status = _dict_param(data.get("initial_unit_status"), units, 0.0)
     initial_output = _dict_param(data.get("initial_unit_output"), units, 0.0)
     reserve_ratio = float(data.get("reserve_ratio", 0.1))
+    delta_t = duration_hours(data)
 
     model = pyo.ConcreteModel(name="unit_commitment_day_ahead")
     model.U = pyo.Set(initialize=units)
@@ -108,7 +111,7 @@ def build_unit_commitment_model(data: dict[str, Any]) -> tuple[Any, dict[str, An
     model.ramp_down_limit = pyo.Constraint(model.U, model.T, rule=ramp_down_rule)
     model.reserve_margin = pyo.Constraint(model.T, rule=reserve_margin_rule)
     model.objective = pyo.Objective(
-        expr=sum(model.unit_output[u, t] * float(fuel_cost[u]) + model.unit_startup[u, t] * float(startup_cost[u]) for u in model.U for t in model.T),
+        expr=sum(model.unit_output[u, t] * float(fuel_cost[u]) * delta_t + model.unit_startup[u, t] * float(startup_cost[u]) for u in model.U for t in model.T),
         sense=pyo.minimize,
     )
     context = {
@@ -124,6 +127,7 @@ def build_unit_commitment_model(data: dict[str, Any]) -> tuple[Any, dict[str, An
         "ramp_up": ramp_up,
         "ramp_down": ramp_down,
         "reserve_ratio": reserve_ratio,
+        "delta_t": delta_t,
     }
     return model, context
 

@@ -9,6 +9,7 @@ from app.solvers.status import ipopt_unavailable_explanation
 FAILURE_MESSAGES = {
     "SOLVER_UNAVAILABLE": "求解器不可用，本次未形成有效优化方案。请安装或配置所需求解器后重试。",
     "INFEASIBLE": "模型不可行，本次未形成有效优化方案。请复核输入边界和冲突约束。",
+    "UNBOUNDED": "求解器已判定模型无界（unbounded），没有有限最优解。请检查目标方向，以及生产、采购等变量是否缺少业务上界。",
     "TIMEOUT": "求解超时，本次结果不代表已获得有效最优方案。请调整时限、模型规模或求解参数后重试。",
     "NUMERICAL_ERROR": "求解发生数值错误，本次结果不可作为有效优化方案。请检查数据尺度和模型数值稳定性。",
     "VALIDATION_ERROR": "输入校验失败，模型尚未执行。请修正缺失或非法参数后重试。",
@@ -23,10 +24,10 @@ class GenericExplainer(BaseExplainer):
         solver = evidence_package.get("solver") or {}
         status = str(solver.get("status") or "unknown").upper()
         error_text = str(solver.get("error") or "")
-        error_code = self._error_code(status, error_text)
+        error_code = self._error_code(status, f"{error_text} {solver.get('termination_condition') or ''}")
         fact_items: list[dict[str, Any]] = []
         if error_code:
-            fact_items.append({"text": self._failure_message(error_code, error_text), "evidence_refs": ["solver.status", "solver.error"]})
+            fact_items.append({"text": self._failure_message(error_code, error_text), "evidence_refs": ["solver.status", "solver.error", "solver.termination_condition"]})
         else:
             formatter = evidence_package.get("formatter") or {}
             if formatter.get("summary"):

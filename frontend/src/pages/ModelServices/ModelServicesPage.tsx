@@ -14,6 +14,9 @@ import { StatusTag } from '../../components/StatusTag';
 import { EmptyActionState, FilterBar } from '../../components/WorkspaceUI';
 import type { ModelAsset } from '../../types/model';
 import { capabilityOrFallback } from '../../features/demo/demoCapabilities';
+import { extractErrorText } from '../../api/client';
+import type { AxiosError } from 'axios';
+import { SolverRunSettings } from '../../components/SolverRunSettings';
 
 function asRecords(value: unknown): Record<string, unknown>[] {
   return Array.isArray(value) ? value.filter((item): item is Record<string, unknown> => !!item && typeof item === 'object' && !Array.isArray(item)) : [];
@@ -106,6 +109,7 @@ function statusText(value?: unknown) {
 }
 
 export function ModelServicesPage() {
+  const [solverSettings, setSolverSettings] = useState<Record<string, unknown>>({});
   const nav = useNavigate();
   const models = useQuery({ queryKey: ['models'], queryFn: getModels });
   const services = useMemo(() => (models.data || []).filter(model => model.status === 'published'), [models.data]);
@@ -171,7 +175,7 @@ export function ModelServicesPage() {
       const storageKey = `optiforge-service-debug:${selected.id}`;
       const previous = readSession<{ key: string; payload: Record<string, unknown>; taskId?: string }>(storageKey);
       if (previous?.taskId) return getTask(previous.taskId);
-      const pending = previous || { key: crypto.randomUUID(), payload: { model_id: selected.id, model: selected.id, model_code: selected.template_id || selected.id, solver: capability.solver, runtime_parameters, parameters: runtime_parameters, async_run: true } };
+      const pending = previous || { key: crypto.randomUUID(), payload: { model_id: selected.id, model: selected.id, model_code: selected.template_id || selected.id, solver: 'auto', solver_config: solverSettings, runtime_parameters, parameters: runtime_parameters, async_run: true } };
       writeSession(storageKey, pending);
       const task = await createTask({ ...pending.payload, idempotency_key: pending.key });
       writeSession(storageKey, { ...pending, taskId: task.id });
@@ -181,8 +185,9 @@ export function ModelServicesPage() {
     onError: error => {
       const httpStatus = (error as { response?: { status?: number } }).response?.status;
       if (selected && httpStatus && httpStatus < 500) writeSession(`optiforge-service-debug:${selected.id}`, undefined);
-      const messageText = error instanceof Error ? error.message : String(error);
-      const businessHint = messageText.includes('Ipopt') ? 'Ipopt 不可用，请检查 NLP 求解器环境。'
+      const messageText = (error as AxiosError).isAxiosError ? extractErrorText(error as AxiosError<{ detail?: unknown; message?: string }>) : error instanceof Error ? error.message : String(error);
+      const businessHint = httpStatus && httpStatus < 500 ? `请求未通过校验（${httpStatus}）：${messageText}`
+        : messageText.includes('Ipopt') ? 'Ipopt 不可用，请检查 NLP 求解器环境。'
         : messageText.includes('JSON') ? messageText
         : '提交或连接暂未确认，请重试恢复原任务，或到任务中心查询。';
       setDebugResult({ status: 'ERROR', error: businessHint, raw_error: messageText });
@@ -264,6 +269,7 @@ export function ModelServicesPage() {
                       <Form.Item label="运行参数 JSON">
                         <Input.TextArea aria-label="运行参数 JSON" rows={8} value={debugPayload} onChange={event => setDebugPayload(event.target.value)} />
                       </Form.Item>
+                      <SolverRunSettings key={selected.id} value={solverSettings} onChange={setSolverSettings} disabled={trackingActive} />
                       <Space>
                         <Button type="primary" disabled={trackingActive} loading={debugInvoke.isPending} onClick={() => debugInvoke.mutate()}>{trackedId ? '恢复任务' : '发起测试调用'}</Button>
                         {trackedId && terminalTask(trackedTask.data?.status) && <Button onClick={() => { writeSession(`optiforge-service-debug:${selected.id}`, undefined); setTrackedId(undefined); setDebugResult(undefined); }}>新建测试调用</Button>}
@@ -273,7 +279,7 @@ export function ModelServicesPage() {
                       {debugDisplay && <Card className="section-gap" size="small" title="调试返回"><JsonViewer value={debugDisplay} /></Card>}
                       {trackedTask.data?.status === 'SUCCESS' && <QueryState query={trackedResult} title="调试结果"><span /></QueryState>}
                       {(debugDisplay || trackedId) && (
-                        <Space className="section-gap" wrap>
+                      <Space className="section-gap" wrap>
                           <Button onClick={() => nav(trackedId ? `/tasks?task=${encodeURIComponent(trackedId)}` : '/tasks')}>跳转任务中心</Button>
                           <Button onClick={() => nav(trackedId ? `/results?task=${encodeURIComponent(trackedId)}` : '/results')}>跳转结果中心</Button>
                         </Space>

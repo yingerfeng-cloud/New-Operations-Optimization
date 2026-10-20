@@ -59,6 +59,7 @@ test('@real real backend smoke creates generic model draft and runs backend test
   let dialog = page.getByRole('dialog', { name: '新增集合' });
   await fill(dialog.getByLabel('编码'), 'resource');
   await fill(dialog.getByLabel('名称'), '资源集合');
+  await dialog.getByLabel('集合成员（JSON 数组）').fill('["R1"]');
   await dialog.getByRole('button', { name: /保.*存/ }).click();
 
   await page.getByRole('button', { name: '新增参数' }).click();
@@ -97,7 +98,7 @@ test('@real real backend smoke creates generic model draft and runs backend test
   const saveResponse = await saveResponsePromise;
   expect(saveResponse.ok(), await saveResponse.text()).toBeTruthy();
 
-  const testResponsePromise = page.waitForResponse(response => /\/api\/models\/[^/]+\/test$/.test(response.url()));
+  const testResponsePromise = page.waitForResponse(response => /\/api\/models\/[^/]+\/test-jobs$/.test(response.url()) && response.request().method() === 'POST');
   await page.getByTestId('model-test-run-button').click();
   const testResponse = await testResponsePromise;
   expect(testResponse.ok(), await testResponse.text()).toBeTruthy();

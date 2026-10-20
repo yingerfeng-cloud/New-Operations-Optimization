@@ -8,17 +8,18 @@ export const createModel = (payload: ModelPayload) => unwrap<ModelAsset>(apiClie
 export const createModelVersion = (id: string, payload: ModelPayload) => unwrap<ModelAsset>(apiClient.post(`/api/models/${id}/versions`, payload));
 export const updateModel = (id: string, payload: ModelPayload) => unwrap<ModelAsset>(apiClient.put(`/api/models/${id}`, payload));
 export const publishModel = (id: string) => unwrap<ModelAsset>(apiClient.post(`/api/models/${id}/publish`));
-export async function testModel(id: string, params: Record<string, unknown>): Promise<ModelAsset> {
+export async function testModel(id: string, params: Record<string, unknown>, solverConfig?: Record<string, unknown>): Promise<ModelAsset> {
   const source = await getModel(id);
-  const fingerprint = JSON.stringify({ parameters: params, content_hash: source.content_hash });
+  const fingerprint = JSON.stringify({ parameters: params, solver_config: solverConfig, content_hash: source.content_hash });
   const stored = readModelTest(id);
   const previous = stored?.finished ? undefined : stored;
   let pending = previous?.fingerprint === fingerprint ? previous : undefined;
   if (!pending && previous) {
     let previousParams: unknown;
-    try { const value = JSON.parse(previous.fingerprint); previousParams = value.parameters ?? value; } catch { /* Invalid local record is not test evidence. */ }
+    let previousSettings: unknown;
+    try { const value = JSON.parse(previous.fingerprint); previousParams = value.parameters ?? value; previousSettings = value.solver_config; } catch { /* Invalid local record is not test evidence. */ }
     const knownId = previous.taskId || String(source.test_task_id || '');
-    if (knownId && JSON.stringify(previousParams) === JSON.stringify(params)) {
+    if (knownId && JSON.stringify(previousParams) === JSON.stringify(params) && JSON.stringify(previousSettings) === JSON.stringify(solverConfig)) {
       const known = await getModelTestTask(knownId);
       const context = known.trace?.model_test as Record<string, unknown> | undefined;
       if (context?.submission_key === previous.key && [context.source_content_hash, context.tested_content_hash].includes(source.content_hash)) {
@@ -29,7 +30,7 @@ export async function testModel(id: string, params: Record<string, unknown>): Pr
   pending ||= { fingerprint, key: crypto.randomUUID(), taskId: undefined as string | undefined };
   writeModelTest(id, pending);
   if (!pending.taskId) {
-    const task = await unwrap<SolveTask>(apiClient.post(`/api/models/${id}/test-jobs`, { parameters: params, idempotency_key: pending.key }));
+    const task = await unwrap<SolveTask>(apiClient.post(`/api/models/${id}/test-jobs`, { parameters: params, solver_config: solverConfig, idempotency_key: pending.key }));
     pending.taskId = task.id;
     writeModelTest(id, pending);
   }

@@ -83,6 +83,7 @@ export interface ModelDraft {
       negative?: boolean;
       validation?: Record<string, unknown>;
       exampleValue?: unknown;
+      sample_value?: unknown;
       required?: boolean;
       description?: string;
     }>;
@@ -108,6 +109,7 @@ export interface ModelDraft {
   runtime_parameters: Record<string, unknown>;
   parameter_groups: Record<string, Record<string, unknown>>;
   advanced: {
+    solver_config?: Record<string, unknown>;
     description?: string;
     generic_spec?: Record<string, unknown>;
     component_spec?: Record<string, unknown>;

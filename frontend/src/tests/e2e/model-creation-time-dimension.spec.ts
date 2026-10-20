@@ -25,7 +25,9 @@ test('model time-dimension contract flows from creation to task horizon selector
   const savePayload = saveRequest.postDataJSON();
   expect(savePayload.ui_metadata.time_dimension).toMatchObject({ policy: 'runtime_variable', default_horizon: 96, allowed_horizons: [24, 48, 96] });
   expect(savePayload.model_draft.time_dimension).toEqual(savePayload.ui_metadata.time_dimension);
-  expect(savePayload.component_spec.ui_metadata.time_dimension).toEqual(savePayload.ui_metadata.time_dimension);
+  expect(savePayload.model_draft.basic_info.builder_mode).toBe('generic_linear');
+  expect(savePayload.component_spec).toEqual({});
+  expect(savePayload.semantic_spec.ui_metadata.time_dimension).toEqual(savePayload.ui_metadata.time_dimension);
 
   await page.goto('/models/MODEL-DRAFT-1/edit');
   await expect(page.getByText('编辑模型草稿').first()).toBeVisible();

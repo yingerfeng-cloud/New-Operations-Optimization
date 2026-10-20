@@ -5,9 +5,32 @@ positional arrays when their axes are known; mappings always use business keys.
 This module does not resolve coefficients or infer an axis from unrelated sets.
 """
 from copy import deepcopy
+import math
 from typing import Any
 
 from app.model_dimensions import extract_dimensions
+
+
+def parameter_default_policy(param: dict) -> str:
+    validation = param.get("validation") or {}
+    explicit = param.get("default_policy") or validation.get("default_policy")
+    if explicit:
+        return str(explicit)
+    if param.get("runtime_injected") is False or any(param.get(key) is not None for key in ("default_value", "defaultValue", "default")):
+        return "default_allowed"
+    return "user_required" if bool(validation.get("required", param.get("required", True))) else "sample_only"
+
+
+def declared_parameter_defaults(semantic: dict) -> dict:
+    result = {}
+    for param in semantic.get("parameters") or []:
+        if parameter_default_policy(param) != "default_allowed":
+            continue
+        key = param.get("math_param") or param.get("code") or param.get("key")
+        value = next((param[field] for field in ("default_value", "defaultValue", "default", "sample_value", "sample") if param.get(field) is not None), None)
+        if key and value is not None:
+            result[str(key)] = deepcopy(value)
+    return result
 
 
 def parameter_input_contract(param: dict, sets: dict[str, list]) -> dict:
@@ -16,6 +39,10 @@ def parameter_input_contract(param: dict, sets: dict[str, list]) -> dict:
     declared = str(validation.get("type") or param.get("type") or param.get("param_type") or "").lower()
     declared = {"list": "array", "object": "dict", "float": "number", "int": "integer"}.get(declared, declared)
     sample = param.get("sample_value", param.get("sample", param.get("default_value", param.get("default"))))
+    # A blank editor placeholder is missing metadata, not a string declaration.
+    # Explicit string contracts remain authoritative below.
+    if isinstance(sample, str) and not sample.strip():
+        sample = None
     if declared in {"number", "integer", "string", "boolean", "array", "dict"}:
         formats = [declared]
     elif dimensions:
@@ -34,12 +61,21 @@ def parameter_input_contract(param: dict, sets: dict[str, list]) -> dict:
             elif isinstance(sample, dict) and "array" in formats and all(str(member) in sample or member in sample for member in members):
                 examples["array"] = [deepcopy(sample.get(member, sample.get(str(member)))) for member in members]
     axes = [{"set": axis, "members": list(sets.get(axis) or [])} for axis in dimensions]
+    leaf = sample
+    while isinstance(leaf, (dict, list)) and leaf:
+        leaf = next(iter(leaf.values())) if isinstance(leaf, dict) else leaf[0]
+    items = validation.get("items") or {}
+    leaf_type = param.get("value_type") or validation.get("item_type") or (items.get("type") if isinstance(items, dict) else None)
+    if not leaf_type:
+        leaf_type = "boolean" if isinstance(leaf, bool) else "string" if isinstance(leaf, str) else "number"
+    if formats == ["string"] or formats == ["boolean"]:
+        leaf_type = formats[0]
     description = "；".join(filter(None, [
         "允许格式：" + " / ".join(formats),
         ("轴顺序：" + " → ".join(dimensions)) if dimensions else "标量",
         "数组逐轴按声明集合顺序；映射逐轴按业务键匹配" if dimensions else "",
     ]))
-    return {"type": formats[0], "allowed_formats": formats, "axis_order": dimensions,
+    return {"type": formats[0], "allowed_formats": formats, "value_type": leaf_type, "axis_order": dimensions,
             "axes": axes, "format_description": description, "format_examples": examples}
 
 
@@ -59,6 +95,20 @@ def validate_parameter_input(item: dict, value: Any, supplied: dict | None = Non
 
     def check(node: Any, depth: int, location: str) -> dict | None:
         if depth >= len(axes):
+            # Array/dict parameters without declared axes still have typed leaves.
+            if isinstance(node, (dict, list)):
+                for label, child in (enumerate(node) if isinstance(node, list) else node.items()):
+                    error = check(child, depth, f"{location}[{label}]")
+                    if error:
+                        return error
+                return None
+            leaf_type = item.get("value_type")
+            if leaf_type in {"number", "integer"} and (
+                isinstance(node, bool) or not isinstance(node, (int, float)) or not math.isfinite(node)
+                or leaf_type == "integer" and int(node) != node
+            ):
+                return {"key": key, "field": location, "error": "invalid numeric value", "expected": f"finite {leaf_type}",
+                        "actual": node, "message": f"参数 {location} 必须为有限数值。"}
             return None
         axis = axes[depth]
         members = supplied.get(axis["set"], axis.get("members"))

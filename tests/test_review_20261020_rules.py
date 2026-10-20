@@ -138,6 +138,7 @@ def test_explicit_change_after_test_requires_retest(client):
 def test_fixed_id_skill_and_formal_entry_are_separate(client):
     f, a = _curve_model(client)
     test_and_publish_model(client, a, {"horizon": 1})
+    fixed_original = client.post(f"/api/models/{a}/skills/generate", json={"use_llm": False}).json()
     b = client.post(f"/api/models/{a}/copy").json()["id"]
     test_and_publish_model(client, b, {"horizon": 1})
     skill = client.post(f"/api/models/{b}/skills/generate", json={"use_llm": False})
@@ -151,6 +152,11 @@ def test_fixed_id_skill_and_formal_entry_are_separate(client):
     assert fixed_skill.status_code == 200, fixed_skill.text
     assert fixed_skill.json()["objective_value"] == pytest.approx(10)
     assert fixed_skill.json()["resolved_model_id"] == b
+    fixed_name = fixed_original['skill_name']
+    listed = next(row for row in client.get('/api/skills').json() if row['skill_name'] == fixed_name)
+    detail = client.get(f'/api/skills/{fixed_name}').json()
+    assert listed['model_id'] == detail['model_id'] == a
+    assert listed['callable'] is detail['callable'] is False
     # Existing lifecycle governance still applies: the superseded A is offline.
     old = client.post(f"/api/models/{a}/invoke", json={"parameters": {"horizon": 1}})
     assert old.status_code == 409

@@ -30,6 +30,10 @@ class JobService:
             if req.idempotency_key:
                 previous = next((task for task in STORE.tasks.values() if task.request.idempotency_key == req.idempotency_key), None)
                 if previous:
+                    context = previous.trace.get("model_test") or {}
+                    if testing_model is not None and model_service._content_hash(testing_model) in {context.get("source_content_hash"), context.get("tested_content_hash")}:
+                        fingerprint_data["tested_content_hash"] = context.get("submitted_content_hash") or context.get("source_content_hash")
+                        fingerprint = hashlib.sha256(json.dumps(fingerprint_data, sort_keys=True).encode()).hexdigest()
                     if previous.trace.get("request_fingerprint") != fingerprint:
                         raise HTTPException(status_code=409, detail={"code": "IDEMPOTENCY_KEY_REUSED", "message": "同一提交标识不能用于不同参数，请先查看原任务。"})
                     return previous
@@ -43,6 +47,7 @@ class JobService:
             record.trace["request_fingerprint"] = fingerprint
             if testing_model is not None:
                 record.trace["model_test"] = {"model_id": testing_model.id, "tested_content_hash": model_service._content_hash(testing_model),
+                    "submitted_content_hash": model_service._content_hash(testing_model),
                     "source_content_hash": req.payload["_model_test"]["source_hash"], "submission_key": req.idempotency_key}
             STORE.tasks[task_id] = record
             STORE.save_runtime()
@@ -81,6 +86,8 @@ class JobService:
             if task.status not in {"FAILED", "TIMEOUT", "CANCELLED", "INTERRUPTED"}:
                 raise HTTPException(status_code=409, detail=f"Cannot retry task in status {task.status}")
             self._validate_historical_dependencies(task)
+            from app.jobs.attempt_history import archive_attempt
+            archive_attempt(task)
             task.attempt_id = uuid.uuid4().hex
             task.error = None
             task.result = None
@@ -174,8 +181,10 @@ class JobService:
             explicit_keys.add("interval_minutes")
         explicit_horizon = self._explicit_horizon(req, explicit_keys)
         if req.solver_config:
+            from app.solvers.run_settings import validate_run_settings
+            req.solver_config = validate_run_settings(req.solver_config)
             if req.solver_config.get("time_limit") is not None:
-                req.time_limit_seconds = int(req.solver_config["time_limit"])
+                req.time_limit_seconds = float(req.solver_config["time_limit"])
             if req.solver_config.get("mip_gap") is not None:
                 req.mip_gap = float(req.solver_config["mip_gap"])
             if req.solver_config.get("thread_num") is not None:
@@ -264,6 +273,11 @@ class JobService:
             "resolved_model_code": model_code,
         }
         semantic_spec = deepcopy(model.semantic_spec or {})
+        semantic_spec["build_mode"] = model.build_mode
+        if model.build_mode in {"template_based", "domain_builder"}:
+            template_code = model_service._template_code(model)
+            if template_code:
+                semantic_spec["template_code"] = template_code
         component_spec = deepcopy(model.component_spec or semantic_spec.get("component_spec") or {})
         generic_spec = deepcopy(model.generic_spec or semantic_spec.get("generic_spec") or {})
         self._validate_set_references(semantic_spec, component_spec, generic_spec)
@@ -359,7 +373,9 @@ class JobService:
         semantic = deepcopy(getattr(model, "semantic_spec", None) or {})
         draft = deepcopy(getattr(model, "model_draft", None) or {})
         draft_parameters = draft.get("runtime_parameters") if isinstance(draft, dict) else {}
+        from app.parameter_input_contract import declared_parameter_defaults
         return {
+            **declared_parameter_defaults(semantic),
             **(semantic.get("sample_runtime_parameters") or {}),
             **(draft_parameters or {}),
             **(deepcopy(getattr(model, "parameters", None) or {})),

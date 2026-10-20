@@ -75,7 +75,8 @@ class MemoryStore:
             persisted_models = {
                 model_id: model.model_dump(mode="json")
                 for model_id, model in self.models.items()
-                if not bool((model.ui_metadata or {}).get("managed_default_template"))
+                if not (bool((model.ui_metadata or {}).get("managed_default_template"))
+                        and str(model.model_family_id or "").startswith("builtin:") and not model.supersedes_model_id)
             }
             persisted_model_ids = set(persisted_models)
             persisted_versions = {

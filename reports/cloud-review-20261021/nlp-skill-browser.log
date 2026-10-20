@@ -1,0 +1,9 @@
+
+Running 2 tests using 1 worker
+
+(node:88720) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  1 src/tests/e2e/cloud_review_libraries.spec.ts:67:1 › cloud review: Skill example fill includes all required business series (2.0s)
+  ✓  2 src/tests/e2e/cloud_review_nlp.spec.ts:16:1 › cloud review: NLP clone runs with UI settings, publishes and calls the actual Ipopt service (22.1s)
+
+  2 passed (44.9s)

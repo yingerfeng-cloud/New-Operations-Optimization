@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 from app.model_dimensions import validate_dimension_field_consistency
+from app.model_dimensions import extract_dimensions
 
 
 REFERENCE_FIELDS = {
@@ -37,23 +38,36 @@ def validate_set_references(
     component_sets = _set_codes(component)
     generic_sets = _set_codes(generic)
     all_sets = semantic_sets | component_sets | generic_sets
+    draft = model_draft or {}
+    draft_semantic = draft.get("semantic") if isinstance(draft.get("semantic"), dict) else {}
+    coordinates = {"sets": {}, "symbols": {}}
+    for source in (draft_semantic, component, generic, semantic):
+        sets = source.get("sets") or {}
+        if isinstance(sets, dict):
+            coordinates["sets"].update(sets)
+        elif isinstance(sets, list):
+            coordinates["sets"].update({str(row.get("code") or row.get("key")): row.get("values") or row.get("members") or [] for row in sets if isinstance(row, dict)})
+        for section in ("parameters", "variables"):
+            for row in source.get(section) or []:
+                if isinstance(row, dict):
+                    name = row.get("code") or row.get("key") or row.get("name")
+                    if name:
+                        coordinates["symbols"][str(name)] = extract_dimensions(row)
 
     errors: list[dict[str, Any]] = []
-    _scan_spec("semantic_spec", semantic, semantic_sets or all_sets, errors)
-    _scan_spec("component_spec", component, component_sets or semantic_sets or all_sets, errors)
-    _scan_spec("generic_spec", generic, generic_sets or semantic_sets or all_sets, errors)
+    _scan_spec("semantic_spec", semantic, semantic_sets or all_sets, errors, coordinates)
+    _scan_spec("component_spec", component, component_sets or semantic_sets or all_sets, errors, coordinates)
+    _scan_spec("generic_spec", generic, generic_sets or semantic_sets or all_sets, errors, coordinates)
 
     schema_sets = semantic_sets or component_sets or generic_sets
     _scan_node("parameter_schema", parameter_schema or {}, schema_sets, errors)
     _scan_node("input_contract", input_contract or {}, schema_sets, errors)
     _scan_node("output_contract", output_contract or {}, schema_sets, errors)
 
-    draft = model_draft or {}
-    draft_semantic = draft.get("semantic") if isinstance(draft.get("semantic"), dict) else {}
     draft_sets = _set_codes(draft_semantic) or semantic_sets or all_sets
-    _scan_spec("model_draft.semantic", draft_semantic, draft_sets, errors)
-    _scan_node("model_draft.components", draft.get("components") or [], draft_sets, errors)
-    _scan_node("model_draft.formulas", draft.get("formulas") or [], draft_sets, errors)
+    _scan_spec("model_draft.semantic", draft_semantic, draft_sets, errors, coordinates)
+    _scan_node("model_draft.components", draft.get("components") or [], draft_sets, errors, coordinates)
+    _scan_node("model_draft.formulas", draft.get("formulas") or [], draft_sets, errors, coordinates)
     return _deduplicate(errors)
 
 
@@ -70,21 +84,21 @@ def _set_codes(spec: dict[str, Any]) -> set[str]:
     return set()
 
 
-def _scan_spec(prefix: str, spec: dict[str, Any], available_sets: set[str], errors: list[dict[str, Any]]) -> None:
+def _scan_spec(prefix: str, spec: dict[str, Any], available_sets: set[str], errors: list[dict[str, Any]], coordinates=None) -> None:
     if not spec:
         return
     for section in ("parameters", "variables", "constraints", "objectives", "objective", "components"):
         if section in spec:
-            _scan_node(f"{prefix}.{section}", spec[section], available_sets, errors)
+            _scan_node(f"{prefix}.{section}", spec[section], available_sets, errors, coordinates)
     for section in ("input_contract", "output_contract", "parameter_schema", "bindings", "dependencies"):
         if section in spec:
-            _scan_node(f"{prefix}.{section}", spec[section], available_sets, errors)
+            _scan_node(f"{prefix}.{section}", spec[section], available_sets, errors, coordinates)
 
 
-def _scan_node(path: str, value: Any, available_sets: set[str], errors: list[dict[str, Any]]) -> None:
+def _scan_node(path: str, value: Any, available_sets: set[str], errors: list[dict[str, Any]], coordinates=None) -> None:
     if isinstance(value, list):
         for index, item in enumerate(value):
-            _scan_node(f"{path}[{index}]", item, available_sets, errors)
+            _scan_node(f"{path}[{index}]", item, available_sets, errors, coordinates)
         return
     if not isinstance(value, dict):
         return
@@ -94,7 +108,22 @@ def _scan_node(path: str, value: Any, available_sets: set[str], errors: list[dic
     for key, child in value.items():
         child_path = f"{path}.{key}" if path.endswith("]") or not code or path.endswith(f".{code}") else f"{path}.{code}.{key}"
         is_term_index = key in {"key", "param_key"} and any(name in value for name in ("var", "variable", "coef_param", "coefficient_parameter"))
-        if key == "free_indices":
+        symbol = value.get("var") or value.get("variable") if key == "key" else value.get("coef_param") or value.get("coefficient_parameter") if key == "param_key" else value.get("parameter") if key == "indices" else None
+        dimensions = (coordinates or {}).get("symbols", {}).get(str(symbol)) if symbol else None
+        if dimensions is not None and isinstance(child, list) and key in {"key", "param_key", "indices"}:
+            for position, token in enumerate(child):
+                axis = dimensions[position] if position < len(dimensions) else None
+                if isinstance(token, dict):
+                    for set_code in _reference_codes(token) + ([str(token["target_set"])] if token.get("target_set") else []):
+                        if set_code not in available_sets:
+                            errors.append({"field": child_path, "error": "set_reference_not_found", "set": set_code, "message": f"索引引用不存在的集合 {set_code}。"})
+                elif _valid_coordinate(token, axis, (coordinates or {}).get("sets", {})):
+                    continue
+                else:
+                    errors.append({"field": child_path, "error": "index_member_not_found", "set": axis,
+                        "actual": token, "expected": (coordinates or {}).get("sets", {}).get(axis, []),
+                        "message": f"{symbol} 的第 {position + 1} 轴 {axis} 不包含成员 {token}。"})
+        elif key == "free_indices":
             for set_code in _free_index_set_codes(value, child):
                 if set_code and set_code not in available_sets:
                     errors.append({
@@ -131,7 +160,26 @@ def _scan_node(path: str, value: Any, available_sets: set[str], errors: list[dic
                         "message": f"{_subject_name(path, value)} 引用了不存在的集合 {set_code}。",
                     })
         if isinstance(child, (dict, list)):
-            _scan_node(child_path, child, available_sets, errors)
+            _scan_node(child_path, child, available_sets, errors, coordinates)
+
+
+def _valid_coordinate(token: Any, axis: str | None, sets: dict) -> bool:
+    if token == axis:
+        return True
+    target = sets.get(axis, [])
+    if isinstance(target, dict):
+        target = target.get('values') or target.get('members') or []
+    if token in target:
+        return True
+    # A scoped iterator can index a larger state set, e.g. SOC[t] over
+    # time={0,1} with state_time={0,1,2}. Validate membership on that axis;
+    # treating the iterator's set name as a literal member rejects valid SOC.
+    if isinstance(token, str) and token in sets:
+        source = sets[token]
+        if isinstance(source, dict):
+            source = source.get('values') or source.get('members') or []
+        return bool(source) and all(member in target for member in source)
+    return False
 
 
 def _reference_codes(value: Any) -> list[str]:

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 from pathlib import Path
+import os
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -30,6 +31,7 @@ def create_app() -> FastAPI:
     @app.get("/api/health")
     def health() -> dict[str, Any]:
         return {
+            **({"instance_id": os.environ["OPTIFORGE_INSTANCE_ID"]} if os.environ.get("OPTIFORGE_INSTANCE_ID") else {}),
             "ok": True,
             "service": "Power Semantic OR Platform",
             "architecture": ["business_semantics", "model_template", "pyomo_builder", "highs_solver", "business_result"],

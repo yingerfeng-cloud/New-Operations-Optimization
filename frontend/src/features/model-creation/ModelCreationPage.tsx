@@ -321,7 +321,8 @@ export function ModelCreationPage() {
     mutationFn: async requestContext => {
       const model = await saveDraftModel(true, requestContext.draft);
       useModelCreationStore.setState({ testSnapshot: { modelId: model.id, snapshot: requestContext.testedSnapshot, contentHash: model.content_hash } });
-      const testedModel = await testModel(model.id, requestContext.draft.runtime_parameters);
+      const settings = requestContext.draft.advanced.solver_config;
+      const testedModel = settings ? await testModel(model.id, requestContext.draft.runtime_parameters, settings) : await testModel(model.id, requestContext.draft.runtime_parameters);
       return {
         sequence: requestContext.sequence,
         modelId: model.id,
@@ -520,6 +521,7 @@ export function ModelCreationPage() {
       draft={normalized}
       validation={validation}
       onTest={runModelTest}
+      onChange={setDraft}
       pending={testRun.isPending || activeTest}
       testRevisionState={!testedAsset ? 'untested' : testIsCurrent ? 'current' : 'outdated'}
       onFixStep={setStep}

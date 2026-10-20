@@ -9,6 +9,19 @@ from app.services.model_set_reference_validator import validate_set_references
 client = TestClient(app)
 
 
+def test_scoped_time_iterator_may_index_superset_state_axis_but_not_wrong_members():
+    semantic = {'sets': [{'code': 'time', 'values': [0, 1]}, {'code': 'state_time', 'values': [0, 1, 2]}],
+                'variables': [{'code': 'soc', 'dimension': ['state_time']}]}
+    generic = {'constraints': [{'terms': [{'var': 'soc', 'key': ['time']}]}]}
+    assert validate_set_references(semantic_spec=semantic, component_spec={}, generic_spec=generic) == []
+    generic['constraints'][0]['terms'][0]['key'] = ['wrong']
+    errors = validate_set_references(semantic_spec=semantic, component_spec={}, generic_spec=generic)
+    assert errors[0]['error'] == 'index_member_not_found'
+    semantic['sets'][0]['values'] = [0, 9]
+    generic['constraints'][0]['terms'][0]['key'] = ['time']
+    assert validate_set_references(semantic_spec=semantic, component_spec={}, generic_spec=generic)[0]['error'] == 'index_member_not_found'
+
+
 def _errors(**overrides):
     payload = {
         "semantic_spec": {"sets": [{"code": "time", "values": [0, 1]}]},
@@ -28,6 +41,19 @@ def test_parameter_and_variable_references_must_exist() -> None:
     })
     assert {item["set"] for item in errors} == {"time_volume", "missing_period"}
     assert all(item["error"] == "set_reference_not_found" for item in errors)
+
+
+def test_literal_business_members_are_coordinates_not_set_names():
+    semantic = {"sets": [{"code": "origin", "values": ["A", "B"]}, {"code": "destination", "values": ["X", "Y"]}],
+                "variables": [{"code": "shipment", "dimension": ["origin", "destination"]}],
+                "parameters": [{"code": "supply", "dimension": ["origin"]}]}
+    generic = {"sets": {"origin": ["A", "B"], "destination": ["X", "Y"]},
+               "constraints": [{"terms": [{"var": "shipment", "key": ["A", "X"]}],
+                                "rhs_terms": [{"factors": [{"parameter": "supply", "indices": ["A"]}]}]}]}
+    assert _errors(semantic_spec=semantic, generic_spec=generic) == []
+    generic["constraints"][0]["terms"][0]["key"] = ["X", "A"]
+    errors = _errors(semantic_spec=semantic, generic_spec=generic)
+    assert len(errors) == 2 and all(row["error"] == "index_member_not_found" for row in errors)
 
 
 def test_generic_constraint_structured_index_must_exist() -> None:

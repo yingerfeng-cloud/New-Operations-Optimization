@@ -38,7 +38,7 @@ class SolveRequest(BaseModel):
     solver: str = "auto"
     mode: str = "business_semantic"
     mip_gap: float = 0.001
-    time_limit_seconds: int = 300
+    time_limit_seconds: float = Field(default=300, gt=0, le=86400)
     thread_num: int | None = None
     presolve: bool = True
     async_run: bool = True
@@ -78,6 +78,12 @@ class TaskView(BaseModel):
     error: str | None = None
     recent_logs: list[str] = Field(default_factory=list)
     trace: dict[str, Any] = Field(default_factory=dict)
+    runtime_parameters: dict[str, Any] = Field(default_factory=dict)
+    model_version: str | None = None
+    model_content_hash: str | None = None
+    horizon: int | None = None
+    interval_minutes: float | None = None
+    attempt_history: list[dict[str, Any]] = Field(default_factory=list)
 
 
 @dataclass
@@ -97,6 +103,7 @@ class TaskRecord:
     duration_seconds: float | None = None
     retry_count: int = 0
     max_retries: int = 0
+    attempt_history: list[dict[str, Any]] = field(default_factory=list)
     result: dict[str, Any] | None = None
     error: str | None = None
     trace: dict[str, Any] = field(default_factory=dict)
@@ -118,6 +125,13 @@ class TaskRecord:
 
     def view(self) -> TaskView:
         objective_value = self.resolved_objective_value()
+        payload = self.request.payload or {}
+        semantic = payload.get("semantic_spec") or {}
+        keys = {str(item.get("math_param") or item.get("code") or item.get("key")) for item in semantic.get("parameters") or []}
+        keys.update(self.request.parameters)
+        keys.update(self.request.runtime_parameters)
+        keys.update({"horizon", "delta_t", "interval_minutes", "time_step_seconds"})
+        context = payload.get("_result_context") or {}
         return TaskView(
             id=self.id,
             attempt_id=self.attempt_id,
@@ -142,6 +156,10 @@ class TaskRecord:
             error=self.error,
             recent_logs=self.logs[-5:],
             trace=dict(self.trace),
+            runtime_parameters={key: payload.get(key, self.request.parameters.get(key, self.request.runtime_parameters.get(key))) for key in sorted(keys) if key in payload or key in self.request.parameters or key in self.request.runtime_parameters},
+            model_version=context.get("version"), model_content_hash=context.get("content_hash"),
+            horizon=payload.get("horizon"), interval_minutes=payload.get("interval_minutes"),
+            attempt_history=list(self.attempt_history),
         )
 
 
@@ -161,6 +179,7 @@ class TaskRecordState(BaseModel):
     duration_seconds: float | None = None
     retry_count: int = 0
     max_retries: int = 0
+    attempt_history: list[dict[str, Any]] = Field(default_factory=list)
     result: dict[str, Any] | None = None
     error: str | None = None
     trace: dict[str, Any] = Field(default_factory=dict)

@@ -361,6 +361,7 @@ class SolveResultFormatter:
         load = context["load"]
         renewable = context["renewable"]
         reserve_ratio = context["reserve_ratio"]
+        delta_t = float(context.get("delta_t", 1))
 
         schedule = []
         period_output = []
@@ -380,7 +381,7 @@ class SolveResultFormatter:
                 total_output += output
                 committed_capacity += p_max[unit] * on
                 startup_count += startup
-                fuel_total += output * fuel_cost[unit]
+                fuel_total += output * fuel_cost[unit] * delta_t
                 startup_total += startup * startup_cost[unit]
                 if on and abs(output - p_max[unit]) <= 1e-4:
                     tightness["output_upper"].append({"unit": unit, "time": time_label, "slack": 0.0})
@@ -394,7 +395,7 @@ class SolveResultFormatter:
                         "unit_output": round(output, 3),
                         "unit_on": on,
                         "unit_startup": startup,
-                        "fuel_cost": round(output * fuel_cost[unit], 2),
+                        "fuel_cost": round(output * fuel_cost[unit] * delta_t, 2),
                         "startup_cost": round(startup * startup_cost[unit], 2),
                     }
                 )
@@ -944,8 +945,8 @@ class SolveResultFormatter:
             "total_pv_generation_used": round(total_used, 6),
             "total_pv_curtailment": round(total_curtail, 6),
             "curtailment_rate": round(total_curtail / total_pv, 6) if total_pv else 0.0,
-            "storage_charge_energy": round(sum(p_ch), 6),
-            "storage_discharge_energy": round(sum(p_dis), 6),
+            "storage_charge_energy": round(sum(p_ch) * delta_t, 6),
+            "storage_discharge_energy": round(sum(p_dis) * delta_t, 6),
             "soc_start": round(soc_values[0], 6) if soc_values else 0.0,
             "soc_end": round(soc_values[-1], 6) if soc_values else 0.0,
             "schedule_deviation": round(sum(dev_pos) + sum(dev_neg), 6),

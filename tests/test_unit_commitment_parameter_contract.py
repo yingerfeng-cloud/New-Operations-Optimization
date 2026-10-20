@@ -50,6 +50,11 @@ def test_unit_commitment_generated_schema_matches_agent_schema() -> None:
     snapshot = json.loads(snapshot_path.read_text(encoding="utf-8"))
 
     for contract in (schema, snapshot["input_schema"]):
-        assert [item["key"] for item in contract if item.get("required") is not False] == EXPECTED_REQUIRED
-        assert [item["key"] for item in contract if item.get("required") is False] == EXPECTED_OPTIONAL
+        # Current schemas also declare the system-derived time step. The old
+        # definition snapshot remains historical; it is not rewritten to invent
+        # a field it never contained. User-supplied/confirmed inputs stay equal.
+        business = [item for item in contract if item.get("default_policy") != "derived"]
+        assert [item["key"] for item in business if item.get("required") is not False] == EXPECTED_REQUIRED
+        assert [item["key"] for item in business if item.get("required") is False] == EXPECTED_OPTIONAL
         assert all(item.get("default_value") is not None for item in contract if item["key"] in EXPECTED_OPTIONAL)
+    assert next(item for item in schema if item['key'] == 'delta_t')['default_policy'] == 'derived'

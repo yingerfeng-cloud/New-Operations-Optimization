@@ -39,7 +39,7 @@ function formatErrorItem(item: unknown): string {
   return parts.join('，');
 }
 
-function extractErrorText(error: AxiosError<{ detail?: unknown; message?: string }>): string {
+export function extractErrorText(error: AxiosError<{ detail?: unknown; message?: string }>): string {
   const detail = error.response?.data?.detail;
   if (typeof detail === 'string') return detail;
   if (detail && typeof detail === 'object' && !Array.isArray(detail)) {

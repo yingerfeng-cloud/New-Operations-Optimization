@@ -41,7 +41,9 @@ class SkillRegistry:
                 continue
             skills.append(self._skill_for_model(model, skill_name_override=skill_name))
             listed_names.add(skill_name)
-        return skills
+        # The same resolver owns list, detail, definition and execution identity.
+        # In particular an active sibling must not replace a fixed binding here.
+        return [self.get_skill(row["skill_name"]) if STORE.skills.get(row["skill_name"], {}).get("model_id") else row for row in skills]
 
     def get_skill(self, skill_name: str) -> dict[str, Any]:
         with STORE.lock:

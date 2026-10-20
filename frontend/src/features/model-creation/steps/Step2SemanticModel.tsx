@@ -7,6 +7,7 @@ import { ComponentDependencyCard, type BindingTarget } from '../components/Compo
 import { ComponentPickerDrawer } from '../components/ComponentPickerDrawer';
 import { ParameterBindingDrawer } from '../components/ParameterBindingDrawer';
 import { TimeDimensionConfigCard } from '../components/TimeDimensionConfigCard';
+import { MccormickConfig } from '../components/MccormickConfig';
 import { reconcileComponentParameterBindings } from '../utils/componentParameterBindings';
 
 type SemanticKind = 'sets' | 'parameters' | 'variables';
@@ -79,6 +80,16 @@ function formatList(value?: string[]) {
   return (value || []).join(', ');
 }
 
+function valueText(value: unknown) {
+  return value == null ? '' : typeof value === 'object' ? JSON.stringify(value) : String(value);
+}
+
+function parseValue(value: unknown) {
+  const text = String(value ?? '').trim();
+  if (!text) return undefined;
+  try { return JSON.parse(text); } catch { return text; }
+}
+
 function duplicateCodes(rows: Array<{ code?: unknown }>) {
   const seen = new Set<string>();
   const duplicated = new Set<string>();
@@ -130,9 +141,10 @@ export function Step2SemanticModel({ draft, onChange }: { draft: ModelDraft; onC
     form.resetFields();
     form.setFieldsValue({
       ...next,
+      membersText: kind === 'sets' ? JSON.stringify((next as SetRow).values || (next as SetRow & { members?: unknown[] }).members || []) : undefined,
       dimensionText: formatList(('indices' in next ? next.indices : undefined) || ('dimension' in next ? next.dimension : undefined)),
-      defaultText: 'defaultValue' in next || 'default_value' in next || 'default' in next ? String((next as ParameterRow).defaultValue ?? (next as ParameterRow).default_value ?? (next as ParameterRow).default ?? '') : '',
-      exampleText: 'exampleValue' in next ? String((next as ParameterRow).exampleValue ?? '') : '',
+      defaultText: valueText((next as ParameterRow).defaultValue ?? (next as ParameterRow).default_value ?? (next as ParameterRow).default),
+      exampleText: valueText((next as ParameterRow).exampleValue),
     });
   };
 
@@ -164,18 +176,23 @@ export function Step2SemanticModel({ draft, onChange }: { draft: ModelDraft; onC
     }
     let row: SemanticRow;
     if (editing.kind === 'sets') {
+      const members = JSON.parse(String(values.membersText || '[]')) as unknown[];
       row = {
+        ...editing.row,
         code: String(values.code || ''),
         name: String(values.name || ''),
         description: String(values.description || ''),
         dimensionType: String(values.dimensionType || 'business'),
         sourceType: values.sourceType as SetRow['sourceType'],
         source_type: values.sourceType as SetRow['source_type'],
-        defaultSize: Number(values.defaultSize || 0),
+        defaultSize: members.length,
+        values: members,
+        ...('members' in editing.row ? { members: members } : {}),
       };
     } else if (editing.kind === 'parameters') {
       const dimension = parseList(values.dimensionText as string);
       row = {
+        ...editing.row,
         code: String(values.code || ''),
         name: String(values.name || ''),
         unit: String(values.unit || ''),
@@ -184,15 +201,18 @@ export function Step2SemanticModel({ draft, onChange }: { draft: ModelDraft; onC
         sourceType: values.sourceType as ParameterRow['sourceType'],
         source_type: values.sourceType as ParameterRow['source_type'],
         required: Boolean(values.required),
-        defaultValue: values.defaultText,
-        default: values.defaultText,
-        exampleValue: values.exampleText,
+        defaultValue: parseValue(values.defaultText),
+        default: parseValue(values.defaultText),
+        default_value: parseValue(values.defaultText),
+        exampleValue: parseValue(values.exampleText),
+        sample_value: parseValue(values.exampleText),
         description: String(values.description || ''),
       };
     } else {
       const dimension = parseList(values.dimensionText as string);
       const variableType = (values.variableType || 'continuous') as keyof typeof variableDomainMap;
       row = {
+        ...editing.row,
         code: String(values.code || ''),
         name: String(values.name || ''),
         variableType: variableType as VariableRow['variableType'],
@@ -241,7 +261,7 @@ export function Step2SemanticModel({ draft, onChange }: { draft: ModelDraft; onC
     { title: '名称', dataIndex: 'name' },
     { title: '结构类型', dataIndex: 'dimensionType', render: value => value || '-' },
     { title: '来源', render: (_, row) => row.sourceType || row.source_type || 'runtime' },
-    { title: '默认规模', dataIndex: 'defaultSize', render: value => value ?? '-' },
+    { title: '成员', render: (_, row) => JSON.stringify(row.values || []) },
     { title: '说明', dataIndex: 'description', render: value => value || '-' },
     actionColumn('sets') as ColumnsType<SetRow>[number],
   ];
@@ -307,6 +327,7 @@ export function Step2SemanticModel({ draft, onChange }: { draft: ModelDraft; onC
   return (
     <>
       {duplicateMessages.length > 0 && <Alert className="section-gap compact-step-note" type="error" showIcon title="编码唯一性校验失败" description={duplicateMessages.join('；')} />}
+      {draft.basic_info.builder_mode === 'component_based' && draft.components.map((component, index) => String(component.type || component.component_id) === 'mccormick_bilinear_relaxation_component' ? <MccormickConfig key={index} draft={draft} index={index} onChange={onChange} /> : null)}
       <div className="semantic-workbench section-gap">
         <SemanticOverviewCard
           draft={draft}
@@ -391,6 +412,12 @@ export function Step2SemanticModel({ draft, onChange }: { draft: ModelDraft; onC
               <Form.Item name="dimensionType" label="结构类型"><Input placeholder="time / business" /></Form.Item>
               <Form.Item name="sourceType" label="来源"><Select options={sourceOptions} /></Form.Item>
               <Form.Item name="defaultSize" label="默认规模"><InputNumber min={0} style={{ width: '100%' }} /></Form.Item>
+              <Form.Item name="membersText" label="集合成员（JSON 数组）" extra={'按公式索引顺序填写实际成员，例如 ["U1","U2"] 或 [0,1]。默认规模不能替代成员；运行时来源也需提供用于测试的代表成员。'} rules={[{ validator: async (_, value) => {
+                let members: unknown;
+                try { members = JSON.parse(String(value || '[]')); } catch { throw new Error('请输入合法的 JSON 数组'); }
+                if (!Array.isArray(members) || !members.length || members.some(item => typeof item !== 'string' && (typeof item !== 'number' || !Number.isFinite(item)))) throw new Error('集合必须包含非空字符串或有限数字成员');
+                if (members.some(item => typeof item === 'string' && !item.trim()) || new Set(members.map(String)).size !== members.length) throw new Error('集合成员不得为空或重复');
+              } }]}><Input.TextArea rows={3} /></Form.Item>
             </>
           )}
           {editing?.kind === 'parameters' && (

@@ -99,11 +99,15 @@ class ModelVersionService:
             }
         )
         metadata = deepcopy(data.get("ui_metadata") or {})
-        for key in ("publish_info", "test_result", "version_info", "function_update"):
+        for key in ("publish_info", "test_result", "version_info", "function_update", "managed_default_template", "managed_template_version"):
             metadata.pop(key, None)
         metadata["supersedes_model_id"] = source.id
         metadata["model_family_id"] = data["model_family_id"]
         data["ui_metadata"] = metadata
+        draft = deepcopy(data.get("model_draft") or {})
+        if draft:
+            draft.setdefault("basic_info", {})["version"] = data["version"]
+            data["model_draft"] = draft
         return ModelPackage.model_validate(data)
 
     def next_family_version(self, source: ModelView, family_models: Iterable[ModelView]) -> str:

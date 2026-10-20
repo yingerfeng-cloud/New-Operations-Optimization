@@ -9,6 +9,7 @@
     "allowed_formats": [
       "array"
     ],
+    "value_type": "number",
     "axis_order": [
       "time"
     ],
@@ -83,6 +84,7 @@
     "allowed_formats": [
       "dict"
     ],
+    "value_type": "number",
     "axis_order": [
       "unit"
     ],
@@ -157,6 +159,7 @@
     "allowed_formats": [
       "dict"
     ],
+    "value_type": "number",
     "axis_order": [
       "unit"
     ],
@@ -227,6 +230,7 @@
     "allowed_formats": [
       "dict"
     ],
+    "value_type": "number",
     "axis_order": [
       "unit"
     ],
@@ -297,6 +301,7 @@
     "allowed_formats": [
       "dict"
     ],
+    "value_type": "number",
     "axis_order": [
       "unit"
     ],
@@ -371,6 +376,7 @@
     "allowed_formats": [
       "dict"
     ],
+    "value_type": "number",
     "axis_order": [
       "unit"
     ],
@@ -445,6 +451,7 @@
     "allowed_formats": [
       "dict"
     ],
+    "value_type": "number",
     "axis_order": [
       "unit"
     ],
@@ -502,6 +509,50 @@
     "dispatch_mode": "economic_dispatch",
     "validation": {
       "type": "dict",
+      "min": 0
+    }
+  },
+  {
+    "key": "delta_t",
+    "name": "时间步长",
+    "dimension": [],
+    "type": "number",
+    "allowed_formats": [
+      "number"
+    ],
+    "value_type": "number",
+    "axis_order": [],
+    "axes": [],
+    "format_description": "允许格式：number；标量",
+    "format_examples": {
+      "number": 1
+    },
+    "unit": "h",
+    "required": false,
+    "description": "",
+    "default_value": 1,
+    "sample_value": 1,
+    "default_policy": "derived",
+    "source_system": null,
+    "runtime_injected": false,
+    "field_role": "parameter",
+    "runtime_editable": false,
+    "sets": {},
+    "time_dimension": {
+      "schema_version": 1,
+      "enabled": true,
+      "policy": "runtime_variable",
+      "default_horizon": 4,
+      "time_set": "time",
+      "state_time_set": null,
+      "interval_minutes": 60.0,
+      "editable": true,
+      "derive_from": null,
+      "allowed_horizons": []
+    },
+    "dispatch_mode": "economic_dispatch",
+    "validation": {
+      "type": "number",
       "min": 0
     }
   }

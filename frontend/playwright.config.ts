@@ -7,6 +7,7 @@ const executablePath = !channel ? process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PAT
 
 export default defineConfig({
   testDir: './src/tests/e2e',
+  testIgnore: '**/cloud_review_*.spec.ts',
   workers: 1,
   timeout: 60_000,
   expect: { timeout: 15_000 },

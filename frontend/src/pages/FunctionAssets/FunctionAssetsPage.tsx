@@ -3,7 +3,7 @@ import { Alert, Button, Card, Col, Collapse, Descriptions, Drawer, Dropdown, For
 import { useMemo, useState } from 'react';
 import { LazyEChart } from '../../components/LazyEChart';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { checkFunctionAssetApiReady, createFunctionAsset, getFunctionAssets, importFunctionAssetCsv, previewFunctionAsset, updateFunctionAsset, validateFunctionAsset } from '../../api/functionAssets';
+import { checkFunctionAssetApiReady, createFunctionAsset, getFunctionAsset, getFunctionAssets, importFunctionAssetCsv, previewFunctionAsset, updateFunctionAsset, validateFunctionAsset } from '../../api/functionAssets';
 import { PageHeader } from '../../components/PageHeader';
 import { StatusTag } from '../../components/StatusTag';
 import { MetricCard, MetricGrid } from '../../components/WorkspaceUI';
@@ -493,6 +493,7 @@ function generatedId(type: FunctionAsset['function_type']) {
 export function FunctionAssetsPage() {
   const qc = useQueryClient();
   const [selected, setSelected] = useState<FunctionAsset | undefined>();
+  const [conflict, setConflict] = useState<FunctionAsset | undefined>();
   const [editing, setEditing] = useState(false);
   const [editingType, setEditingType] = useState<FunctionAsset['function_type']>('piecewise_1d');
   const [importing, setImporting] = useState(false);
@@ -548,14 +549,18 @@ export function FunctionAssetsPage() {
       delete payload.y_unit;
       delete payload.z_name;
       delete payload.z_unit;
-      return selected?.function_id ? updateFunctionAsset(selected.function_id, payload) : createFunctionAsset(payload);
+      return selected?.function_id ? updateFunctionAsset(selected.function_id, { ...payload, expected_revision: selected.revision, expected_content_hash: selected.content_hash }) : createFunctionAsset(payload);
     },
     onSuccess: asset => {
+      setConflict(undefined);
       setSelected(undefined);
       setEditing(false);
       done('函数资产已保存');
     },
-    onError: error => {
+    onError: async error => {
+      if ((error as { response?: { status?: number } }).response?.status === 409 && selected) {
+        try { setConflict(await getFunctionAsset(selected.function_id)); } catch { /* Keep the local edit if the refresh also fails. */ }
+      }
       message.error(`函数资产保存失败：${saveErrorText(error)}`);
     },
   });
@@ -630,6 +635,7 @@ export function FunctionAssetsPage() {
   };
 
   const setCommonFormValues = (type: FunctionAsset['function_type'], points: number[][], values: Record<string, unknown>) => {
+    setConflict(undefined);
     setEditingType(type);
     form.resetFields();
     form.setFieldsValue({
@@ -826,6 +832,14 @@ export function FunctionAssetsPage() {
       >
         {editing ? (
           <Form form={form} layout="vertical" onFinish={submitAsset}>
+            {conflict && <Alert type="warning" showIcon title={`保存冲突：函数库已更新到 r${conflict.revision}`} description={<Space orientation="vertical" style={{ width: '100%' }}>
+              <Typography.Text>当前编辑仍保留。比较下列内容后，可明确选择以最新修订为保存基线；随后点击保存才会创建新修订。</Typography.Text>
+              <Collapse items={[{ key: 'function-conflict-diff', label: '比较本机编辑与最新修订', children: <pre>{JSON.stringify({
+                本机编辑: { ...form.getFieldsValue(true), points: manualPoints.map(point => editingType === 'piecewise_2d' ? [point.x, point.y, point.z] : [point.x, point.y]) },
+                最新修订: { revision: conflict.revision, input_schema: conflict.input_schema, output_schema: conflict.output_schema, solve_strategy: conflict.solve_strategy, points: conflict.points, points_2d: conflict.points_2d, out_of_domain_policy: conflict.out_of_domain_policy },
+              }, null, 2)}</pre> }]} />
+              <Button onClick={() => { setSelected(previous => previous ? { ...previous, revision: conflict.revision, content_hash: conflict.content_hash } : previous); setConflict(undefined); }}>保留当前编辑，采用最新保存基线</Button>
+            </Space>} />}
             <Row gutter={12}>
               <Col span={24}>
                 <Form.Item name="function_type" label="函数类型" rules={[{ required: true }]}>

@@ -173,6 +173,14 @@ class FunctionAssetService:
     def update_asset(self, function_id: str, payload: dict[str, Any]) -> FunctionAsset:
         with STORE.lock:
             existing = self.get_asset(function_id).model_dump()
+            payload = deepcopy(payload)
+            expected_revision = payload.pop("expected_revision", payload.get("revision"))
+            expected_hash = payload.pop("expected_content_hash", None)
+            if (expected_revision is not None and expected_revision != existing["revision"]
+                    or expected_hash is not None and expected_hash != existing["content_hash"]):
+                raise HTTPException(status_code=409, detail={"code": "FUNCTION_DRAFT_CONFLICT",
+                    "message": "函数已在其他窗口更新，当前输入已保留。请查看最新修订并比较差异后再保存。",
+                    "current_revision": existing["revision"], "current_content_hash": existing["content_hash"]})
             history = deepcopy((STORE.function_assets.get(function_id) or {}).get("_versions") or {})
             history[str(existing["revision"])] = deepcopy(existing)
             asset = self._normalize({**existing, **payload, "function_id": function_id}, creating=False)

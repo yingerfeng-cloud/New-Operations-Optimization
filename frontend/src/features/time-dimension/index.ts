@@ -13,7 +13,7 @@ export interface RuntimeField {
   type?: string; unit?: string; description?: string; enumValues?: unknown[]; dimensionValues?: Record<string, string[]>; min?: number; max?: number;
   groupKey?: string; groupLabel?: string; groupOrder?: number; fieldOrder?: number;
   editorHint?: string; helpText?: string; dataSourceLabel?: string; sourceSystem?: string; defaultPolicy?: string;
-  role?: 'parameter' | 'set_members' | 'time_labels'; editable?: boolean;
+  role?: 'parameter' | 'set_members' | 'time_labels'; editable?: boolean; valueType?: string;
 }
 
 export const objectValue = (value: unknown): Record<string, unknown> => value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {};
@@ -74,6 +74,7 @@ export function runtimeFieldsFromContracts(...sources: unknown[]): RuntimeField[
       defaultValue: item.default ?? item.defaultValue ?? item.default_value ?? existing?.defaultValue,
       exampleValue: item.example ?? item.exampleValue ?? item.sample ?? item.sample_value ?? existing?.exampleValue,
       type: String(item.type || item.value_type || existing?.type || ''),
+      valueType: String(item.value_type || existing?.valueType || (item.field_role === 'set_members' || item.field_role === 'time_labels' ? 'string' : 'number')),
       unit: String(item.unit || existing?.unit || ''), description: String(item.description || existing?.description || ''),
       enumValues: Array.isArray(item.enum) ? item.enum : Array.isArray(validation.enum) ? validation.enum : existing?.enumValues,
       min: item.min == null && validation.min == null ? existing?.min : Number(item.min ?? validation.min),

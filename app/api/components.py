@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from copy import deepcopy
+from uuid import uuid4
 
 import app.model_components  # noqa: F401
 from fastapi import APIRouter, HTTPException
@@ -155,7 +156,7 @@ def delete_component(component_id: str) -> dict:
 def copy_component_version(component_id: str, payload: dict | None = None) -> dict:
     source = get_component(component_id)
     payload = payload or {}
-    next_version = str(payload.get("version") or f"{source.get('version', '1.0.0')}-copy")
+    next_version = str(payload.get("version") or f"{source.get('version', '1.0.0')}-copy-{uuid4().hex[:8]}")
     new_component_id = str(payload.get("component_id") or f"{component_id}_v{next_version.replace('.', '_').replace('-', '_')}")
     copied = {
         **deepcopy(source),

@@ -6,6 +6,7 @@ from typing import Any
 
 from app.schemas.result import SolverRunResult
 from app.solvers.base import SolverProgressCallback
+from app.solvers.execution_lock import solver_execution_lock
 
 
 class HiGHSAdapter:
@@ -26,6 +27,15 @@ class HiGHSAdapter:
         threads: int | None = None,
         progress_callback: SolverProgressCallback | None = None,
     ) -> SolverRunResult:
+        with solver_execution_lock:
+            return self._solve_serial(model, mip_gap=mip_gap, time_limit_seconds=time_limit_seconds,
+                                      threads=threads, progress_callback=progress_callback)
+
+    def _solve_serial(self, model: Any, **options: Any) -> SolverRunResult:
+        mip_gap = options["mip_gap"]
+        time_limit_seconds = options["time_limit_seconds"]
+        threads = options["threads"]
+        progress_callback = options["progress_callback"]
         import pyomo.environ as pyo
 
         solver = pyo.SolverFactory("appsi_highs")
@@ -50,11 +60,12 @@ class HiGHSAdapter:
         actual_mip_gap = None
         if isinstance(lower_bound, (int, float)) and isinstance(upper_bound, (int, float)):
             actual_mip_gap = abs(float(upper_bound) - float(lower_bound)) / max(1.0, abs(float(upper_bound)))
-        status = "optimal" if "optimal" in termination_lower else "infeasible" if "infeasible" in termination_lower else "failed"
-        if status != "infeasible":
+        status = ("optimal" if "optimal" in termination_lower else "unbounded" if "unbounded" in termination_lower
+                  else "infeasible" if "infeasible" in termination_lower else "timeout" if "time" in termination_lower else "failed")
+        if status not in {"infeasible", "unbounded"}:
             try:
                 model.solutions.load_from(result)
-                if status == "failed" and "time" in termination_lower:
+                if status == "timeout":
                     status = "feasible"
             except Exception:
                 pass
@@ -72,14 +83,14 @@ class HiGHSAdapter:
             objective_value=objective_value,
             solve_time=round(solve_time, 4),
             mip_gap=None if actual_mip_gap is None else round(actual_mip_gap, 8),
-            variable_values=self._extract_variables(model),
+            variable_values=self._extract_variables(model) if status in {"optimal", "feasible"} else {},
             solver_log=f"HiGHS termination_condition={termination}",
             raw_termination_condition=termination,
             termination_condition=termination,
             solver_name=self.name,
             solver_type="MILP" if any(var.is_binary() or var.is_integer() for component in model.component_objects(pyo.Var, active=True) for var in component.values()) else "LP",
             solver_available=True,
-            message="模型不可行，请检查硬负荷目标、库容边界、生态流量和函数资产定义域。" if status == "infeasible" else "",
+            message="模型不可行，请检查当前业务的供需平衡、变量边界与约束。" if status == "infeasible" else "模型无界（unbounded），请检查目标方向以及生产、采购等变量是否缺少上界。" if status == "unbounded" else "",
         )
 
     def _configure_progress_callback(

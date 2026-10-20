@@ -70,7 +70,7 @@ function TaskVariableValue({ value, variable }: { value: unknown; variable: stri
 
 function statusColor(status: string, current: string) {
   if (current === 'SUCCESS') return 'green';
-  if (['FAILED', 'INFEASIBLE', 'TIMEOUT', 'CANCELLED'].includes(current)) return status === current ? 'red' : 'gray';
+  if (['FAILED', 'INFEASIBLE', 'TIMEOUT', 'CANCELLED', 'INTERRUPTED'].includes(current)) return status === current ? 'red' : 'gray';
   const currentIndex = stageLabels.findIndex(([key]) => key === current);
   const statusIndex = stageLabels.findIndex(([key]) => key === status);
   return statusIndex <= currentIndex ? 'blue' : 'gray';
@@ -105,7 +105,7 @@ export function TaskOverviewPanel({ task }: { task?: SolveTask }) {
   const trace = task.trace || {};
   const problemType = task.problem_type || trace.problem_type || (String(task.solver || '').toLowerCase().includes('ipopt') ? 'NLP' : '-');
   const isNlp = String(problemType).toUpperCase() === 'NLP' || String(task.solver || '').toLowerCase().includes('ipopt');
-  const progressStatus = status === 'SUCCESS' ? 'success' : ['FAILED', 'TIMEOUT', 'CANCELLED', 'INFEASIBLE'].includes(status) ? 'exception' : 'active';
+  const progressStatus = status === 'SUCCESS' ? 'success' : ['FAILED', 'TIMEOUT', 'CANCELLED', 'INFEASIBLE', 'INTERRUPTED'].includes(status) ? 'exception' : 'active';
   return (
     <>
       <div className="task-overview-progress">
@@ -189,7 +189,7 @@ function eventColor(kind: string) {
 }
 
 function taskIsTerminal(task?: SolveTask) {
-  return ['SUCCESS', 'FAILED', 'INFEASIBLE', 'TIMEOUT', 'CANCELLED'].includes(String(task?.status || '').toUpperCase());
+  return ['SUCCESS', 'FAILED', 'INFEASIBLE', 'TIMEOUT', 'CANCELLED', 'INTERRUPTED'].includes(String(task?.status || '').toUpperCase());
 }
 
 function missingProgressDescription(task?: SolveTask) {
@@ -307,6 +307,7 @@ export function TaskInputPanel({ task }: { task?: SolveTask }) {
       { key: 'source', label: '数据来源', children: text(task?.data_source || trace.data_source || '手工录入') }, { key: 'submitted', label: '提交时间', children: task?.created_at || '-' },
     ]} />
     <Card size="small" title="业务参数" className="section-gap"><Table size="small" pagination={false} rowKey="__row_key" dataSource={rowsFromObject(parameters)} columns={[{ title: '参数', dataIndex: 'key' }, { title: '规模', dataIndex: 'value', render: value => Array.isArray(value) ? `${value.length} 项` : typeof value === 'object' && value ? `${Object.keys(value).length} 项` : '-' }, { title: '值 / 预览', dataIndex: 'value', render: value => <JsonViewer value={value} /> }]} /></Card>
+    {Array.isArray(task?.attempt_history) && task.attempt_history.length > 0 && <Card size="small" title="历史尝试（冻结请求与结果）" className="section-gap"><JsonViewer value={task.attempt_history} /></Card>}
     {Boolean(task?.advanced_config || trace.advanced_config) && <Card size="small" title="高级配置" className="section-gap"><JsonViewer value={task?.advanced_config || trace.advanced_config} /></Card>}</>
   );
 }

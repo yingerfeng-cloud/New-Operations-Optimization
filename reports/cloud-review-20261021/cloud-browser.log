@@ -1,0 +1,20 @@
+
+Running 13 tests using 1 worker
+
+(node:88045) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓   1 src/tests/e2e/cloud_review_assets.spec.ts:25:1 › cloud review: builtin derived version and v0.2 keep identity through UI test and publish (31.9s)
+  ✓   2 src/tests/e2e/cloud_review_assets.spec.ts:43:1 › cloud review: editor recovers a genuinely lost test response with the same task and attempt (9.7s)
+  ✓   3 src/tests/e2e/cloud_review_assets.spec.ts:69:1 › cloud review: stale second editor keeps its input and cannot overwrite the first name (5.3s)
+  ✓   4 src/tests/e2e/cloud_review_libraries.spec.ts:3:1 › cloud review: published component rename keeps unvisited formulas and repeated copies have distinct IDs (8.3s)
+  ✓   5 src/tests/e2e/cloud_review_libraries.spec.ts:37:1 › cloud review: curve conflict preserves the stale edit and requires an explicit new baseline (8.6s)
+  ✓   6 src/tests/e2e/cloud_review_nlp.spec.ts:16:1 › cloud review: NLP clone runs with UI settings, publishes and calls the actual Ipopt service (13.0s)
+  ✓   7 src/tests/e2e/cloud_review_storage.spec.ts:4:3 › cloud review: storage native version keeps editable SOC equations and independently yields 75 (10.9s)
+  ✓   8 src/tests/e2e/cloud_review_storage.spec.ts:4:3 › cloud review: storage native version keeps editable SOC equations and independently yields 57.75 (10.9s)
+  ✓   9 src/tests/e2e/cloud_review_workbench.spec.ts:32:1 › cloud review: blank two-dimensional transportation is authored, saved, tested and published through UI (22.9s)
+  ✓  10 src/tests/e2e/cloud_review_workbench.spec.ts:82:1 › cloud review: explicit generic clone executes its new twelve-variable model and retains renamed set members (15.8s)
+  ✓  11 src/tests/e2e/cloud_review_workbench.spec.ts:123:1 › cloud review: McCormick component expressions and bounds are configured and retained through the normal UI (14.0s)
+  ✓  12 src/tests/e2e/cloud_review_workbench.spec.ts:173:1 › cloud review: invalid numeric CSV is blocked in the wizard and corrected input reaches the solver (8.7s)
+  ✓  13 src/tests/e2e/cloud_review_workbench.spec.ts:202:1 › cloud review: unbounded generic model retains its solver diagnosis and a finite bound repairs the model (23.1s)
+
+  13 passed (3.1m)

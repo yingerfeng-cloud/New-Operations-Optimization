@@ -6,6 +6,33 @@
       "time"
     ],
     "type": "array",
+    "allowed_formats": [
+      "array"
+    ],
+    "value_type": "number",
+    "axis_order": [
+      "time"
+    ],
+    "axes": [
+      {
+        "set": "time",
+        "members": [
+          0,
+          1,
+          2,
+          3
+        ]
+      }
+    ],
+    "format_description": "允许格式：array；轴顺序：time；数组逐轴按声明集合顺序；映射逐轴按业务键匹配",
+    "format_examples": {
+      "array": [
+        220,
+        180,
+        520,
+        610
+      ]
+    },
     "unit": "元/MWh",
     "required": true,
     "description": "",
@@ -17,6 +44,10 @@
       610
     ],
     "default_policy": "user_required",
+    "source_system": "market",
+    "runtime_injected": true,
+    "field_role": "parameter",
+    "runtime_editable": true,
     "sets": {
       "time": [
         0,
@@ -25,6 +56,19 @@
         3
       ]
     },
+    "time_dimension": {
+      "schema_version": 1,
+      "enabled": true,
+      "policy": "runtime_variable",
+      "default_horizon": 4,
+      "time_set": "time",
+      "state_time_set": null,
+      "interval_minutes": 60.0,
+      "editable": true,
+      "derive_from": null,
+      "allowed_horizons": []
+    },
+    "dispatch_mode": "economic_dispatch",
     "validation": {
       "type": "array"
     }
@@ -36,6 +80,27 @@
       "storage"
     ],
     "type": "dict",
+    "allowed_formats": [
+      "dict"
+    ],
+    "value_type": "number",
+    "axis_order": [
+      "storage"
+    ],
+    "axes": [
+      {
+        "set": "storage",
+        "members": [
+          "B1"
+        ]
+      }
+    ],
+    "format_description": "允许格式：dict；轴顺序：storage；数组逐轴按声明集合顺序；映射逐轴按业务键匹配",
+    "format_examples": {
+      "dict": {
+        "B1": 120
+      }
+    },
     "unit": "MWh",
     "required": true,
     "description": "",
@@ -44,11 +109,28 @@
       "B1": 120
     },
     "default_policy": "user_required",
+    "source_system": "BMS",
+    "runtime_injected": true,
+    "field_role": "parameter",
+    "runtime_editable": true,
     "sets": {
       "storage": [
         "B1"
       ]
     },
+    "time_dimension": {
+      "schema_version": 1,
+      "enabled": true,
+      "policy": "runtime_variable",
+      "default_horizon": 4,
+      "time_set": "time",
+      "state_time_set": null,
+      "interval_minutes": 60.0,
+      "editable": true,
+      "derive_from": null,
+      "allowed_horizons": []
+    },
+    "dispatch_mode": "economic_dispatch",
     "validation": {
       "type": "dict",
       "min": 0
@@ -61,6 +143,27 @@
       "storage"
     ],
     "type": "dict",
+    "allowed_formats": [
+      "dict"
+    ],
+    "value_type": "number",
+    "axis_order": [
+      "storage"
+    ],
+    "axes": [
+      {
+        "set": "storage",
+        "members": [
+          "B1"
+        ]
+      }
+    ],
+    "format_description": "允许格式：dict；轴顺序：storage；数组逐轴按声明集合顺序；映射逐轴按业务键匹配",
+    "format_examples": {
+      "dict": {
+        "B1": 40
+      }
+    },
     "unit": "MW",
     "required": true,
     "description": "",
@@ -69,11 +172,28 @@
       "B1": 40
     },
     "default_policy": "user_required",
+    "source_system": "BMS",
+    "runtime_injected": true,
+    "field_role": "parameter",
+    "runtime_editable": true,
     "sets": {
       "storage": [
         "B1"
       ]
     },
+    "time_dimension": {
+      "schema_version": 1,
+      "enabled": true,
+      "policy": "runtime_variable",
+      "default_horizon": 4,
+      "time_set": "time",
+      "state_time_set": null,
+      "interval_minutes": 60.0,
+      "editable": true,
+      "derive_from": null,
+      "allowed_horizons": []
+    },
+    "dispatch_mode": "economic_dispatch",
     "validation": {
       "type": "dict",
       "min": 0
@@ -86,6 +206,27 @@
       "storage"
     ],
     "type": "dict",
+    "allowed_formats": [
+      "dict"
+    ],
+    "value_type": "number",
+    "axis_order": [
+      "storage"
+    ],
+    "axes": [
+      {
+        "set": "storage",
+        "members": [
+          "B1"
+        ]
+      }
+    ],
+    "format_description": "允许格式：dict；轴顺序：storage；数组逐轴按声明集合顺序；映射逐轴按业务键匹配",
+    "format_examples": {
+      "dict": {
+        "B1": 40
+      }
+    },
     "unit": "MW",
     "required": true,
     "description": "",
@@ -94,11 +235,28 @@
       "B1": 40
     },
     "default_policy": "user_required",
+    "source_system": "BMS",
+    "runtime_injected": true,
+    "field_role": "parameter",
+    "runtime_editable": true,
     "sets": {
       "storage": [
         "B1"
       ]
     },
+    "time_dimension": {
+      "schema_version": 1,
+      "enabled": true,
+      "policy": "runtime_variable",
+      "default_horizon": 4,
+      "time_set": "time",
+      "state_time_set": null,
+      "interval_minutes": 60.0,
+      "editable": true,
+      "derive_from": null,
+      "allowed_horizons": []
+    },
+    "dispatch_mode": "economic_dispatch",
     "validation": {
       "type": "dict",
       "min": 0
@@ -111,6 +269,27 @@
       "storage"
     ],
     "type": "dict",
+    "allowed_formats": [
+      "dict"
+    ],
+    "value_type": "number",
+    "axis_order": [
+      "storage"
+    ],
+    "axes": [
+      {
+        "set": "storage",
+        "members": [
+          "B1"
+        ]
+      }
+    ],
+    "format_description": "允许格式：dict；轴顺序：storage；数组逐轴按声明集合顺序；映射逐轴按业务键匹配",
+    "format_examples": {
+      "dict": {
+        "B1": 0.94
+      }
+    },
     "unit": "p.u.",
     "required": true,
     "description": "",
@@ -121,11 +300,28 @@
       "B1": 0.94
     },
     "default_policy": "default_allowed",
+    "source_system": "BMS",
+    "runtime_injected": true,
+    "field_role": "parameter",
+    "runtime_editable": true,
     "sets": {
       "storage": [
         "B1"
       ]
     },
+    "time_dimension": {
+      "schema_version": 1,
+      "enabled": true,
+      "policy": "runtime_variable",
+      "default_horizon": 4,
+      "time_set": "time",
+      "state_time_set": null,
+      "interval_minutes": 60.0,
+      "editable": true,
+      "derive_from": null,
+      "allowed_horizons": []
+    },
+    "dispatch_mode": "economic_dispatch",
     "validation": {
       "type": "dict",
       "min": 0,
@@ -139,6 +335,27 @@
       "storage"
     ],
     "type": "dict",
+    "allowed_formats": [
+      "dict"
+    ],
+    "value_type": "number",
+    "axis_order": [
+      "storage"
+    ],
+    "axes": [
+      {
+        "set": "storage",
+        "members": [
+          "B1"
+        ]
+      }
+    ],
+    "format_description": "允许格式：dict；轴顺序：storage；数组逐轴按声明集合顺序；映射逐轴按业务键匹配",
+    "format_examples": {
+      "dict": {
+        "B1": 0.92
+      }
+    },
     "unit": "p.u.",
     "required": true,
     "description": "",
@@ -149,11 +366,28 @@
       "B1": 0.92
     },
     "default_policy": "default_allowed",
+    "source_system": "BMS",
+    "runtime_injected": true,
+    "field_role": "parameter",
+    "runtime_editable": true,
     "sets": {
       "storage": [
         "B1"
       ]
     },
+    "time_dimension": {
+      "schema_version": 1,
+      "enabled": true,
+      "policy": "runtime_variable",
+      "default_horizon": 4,
+      "time_set": "time",
+      "state_time_set": null,
+      "interval_minutes": 60.0,
+      "editable": true,
+      "derive_from": null,
+      "allowed_horizons": []
+    },
+    "dispatch_mode": "economic_dispatch",
     "validation": {
       "type": "dict",
       "min": 0,
@@ -167,6 +401,27 @@
       "storage"
     ],
     "type": "dict",
+    "allowed_formats": [
+      "dict"
+    ],
+    "value_type": "number",
+    "axis_order": [
+      "storage"
+    ],
+    "axes": [
+      {
+        "set": "storage",
+        "members": [
+          "B1"
+        ]
+      }
+    ],
+    "format_description": "允许格式：dict；轴顺序：storage；数组逐轴按声明集合顺序；映射逐轴按业务键匹配",
+    "format_examples": {
+      "dict": {
+        "B1": 50
+      }
+    },
     "unit": "MWh",
     "required": true,
     "description": "",
@@ -177,13 +432,74 @@
       "B1": 50
     },
     "default_policy": "default_allowed",
+    "source_system": "BMS",
+    "runtime_injected": true,
+    "field_role": "parameter",
+    "runtime_editable": true,
     "sets": {
       "storage": [
         "B1"
       ]
     },
+    "time_dimension": {
+      "schema_version": 1,
+      "enabled": true,
+      "policy": "runtime_variable",
+      "default_horizon": 4,
+      "time_set": "time",
+      "state_time_set": null,
+      "interval_minutes": 60.0,
+      "editable": true,
+      "derive_from": null,
+      "allowed_horizons": []
+    },
+    "dispatch_mode": "economic_dispatch",
     "validation": {
       "type": "dict",
+      "min": 0
+    }
+  },
+  {
+    "key": "delta_t",
+    "name": "时间步长",
+    "dimension": [],
+    "type": "number",
+    "allowed_formats": [
+      "number"
+    ],
+    "value_type": "number",
+    "axis_order": [],
+    "axes": [],
+    "format_description": "允许格式：number；标量",
+    "format_examples": {
+      "number": 1
+    },
+    "unit": "h",
+    "required": false,
+    "description": "",
+    "default_value": 1,
+    "sample_value": 1,
+    "default_policy": "derived",
+    "source_system": null,
+    "runtime_injected": false,
+    "field_role": "parameter",
+    "runtime_editable": false,
+    "sets": {},
+    "time_dimension": {
+      "schema_version": 1,
+      "enabled": true,
+      "policy": "runtime_variable",
+      "default_horizon": 4,
+      "time_set": "time",
+      "state_time_set": null,
+      "interval_minutes": 60.0,
+      "editable": true,
+      "derive_from": null,
+      "allowed_horizons": []
+    },
+    "dispatch_mode": "economic_dispatch",
+    "validation": {
+      "type": "number",
       "min": 0
     }
   }

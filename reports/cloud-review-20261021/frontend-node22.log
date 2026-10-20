@@ -1,0 +1,298 @@
+
+> optiforge-platform-frontend@1.0.0 test
+> vitest run --run
+
+
+ RUN  v4.1.12 /app/frontend
+
+stderr | src/tests/unit/AgentWorkbenchPage.test.tsx > loads agent status, skills and sends a V3 Agent turn
+`NaN` is an invalid value for the `height` css style property.
+
+ ✓ src/tests/unit/AgentWorkbenchPage.test.tsx (18 tests) 36220ms
+   ✓ loads agent status, skills and sends a V3 Agent turn  2913ms
+   ✓ shows the auto-selected optimization model inline and submits a safe switch turn  788ms
+   ✓ offers guided or batch parameter entry without sending before review  2487ms
+   ✓ writes only completed fields when batch filling part of a long parameter list  1755ms
+   ✓ requires an inline model choice when routing needs clarification  397ms
+   ✓ shows Agent thinking in the conversation instead of a sending spinner on the button  704ms
+   ✓ keeps a server-recorded failed turn out of the composer without adding another toast  735ms
+   ✓ renders a durable failed Turn, prioritizes it over stale task state, and retries the same Turn  338ms
+   ✓ resolves the V3 approval chain without calling legacy confirmation APIs  1765ms
+   ✓ clears expert Skill before returning to business mode  6149ms
+   ✓ replaces duplicated expert panels with compact task diagnostics  2848ms
+   ✓ switching history restores the selected conversation run  2842ms
+   ✓ uses the durable task lifecycle instead of a stale run snapshot  2012ms
+   ✓ toggling the inspector keeps the conversation controls available  3233ms
+   ✓ activity inspector behaves as a keyboard-accessible dialog  1476ms
+   ✓ mobile session drawer exposes create, switch, and manage actions  2275ms
+   ✓ deleting a history conversation requires confirmation and calls the delete API  3251ms
+ ✓ src/tests/unit/ModelCreationPage.test.tsx (22 tests) 67651ms
+   ✓ renders five-step model creation  821ms
+   ✓ test run saves draft before invoking backend test  518ms
+   ✓ save test and publish use one asset without creating a second model  4378ms
+   ✓ editing while a test is running keeps the returned snapshot outdated  4162ms
+   ✓ repeated clicks share an active test and a changed draft requires a subsequent test  7053ms
+   ✓ editing after a successful test invalidates publish without creating another asset  6606ms
+   ✓ retesting a changed draft updates and publishes the same asset  5470ms
+   ✓ version mode creates its first saved asset through the version endpoint  4510ms
+   ✓ refresh and network recovery show the same model test and verify current evidence  17960ms
+   ✓ a restored SUCCESS cannot publish a different current model hash  2989ms
+   ✓ autosave accepts partial semantics and updates the same located draft  8274ms
+   ✓ a failed save retains the local unsubmitted copy across a fresh workspace  3102ms
+ ✓ src/tests/unit/modelCreationStore.test.ts (15 tests) 15ms
+ ✓ src/tests/unit/FunctionAssetsPage.test.tsx (8 tests) 10212ms
+   ✓ uses one create entry and opens a blank new function asset drawer  414ms
+   ✓ CSV import starts empty and fills examples only on explicit button click  933ms
+   ✓ creating a 2D surface posts to createFunctionAsset, closes drawer and refreshes list  1128ms
+   ✓ blocks save before POST when current backend does not expose the latest function asset API  1437ms
+   ✓ editing existing 2D surface shows original xyz points and preserves points_2d  1187ms
+   ✓ create rejection with 422 preserves edits and shows the validation reason without refreshing  2526ms
+   ✓ update rejection with 422 preserves edits and shows the validation reason without refreshing  2581ms
+ ✓ src/tests/unit/SkillCenterPage.test.tsx (6 tests) 756ms
+ ✓ src/tests/unit/ModelCenterPage.test.tsx (10 tests) 16231ms
+   ✓ renders model center metrics and basic asset detail  1983ms
+   ✓ renders semantic and generic model panels  1371ms
+   ✓ renders template-based unit commitment math from asset detail fallbacks  794ms
+   ✓ renders component and runtime model panels  799ms
+   ✓ derives a readable runtime schema when a legacy asset only stores defaults  406ms
+   ✓ renders governance and history model panels  794ms
+   ✓ runs model asset operations from list  4842ms
+   ✓ promotes an unchanged trial baseline without repeating the solver test  2495ms
+   ✓ returns an unpublished trial to draft before opening the editor  2394ms
+   ✓ model detail follows route id changes and close returns to models  352ms
+ ✓ src/tests/unit/Step3MathExpansion.test.tsx (19 tests) 84255ms
+   ✓ Step3 generic builder composes only backend authoritative fragments into generic_spec  824ms
+   ✓ treats coefficient-times-variable expressions as linear while flagging variable products  678ms
+   ✓ Step3 exposes weighted objective mode, global direction and normalized summary  306ms
+   ✓ Step3 component builder renders generated constraints and dependencies  1584ms
+   ✓ Step3 explains empty component outputs and binding states  1281ms
+   ✓ Step3 template builder opens formula editor for generated formulas  2661ms
+   ✓ Step3 opens Add Function Mapping modal and saves complete component config  2859ms
+   ✓ Step3 disables display-only assets in the function mapping picker  1786ms
+   ✓ Step3 saves 2D function mapping component with triangulated MILP strategy  3474ms
+   ✓ Step3 binds a 2D asset to the selected catalog component without adding a duplicate  3321ms
+   ✓ Step3 rejects 2D mapping when z variable is missing  3226ms
+   ✓ Step3 excludes display_only strategy and warns for convex hull approximation  2330ms
+   ✓ Step3 compiles, saves and closes editors then adds again with strict  12647ms
+   ✓ Step3 compiles, saves and closes editors then adds again with skip_first  14608ms
+   ✓ time and symbol changes while the editor is open require compilation again  9555ms
+   ✓ ignores a late compile response after changing expression  4857ms
+   ✓ ignores a late compile response after changing symbol  6436ms
+   ✓ ignores a late compile response after changing time  6602ms
+   ✓ ignores a late compile response after changing boundary  5216ms
+stderr | src/tests/unit/ComponentLibraryPage.test.tsx > renders component library list and structured detail drawer
+Warning: [antd: Descriptions] Sum of column `span` in a line not match `column` of Descriptions.
+Warning: [antd: Descriptions] Sum of column `span` in a line not match `column` of Descriptions.
+
+ ✓ src/tests/unit/FormulaEditor.test.tsx (17 tests) 26969ms
+   ✓ solve_active formula cannot be applied until authoritative compilation succeeds  2606ms
+   ✓ inserts variable at cursor and applies  3319ms
+   ✓ offers click-to-insert tags for symbols, operators and function syntax  4577ms
+   ✓ search filters function templates and shows a clear empty state  1279ms
+   ✓ asks for confirmation before deleting an existing formula  1148ms
+   ✓ empty formula cannot be applied  874ms
+   ✓ uses the professional code editor and supports focus mode  1583ms
+   ✓ exits focus mode without discarding or prompting for unsaved edits  1667ms
+   ✓ protects unsaved edits with three explicit exit choices  2093ms
+   ✓ undefined variable has clear error  416ms
+   ✓ objective cannot contain relation operator  936ms
+   ✓ constraint requires relation operator  476ms
+   ✓ shows four-stage authoritative backend compile result  2449ms
+   ✓ editing a compiled formula immediately invalidates the authoritative artifact  3169ms
+stderr | src/tests/unit/ComponentLibraryPage.test.tsx > draft component copies can be deleted from more actions
+Warning: [antd: Modal] Static function can not consume context like dynamic theme. Please use 'App' component instead.
+
+stderr | src/tests/unit/ComponentLibraryPage.test.tsx > legacy formula fields are normalized for editing and synchronized on save
+`NaN` is an invalid value for the `height` css style property.
+
+ ✓ src/tests/unit/Step2SemanticModel.test.tsx (12 tests) 12685ms
+   ✓ can add structured sets, parameters, and variables into semantic draft  1252ms
+   ✓ opens semantic item editor from overview card  525ms
+   ✓ renders component builder writeback without raw JSON block  486ms
+   ✓ opens parameter binding drawer from missing component dependency  1055ms
+   ✓ selects components from catalog and automatically includes dependencies  3139ms
+   ✓ cascade removes components that depend on the selected base component  2729ms
+   ✓ blocks applying a component selection that contains a dependency cycle  2889ms
+ ✓ src/tests/unit/ComponentLibraryPage.test.tsx (12 tests) 20608ms
+   ✓ renders component library list and structured detail drawer  928ms
+   ✓ direct edit waits for detail and hydrates every formula section  5172ms
+   ✓ published components offer copy-edit instead of a disabled edit action  1204ms
+   ✓ draft component copies can be deleted from more actions  2644ms
+   ✓ legacy formula fields are normalized for editing and synchronized on save  1659ms
+   ✓ confirming deletion removes the selected formula from the component draft  5434ms
+   ✓ renders component schema, math, parameter interface and dependency panels  1332ms
+   ✓ new component opens a system-owned draft lifecycle editor  1567ms
+   ✓ keeps model-specific parameter binding out of the component editor  662ms
+ ✓ src/tests/unit/CascadeHydroTemplate.test.tsx (7 tests) 3417ms
+   ✓ Step3 展示梯级水电核心组件  1171ms
+   ✓ Step4 展示水电模式控件和兼容提示  648ms
+   ✓ Step5 展示函数资产和 MILP 风险诊断  363ms
+   ✓ 结果中心通过统一业务输出视图展示水电结果  1227ms
+ ✓ src/tests/unit/AgentRunPanels.test.tsx (5 tests) 478ms
+ ✓ src/tests/unit/TaskCreateContracts.test.ts (33 tests) 12ms
+ ✓ src/tests/unit/ParameterEditorP1.test.tsx (13 tests) 1335ms
+   ✓ time sequence uses semantic labels and editable cells  302ms
+ ✓ src/tests/unit/modelCreationTimeDimension.test.ts (9 tests) 10ms
+ ✓ src/tests/unit/componentDependencies.test.ts (10 tests) 9ms
+ ✓ src/tests/unit/TaskPanelsP1.test.tsx (7 tests) 726ms
+ ✓ src/tests/unit/RuntimeParameterGroups.test.ts (8 tests) 9ms
+ ✓ src/tests/unit/NonlinearDiagnostics.test.tsx (7 tests) 2296ms
+   ✓ Formula Builder 输入双线性公式时给出提示  918ms
+   ✓ Step5 展示非线性诊断并阻断未转换双线性  509ms
+   ✓ 缺少上下界时阻断发布  427ms
+   ✓ 已转换 McCormick 后允许发布  436ms
+ ✓ src/tests/unit/Step4RuntimeParams.test.tsx (6 tests) 1352ms
+   ✓ renders parameter categories and missing prompts  497ms
+   ✓ edits table value into runtime schema  304ms
+ ✓ src/tests/unit/validateModelDraft.test.ts (9 tests) 11ms
+ ✓ src/tests/unit/FormulaManagementPanel.test.tsx (3 tests) 2753ms
+   ✓ management panel filters, copies, toggles and batch compiles formulas  1331ms
+   ✓ keeps successful dependency analysis in the card header instead of a large alert  457ms
+   ✓ marks preview formulas with semantic errors as compile failures  963ms
+ ✓ src/tests/unit/TaskCreateWizardP0.test.tsx (8 tests) 13596ms
+   ✓ blocks when both contract interfaces fail and exposes retry  524ms
+   ✓ array input schema renders object parameters as editable key-value rows  1753ms
+   ✓ renders string and nested-map defaults, then blocks a partially cleared required matrix  4630ms
+   ✓ closing resets model, step, and edited parameters  1865ms
+   ✓ edited model switch asks for confirmation and cancel preserves current model  2582ms
+   ✓ submit lock permits only one request while pending  2045ms
+ ✓ src/tests/unit/AuthoritativeObjectiveAndVersion.test.ts (5 tests) 7ms
+ ✓ src/tests/unit/ScenarioLibraryPage.test.tsx (4 tests) 627ms
+   ✓ renders configured scenarios and opens the actual model asset  325ms
+ ✓ src/tests/unit/ModelServicesPage.test.tsx (3 tests) 3065ms
+   ✓ renders model services page and service list  828ms
+   ✓ runs online debug call with JSON payload  1108ms
+   ✓ shows clear error for invalid debug JSON  1086ms
+ ✓ src/tests/unit/componentFormulaContract.test.ts (13 tests) 9ms
+ ✓ src/tests/unit/ModelWorkspaceMode.test.ts (6 tests) 8ms
+ ✓ src/tests/unit/TimeDimensionConfigCard.test.tsx (5 tests) 3320ms
+   ✓ configures fixed, free, choice and optional state/labels  1483ms
+   ✓ offers only time-dimensional runtime parameters for data_derived  434ms
+   ✓ offers dimensions alias parameters for data_derived and stores scalar granularity  426ms
+   ✓ blocks disabling while time dimensions are referenced  480ms
+   ✓ blocks disabling the state set while it is referenced  496ms
+ ✓ src/tests/unit/compileFormulaToGenericSpec.test.ts (6 tests) 9ms
+ ✓ src/tests/unit/CommandSearchP0.test.tsx (4 tests) 986ms
+   ✓ visual and keyboard order share the same displayed array  326ms
+   ✓ closing and reopening clears query, results state, and active index  336ms
+ ✓ src/tests/unit/Step5ReviewPublish.test.tsx (3 tests) 589ms
+   ✓ disables publish and test actions when validation has blockers  357ms
+ ✓ src/tests/unit/NlpDiagnostics.test.tsx (3 tests) 607ms
+   ✓ Ipopt 可用时 NLP 可发布但必须确认风险  456ms
+ ✓ src/tests/unit/ParameterEditorP0.test.tsx (18 tests) 199ms
+ ✓ src/tests/unit/ReviewFunctionUpdates.test.tsx (3 tests) 1818ms
+   ✓ only selected F is updated and applied after the exact candidate test  1034ms
+   ✓ refresh and an uncertain submission reuse the same candidate identity  515ms
+stderr | src/tests/unit/CloudReviewEditing.test.tsx > renaming a component preserves unvisited formula, variable and parameter sections
+`NaN` is an invalid value for the `height` css style property.
+
+ ✓ src/tests/unit/CloudReviewEditing.test.tsx (4 tests) 537ms
+   ✓ renaming a component preserves unvisited formula, variable and parameter sections  534ms
+ ✓ src/tests/unit/ReviewResultContracts.test.tsx (5 tests) 1120ms
+   ✓ cached read failure retains old rows and shows last update and recovery  580ms
+ ✓ src/tests/unit/ModelNavigationCommand.test.ts (3 tests) 18ms
+stderr | src/tests/unit/ReviewDraftLeave.test.tsx > continue editing preserves draft and only explicit discard clears it
+Warning: [antd: Modal] `maskClosable` is deprecated. Please use `mask.closable` instead.
+
+stderr | src/tests/unit/ReviewDraftLeave.test.tsx > continue editing preserves draft and only explicit discard clears it
+Warning: [antd: Modal] `maskClosable` is deprecated. Please use `mask.closable` instead.
+
+stderr | src/tests/unit/ReviewDraftLeave.test.tsx > failed save prevents navigation and successful retry leaves
+Warning: [antd: Modal] `maskClosable` is deprecated. Please use `mask.closable` instead.
+
+stderr | src/tests/unit/ReviewDraftLeave.test.tsx > failed save prevents navigation and successful retry leaves
+Warning: [antd: Modal] `maskClosable` is deprecated. Please use `mask.closable` instead.
+
+stderr | src/tests/unit/ReviewDraftLeave.test.tsx > failed save prevents navigation and successful retry leaves
+Warning: [antd: Modal] `maskClosable` is deprecated. Please use `mask.closable` instead.
+
+stderr | src/tests/unit/ReviewDraftLeave.test.tsx > failed save prevents navigation and successful retry leaves
+Warning: [antd: Modal] `maskClosable` is deprecated. Please use `mask.closable` instead.
+
+stderr | src/tests/unit/ReviewDraftLeave.test.tsx > failed save prevents navigation and successful retry leaves
+Warning: [antd: Modal] `maskClosable` is deprecated. Please use `mask.closable` instead.
+
+stderr | src/tests/unit/ReviewDraftLeave.test.tsx > browser history navigation is guarded and clean drafts leave normally
+Warning: [antd: Modal] `maskClosable` is deprecated. Please use `mask.closable` instead.
+
+ ✓ src/tests/unit/ReviewDraftLeave.test.tsx (3 tests) 541ms
+   ✓ continue editing preserves draft and only explicit discard clears it  345ms
+ ✓ src/tests/unit/FormulaManagement.test.ts (4 tests) 8ms
+ ✓ src/tests/unit/ReviewModelTestTracking.test.ts (3 tests) 7ms
+ ✓ src/tests/unit/ResultCenterPage.test.tsx (2 tests) 814ms
+   ✓ renders result center and structured report detail  811ms
+ ✓ src/tests/unit/ReviewWorkspaceRecovery.test.ts (3 tests) 6ms
+ ✓ src/tests/unit/FocusEditor.test.tsx (5 tests) 867ms
+ ✓ src/tests/unit/ComponentParameterBindings.test.ts (4 tests) 5ms
+ ✓ src/tests/unit/formulaValidator.test.ts (7 tests) 7ms
+ ✓ src/tests/unit/modelLifecycle.test.ts (5 tests) 5ms
+ ✓ src/tests/unit/TaskCenterPage.test.tsx (24 tests) 8ms
+ ✓ src/tests/unit/ModelInteractionEnhancements.test.tsx (2 tests) 308ms
+ ✓ src/tests/unit/ReviewAsyncServices.test.tsx (2 tests) 7752ms
+   ✓ async call survives page remount, blocks duplicate clicks and recovers after a read failure  5379ms
+   ✓ uncertain submission retries with the same idempotency key  2372ms
+ ✓ src/tests/unit/RuntimeParameterHistory.test.ts (3 tests) 5ms
+ ✓ src/tests/unit/ModelServicesDemoInvoke.test.tsx (1 test) 1498ms
+   ✓ model services shows NLP sample and enriched debug response  1462ms
+ ✓ src/tests/unit/DashboardPage.test.tsx (1 test) 539ms
+   ✓ dashboard renders React platform entries  538ms
+ ✓ src/tests/unit/Sidebar.test.tsx (5 tests) 182ms
+ ✓ src/tests/unit/ModelCreationProgress.test.tsx (3 tests) 247ms
+ ✓ src/tests/unit/authoritativeCompilation.test.ts (3 tests) 5ms
+ ✓ src/tests/unit/ModelFocusLifecycle.test.tsx (1 test) 20ms
+ ✓ src/tests/unit/TimeSeriesPreview.test.tsx (4 tests) 177ms
+ ✓ src/tests/unit/HeaderTaskInbox.test.tsx (1 test) 872ms
+   ✓ failed task messages can be handled without deleting task history  871ms
+ ✓ src/tests/unit/ModelBuildSummaryBar.test.tsx (3 tests) 204ms
+ ✓ src/tests/unit/resultLabels.test.ts (3 tests) 5ms
+ ✓ src/tests/unit/ModelDocumentationSource.test.tsx (2 tests) 316ms
+   ✓ model documentation is read from the saved model definition  314ms
+ ✓ src/tests/unit/SolverStatus.test.tsx (2 tests) 280ms
+stderr | src/tests/unit/RuntimeWorkspaceComponents.test.tsx > fullscreen matrix saves edits and cancel does not save
+An update to ForwardRef(StickyScrollBar) inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+ ✓ src/tests/unit/RuntimeWorkspaceComponents.test.tsx (3 tests) 567ms
+ ✓ src/tests/unit/OfficialFrontendOnly.test.tsx (3 tests) 774ms
+   ✓ header exposes only the React model creation entry  369ms
+   ✓ settings page documents frontend as React-only  403ms
+ ✓ src/tests/unit/builderModeTransition.test.ts (2 tests) 4ms
+ ✓ src/tests/unit/ParameterBindingDrawer.test.tsx (1 test) 750ms
+   ✓ renders binding context and saves validation status  749ms
+ ✓ src/tests/unit/formulaDsl.test.ts (3 tests) 5ms
+ ✓ src/tests/unit/ReviewLlmConfigImport.test.tsx (1 test) 1858ms
+   ✓ settings imports the server local file and refreshes safe configuration without echoing a key  1857ms
+ ✓ src/tests/unit/DemoDashboard.test.tsx (1 test) 519ms
+   ✓ dashboard keeps solver capabilities concise and routes details to runtime  518ms
+ ✓ src/tests/unit/formulaDictionary.test.ts (1 test) 3ms
+ ✓ src/tests/unit/AgentExplanationPanel.test.tsx (1 test) 187ms
+ ✓ src/tests/unit/CascadeHydroResultExplanation.test.tsx (1 test) 387ms
+   ✓ hydro output uses the same model-neutral business output renderer  386ms
+ ✓ src/tests/unit/formulaParser.test.ts (4 tests) 6ms
+ ✓ src/tests/unit/PageStates.test.tsx (2 tests) 277ms
+ ✓ src/tests/unit/CloudReviewFormula.test.ts (1 test) 5ms
+ ✓ src/tests/unit/componentDependencyPanel.test.tsx (2 tests) 190ms
+ ✓ src/tests/unit/AgentWorkbenchIntentCard.test.tsx (1 test) 312ms
+   ✓ shows ranked candidates, confidence, reason and clarification  311ms
+ ✓ src/tests/unit/RuntimeParameterImport.test.ts (3 tests) 5ms
+ ✓ src/tests/unit/ModelAssetTimeDimension.test.tsx (1 test) 177ms
+ ✓ src/tests/unit/AudienceMode.test.tsx (1 test) 82ms
+ ✓ src/tests/unit/NlpResultExplanation.test.tsx (1 test) 309ms
+   ✓ NLP result panel explains Ipopt local optimum boundary  308ms
+ ✓ src/tests/unit/SkillCenterAgentSkillV2.test.tsx (1 test) 274ms
+ ✓ src/tests/unit/AgentCascadeHydroDemo.test.tsx (1 test) 172ms
+ ✓ src/tests/unit/AgentNlpQuestions.test.tsx (1 test) 156ms
+ ✓ src/tests/unit/smoke.test.tsx (1 test) 124ms
+
+ Test Files  86 passed (86)
+      Tests  482 passed (482)
+   Start at  17:54:37
+   Duration  189.61s (transform 1.73s, setup 11.43s, import 8.78s, tests 336.34s, environment 16.60s)

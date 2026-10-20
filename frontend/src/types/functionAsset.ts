@@ -29,6 +29,7 @@ export interface FunctionAsset {
   validation_errors?: Array<Record<string, unknown>>;
   validation_warnings?: Array<Record<string, unknown>>;
   referenced_by?: Array<Record<string, unknown>>;
+  out_of_domain_policy?: string;
 }
 
 export interface FunctionAssetValidation {

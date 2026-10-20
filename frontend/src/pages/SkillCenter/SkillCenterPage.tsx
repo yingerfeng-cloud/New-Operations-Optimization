@@ -40,6 +40,7 @@ function sampleFromSchema(schema?: SkillInputField[]) {
   for (const item of schema || []) {
     const key = item.key;
     if (!key) continue;
+    if (item.default_policy === 'derived') continue;
     const value = item.sample_value ?? item.default_value;
     if (value !== undefined && value !== null) payload[key] = value;
   }

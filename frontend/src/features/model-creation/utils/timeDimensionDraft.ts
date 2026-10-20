@@ -52,8 +52,10 @@ export function normalizeTimeDimensionConfig(value: unknown, availableSetCodes?:
     max_horizon: positiveInteger(source.max_horizon),
     horizon_step: positiveInteger(source.horizon_step),
     ...(allowed.length ? { allowed_horizons: allowed } : {}),
-    interval_minutes: source.interval_minutes === undefined ? undefined : Number(source.interval_minutes),
-    delta_t: source.delta_t === undefined ? undefined : Number(source.delta_t),
+    ...(allowed.length ? {} : {
+      interval_minutes: source.interval_minutes == null ? (source.delta_t == null ? undefined : Number(source.delta_t) * 60) : Number(source.interval_minutes),
+      delta_t: source.delta_t == null ? (source.interval_minutes == null ? undefined : Number(source.interval_minutes) / 60) : Number(source.delta_t),
+    }),
     ...(Object.keys(intervalMap).length ? { interval_minutes_by_horizon: intervalMap } : {}),
     ...(Object.keys(deltaMap).length ? { delta_t_by_horizon: deltaMap } : {}),
     ...(Object.prototype.hasOwnProperty.call(source, 'derive_from') ? { derive_from: source.derive_from ? String(source.derive_from) : null } : {}),

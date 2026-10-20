@@ -30,7 +30,8 @@ def main():
     from app.templates.power_templates import get_template
     from tests.review_synthetic_poc import economic_check
 
-    evidence = Path("reports/review_20261020_evidence/llm-live-journey.json")
+    evidence = Path(os.environ.get("OPTIFORGE_REVIEW_EVIDENCE_FILE", "reports/review_20261020_evidence/llm-live-journey.json"))
+    evidence.parent.mkdir(parents=True, exist_ok=True)
     resume = "--resume-after-solve" in sys.argv or "--resume-explanation-only" in sys.argv
     report = {"synthetic_inputs": True, "customer_data": False, "real_provider_calls": True, "stages": [], "passed": False}
 

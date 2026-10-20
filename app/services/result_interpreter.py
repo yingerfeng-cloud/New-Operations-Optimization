@@ -32,7 +32,7 @@ class ResultInterpreter:
             evidence["unit_output"] = {"by_unit": by_unit, "leading_unit": leading_unit, "total_output": sum(by_unit.values()), "remaining_output": remaining_output, "unit": unit}
             remaining_text = f"其余机组补足剩余负荷，出力合计 {remaining_output:g}{unit}。" if remaining_output > 0 else ""
             evidence["facts"].append({
-                "text": f"机组出力计划中 {leading_unit} 承担主要出力，各时段出力合计 {sum(by_unit.values()):g}{unit}。{remaining_text}",
+                "text": f"机组出力计划中 {leading_unit} 承担主要出力，该机组各时段出力合计 {by_unit[leading_unit]:g}{unit}；全部机组合计 {sum(by_unit.values()):g}{unit}。{remaining_text}",
                 "evidence_refs": ["business_outcomes.unit_output", "variables_summary.unit_output"],
             })
         plan = (variables.get("unit_commitment_plan") or {}).get("rows") or []

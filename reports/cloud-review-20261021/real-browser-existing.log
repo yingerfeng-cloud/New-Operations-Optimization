@@ -1,0 +1,24 @@
+[WebServer] INFO:     Started server process [86006]
+[WebServer] INFO:     Waiting for application startup.
+[WebServer] INFO:     Application startup complete.
+[WebServer] INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
+[WebServer] (node:86012) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] (node:86035) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+
+Running 9 tests using 1 worker
+
+(node:86037) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  1 src/tests/e2e/formula_real_backend_gate.spec.ts:23:1 › @real real authoritative backend closes linear maximize state preview dimension and bilinear formula gates (113ms)
+  ✓  2 src/tests/e2e/formula_ui_real_solver_closure.spec.ts:94:1 › @real UI authoritative artifacts preserve four boundary semantics through the real Builder and HiGHS (7.0s)
+  ✓  3 src/tests/e2e/real_backend_smoke.spec.ts:45:1 › @real real backend smoke creates generic model draft and runs backend testModel (9.0s)
+  ✓  4 src/tests/e2e/real_production_gate.spec.ts:81:1 › @real controlled environment is healthy and contains callable seed models (231ms)
+  ✓  5 src/tests/e2e/real_production_gate.spec.ts:89:1 › @real published generic model solves with the real backend and emits result metadata (857ms)
+  ✓  6 src/tests/e2e/real_production_gate.spec.ts:112:1 › @real candidate horizon and data-derived horizon use real published contracts (8.3s)
+  ✓  7 src/tests/e2e/real_production_gate.spec.ts:199:1 › @real hydro capability is selected from semantic structure and solved through the generic task API (34.4s)
+  ✓  8 src/tests/e2e/real_production_gate.spec.ts:225:1 › @real real infeasible submission returns actionable diagnosis instead of a generic failure only (3.4s)
+  ✓  9 src/tests/e2e/real_production_gate.spec.ts:251:1 › @real agent performs automatic skill matching without a hidden requested skill (1.1s)
+
+  9 passed (1.2m)

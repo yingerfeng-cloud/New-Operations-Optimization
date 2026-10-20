@@ -9,6 +9,9 @@ export default defineConfig({
   testDir: './src/tests/e2e',
   // Mock is the default classification; any spec explicitly tagged @real is excluded.
   grepInvert: /@real/,
+  // These suites have dedicated live-service configurations and require real
+  // APIs; counting them as Mock tests masks their environment requirements.
+  testIgnore: ['**/cloud_review_*.spec.ts', '**/review_incremental.spec.ts', '**/review_recovery.spec.ts'],
   workers: 1,
   timeout: 60_000,
   expect: { timeout: 15_000 },

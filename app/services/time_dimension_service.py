@@ -52,6 +52,22 @@ def resolve_time_dimension_config(
     )
 
 
+def duration_hours(parameters: dict[str, Any]) -> float:
+    """Resolve the already-normalized physical duration, never coerce null to zero."""
+    import math
+    values = [(key, float(parameters[key]) / divisor) for key, divisor in
+              (("delta_t", 1), ("interval_minutes", 60), ("time_step_seconds", 3600))
+              if parameters.get(key) is not None]
+    if not values:
+        return 1.0
+    duration = values[0][1]
+    if not math.isfinite(duration) or duration <= 0:
+        raise ValueError("时间步长必须为大于 0 的有限小时数")
+    if any(not math.isfinite(value) or abs(value - duration) > 1e-8 for _, value in values):
+        raise ValueError("delta_t、interval_minutes 与 time_step_seconds 必须表示相同时长")
+    return duration
+
+
 def resolve_state_time_set(
     config: dict[str, Any],
     *,

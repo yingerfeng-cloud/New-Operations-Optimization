@@ -1,0 +1,311 @@
+{
+  "synthetic": true,
+  "cases": [
+    {
+      "environment": "native UI",
+      "task_id": "OPT-1C9DF19B84",
+      "model_id": "MODEL-FC3FA202",
+      "name": "合成储能效率 1 1792518242162",
+      "status": "SUCCESS",
+      "objective_value": 75.0,
+      "solver": "HiGHS",
+      "termination": "optimal",
+      "variables": {
+        "storage_charge": {
+          "storage_charge[B1,0]": 2.5,
+          "storage_charge[B1,1]": 0.0,
+          "storage_charge[B1,2]": 0.0,
+          "storage_charge[B1,3]": 0.0
+        },
+        "storage_discharge": {
+          "storage_discharge[B1,0]": 0.0,
+          "storage_discharge[B1,1]": 15.25,
+          "storage_discharge[B1,2]": 0.0,
+          "storage_discharge[B1,3]": 0.0
+        },
+        "storage_soc": {
+          "storage_soc[B1,0]": 15.25,
+          "storage_soc[B1,1]": 0.0,
+          "storage_soc[B1,2]": 0.0,
+          "storage_soc[B1,3]": 0.0
+        },
+        "charge_status": {
+          "charge_status[B1,0]": 1.0,
+          "charge_status[B1,1]": 0.0,
+          "charge_status[B1,2]": 1.0,
+          "charge_status[B1,3]": 0.0
+        },
+        "discharge_status": {
+          "discharge_status[B1,0]": 0.0,
+          "discharge_status[B1,1]": 1.0,
+          "discharge_status[B1,2]": 0.0,
+          "discharge_status[B1,3]": 0.0
+        }
+      },
+      "error": null
+    },
+    {
+      "environment": "native UI",
+      "task_id": "OPT-27BB4B3368",
+      "model_id": "MODEL-E591B3C8",
+      "name": "合成储能效率 0.8 1792518252996",
+      "status": "SUCCESS",
+      "objective_value": 57.75,
+      "solver": "HiGHS",
+      "termination": "optimal",
+      "variables": {
+        "storage_charge": {
+          "storage_charge[B1,0]": 2.5,
+          "storage_charge[B1,1]": 0.0,
+          "storage_charge[B1,2]": 0.0,
+          "storage_charge[B1,3]": 0.0
+        },
+        "storage_discharge": {
+          "storage_discharge[B1,0]": 0.0,
+          "storage_discharge[B1,1]": 11.8,
+          "storage_discharge[B1,2]": 0.0,
+          "storage_discharge[B1,3]": 0.0
+        },
+        "storage_soc": {
+          "storage_soc[B1,0]": 14.75,
+          "storage_soc[B1,1]": 0.0,
+          "storage_soc[B1,2]": 0.0,
+          "storage_soc[B1,3]": 0.0
+        },
+        "charge_status": {
+          "charge_status[B1,0]": 1.0,
+          "charge_status[B1,1]": 0.0,
+          "charge_status[B1,2]": 1.0,
+          "charge_status[B1,3]": 0.0
+        },
+        "discharge_status": {
+          "discharge_status[B1,0]": 0.0,
+          "discharge_status[B1,1]": 1.0,
+          "discharge_status[B1,2]": 0.0,
+          "discharge_status[B1,3]": 0.0
+        }
+      },
+      "error": null
+    },
+    {
+      "environment": "native UI",
+      "task_id": "OPT-4568CF2976",
+      "model_id": "MODEL-2BF6CD53",
+      "name": "合成运输验收 1792518263924",
+      "status": "SUCCESS",
+      "objective_value": 7.0,
+      "solver": "HiGHS",
+      "termination": "optimal",
+      "variables": {
+        "shipment": {
+          "A,X": 1.0,
+          "A,Y": 1.0,
+          "B,X": 0.0,
+          "B,Y": 1.0
+        }
+      },
+      "error": null
+    },
+    {
+      "environment": "native UI",
+      "task_id": "OPT-599A1BF1F9",
+      "model_id": "MODEL-8A4CE9FD",
+      "name": "合成 generic 独立答案 1792518286796",
+      "status": "SUCCESS",
+      "objective_value": 12.0,
+      "solver": "HiGHS",
+      "termination": "optimal",
+      "variables": {
+        "unit_output": {
+          "U1,0": 1.0,
+          "U1,1": 1.0,
+          "U1,2": 1.0,
+          "U1,3": 1.0,
+          "U2,0": 1.0,
+          "U2,1": 1.0,
+          "U2,2": 1.0,
+          "U2,3": 1.0,
+          "U3,0": 1.0,
+          "U3,1": 1.0,
+          "U3,2": 1.0,
+          "U3,3": 1.0
+        }
+      },
+      "error": null
+    },
+    {
+      "environment": "native UI",
+      "task_id": "OPT-3B6B72CF41",
+      "model_id": "MODEL-C760638C",
+      "name": "synthetic_mccormick_ui_1792518301333",
+      "status": "SUCCESS",
+      "objective_value": 0.0,
+      "solver": "HiGHS",
+      "termination": "optimal",
+      "variables": {
+        "flow": {
+          "flow[0]": 0.0
+        },
+        "head": {
+          "head[0]": 0.0
+        },
+        "product": {
+          "product[0]": 0.0
+        }
+      },
+      "error": null
+    },
+    {
+      "environment": "native UI",
+      "task_id": "OPT-27272218AD",
+      "model_id": "MODEL-791DB3E2",
+      "name": "合成无界诊断 1792518325327",
+      "status": "FAILED",
+      "objective_value": null,
+      "solver": "HiGHS",
+      "termination": "unbounded",
+      "variables": null,
+      "error": "模型无界（unbounded），请检查目标方向以及生产、采购等变量是否缺少上界。"
+    },
+    {
+      "environment": "native UI",
+      "task_id": "OPT-9B9E9AC7C6",
+      "model_id": "MODEL-791DB3E2",
+      "name": "合成无界诊断 1792518325327",
+      "status": "SUCCESS",
+      "objective_value": -10.0,
+      "solver": "HiGHS",
+      "termination": "optimal",
+      "variables": {
+        "production": {
+          "P": 10.0
+        }
+      },
+      "error": null
+    },
+    {
+      "environment": "final image NLP UI",
+      "task_id": "OPT-D9D8A211AF",
+      "model_id": "MODEL-A479C472",
+      "name": "合成 NLP UI 验收 1792518623085",
+      "status": "SUCCESS",
+      "objective_value": 75.00000025,
+      "solver": "Ipopt",
+      "termination": "optimal",
+      "variables": {
+        "flow": {
+          "flow[0]": 2.70043706,
+          "flow[1]": 2.70043706,
+          "flow[2]": 2.70043706
+        },
+        "head": {
+          "head[0]": 4.62888035,
+          "head[1]": 4.62888035,
+          "head[2]": 4.62888035
+        },
+        "power": {
+          "power[0]": 25.00000008,
+          "power[1]": 25.00000008,
+          "power[2]": 25.00000008
+        }
+      },
+      "error": null
+    },
+    {
+      "environment": "final image NLP UI",
+      "task_id": "OPT-B0BCC46E10",
+      "model_id": "MODEL-A479C472",
+      "name": "合成 NLP UI 验收 1792518623085",
+      "status": "SUCCESS",
+      "objective_value": 75.00000025,
+      "solver": "Ipopt",
+      "termination": "optimal",
+      "variables": {
+        "flow": {
+          "flow[0]": 2.70043706,
+          "flow[1]": 2.70043706,
+          "flow[2]": 2.70043706
+        },
+        "head": {
+          "head[0]": 4.62888035,
+          "head[1]": 4.62888035,
+          "head[2]": 4.62888035
+        },
+        "power": {
+          "power[0]": 25.00000008,
+          "power[1]": 25.00000008,
+          "power[2]": 25.00000008
+        }
+      },
+      "error": null
+    },
+    {
+      "environment": "final image NLP UI",
+      "task_id": "OPT-9C6C60484A",
+      "model_id": "MODEL-A479C472",
+      "name": "合成 NLP UI 验收 1792518623085",
+      "status": "SUCCESS",
+      "objective_value": -0.0,
+      "solver": "HiGHS",
+      "termination": "optimal",
+      "variables": {
+        "flow": {
+          "flow[0]": 1.0,
+          "flow[1]": 1.0,
+          "flow[2]": 1.0
+        },
+        "head": {
+          "head[0]": 1.0,
+          "head[1]": 1.0,
+          "head[2]": 1.0
+        },
+        "power": {
+          "power[0]": -0.0,
+          "power[1]": -0.0,
+          "power[2]": -0.0
+        }
+      },
+      "error": null
+    },
+    {
+      "environment": "final image NLP UI",
+      "task_id": "OPT-E15ADFB8BA",
+      "model_id": "MODEL-A479C472",
+      "name": "合成 NLP UI 验收 1792518623085",
+      "status": "TIMEOUT",
+      "objective_value": null,
+      "solver": "Ipopt",
+      "termination": null,
+      "variables": null,
+      "error": "任务超过 time_limit_seconds=0.001，已自动标记超时。"
+    },
+    {
+      "environment": "final image NLP UI",
+      "task_id": "OPT-994FA65050",
+      "model_id": "MODEL-A479C472",
+      "name": "合成 NLP UI 验收 1792518623085",
+      "status": "SUCCESS",
+      "objective_value": 75.00000025,
+      "solver": "Ipopt",
+      "termination": "optimal",
+      "variables": {
+        "flow": {
+          "flow[0]": 2.70043706,
+          "flow[1]": 2.70043706,
+          "flow[2]": 2.70043706
+        },
+        "head": {
+          "head[0]": 4.62888035,
+          "head[1]": 4.62888035,
+          "head[2]": 4.62888035
+        },
+        "power": {
+          "power[0]": 25.00000008,
+          "power[1]": 25.00000008,
+          "power[2]": 25.00000008
+        }
+      },
+      "error": null
+    }
+  ]
+}

@@ -2,12 +2,15 @@ from __future__ import annotations
 
 import math
 import time
+from pathlib import Path
+from tempfile import TemporaryDirectory
 from typing import Any
 
 import pyomo.environ as pyo
 
 from app.schemas.result import SolverRunResult
 from app.solvers.base import SolverProgressCallback
+from app.solvers.execution_lock import solver_execution_lock
 from app.solvers.status import IPOPT_UNAVAILABLE_MESSAGE
 
 
@@ -71,20 +74,30 @@ class NLPSolverAdapter:
             solver.options["acceptable_constr_viol_tol"] = acceptable_tolerance
 
         started = time.monotonic()
-        try:
-            result = solver.solve(model, tee=False)
-        except Exception as exc:
-            return self._failed_result("solver_exception", f"Ipopt solve failed: {exc}")
+        with TemporaryDirectory(prefix="optiforge-ipopt-") as directory:
+            logfile = Path(directory) / "ipopt.log"
+            try:
+                with solver_execution_lock:
+                    result = solver.solve(model, tee=False, logfile=str(logfile))
+            except Exception as exc:
+                native_log = logfile.read_text(errors="replace")[-12000:] if logfile.exists() else ""
+                if self._cpu_limit_reached(native_log):
+                    return self._failed_result("timeout", f"Ipopt CPU time limit exceeded. {native_log}", solver_available=True)
+                return self._failed_result("solver_exception", f"Ipopt solve failed: {exc}. {native_log}", solver_available=True)
+            native_log = logfile.read_text(errors="replace")[-12000:] if logfile.exists() else ""
         solve_time = time.monotonic() - started
 
         termination = str(result.solver.termination_condition)
+        native_message = str(getattr(result.solver, "message", "") or "")
+        if self._cpu_limit_reached(native_log + native_message):
+            termination = "maxTimeLimit"
         objective_value = self._objective_value(model)
         variables = self.extract_variables(model)
         violations = self.constraint_violations(model)
-        status = self._status_from_termination(termination, violations)
+        status = "timeout" if "timelimit" in termination.lower() else self._status_from_termination(termination, violations)
         if status not in {"local_optimal", "feasible"}:
             objective_value = None
-        message = f"Ipopt termination_condition={termination}. {LOCAL_OPTIMUM_WARNING}"
+        message = f"Ipopt termination_condition={termination}. {native_message}. {LOCAL_OPTIMUM_WARNING}\n{native_log}"
         return SolverRunResult(
             status=status,
             objective_value=objective_value,
@@ -103,6 +116,12 @@ class NLPSolverAdapter:
             solver_message=message,
             message=message,
         )
+
+    @staticmethod
+    def _cpu_limit_reached(message: str) -> bool:
+        lowered = message.lower().replace('_', ' ')
+        return any(token in lowered for token in ("maximum cpu time exceeded", "maximum cputime exceeded", "max cpu time exceeded",
+            "cpu time limit exceeded", "cpu time limit reached", "maximum wallclock time exceeded", "maximum wall clock time exceeded"))
 
     def _failed_result(self, status: str, message: str, *, solver_available: bool = False) -> SolverRunResult:
         return SolverRunResult(

@@ -17,8 +17,15 @@ class PyomoModelBuilder:
             or runtime_parameters.get("build_mode")
             or model_template.get("semantic_spec", {}).get("build_mode")
         )
-        if build_mode == "template_based" and model_template.get("template_code"):
+        if build_mode in {None, "template_based", "domain_builder"} and model_template.get("template_code"):
             model_code = model_template["template_code"]
+        # An explicit mode owns execution. A clone may retain its template code
+        # for provenance, which must never override the user's compiled formulas.
+        if build_mode == "generic_linear":
+            spec = runtime_parameters.get("generic_spec") or model_template.get("generic_spec")
+            if not spec:
+                raise RuntimeError("generic_linear model is missing its compiled generic_spec")
+            return GenericLinearBuilder().build(spec)
         if model_code == "nonlinear_hydro_power_demo":
             return NonlinearHydroPowerDemoBuilder().build(model_template, runtime_parameters)
         if build_mode == "component_based":

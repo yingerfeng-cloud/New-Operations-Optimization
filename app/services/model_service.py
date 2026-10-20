@@ -53,6 +53,7 @@ LOGGER = logging.getLogger(__name__)
 class ModelService:
     def create_model(self, model: ModelPackage, *, inherited_dependencies: dict | None = None) -> ModelView:
         model = model.model_copy(update={
+            "ui_metadata": {key: value for key, value in (model.ui_metadata or {}).items() if key not in {"managed_default_template", "managed_template_version"}},
             "function_dependencies": deepcopy(inherited_dependencies or {}),
             "test_task_id": None, "last_test_parameters": {},
             "status": "developing",
@@ -115,6 +116,13 @@ class ModelService:
 
     def _update_model_locked(self, model_id: str, model: ModelPackage) -> ModelView:
         existing = self.get_model(model_id)
+        # Version is the identity prepared when this asset was created, rather
+        # than a default in an older editor's incomplete PUT payload.
+        draft = deepcopy(model.model_draft or {})
+        if draft:
+            draft.setdefault("basic_info", {})["version"] = existing.version
+        model = model.model_copy(update={"version": existing.version, "model_draft": draft,
+            "ui_metadata": {key: value for key, value in (model.ui_metadata or {}).items() if key not in {"managed_default_template", "managed_template_version"}}})
         if existing.status in IMMUTABLE_MODEL_STATUSES or existing.published_at:
             raise HTTPException(status_code=409, detail="Online and historical model versions are immutable; create a new version before editing")
         from app.services.function_dependencies import dependency_ids
@@ -252,7 +260,7 @@ class ModelService:
                 "published_by": normalized_model.published_by or (normalized_model.ui_metadata or {}).get("published_by") or "system",
                 "published_at": published_at,
                 "updated_at": published_at,
-                "solver": diagnosis.get("recommended_solver") or normalized_model.solver,
+                "solver": (dry_run_result.get("solver_check") or {}).get("solver") or diagnosis.get("recommended_solver") or normalized_model.solver,
                 "problem_type": (dry_run_result.get("solver_check") or {}).get("problem_type") or normalized_model.problem_type,
                 "model_problem_type": (dry_run_result.get("solver_check") or {}).get("problem_type") or normalized_model.model_problem_type,
                 "validation_warnings": warnings,
@@ -406,7 +414,7 @@ class ModelService:
             }
         }
         copied.template_id = new_code
-        if copied.build_mode == "template_based":
+        if copied.build_mode in {"template_based", "domain_builder"}:
             copied.semantic_spec["template_code"] = self._template_code(model)
         self._replace_model_code(copied.semantic_spec, new_code)
         self._replace_model_code(copied.component_spec, new_code)
@@ -696,7 +704,7 @@ class ModelService:
         return str(semantic.get("model_code") or semantic.get("code") or component.get("model_code") or model.template_id or model.id or "")
 
     def _is_managed_default(self, model: ModelPackage | ModelView) -> bool:
-        return bool((model.ui_metadata or {}).get("managed_default_template"))
+        return bool((model.ui_metadata or {}).get("managed_default_template")) and str(model.model_family_id or "").startswith("builtin:") and not model.supersedes_model_id
 
     def _custom_model_code(self, model: ModelView) -> str:
         semantic = model.semantic_spec or {}
@@ -861,9 +869,12 @@ class ModelService:
         model = self.get_model(model_id)
         model = model.model_copy(update={"function_dependencies": capture_dependencies(model)})
         parameters = test_case.get("parameters") or self._default_test_parameters(model)
+        from app.solvers.run_settings import validate_run_settings
+        settings = validate_run_settings(test_case.get("solver_config") or {})
         task = job_service.create_task(SolveRequest(
             model_id=model_id, parameters=parameters, async_run=True,
             idempotency_key=test_case.get("idempotency_key"),
+            solver_config=settings, time_limit_seconds=settings.get("time_limit", 300),
         ), testing_model=model)
         with STORE.lock:
             current = self.get_model(model_id)
@@ -880,16 +891,24 @@ class ModelService:
         model = self.get_model(task.request.model_id)
         if self._content_hash(model) != context["source_hash"]:
             raise RuntimeError("MODEL_TEST_OUTDATED: 模型在测试期间发生修改，请测试当前版本。")
-        model = model.model_copy(update={"function_dependencies": context["dependencies"]})
+        model = model.model_copy(update={"function_dependencies": context["dependencies"],
+            "solver": task.result.get("solver_name") or task.request.solver,
+            "problem_type": task.result.get("problem_type") or model.problem_type,
+            "model_problem_type": task.result.get("problem_type") or model.model_problem_type})
         content_hash = self._content_hash(model)
+        task.trace.setdefault("model_test", {})["tested_content_hash"] = content_hash
         updated = model.model_copy(update={
             "status": "published" if model.status == "published" else "trial",
             "content_hash": content_hash, "tested_content_hash": content_hash,
             "tested_model_id": model.id, "tested_at": now_text(), "updated_at": now_text(),
             "test_task_id": task.id, "last_test_parameters": deepcopy(task.request.parameters),
+            "solver": task.result.get("solver_name") or task.request.solver,
+            "problem_type": task.result.get("problem_type") or model.problem_type,
+            "model_problem_type": task.result.get("problem_type") or model.model_problem_type,
             "dry_run_result": {"structure_check": {"status": "passed", "errors": []}, "solver_check": {
                 "status": "passed", "warnings": [], "objective_value": task.objective_value,
                 "problem_type": task.result.get("problem_type"), "solver_status": task.result.get("termination_condition"),
+                "solver": task.result.get("solver_name") or task.request.solver,
             }},
         })
         STORE.models[model.id] = updated
@@ -899,7 +918,9 @@ class ModelService:
         semantic = deepcopy(model.semantic_spec or {})
         draft = deepcopy(model.model_draft or {})
         component_spec = deepcopy(model.component_spec or semantic.get("component_spec") or {})
+        from app.parameter_input_contract import declared_parameter_defaults
         parameters = {
+            **declared_parameter_defaults(semantic),
             **(semantic.get("sample_runtime_parameters") or {}),
             **((draft.get("runtime_parameters") or {}) if isinstance(draft, dict) else {}),
             **(model.parameters or {}),
@@ -1088,6 +1109,10 @@ class ModelService:
         return errors
 
     def _diagnose_problem_type(self, model: ModelPackage | ModelView) -> dict[str, Any]:
+        if model.build_mode in {"template_based", "domain_builder"} and self._template_code(model) == "nonlinear_hydro_power_demo":
+            return {"inferred_problem_type": "NLP", "effective_problem_type": "NLP", "requested_problem_type": "NLP",
+                    "recommended_problem_type": "NLP", "recommended_solver": "Ipopt", "solver": "Ipopt",
+                    "solver_supported": True, "publish_valid": True, "warnings": ["NLP 只保证局部求解，需核查初值与边界。"]}
         draft = deepcopy(model.model_draft or {})
         if draft:
             basic = draft.setdefault("basic_info", {})

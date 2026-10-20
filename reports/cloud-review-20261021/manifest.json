@@ -1,0 +1,241 @@
+{
+  "recorded_at": "2026-10-21T02:01:08.194857+08:00",
+  "baseline_commit": "fd2e0f26a026369292ca63f69e038d736f13fbbd",
+  "comparison_baseline": "bb9a95ac351a677117428447df09585af3b711f2",
+  "historical_only_baseline": "9f35c9f50562b946bfaf65e66a03cdc4c84094fb",
+  "validated_staged_code_tree": "5d00cbbf3bec243e6bca100a2ef29baeb2e02407",
+  "not_included": [
+    "user uncommitted README.md",
+    "user uncommitted OPERATION_MANUAL.md",
+    "user uncommitted docs/user-manual.md",
+    "screenshots",
+    "trace.zip",
+    "secrets",
+    "deployment runtime"
+  ],
+  "scope": {
+    "accumulated_issues": 27,
+    "confirmed_conditional_storage_issue": 1,
+    "all_111_matrix_rows_reexecuted": false,
+    "customer_data": false,
+    "production_deployed": false
+  },
+  "new_verification": {
+    "backend_default_clean": {
+      "passed": 685,
+      "skipped": 5
+    },
+    "frontend_default_Node24": {
+      "files": 86,
+      "passed": 482
+    },
+    "frontend_default_Node22_22_23_2": {
+      "files": 86,
+      "passed": 482,
+      "container_limits": {
+        "cpu": 4,
+        "memory_GiB": 4
+      }
+    },
+    "existing_real_browser": 9,
+    "mock_browser": 43,
+    "cloud_real_browser": 13,
+    "additional_real_UI_Skill_and_expanded_NLP": 2,
+    "native_cancel_UI_retry": 1,
+    "native_crash_UI_retry": 1,
+    "synthetic_business_cases": 11,
+    "clean_typecheck_and_production_build": true,
+    "npm_vulnerabilities": 0,
+    "real_Volcengine_LLM": true,
+    "history_records_fabricated": 0
+  },
+  "historical_evidence": {
+    "previous_batches": [
+      "d479bdb",
+      "d1e2595",
+      "fd2e0f2"
+    ],
+    "not_relabelled_as_new": true
+  },
+  "source_documents": [
+    {
+      "file": "report.md",
+      "url": "https://drive.google.com/file/d/1YQFmeAbyNsE8tCp7Ztyg9ix0pBxrMBHS/view",
+      "sha256": "b4e4aafbdf33ea3db2b5891c3b0956c671feca7a2c08c903f1bec05b271816b7"
+    },
+    {
+      "file": "matrix.md",
+      "url": "https://drive.google.com/file/d/15EYl0s183-cCanL-9fmAHMj5toGuZeY-/view",
+      "sha256": "014dd51b07fcc69abcc3656dd976765a1cbd2c769491975456ba5c52b5afba33"
+    },
+    {
+      "file": "defects.md",
+      "url": "https://drive.google.com/file/d/1sZjCxFhtLSM-66mNFB8HfFYF4oUoTuAr/view",
+      "sha256": "0f460ae84a64cfdedbc4c9d4296195bfab3e5e01d7929e390d9d87fe69eaba3d"
+    },
+    {
+      "file": "index.md",
+      "url": "https://drive.google.com/file/d/1V7ZEk8lNvnVLiztwGmDoLJFOEt4GC5Ag/view",
+      "sha256": "3846dc48c5a39eb3eb3aa0a81fca893fc7b9a26457852b5f6f96ecb081298b60"
+    }
+  ],
+  "log_artifacts": [
+    {
+      "file": "backend-clean.log",
+      "sha256": "7a97785a9fc5a9d7358387e2e274baad73a10274796c8792fda1f2a95634c926",
+      "local_original": "cloud-clean-backend-r2.log",
+      "local_original_sha256": "6dce8c30732bfdb1adc838e4c556f6df3e8f5e07467ffaa95b418dc9d4f4af03"
+    },
+    {
+      "file": "frontend-node24.log",
+      "sha256": "a4398934d9c25276f6408c498b724a99dcf94c272627a4a4685c23fd2dbdb9a4",
+      "local_original": "cloud-frontend-final.log",
+      "local_original_sha256": "f5de8b6395d6797104a6200ba9b3ff38788297193a87d1339294974f6b7aba8b"
+    },
+    {
+      "file": "frontend-node22.log",
+      "sha256": "f66853ab8aaf32b2d1a4d880d13869a80e55ca8775024932e8ec12f4dfb9a677",
+      "local_original": "cloud-node22-frontend.log",
+      "local_original_sha256": "fbb22c21cbac171274f8200a186ad7619bb34c170ef3757e122aea9e2b075b02"
+    },
+    {
+      "file": "build-clean.log",
+      "sha256": "4c868ac1eba1c86b66b9099eedc8d1e1546185839c3d58643cbae5bcd0f4d536",
+      "local_original": "cloud-clean-build.log",
+      "local_original_sha256": "4c868ac1eba1c86b66b9099eedc8d1e1546185839c3d58643cbae5bcd0f4d536"
+    },
+    {
+      "file": "real-browser-existing.log",
+      "sha256": "f7e0196eaff479a1cee6eee9540de6f7fc658c582955b4c81c7c104c404fbb02",
+      "local_original": "cloud-real-gate-r4.log",
+      "local_original_sha256": "f7e0196eaff479a1cee6eee9540de6f7fc658c582955b4c81c7c104c404fbb02"
+    },
+    {
+      "file": "mock-browser.log",
+      "sha256": "8c74b918e54663b2b6bd5f588c2e6f51af30c483326933015f9d9ebb6f03e688",
+      "local_original": "cloud-mock-gate-r3.log",
+      "local_original_sha256": "8c74b918e54663b2b6bd5f588c2e6f51af30c483326933015f9d9ebb6f03e688"
+    },
+    {
+      "file": "cloud-browser.log",
+      "sha256": "8d3d9b0703d02cca2178e6b11eb698b9e98b13c468de7a59aa760864fcb816ac",
+      "local_original": "cloud-ui-final.log",
+      "local_original_sha256": "8d3d9b0703d02cca2178e6b11eb698b9e98b13c468de7a59aa760864fcb816ac"
+    },
+    {
+      "file": "nlp-skill-browser.log",
+      "sha256": "ab2023ede262b736c5340ff5387aed6c69cd2b61ba2939eac785de06a004a9df",
+      "local_original": "cloud-ui-nlp-skill-r2.log",
+      "local_original_sha256": "ab2023ede262b736c5340ff5387aed6c69cd2b61ba2939eac785de06a004a9df"
+    },
+    {
+      "file": "cancel-browser.log",
+      "sha256": "4c7fa8d459944277a5bdbc1df8ca0939f8f33c95e22eedc2653b13d1a6b6438b",
+      "local_original": "cloud-cancel-final-ui.log",
+      "local_original_sha256": "4c7fa8d459944277a5bdbc1df8ca0939f8f33c95e22eedc2653b13d1a6b6438b"
+    },
+    {
+      "file": "crash-browser.log",
+      "sha256": "e082536e02d26c8768510e95d0189190787ed2271613081d44599faddf04e4cc",
+      "local_original": "cloud-crash-final-ui.log",
+      "local_original_sha256": "e082536e02d26c8768510e95d0189190787ed2271613081d44599faddf04e4cc"
+    },
+    {
+      "file": "synthetic-business.log",
+      "sha256": "cf9d2ac5289aa82549e59d317134643dd487a4edf752d21be2312a53d3abd13c",
+      "local_original": "cloud-synthetic-11-final.log",
+      "local_original_sha256": "8943be4678678e1ddb7f11c074488314b6084a3ab49f0955760ffbda04709b25"
+    },
+    {
+      "file": "fixed-skill-binding.log",
+      "sha256": "5aaf74d38623a7fbda19375377c617c718dc8823a5b8ac7f9e27394cc99c29f3",
+      "local_original": "cloud-fixed-skill-list.log",
+      "local_original_sha256": "f06ad3d318ac014578ba5b0781637e6671bf719b02e513bbe7003467e166603e"
+    }
+  ],
+  "diagnostics_kept_locally": [
+    "Initial regression failures preceded fixes; source cases and synthesized fixtures distinguished.",
+    "Early UI attempts included locator, fixture and interrupted-save setup errors; final complete run passed.",
+    "First clean backend run started before frontend build and failed the explicit dist prerequisite; build then full clean run passed.",
+    "Local 3-second API timeout during overlapping acceptance retained; final numerical tests ran on separate fresh service.",
+    "Original raw report attachments were not all available; storage fixture explicitly reconstructed."
+  ],
+  "text_artifacts": [
+    {
+      "file": "backend-clean.log",
+      "sha256": "7a97785a9fc5a9d7358387e2e274baad73a10274796c8792fda1f2a95634c926"
+    },
+    {
+      "file": "build-clean.log",
+      "sha256": "4c868ac1eba1c86b66b9099eedc8d1e1546185839c3d58643cbae5bcd0f4d536"
+    },
+    {
+      "file": "cancel-browser.log",
+      "sha256": "4c7fa8d459944277a5bdbc1df8ca0939f8f33c95e22eedc2653b13d1a6b6438b"
+    },
+    {
+      "file": "cloud-browser.log",
+      "sha256": "8d3d9b0703d02cca2178e6b11eb698b9e98b13c468de7a59aa760864fcb816ac"
+    },
+    {
+      "file": "crash-browser.log",
+      "sha256": "e082536e02d26c8768510e95d0189190787ed2271613081d44599faddf04e4cc"
+    },
+    {
+      "file": "dependency-audit.json",
+      "sha256": "ecc822d80d0fc42a16388ff47395d4b9cc5287a42662c3f57a69e4c5e6af088b"
+    },
+    {
+      "file": "deployment-copy.json",
+      "sha256": "5194c5d9ff7f77e9a0a242457ccbd794562b866b52710400d894d55031586c76"
+    },
+    {
+      "file": "fixed-skill-binding.log",
+      "sha256": "5aaf74d38623a7fbda19375377c617c718dc8823a5b8ac7f9e27394cc99c29f3"
+    },
+    {
+      "file": "frontend-node22.log",
+      "sha256": "f66853ab8aaf32b2d1a4d880d13869a80e55ca8775024932e8ec12f4dfb9a677"
+    },
+    {
+      "file": "frontend-node24.log",
+      "sha256": "a4398934d9c25276f6408c498b724a99dcf94c272627a4a4685c23fd2dbdb9a4"
+    },
+    {
+      "file": "image-source-verification.json",
+      "sha256": "efbd3ae07e351bbeb3f387d22e532e68b47528eb69bfc6b028818279b6e210be"
+    },
+    {
+      "file": "known-answers.json",
+      "sha256": "900a92069f877327f185060492ccb79651e17d15e358414b86599a3ccb275571"
+    },
+    {
+      "file": "lifecycle.json",
+      "sha256": "0ca230435d43c6d265ea710946d3b0368dae5bb724efddf8602dc13e2f030b1a"
+    },
+    {
+      "file": "mock-browser.log",
+      "sha256": "8c74b918e54663b2b6bd5f588c2e6f51af30c483326933015f9d9ebb6f03e688"
+    },
+    {
+      "file": "nlp-skill-browser.log",
+      "sha256": "ab2023ede262b736c5340ff5387aed6c69cd2b61ba2939eac785de06a004a9df"
+    },
+    {
+      "file": "real-browser-existing.log",
+      "sha256": "f7e0196eaff479a1cee6eee9540de6f7fc658c582955b4c81c7c104c404fbb02"
+    },
+    {
+      "file": "real-llm.json",
+      "sha256": "cfe8ae91c5fc6bbd1022673ff7d08a9b39d9da94495153d7a8213982374d8f6d"
+    },
+    {
+      "file": "synthetic-business.log",
+      "sha256": "cf9d2ac5289aa82549e59d317134643dd487a4edf752d21be2312a53d3abd13c"
+    },
+    {
+      "file": "ui-known-answers.json",
+      "sha256": "7ea699bc1e11612d11c12b27b36a196ef6bfef01c1041f2adc262b94e7529d23"
+    }
+  ]
+}

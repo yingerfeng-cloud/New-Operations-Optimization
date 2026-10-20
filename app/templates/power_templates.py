@@ -85,6 +85,7 @@ def power_template_library() -> dict[str, dict[str, Any]]:
         template["ui_metadata"]["documentation_source"] = "template_definition"
         if code == "pv_storage_capacity_planning":
             _normalize_pv_storage_capacity_template(template)
+        _normalize_native_energy_contract(template)
         _normalize_template_time_sets(template)
         apply_time_dimension_metadata(template)
         template.setdefault("version", "v1.0")
@@ -106,6 +107,33 @@ def power_template_library() -> dict[str, dict[str, Any]]:
             }
             apply_time_dimension_metadata(template)
     return templates
+
+
+def _normalize_native_energy_contract(template: dict[str, Any]) -> None:
+    code = template.get("model_code")
+    if code not in {"economic_dispatch", "unit_commitment_day_ahead", "storage_dispatch", "renewable_storage_dispatch", "chp_dispatch"}:
+        return
+    template.setdefault("sample_runtime_parameters", {}).setdefault("delta_t", 1)
+    if not any(item.get("code") == "delta_t" for item in template.get("parameters") or []):
+        template.setdefault("parameters", []).append({"code": "delta_t", "name": "时间步长", "unit": "h", "dimension": [], "required": False, "default": 1, "sample": 1, "default_policy": "derived", "runtime_editable": False, "validation": {"type": "number", "min": 0}})
+    if code == "economic_dispatch":
+        template["objectives"][0]["expression"] = "sum(fuel_cost[u] * unit_output[u,t] * delta_t for u in unit for t in time)"
+    elif code == "unit_commitment_day_ahead":
+        template["objectives"][0]["expression"] = "sum(fuel_cost[u] * unit_output[u,t] * delta_t + startup_cost[u] * unit_startup[u,t] for u in unit for t in time)"
+    elif code == "storage_dispatch":
+        template["constraints"] = [row for row in template["constraints"] if row["code"] != "soc_balance"] + [
+            {**_constraint("soc_initial", "首时段SOC平衡", "storage_soc[s,0] == initial_soc[s] + (storage_charge[s,0] * charge_efficiency[s] - storage_discharge[s,0] / discharge_efficiency[s]) * delta_t", ["storage"]), "scope": [{"set": "storage", "alias": "s"}]},
+            {**_constraint("soc_balance", "SOC平衡", "storage_soc[s,t] == storage_soc[s,t-1] + (storage_charge[s,t] * charge_efficiency[s] - storage_discharge[s,t] / discharge_efficiency[s]) * delta_t", ["storage", "time"]), "scope": [{"set": "storage", "alias": "s"}, {"set": "time", "alias": "t"}], "boundary_strategy": "skip_first"},
+        ]
+        template["objectives"][0]["expression"] = "sum(electricity_price[t] * (storage_discharge[s,t] - storage_charge[s,t]) * delta_t for s in storage for t in time)"
+    elif code == "renewable_storage_dispatch":
+        template.setdefault("ui_metadata", {})["storage_semantics"] = "individual_exclusive"
+        template["description"] = str(template.get("description") or "风光储协同") + " 每个储能成员表示单个设备，同一时段禁止同时充放电。"
+        template.setdefault("variables", []).append(_var("charging", "充电模式", "0/1", ["storage", "time"], "Binary"))
+        template.setdefault("constraints", []).extend([
+            _constraint("charge_mode_limit", "单设备充电互斥", "storage_charge[s,t] <= charge_power_max[s] * charging[s,t]", ["storage", "time"]),
+            _constraint("discharge_mode_limit", "单设备放电互斥", "storage_discharge[s,t] <= discharge_power_max[s] * (1 - charging[s,t])", ["storage", "time"]),
+        ])
 
 
 def _normalize_template_time_sets(template: dict[str, Any]) -> None:

@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from app.services.time_dimension_service import duration_hours
+
 
 class PowerTemplateBuilder:
     def build(self, model_code: str, data: dict[str, Any]) -> tuple[Any, dict[str, Any]]:
@@ -44,8 +46,9 @@ class PowerTemplateBuilder:
 
         m.ramp_up_limit = pyo.Constraint(m.U, m.T, rule=ramp_up_rule)
         m.ramp_down_limit = pyo.Constraint(m.U, m.T, rule=ramp_down_rule)
-        m.objective = pyo.Objective(expr=sum(m.unit_output[u, t] * cost[u] for u in m.U for t in m.T), sense=pyo.minimize)
-        return m, {"model_code": "economic_dispatch", "units": units, "times": times, "load": load, "p_min": p_min, "p_max": p_max, "fuel_cost": cost}
+        delta_t = duration_hours(data)
+        m.objective = pyo.Objective(expr=sum(m.unit_output[u, t] * cost[u] * delta_t for u in m.U for t in m.T), sense=pyo.minimize)
+        return m, {"model_code": "economic_dispatch", "units": units, "times": times, "load": load, "p_min": p_min, "p_max": p_max, "fuel_cost": cost, "delta_t": delta_t}
 
     def _storage_dispatch(self, data: dict[str, Any]) -> tuple[Any, dict[str, Any]]:
         import pyomo.environ as pyo
@@ -59,6 +62,7 @@ class PowerTemplateBuilder:
         charge_eff = _dict(data.get("charge_efficiency"), storage, 0.95)
         discharge_eff = _dict(data.get("discharge_efficiency"), storage, 0.95)
         initial_soc = _dict(data.get("initial_soc"), storage, 50.0)
+        delta_t = duration_hours(data)
 
         m = pyo.ConcreteModel(name="storage_dispatch")
         m.S = pyo.Set(initialize=storage)
@@ -72,14 +76,14 @@ class PowerTemplateBuilder:
 
         def soc_rule(model: Any, s: str, t: int) -> Any:
             prev = initial_soc[s] if t == 0 else model.storage_soc[s, t - 1]
-            return model.storage_soc[s, t] == prev + model.storage_charge[s, t] * charge_eff[s] - model.storage_discharge[s, t] / discharge_eff[s]
+            return model.storage_soc[s, t] == prev + (model.storage_charge[s, t] * charge_eff[s] - model.storage_discharge[s, t] / discharge_eff[s]) * delta_t
 
         m.soc_balance = pyo.Constraint(m.S, m.T, rule=soc_rule)
         m.charge_discharge_exclusive = pyo.Constraint(m.S, m.T, rule=lambda model, s, t: model.charge_status[s, t] + model.discharge_status[s, t] <= 1)
         m.charge_power_bounds = pyo.Constraint(m.S, m.T, rule=lambda model, s, t: model.storage_charge[s, t] <= charge_max[s] * model.charge_status[s, t])
         m.discharge_power_bounds = pyo.Constraint(m.S, m.T, rule=lambda model, s, t: model.storage_discharge[s, t] <= discharge_max[s] * model.discharge_status[s, t])
-        m.objective = pyo.Objective(expr=sum(price[times[t]] * (m.storage_discharge[s, t] - m.storage_charge[s, t]) for s in m.S for t in m.T), sense=pyo.maximize)
-        return m, {"model_code": "storage_dispatch", "storage": storage, "times": times, "price": price, "capacity": capacity, "initial_soc": initial_soc}
+        m.objective = pyo.Objective(expr=sum(price[times[t]] * (m.storage_discharge[s, t] - m.storage_charge[s, t]) * delta_t for s in m.S for t in m.T), sense=pyo.maximize)
+        return m, {"model_code": "storage_dispatch", "storage": storage, "times": times, "price": price, "capacity": capacity, "initial_soc": initial_soc, "delta_t": delta_t}
 
     def _renewable_storage_dispatch(self, data: dict[str, Any]) -> tuple[Any, dict[str, Any]]:
         import pyomo.environ as pyo
@@ -95,6 +99,7 @@ class PowerTemplateBuilder:
         discharge_max = _dict(data.get("discharge_power_max"), storage, 30.0)
         initial_soc = _dict(data.get("initial_soc"), storage, 30.0)
         curtail_penalty = float(data.get("curtailment_penalty", 1000.0))
+        delta_t = duration_hours(data)
 
         m = pyo.ConcreteModel(name="renewable_storage_dispatch")
         m.R = pyo.Set(initialize=sites)
@@ -105,21 +110,22 @@ class PowerTemplateBuilder:
         m.storage_charge = pyo.Var(m.S, m.T, within=pyo.NonNegativeReals)
         m.storage_discharge = pyo.Var(m.S, m.T, within=pyo.NonNegativeReals)
         m.storage_soc = pyo.Var(m.S, m.T, bounds=lambda model, s, t: (0.0, capacity[s]))
+        m.charging = pyo.Var(m.S, m.T, within=pyo.Binary)
         m.renewable_balance = pyo.Constraint(m.R, m.T, rule=lambda model, r, t: model.renewable_used[r, t] + model.renewable_curtailment[r, t] == forecast[r][times[t]])
         m.power_balance = pyo.Constraint(m.T, rule=lambda model, t: sum(model.renewable_used[r, t] for r in model.R) + sum(model.storage_discharge[s, t] for s in model.S) >= load[times[t]] + sum(model.storage_charge[s, t] for s in model.S))
         m.grid_export_limit = pyo.Constraint(m.T, rule=lambda model, t: sum(model.renewable_used[r, t] for r in model.R) + sum(model.storage_discharge[s, t] - model.storage_charge[s, t] for s in model.S) <= grid_limit[times[t]])
 
         def soc_rule(model: Any, s: str, t: int) -> Any:
             prev = initial_soc[s] if t == 0 else model.storage_soc[s, t - 1]
-            return model.storage_soc[s, t] == prev + model.storage_charge[s, t] * 0.95 - model.storage_discharge[s, t] / 0.95
+            return model.storage_soc[s, t] == prev + (model.storage_charge[s, t] * 0.95 - model.storage_discharge[s, t] / 0.95) * delta_t
 
         m.storage_soc_balance = pyo.Constraint(m.S, m.T, rule=soc_rule)
-        m.charge_limit = pyo.Constraint(m.S, m.T, rule=lambda model, s, t: model.storage_charge[s, t] <= charge_max[s])
-        m.discharge_limit = pyo.Constraint(m.S, m.T, rule=lambda model, s, t: model.storage_discharge[s, t] <= discharge_max[s])
-        revenue = sum(price[times[t]] * (sum(m.renewable_used[r, t] for r in m.R) + sum(m.storage_discharge[s, t] - m.storage_charge[s, t] for s in m.S)) for t in m.T)
-        curtailment = sum(m.renewable_curtailment[r, t] for r in m.R for t in m.T)
+        m.charge_limit = pyo.Constraint(m.S, m.T, rule=lambda model, s, t: model.storage_charge[s, t] <= charge_max[s] * model.charging[s, t])
+        m.discharge_limit = pyo.Constraint(m.S, m.T, rule=lambda model, s, t: model.storage_discharge[s, t] <= discharge_max[s] * (1 - model.charging[s, t]))
+        revenue = sum(price[times[t]] * (sum(m.renewable_used[r, t] for r in m.R) + sum(m.storage_discharge[s, t] - m.storage_charge[s, t] for s in m.S)) * delta_t for t in m.T)
+        curtailment = sum(m.renewable_curtailment[r, t] * delta_t for r in m.R for t in m.T)
         m.objective = pyo.Objective(expr=curtail_penalty * curtailment - revenue, sense=pyo.minimize)
-        return m, {"model_code": "renewable_storage_dispatch", "sites": sites, "storage": storage, "times": times, "forecast": forecast, "load": load, "price": price}
+        return m, {"model_code": "renewable_storage_dispatch", "sites": sites, "storage": storage, "times": times, "forecast": forecast, "load": load, "price": price, "delta_t": delta_t, "storage_semantics": "individual_exclusive"}
 
     def _chp_dispatch(self, data: dict[str, Any]) -> tuple[Any, dict[str, Any]]:
         import pyomo.environ as pyo
@@ -146,7 +152,7 @@ class PowerTemplateBuilder:
         m.heat_balance = pyo.Constraint(m.T, rule=lambda model, t: sum(model.heat_output[u, t] for u in model.U) == heat_load[times[t]])
         m.coupling_min = pyo.Constraint(m.U, m.T, rule=lambda model, u, t: model.heat_output[u, t] >= r_min[u] * model.electric_output[u, t])
         m.coupling_max = pyo.Constraint(m.U, m.T, rule=lambda model, u, t: model.heat_output[u, t] <= r_max[u] * model.electric_output[u, t])
-        m.objective = pyo.Objective(expr=sum(fuel_cost[u] * (m.electric_output[u, t] + 0.5 * m.heat_output[u, t]) for u in m.U for t in m.T), sense=pyo.minimize)
+        m.objective = pyo.Objective(expr=sum(fuel_cost[u] * (m.electric_output[u, t] + 0.5 * m.heat_output[u, t]) * duration_hours(data) for u in m.U for t in m.T), sense=pyo.minimize)
         return m, {"model_code": "chp_dispatch", "units": units, "times": times, "electric_load": electric_load, "heat_load": heat_load, "fuel_cost": fuel_cost}
 
 

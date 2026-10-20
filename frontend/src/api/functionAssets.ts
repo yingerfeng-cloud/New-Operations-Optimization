@@ -5,7 +5,7 @@ export const getFunctionAssets = () => unwrap<FunctionAsset[]>(apiClient.get('/a
 export const getFunctionAsset = (id: string) => unwrap<FunctionAsset>(apiClient.get(`/api/function-assets/${id}`));
 export const createFunctionAsset = (payload: Partial<FunctionAsset>) => unwrap<FunctionAsset>(apiClient.post('/api/function-assets', payload, { suppressErrorToast: true }));
 export const importFunctionAssetCsv = (payload: Record<string, unknown>) => unwrap<FunctionAsset>(apiClient.post('/api/function-assets/import-csv', payload, { suppressErrorToast: true }));
-export const updateFunctionAsset = (id: string, payload: Partial<FunctionAsset>) => unwrap<FunctionAsset>(apiClient.put(`/api/function-assets/${id}`, payload, { suppressErrorToast: true }));
+export const updateFunctionAsset = (id: string, payload: Partial<FunctionAsset> & { expected_revision?: number; expected_content_hash?: string }) => unwrap<FunctionAsset>(apiClient.put(`/api/function-assets/${id}`, payload, { suppressErrorToast: true }));
 export const validateFunctionAsset = (id: string, payload?: Partial<FunctionAsset>) => unwrap<FunctionAssetValidation>(apiClient.post(`/api/function-assets/${id}/validate`, payload || {}));
 export const previewFunctionAsset = (id: string, payload?: Record<string, unknown>) => unwrap<FunctionAssetPreview>(apiClient.post(`/api/function-assets/${id}/preview`, payload || {}));
 
