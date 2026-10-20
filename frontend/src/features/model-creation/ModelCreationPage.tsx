@@ -1,10 +1,14 @@
-import { Button, Dropdown, Modal, Space, message } from 'antd';
+import { Alert, Button, Dropdown, Modal, Space, Typography, message } from 'antd';
 import { MoreOutlined } from '@ant-design/icons';
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { UNSAFE_DataRouterContext, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { DraftLeaveDialog, DraftLeaveGuard } from './components/DraftLeaveGuard';
-import { createModel, createModelVersion, getModel, publishModel, testModel, updateModel } from '../../api/models';
+import { createModel, createModelVersion, getModel, publishModel, testModel, updateModel, returnModelToDraft } from '../../api/models';
+import { readModelTest, getModelTestTask } from '../../api/modelTestTracking';
+import { terminalTask } from '../../api/taskTracking';
+import { editWorkspaceKey, forgetWorkspaceRecovery, readWorkspaceRecovery } from './utils/workspaceRecovery';
+import type { ModelAsset } from '../../types/model';
 import { getSystemConfig } from '../../api/systemConfig';
 import { getTemplateDetail, getTemplates } from '../../api/templates';
 import { PageHeader } from '../../components/PageHeader';
@@ -77,6 +81,16 @@ export function ModelCreationPage() {
   const [mainScrollContainer, setMainScrollContainer] = useState<HTMLElement | null>(null);
   const [activeSection, setActiveSection] = useState<string>();
   const [lastSavedAt, setLastSavedAt] = useState<string>();
+  const [backupAvailable, setBackupAvailable] = useState(true);
+  const [saveError, setSaveError] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [testRecoveryError, setTestRecoveryError] = useState('');
+  const [, setTrackingRevision] = useState(0);
+  const savedAssetRef = useRef<ModelAsset | undefined>(undefined);
+  const saveInFlightRef = useRef<{ generation?: string; snapshot: string; promise: Promise<ModelAsset> } | undefined>(undefined);
+  const testInFlightRef = useRef<Promise<ModelAsset | undefined> | undefined>(undefined);
+  const autoSaveRef = useRef<() => Promise<unknown>>(() => Promise.resolve());
+  const restoredSectionRef = useRef('');
   const testRequestSequenceRef = useRef(0);
   const issueNavigationTimerRef = useRef<number | undefined>(undefined);
   const focusStartDraftRef = useRef<ModelDraft | undefined>(undefined);
@@ -86,6 +100,8 @@ export function ModelCreationPage() {
     step,
     workspace,
     currentDraftModelId,
+    testSnapshot,
+    lastSavedSnapshot,
     setStep,
     setDraft,
     initializeWorkspace,
@@ -96,6 +112,10 @@ export function ModelCreationPage() {
     reset,
   } = useModelCreationStore();
   const focusContext = useFocusEditorContext({ scrollContainer: mainScrollContainer, stepIndex: step, sectionKey: activeSection, onRestoreStep: setStep });
+  const handleSectionChange = useCallback((key: string) => {
+    setActiveSection(key);
+    if (useModelCreationStore.getState().section !== key) useModelCreationStore.setState({ section: key });
+  }, []);
   const templates = useQuery({ queryKey: ['templates'], queryFn: getTemplates });
   const systemConfig = useQuery({ queryKey: ['system-config'], queryFn: getSystemConfig, retry: false });
   const scenarioDictionary = systemConfig.data?.dictionaries?.business_scenarios;
@@ -119,12 +139,25 @@ export function ModelCreationPage() {
   });
   const resolvedMode = sourceModel.data ? effectiveAssetMode(request.mode, sourceModel.data) : request.mode;
   const requestKey = `${resolvedMode}:${request.sourceModelId || ''}:${request.templateCode || ''}:${request.scenarioId || ''}`;
+  const testTaskId = currentDraftModelId ? readModelTest(currentDraftModelId)?.taskId || (sourceModel.data?.id === currentDraftModelId ? String(sourceModel.data.test_task_id || '') : '') : '';
+  const modelTestTask = useQuery({ queryKey: ['model-workspace-test', testTaskId], queryFn: () => getModelTestTask(testTaskId!), enabled: !!testTaskId && workspace.initialized,
+    refetchInterval: query => terminalTask(query.state.data?.status) ? false : 1200 });
+  const activeTest = !!testTaskId && !terminalTask(modelTestTask.data?.status);
+
+  useEffect(() => {
+    const tracking = () => setTrackingRevision(value => value + 1);
+    const backup = (event: Event) => setBackupAvailable(Boolean((event as CustomEvent).detail));
+    window.addEventListener('optiforge:model-test', tracking);
+    window.addEventListener('optiforge:workspace-backup', backup);
+    return () => { window.removeEventListener('optiforge:model-test', tracking); window.removeEventListener('optiforge:workspace-backup', backup); };
+  }, []);
 
   useEffect(() => {
     setMainScrollContainer(document.querySelector<HTMLElement>('.main-content'));
   }, []);
 
   useEffect(() => {
+    if (useModelCreationStore.getState().workspace.sessionId === requestKey && useModelCreationStore.getState().currentDraftModelId) return;
     setVisitedThrough(0);
     setShowAllValidation(false);
     setTestedAsset(undefined);
@@ -144,8 +177,9 @@ export function ModelCreationPage() {
   useEffect(() => {
     let active = true;
     const existing = useModelCreationStore.getState().workspace;
-    if (existing.initialized && existing.dirty && existing.sessionId === requestKey) {
+    if (existing.initialized && existing.sessionId === requestKey) {
       initializedKeyRef.current = requestKey;
+      setWorkspace({ initialized: true });
       return () => { active = false; };
     }
     initializedKeyRef.current = '';
@@ -153,6 +187,13 @@ export function ModelCreationPage() {
 
     if (request.legacySource) return () => { active = false; };
     if (systemConfig.isPending) return () => { active = false; };
+    const recovery = readWorkspaceRecovery(requestKey);
+    if (recovery && (!request.sourceModelId || sourceModel.data)) {
+      initializedKeyRef.current = requestKey;
+      useModelCreationStore.getState().restoreWorkspace(recovery);
+      if (sourceModel.data?.id === recovery.currentDraftModelId) savedAssetRef.current = sourceModel.data;
+      return () => { active = false; };
+    }
     if (resolvedMode === 'new') {
       const blank = createBlankDraft();
       const requestedScenario = availableScenarios.find(item => item.id === request.scenarioId);
@@ -196,6 +237,11 @@ export function ModelCreationPage() {
           currentAssetId,
           sessionId: requestKey,
         }, next, 1);
+        if (currentAssetId) {
+          savedAssetRef.current = sourceModel.data;
+          useModelCreationStore.setState({ lastSavedSnapshot: JSON.stringify(normalizeModelDraft(next)), lastSavedContentHash: sourceModel.data.content_hash });
+          if (sourceModel.data.test_task_id) useModelCreationStore.setState({ testSnapshot: { modelId: sourceModel.data.id, snapshot: JSON.stringify(normalizeModelDraft(next)), contentHash: sourceModel.data.content_hash } });
+        }
       }
     }
     return () => { active = false; };
@@ -215,20 +261,46 @@ export function ModelCreationPage() {
     if (issueNavigationTimerRef.current !== undefined) window.clearTimeout(issueNavigationTimerRef.current);
   }, []);
 
-  const saveDraftModel = async (requireValid = false, draftOverride?: ReturnType<typeof normalizeModelDraft>) => {
-    const state = useModelCreationStore.getState();
-    const generation = state.workspace.generation;
-    const submittedDraft = normalizeModelDraft(draftOverride || state.draft);
-    const createAsset = state.workspace.mode === 'version' && state.workspace.sourceModelId
-      ? (payload: Parameters<typeof createModel>[0]) => createModelVersion(state.workspace.sourceModelId!, payload)
-      : createModel;
-    const model = await saveModelDraftAsset(submittedDraft, state.currentDraftModelId, { createModel: createAsset, updateModel }, requireValid);
-    const current = useModelCreationStore.getState();
-    if (current.workspace.generation === generation) {
-      current.setCurrentDraftModelId(model.id);
-      current.setWorkspace({ dirty: JSON.stringify(normalizeModelDraft(current.draft)) !== JSON.stringify(submittedDraft), currentAssetId: model.id });
-    }
-    return model;
+  const saveDraftModel = (requireValid = false, draftOverride?: ReturnType<typeof normalizeModelDraft>): Promise<ModelAsset> => {
+    const initial = useModelCreationStore.getState();
+    const generation = initial.workspace.generation;
+    const submittedDraft = normalizeModelDraft(draftOverride || initial.draft);
+    const snapshot = JSON.stringify(submittedDraft);
+    if (requireValid && !validateModelDraft(submittedDraft).valid) return Promise.reject(new Error('发布前校验未通过'));
+    const inFlight = saveInFlightRef.current;
+    if (inFlight && inFlight.generation === generation && inFlight.snapshot === snapshot) return inFlight.promise;
+    const save = async () => {
+      const state = useModelCreationStore.getState();
+      if (state.workspace.generation !== generation) throw new Error('工作区已切换，未提交旧草稿');
+      if (state.currentDraftModelId && state.lastSavedSnapshot === snapshot && savedAssetRef.current?.id === state.currentDraftModelId) return savedAssetRef.current;
+      const createAsset = state.workspace.mode === 'version' && state.workspace.sourceModelId
+        ? (payload: Parameters<typeof createModel>[0]) => createModelVersion(state.workspace.sourceModelId!, payload) : createModel;
+      const update = async (id: string, payload: Parameters<typeof updateModel>[1]) => {
+        if (savedAssetRef.current?.id === id && savedAssetRef.current.status === 'trial' && !savedAssetRef.current.published_at) await returnModelToDraft(id, state.lastSavedContentHash);
+        return updateModel(id, { ...payload, expected_content_hash: state.lastSavedContentHash });
+      };
+      const model = await saveModelDraftAsset(submittedDraft, state.currentDraftModelId, { createModel: createAsset, updateModel: update }, requireValid);
+      const current = useModelCreationStore.getState();
+      if (current.workspace.generation === generation) {
+        const oldSession = current.workspace.sessionId;
+        const sessionId = editWorkspaceKey(model.id);
+        savedAssetRef.current = model;
+        current.setCurrentDraftModelId(model.id);
+        useModelCreationStore.setState({ lastSavedSnapshot: snapshot, lastSavedContentHash: model.content_hash });
+        current.setWorkspace({ dirty: JSON.stringify(normalizeModelDraft(current.draft)) !== snapshot, mode: 'edit', sourceModelId: model.id, currentAssetId: model.id, sessionId });
+        if (oldSession !== sessionId) forgetWorkspaceRecovery(oldSession);
+        if (oldSession !== sessionId) nav(`/models/${encodeURIComponent(model.id)}/edit`, { replace: true });
+        setLastSavedAt(new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }));
+        setSaveError('');
+      }
+      return model;
+    };
+    setSaving(true);
+    const promise = (inFlight ? inFlight.promise.catch(() => undefined).then(save) : save()).catch(error => {
+      setSaveError(error instanceof Error ? error.message : '草稿保存失败'); throw error;
+    }).finally(() => { if (saveInFlightRef.current?.promise === promise) { saveInFlightRef.current = undefined; setSaving(false); } });
+    saveInFlightRef.current = { generation, snapshot, promise };
+    return promise;
   };
   const saveDraft = useMutation({ mutationFn: () => saveDraftModel(false), onSuccess: () => { setLastSavedAt(new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })); message.success('草稿已保存'); } });
   const publish = useMutation({
@@ -248,6 +320,7 @@ export function ModelCreationPage() {
   const testRun = useMutation<ModelTestSuccessContext, Error, ModelTestRequestContext>({
     mutationFn: async requestContext => {
       const model = await saveDraftModel(true, requestContext.draft);
+      useModelCreationStore.setState({ testSnapshot: { modelId: model.id, snapshot: requestContext.testedSnapshot, contentHash: model.content_hash } });
       const testedModel = await testModel(model.id, requestContext.draft.runtime_parameters);
       return {
         sequence: requestContext.sequence,
@@ -258,7 +331,7 @@ export function ModelCreationPage() {
     },
   });
 
-  const runModelTest = async () => {
+  const performModelTest = async () => {
     const capturedDraft = normalizeModelDraft(useModelCreationStore.getState().draft);
     const requestContext: ModelTestRequestContext = {
       sequence: ++testRequestSequenceRef.current,
@@ -268,6 +341,8 @@ export function ModelCreationPage() {
     try {
       const result = await testRun.mutateAsync(requestContext);
       if (result.sequence !== testRequestSequenceRef.current) return undefined;
+      savedAssetRef.current = result.model;
+      useModelCreationStore.setState({ lastSavedContentHash: result.model.content_hash });
       setTestedAsset({ id: result.modelId, snapshot: result.testedSnapshot });
       return result.model;
     } catch (error) {
@@ -275,6 +350,56 @@ export function ModelCreationPage() {
       throw error;
     }
   };
+
+  const runModelTest = () => {
+    if (testInFlightRef.current) return testInFlightRef.current;
+    if (activeTest) return Promise.reject(new Error('已有测试任务运行中，请继续查看同一任务。'));
+    const promise = performModelTest().finally(() => { if (testInFlightRef.current === promise) testInFlightRef.current = undefined; });
+    testInFlightRef.current = promise;
+    return promise;
+  };
+
+  autoSaveRef.current = () => saveDraftModel(false);
+  useEffect(() => {
+    if (saveError || !workspace.initialized || !workspace.dirty || !draft.basic_info.name.trim() || !draft.basic_info.scenario || !draft.basic_info.model_code) return;
+    const timer = window.setTimeout(() => { void autoSaveRef.current().catch(() => undefined); }, 2500);
+    return () => window.clearTimeout(timer);
+  }, [draft, workspace.dirty, workspace.generation, workspace.initialized, saveError]);
+
+  useEffect(() => {
+    if (!sourceModel.data || sourceModel.data.id !== currentDraftModelId) return;
+    savedAssetRef.current ||= sourceModel.data;
+  }, [sourceModel.data, currentDraftModelId]);
+
+  useEffect(() => {
+    const task = modelTestTask.data;
+    const context = task?.trace?.model_test as Record<string, unknown> | undefined;
+    if (task?.status !== 'SUCCESS' || !testSnapshot || testSnapshot.modelId !== currentDraftModelId || context?.model_id !== currentDraftModelId) return;
+    let active = true;
+    void getModel(currentDraftModelId!).then(model => {
+      if (!active) return;
+      if (!model.content_hash || model.tested_model_id !== model.id || model.tested_content_hash !== model.content_hash || model.content_hash !== context.tested_content_hash
+        || (model.dry_run_result?.solver_check as Record<string, unknown> | undefined)?.status !== 'passed') {
+        setTestedAsset(undefined);
+        setTestRecoveryError('当前内容与该任务的有效测试证据不一致，请测试当前修订。'); return;
+      }
+      savedAssetRef.current = model;
+      useModelCreationStore.setState({ lastSavedContentHash: model.content_hash });
+      setTestedAsset({ id: model.id, snapshot: testSnapshot.snapshot });
+      setTestRecoveryError('');
+    }).catch(() => { if (active) setTestRecoveryError('测试证据暂未读取成功，请恢复同一任务记录。'); });
+    return () => { active = false; };
+  }, [currentDraftModelId, modelTestTask.data, modelTestTask.dataUpdatedAt, testSnapshot]);
+
+  useEffect(() => {
+    if (!workspace.initialized || restoredSectionRef.current === workspace.generation) return;
+    const section = useModelCreationStore.getState().section;
+    restoredSectionRef.current = workspace.generation || '';
+    if (section && /^[a-z0-9_-]+$/i.test(section)) {
+      const timer = window.setTimeout(() => document.querySelector<HTMLElement>(`[data-section-key="${section}"]`)?.scrollIntoView?.({ block: 'start' }), 100);
+      return () => window.clearTimeout(timer);
+    }
+  }, [workspace.initialized, workspace.generation, step]);
 
   const confirmSourceSwitch = () => new Promise<boolean>(resolve => {
     if (!useModelCreationStore.getState().workspace.dirty) {
@@ -298,7 +423,7 @@ export function ModelCreationPage() {
       scenario: scenario?.name || '',
       scenario_id: scenarioId,
     };
-    initializeWorkspace({ mode: 'new', sessionId: `new:${Date.now()}` }, next);
+    initializeWorkspace({ mode: 'new', sessionId: requestKey }, next);
     setWorkspace({ dirty: true });
   };
 
@@ -332,11 +457,12 @@ export function ModelCreationPage() {
     );
   }
 
+  const ownsCurrentDraft = workspace.initialized && workspace.sessionId === requestKey && currentDraftModelId === request.sourceModelId;
   const waitingForData = request.legacySource
     || systemConfig.isPending
-    || (!!request.sourceModelId && sourceModel.isPending)
+    || (!!request.sourceModelId && sourceModel.isPending && !ownsCurrentDraft)
     || (resolvedMode === 'template' && !!request.templateCode && templateDetail.isPending)
-    || initializedKeyRef.current !== requestKey
+    || (initializedKeyRef.current !== requestKey && !ownsCurrentDraft)
     || !workspace.initialized;
   if (waitingForData) {
     return <PageLoading label={resolvedMode === 'template' ? '正在加载完整模型模板…' : request.sourceModelId ? '正在加载目标模型资产…' : '正在初始化空白工作台…'} />;
@@ -394,7 +520,7 @@ export function ModelCreationPage() {
       draft={normalized}
       validation={validation}
       onTest={runModelTest}
-      pending={false}
+      pending={testRun.isPending || activeTest}
       testRevisionState={!testedAsset ? 'untested' : testIsCurrent ? 'current' : 'outdated'}
       onFixStep={setStep}
     />,
@@ -445,7 +571,7 @@ export function ModelCreationPage() {
       {sourceLeaveOpen && <DraftLeaveDialog open onSave={() => saveDraftModel(false)} onContinue={() => { setSourceLeaveOpen(false); sourceLeaveResolver.current?.(false); }} onLeave={() => { setSourceLeaveOpen(false); sourceLeaveResolver.current?.(true); }} onDiscard={() => { reset(); setSourceLeaveOpen(false); sourceLeaveResolver.current?.(true); }} />}
       <PageHeader
         title={workspaceTitles[resolvedMode]}
-        description={resolvedMode === 'version' ? '创建同一模型族的新草稿并继承选定版本；原试运行、已发布或已下线版本不会被直接覆盖。' : '当前工作台仅使用本模式指定的数据源，模式之间不会自动恢复其他草稿。'}
+        description={resolvedMode === 'version' ? '创建同一模型族的新草稿并继承选定版本；原试运行、已发布或已下线版本不会被直接覆盖。' : '当前地址定位本草稿；自动保存更新同一资产，未成功提交的内容保留本机恢复副本。'}
         extra={(
           <Space wrap>
             <Dropdown
@@ -462,20 +588,26 @@ export function ModelCreationPage() {
         )}
       />
 
+      {!backupAvailable && <Alert type="warning" showIcon title="本机恢复存储不可用，请保持页面打开并手动保存草稿" />}
+      {saveError && <Alert type="error" showIcon title="草稿尚未保存到服务端" description={saveError} action={<Button onClick={() => saveDraft.mutate()}>重试保存</Button>} />}
+      {testTaskId && <div className="section-gap"><Typography.Paragraph>模型测试任务：{testTaskId} · {modelTestTask.data?.status || '读取中'} · {modelTestTask.data?.progress || 0}%</Typography.Paragraph>
+        {(modelTestTask.error || testRecoveryError) && <Alert type="warning" showIcon title={testRecoveryError || '测试任务暂未更新，本机记录已保留'} action={<Button onClick={() => void modelTestTask.refetch()}>恢复测试记录</Button>} />}
+        {modelTestTask.data?.error && <Alert type="error" title={modelTestTask.data.error} />}
+      </div>}
       <ModelBuildSummaryBar draft={draft} validation={validation} blocker={firstBlocker} visibleSectionKeys={visibleSectionKeys} dirty={workspace.dirty} currentStepTitle={stepMeta[step].title} onInspection={() => setInspectionOpen(true)} />
       <ModelCreationProgress currentStep={step} visitedThrough={visibleStepLimit} steps={stepMeta} validation={validation} onChange={enterStep} />
       <StepBody
         title={stepMeta[step].title}
         description={stepMeta[step].description}
       >
-        <StepSectionNav items={stepSections[step]} containerId="model-step-content" scrollContainer={mainScrollContainer} resetKey={step} onActiveChange={setActiveSection} onFocus={step >= 1 && step <= 3 ? openFocusEditor : undefined} />
+        <StepSectionNav items={stepSections[step]} containerId="model-step-content" scrollContainer={mainScrollContainer} resetKey={step} onActiveChange={handleSectionChange} onFocus={step >= 1 && step <= 3 ? openFocusEditor : undefined} />
         <div id="model-step-content">{focusOpen ? <div className="focus-editor-placeholder">当前步骤已在聚焦编辑模式中打开。</div> : pages[step]}</div>
       </StepBody>
 
-      <ActionFooter left={<div className="model-footer-left"><Space wrap><Button disabled={step === 0} onClick={() => setStep(step - 1)}>上一步</Button><Button type="primary" disabled={step === 4} onClick={() => enterStep(step + 1)}>下一步</Button></Space><span className="model-footer-status">{workspace.dirty ? '未保存' : lastSavedAt ? `已保存于 ${lastSavedAt}` : '已保存'} · {validation.valid ? '无阻断项' : `${Object.values(validation.sections).flatMap(section => section.errors).length} 项阻断`} · {testIsCurrent ? '最近测试通过' : '当前版本待测试'}</span></div>}>
+      <ActionFooter left={<div className="model-footer-left"><Space wrap><Button disabled={step === 0} onClick={() => setStep(step - 1)}>上一步</Button><Button type="primary" disabled={step === 4} onClick={() => enterStep(step + 1)}>下一步</Button></Space><span className="model-footer-status">{saving || saveDraft.isPending ? '保存中' : saveError ? '服务端保存失败' : workspace.dirty ? '待自动保存' : lastSavedAt ? `已保存于 ${lastSavedAt}` : '已保存'}{backupAvailable && (workspace.dirty || lastSavedSnapshot) ? ' · 本机恢复副本已保留' : ''} · {validation.valid ? '无阻断项' : `${Object.values(validation.sections).flatMap(section => section.errors).length} 项阻断`} · {testIsCurrent ? '最近测试通过' : '当前版本待测试'}</span></div>}>
         <Button onClick={validateCurrentDraft}>校验模型</Button>
         <Button loading={saveDraft.isPending} onClick={() => saveDraft.mutate()}>保存草稿</Button>
-        <Button type={step === 4 || validation.valid ? 'primary' : 'default'} disabled={!validation.valid || !testIsCurrent || testRun.isPending} loading={publish.isPending} title={!testIsCurrent ? '请先保存并测试当前修订' : undefined} onClick={() => publish.mutate()}>发布模型</Button>
+        <Button type={step === 4 || validation.valid ? 'primary' : 'default'} disabled={!validation.valid || !testIsCurrent || testRun.isPending || activeTest} loading={publish.isPending} title={!testIsCurrent ? '请先保存并测试当前修订' : undefined} onClick={() => publish.mutate()}>发布模型</Button>
       </ActionFooter>
       {inspectionOpen && <ModelInspectionDrawer open draft={draft} workspace={workspace} validation={validation} steps={stepMeta} tested={testIsCurrent} onClose={() => setInspectionOpen(false)} onNavigate={navigateIssue} />}
       {focusOpen && <FocusEditor open modelName={draft.basic_info.name} objectName={stepMeta[step].title} dirty={focusDirty} onClose={() => closeFocusEditor()} onDiscard={() => closeFocusEditor(true)} onSave={async () => { await saveDraft.mutateAsync(); }} onValidate={validateCurrentDraft}>{pages[step]}</FocusEditor>}

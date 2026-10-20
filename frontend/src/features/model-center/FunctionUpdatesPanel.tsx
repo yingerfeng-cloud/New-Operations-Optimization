@@ -10,6 +10,9 @@ import { getResult } from '../../api/results';
 import { terminalTask } from '../../api/taskTracking';
 import { QueryState } from '../../components/QueryState';
 import type { ModelAsset } from '../../types/model';
+import { assetToWorkspaceDraft } from '../model-creation/utils/workspaceMode';
+import { normalizeModelDraft } from '../model-creation/utils/normalizeModelDraft';
+import { editWorkspaceKey, writeWorkspaceRecovery } from '../model-creation/utils/workspaceRecovery';
 
 interface PendingUpdate { key: string; revisions: Record<string, number>; candidateId?: string; taskId?: string }
 const storageKey = (id: string) => `optiforge-function-update:${id}`;
@@ -36,6 +39,12 @@ export function FunctionUpdatesPanel({ model, onApplied }: { model: ModelAsset; 
     remember(context); // Uncertain submissions and refresh reuse the same identity.
     const response = await testFunctionUpdates(model.id, context.revisions, context.key);
     remember({ ...context, candidateId: response.model.id, taskId: response.task.id });
+    const draft = normalizeModelDraft(assetToWorkspaceDraft(response.model, 'edit'));
+    const snapshot = JSON.stringify(draft);
+    writeWorkspaceRecovery({ schema_version: 1, updatedAt: new Date().toISOString(), draft, step: 4,
+      workspace: { mode: 'edit', sourceModelId: response.model.id, currentAssetId: response.model.id, sessionId: editWorkspaceKey(response.model.id), initialized: true, dirty: false },
+      currentDraftModelId: response.model.id, lastSavedSnapshot: snapshot, lastSavedContentHash: response.model.content_hash,
+      testSnapshot: { modelId: response.model.id, snapshot, contentHash: response.model.content_hash } });
   } });
   const apply = useMutation({ mutationFn: () => applyFunctionUpdates(pending!.candidateId!), onSuccess: published => {
     remember(undefined); setRevisions({}); message.success('新模型版本已发布，正式服务已切换'); onApplied?.(published);
@@ -77,6 +86,8 @@ export function FunctionUpdatesPanel({ model, onApplied }: { model: ModelAsset; 
       <Typography.Paragraph>测试目标：{String(oldObjective ?? '未记录')} → {String(newObjective ?? '待完成')}。综合加权目标按模型定义解释。</Typography.Paragraph>
       {result.data && <details><summary>物理量、变量及目标分项</summary><pre style={{ whiteSpace: 'pre-wrap' }}>{JSON.stringify(result.data, null, 2)}</pre></details>}
       <Button type="primary" disabled={!canApply} loading={apply.isPending} onClick={() => apply.mutate()}>应用更新</Button>
+      {pending.candidateId && <Button onClick={() => nav(`/models/${encodeURIComponent(pending.candidateId!)}/edit`)}>在工作台查看候选</Button>}
+      {candidate.error && <Alert type="warning" title="候选测试证据暂未更新" action={<Button onClick={() => void candidate.refetch()}>恢复证据</Button>} />}
       {apply.isError && <Alert type="error" title="应用失败，请检查当前版本和测试证据后重试" />}
     </Card></QueryState>}
   </Space>;

@@ -1,0 +1,13 @@
+
+> optiforge-platform-frontend@1.0.0 test
+> vitest run --run src/tests/unit/ModelCreationPage.test.tsx src/tests/unit/CascadeHydroTemplate.test.tsx --reporter=dot
+
+
+ RUN  v4.1.9 /Users/joiefu/Project/OPTIFORGE/frontend
+
+·····························
+
+ Test Files  2 passed (2)
+      Tests  29 passed (29)
+   Start at  22:24:17
+   Duration  48.40s (transform 385ms, setup 305ms, import 969ms, tests 50.54s, environment 664ms)

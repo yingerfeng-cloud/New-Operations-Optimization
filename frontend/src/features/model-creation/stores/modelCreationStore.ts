@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { forgetWorkspaceRecovery, writeWorkspaceRecovery, type WorkspaceRecovery, type WorkspaceTestSnapshot } from '../utils/workspaceRecovery';
 import type { FormulaDef } from '../../../types/formula';
 import type { BuildMode } from '../../../types/model';
 import type { ModelTemplate } from '../../../types/template';
@@ -196,6 +197,10 @@ interface State {
   loadedTemplate: ModelTemplate | null;
   validationResult: ModelDraftValidationResult | null;
   currentDraftModelId?: string;
+  lastSavedSnapshot?: string;
+  lastSavedContentHash?: string;
+  testSnapshot?: WorkspaceTestSnapshot;
+  section?: string;
   setStep: (n: number) => void;
   updateDraft: (patch: Partial<ModelDraft>) => void;
   setDraft: (d: ModelDraft) => void;
@@ -204,6 +209,7 @@ interface State {
   setCurrentDraftModelId: (id?: string) => void;
   setLoadedTemplate: (template: ModelTemplate | null) => void;
   setValidationResult: (result: ModelDraftValidationResult | null) => void;
+  restoreWorkspace: (value: WorkspaceRecovery) => void;
   reset: () => void;
 }
 
@@ -237,12 +243,15 @@ export const useModelCreationStore = create<State>()((set) => ({
     loadedTemplate: null,
     validationResult: null,
     currentDraftModelId: context.currentAssetId,
+    lastSavedSnapshot: undefined, lastSavedContentHash: undefined, testSnapshot: undefined, section: undefined,
   }),
   setWorkspace: patch => set(state => ({ workspace: { ...state.workspace, ...patch } })),
   setCurrentDraftModelId: currentDraftModelId => set(state => ({ currentDraftModelId, workspace: { ...state.workspace, currentAssetId: currentDraftModelId } })),
   setLoadedTemplate: loadedTemplate => set({ loadedTemplate }),
   setValidationResult: validationResult => set({ validationResult }),
+  restoreWorkspace: value => set({ ...value, draft: value.draft, modelDraft: value.draft, builderMode: value.draft.basic_info.builder_mode, workspace: { ...value.workspace, generation: createSessionId(), initialized: true }, step: Math.min(4, Math.max(0, value.step || 0)) }),
   reset: () => {
+    forgetWorkspaceRecovery(useModelCreationStore.getState().workspace.sessionId);
     const draft = createBlankDraft();
     return set({
       draft,
@@ -253,6 +262,17 @@ export const useModelCreationStore = create<State>()((set) => ({
       loadedTemplate: null,
       validationResult: null,
       currentDraftModelId: undefined,
+      lastSavedSnapshot: undefined, lastSavedContentHash: undefined, testSnapshot: undefined, section: undefined,
     });
   },
 }));
+
+
+useModelCreationStore.subscribe((state, previous) => {
+  if (!state.workspace.initialized || (!state.workspace.dirty && !state.currentDraftModelId && !state.draft.basic_info.name)) return;
+  if (state.draft === previous.draft && state.workspace === previous.workspace && state.step === previous.step && state.testSnapshot === previous.testSnapshot && state.lastSavedContentHash === previous.lastSavedContentHash && state.section === previous.section) return;
+  const saved = writeWorkspaceRecovery({ schema_version: 1, updatedAt: new Date().toISOString(), workspace: state.workspace,
+    draft: state.draft, step: state.step, section: state.section, currentDraftModelId: state.currentDraftModelId,
+    lastSavedSnapshot: state.lastSavedSnapshot, lastSavedContentHash: state.lastSavedContentHash, testSnapshot: state.testSnapshot });
+  window.dispatchEvent(new CustomEvent('optiforge:workspace-backup', { detail: saved }));
+});

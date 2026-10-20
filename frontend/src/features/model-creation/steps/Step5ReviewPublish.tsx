@@ -331,7 +331,7 @@ export function Step5ReviewPublish({
         </Card>
       )}
       <Space className="section-gap" wrap>
-        <Button data-testid="model-test-run-button" onClick={runTest} disabled={publishBlocked} loading={pending}>测试运行</Button>
+        <Button data-testid="model-test-run-button" onClick={runTest} disabled={publishBlocked || pending} loading={pending}>测试运行</Button>
         {publishBlocked && (
           <Typography.Text type="secondary">
             不可发布原因：{publishBlockReason}

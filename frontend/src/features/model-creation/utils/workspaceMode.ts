@@ -35,7 +35,7 @@ export function parseWorkspaceRequest(searchParams: URLSearchParams, routeModelI
 }
 
 export function effectiveAssetMode(mode: ModelWorkspaceMode, asset: ModelAsset): ModelWorkspaceMode {
-  return mode === 'edit' && immutableStatuses.has(String(asset.status)) ? 'version' : mode;
+  return mode === 'edit' && immutableStatuses.has(String(asset.status)) && !(asset.status === 'trial' && !asset.published_at) ? 'version' : mode;
 }
 
 export function assetToWorkspaceDraft(asset: ModelAsset, mode: ModelWorkspaceMode): ModelDraft {

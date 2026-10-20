@@ -34,8 +34,10 @@ export function DraftLeaveDialog({ open, onContinue, onLeave, onDiscard, onSave 
 }
 
 export function DraftLeaveGuard({ onSave }: { onSave: () => Promise<unknown> }) {
-  const blocker = useBlocker(({ currentLocation, nextLocation }) => {
-    const { workspace } = useModelCreationStore.getState();
+  const blocker = useBlocker(({ currentLocation, nextLocation, historyAction }) => {
+    const { workspace, currentDraftModelId } = useModelCreationStore.getState();
+    if (historyAction === 'REPLACE' && currentLocation.pathname === '/models/create' && currentDraftModelId
+      && nextLocation.pathname === `/models/${encodeURIComponent(currentDraftModelId)}/edit`) return false;
     return workspace.initialized && workspace.dirty && (currentLocation.pathname !== nextLocation.pathname || currentLocation.search !== nextLocation.search);
   });
   if (blocker.state !== 'blocked') return null;

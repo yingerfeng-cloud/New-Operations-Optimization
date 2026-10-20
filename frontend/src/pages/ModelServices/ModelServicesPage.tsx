@@ -134,9 +134,10 @@ export function ModelServicesPage() {
   const selectedCapability = capabilityOrFallback(selected || {});
   const selectedSamplePayload = useMemo(() => samplePayloadFor(selected, detail.data, parameters), [detail.data, parameters, selected]);
   const endpoint = selected ? '/api/tasks' : '';
+  const formalCode = String((selected?.semantic_spec || {}).model_code || selected?.template_id || selected?.id || '');
   const example = selected ? `curl -X POST http://localhost:8000/api/tasks \\
   -H "Content-Type: application/json" \\
-  -d '${JSON.stringify({ model_id: selected.id, model_code: selected.template_id || selected.id, problem_type: selectedCapability.problemType, solver: selectedCapability.solver, runtime_parameters: selectedSamplePayload, async_run: true }, null, 2)}'` : '';
+  -d '${JSON.stringify({ model_code: formalCode, problem_type: selectedCapability.problemType, solver: selectedCapability.solver, runtime_parameters: selectedSamplePayload, async_run: true }, null, 2)}'` : '';
 
   useEffect(() => {
     if (!selectedId && filteredServices[0]) setSelectedId(filteredServices[0].id);
@@ -225,7 +226,8 @@ export function ModelServicesPage() {
                   children: (
                     <>
                       <Descriptions bordered size="small" column={2} items={[
-                        { key: 'id', label: '模型 ID', children: selected.id },
+                        { key: 'id', label: '固定模型 ID', children: selected.id },
+                        { key: 'formal-code', label: '正式服务编码', children: formalCode },
                         { key: 'name', label: '服务名称', children: selected.name },
                         { key: 'endpoint', label: '调用接口', children: endpoint },
                         { key: 'method', label: '方法', children: 'POST' },
@@ -258,6 +260,7 @@ export function ModelServicesPage() {
                   label: '在线调试',
                   children: (
                     <Form layout="vertical">
+                      <Alert type="info" title="在线调试固定当前模型 ID；对外稳定调用使用 API 示例中的 model_code，解析当时的正式版本。" />
                       <Form.Item label="运行参数 JSON">
                         <Input.TextArea aria-label="运行参数 JSON" rows={8} value={debugPayload} onChange={event => setDebugPayload(event.target.value)} />
                       </Form.Item>

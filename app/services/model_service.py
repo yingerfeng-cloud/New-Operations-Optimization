@@ -106,7 +106,14 @@ class ModelService:
             raise HTTPException(status_code=404, detail="Model not found")
         return model
 
-    def update_model(self, model_id: str, model: ModelPackage) -> ModelView:
+    def update_model(self, model_id: str, model: ModelPackage, *, expected_content_hash: str | None = None) -> ModelView:
+        with STORE.lock:
+            existing = self.get_model(model_id)
+            if expected_content_hash is not None and existing.content_hash != expected_content_hash:
+                raise HTTPException(status_code=409, detail={"code": "MODEL_DRAFT_CONFLICT", "message": "草稿已在其他位置改变，已保留本机恢复副本；请比较当前服务端内容后再保存。"})
+            return self._update_model_locked(model_id, model)
+
+    def _update_model_locked(self, model_id: str, model: ModelPackage) -> ModelView:
         existing = self.get_model(model_id)
         if existing.status in IMMUTABLE_MODEL_STATUSES or existing.published_at:
             raise HTTPException(status_code=409, detail="Online and historical model versions are immutable; create a new version before editing")
@@ -134,6 +141,11 @@ class ModelService:
     def _publish_model_locked(self, model_id: str) -> ModelView:
         model = self.get_model(model_id)
         from app.services.function_dependencies import assert_dependencies_current
+        context = (model.ui_metadata or {}).get("function_update") or {}
+        if context and not model.published_at:
+            active = [row for row in STORE.models.values() if row.model_family_id == model.model_family_id and row.is_active_version]
+            if active and active[0].id != context.get("source_model_id"):
+                raise HTTPException(status_code=409, detail={"code": "FORMAL_VERSION_CHANGED", "message": "正式版本已经切换，请基于当前正式版本准备更新。"})
         current_hash = self._content_hash(ModelPackage.model_validate(model.model_dump()))
         self._validate_publish_code_ownership(model)
         normalized_model = self._normalize_component_model(ModelPackage(**model.model_dump()))
@@ -305,7 +317,14 @@ class ModelService:
             STORE.save_runtime()
         return updated
 
-    def return_model_to_draft(self, model_id: str) -> ModelView:
+    def return_model_to_draft(self, model_id: str, *, expected_content_hash: str | None = None) -> ModelView:
+        with STORE.lock:
+            model = self.get_model(model_id)
+            if expected_content_hash is not None and model.content_hash != expected_content_hash:
+                raise HTTPException(status_code=409, detail={"code": "MODEL_DRAFT_CONFLICT", "message": "草稿已在其他位置改变，请先比较当前内容。"})
+            return self._return_model_to_draft_locked(model_id)
+
+    def _return_model_to_draft_locked(self, model_id: str) -> ModelView:
         model = self.get_model(model_id)
         if model.status != "trial":
             raise HTTPException(
@@ -332,6 +351,7 @@ class ModelService:
                 "tested_at": None,
                 "tested_content_hash": None,
                 "tested_model_id": None,
+                "test_task_id": None,
                 "updated_at": now_text(),
             }
         )

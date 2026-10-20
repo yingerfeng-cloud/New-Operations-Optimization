@@ -1,3 +1,4 @@
+import { listWorkspaceRecoveries, recoveryUrl } from '../../features/model-creation/utils/workspaceRecovery';
 import { FunctionUpdatesPanel } from '../../features/model-center/FunctionUpdatesPanel';
 import { MoreOutlined } from '@ant-design/icons';
 import { Button, Card, Drawer, Dropdown, Input, Modal, Select, Space, Tabs, Tag, Tooltip, message } from 'antd';
@@ -123,6 +124,7 @@ export function ModelCenterPage() {
   const [templateOpen, setTemplateOpen] = useState(false);
   const [template, setTemplate] = useState<string>();
   const viewId = id;
+  const localDrafts = listWorkspaceRecoveries();
   const [expertView, setExpertView] = useState(false);
   const [filters, setFilters] = useState<{ build?: string; problem?: string; status?: string; scene?: string; keyword?: string }>({});
   const models = useQuery({ queryKey: ['models'], queryFn: getModels });
@@ -160,7 +162,7 @@ export function ModelCenterPage() {
     onError: error => message.error(`下线失败：${errorMessage(error)}`),
   });
   const returnDraft = useMutation({
-    mutationFn: returnModelToDraft,
+    mutationFn: (id: string) => returnModelToDraft(id),
     onSuccess: model => {
       message.success('模型已退回草稿，原测试基线已清除');
       refresh(model.id);
@@ -234,7 +236,7 @@ export function ModelCenterPage() {
       <PageHeader
         title="模型资产中心"
         description="模型版本管理、发布治理、模板克隆、测试运行与资产沉淀。"
-        extra={<><Button onClick={() => setTemplateOpen(true)}>从模板克隆</Button><Button type="primary" onClick={() => nav('/models/create')}>创建模型</Button></>}
+        extra={<>{localDrafts.length > 0 && <Dropdown menu={{ items: localDrafts.map((item, index) => ({ key: String(index), label: `${item.draft.basic_info.name || '未命名草稿'} · 第 ${item.step + 1} 步` })), onClick: ({ key }) => nav(recoveryUrl(localDrafts[Number(key)])) }}><Button>恢复本机草稿</Button></Dropdown>}<Button onClick={() => setTemplateOpen(true)}>从模板克隆</Button><Button type="primary" onClick={() => nav('/models/create')}>创建模型</Button></>}
       />
       <MetricGrid>
         <MetricCard title="模型资产数" value={models.data === undefined ? '—' : rows.length} description="真实后端资产" tone="blue" />

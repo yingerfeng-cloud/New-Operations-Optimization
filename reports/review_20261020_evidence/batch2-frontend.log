@@ -1,0 +1,33 @@
+
+ RUN  v4.1.9 /Users/joiefu/Project/OPTIFORGE/frontend
+
+·········stderr | src/tests/unit/ReviewDraftLeave.test.tsx > continue editing preserves draft and only explicit discard clears it
+Warning: [antd: Modal] `maskClosable` is deprecated. Please use `mask.closable` instead.
+
+stderr | src/tests/unit/ReviewDraftLeave.test.tsx > continue editing preserves draft and only explicit discard clears it
+Warning: [antd: Modal] `maskClosable` is deprecated. Please use `mask.closable` instead.
+
+stderr | src/tests/unit/ReviewDraftLeave.test.tsx > failed save prevents navigation and successful retry leaves
+Warning: [antd: Modal] `maskClosable` is deprecated. Please use `mask.closable` instead.
+
+stderr | src/tests/unit/ReviewDraftLeave.test.tsx > failed save prevents navigation and successful retry leaves
+Warning: [antd: Modal] `maskClosable` is deprecated. Please use `mask.closable` instead.
+
+stderr | src/tests/unit/ReviewDraftLeave.test.tsx > failed save prevents navigation and successful retry leaves
+Warning: [antd: Modal] `maskClosable` is deprecated. Please use `mask.closable` instead.
+
+stderr | src/tests/unit/ReviewDraftLeave.test.tsx > failed save prevents navigation and successful retry leaves
+Warning: [antd: Modal] `maskClosable` is deprecated. Please use `mask.closable` instead.
+
+stderr | src/tests/unit/ReviewDraftLeave.test.tsx > failed save prevents navigation and successful retry leaves
+Warning: [antd: Modal] `maskClosable` is deprecated. Please use `mask.closable` instead.
+
+·stderr | src/tests/unit/ReviewDraftLeave.test.tsx > browser history navigation is guarded and clean drafts leave normally
+Warning: [antd: Modal] `maskClosable` is deprecated. Please use `mask.closable` instead.
+
+·································
+
+ Test Files  7 passed (7)
+      Tests  43 passed (43)
+   Start at  22:06:43
+   Duration  49.04s (transform 561ms, setup 870ms, import 961ms, tests 53.47s, environment 1.69s)

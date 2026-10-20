@@ -1,9 +1,12 @@
+import { readWorkspaceRecovery } from '../../features/model-creation/utils/workspaceRecovery';
 import { act, screen } from '@testing-library/react';
 import { fireEvent, waitFor } from '@testing-library/react';
-import { MemoryRouter, Route, Routes, useNavigate } from 'react-router-dom';
+import { MemoryRouter, Route, Routes, useNavigate, useLocation } from 'react-router-dom';
 import { vi } from 'vitest';
 import { ModelCreationPage } from '../../features/model-creation/ModelCreationPage';
-import { useModelCreationStore } from '../../features/model-creation/stores/modelCreationStore';
+import { normalizeModelDraft } from '../../features/model-creation/utils/normalizeModelDraft';
+import { buildModelDraftPayload } from '../../features/model-creation/utils/saveModelDraftAsset';
+import { createBlankDraft, useModelCreationStore } from '../../features/model-creation/stores/modelCreationStore';
 import type { ModelTemplate } from '../../types/template';
 import { renderWithQueryClient } from '../testUtils';
 
@@ -27,8 +30,9 @@ const systemApi = vi.hoisted(() => ({
   getSystemConfig: vi.fn(async () => ({ dictionaries: { business_scenarios: systemApi.scenarioItems } })),
 }));
 vi.mock('../../api/systemConfig', () => ({ getSystemConfig: systemApi.getSystemConfig }));
+const savedTestAssets = vi.hoisted(() => new Map<string, any>());
 const modelApi = vi.hoisted(() => ({
-  getModel: vi.fn(async (id = 'MODEL-POWER-UNIT-COMMITMENT-DAY-AHEAD') => ({
+  getModel: vi.fn(async (id = 'MODEL-POWER-UNIT-COMMITMENT-DAY-AHEAD') => savedTestAssets.get(id) || ({
     id,
     name: id === 'MODEL-B' ? '模型 B' : '日前机组组合优化 Unit Commitment',
     scene: '日前机组组合优化',
@@ -67,12 +71,16 @@ const modelApi = vi.hoisted(() => ({
       advanced: {},
     },
   })),
-  createModel: vi.fn(async () => ({ id: 'MODEL-1', status: 'draft' })),
-  createModelVersion: vi.fn(async () => ({ id: 'MODEL-VERSION-1', status: 'draft' })),
-  updateModel: vi.fn(async (id: string) => ({ id, status: 'draft' })),
+  createModel: vi.fn(async (payload: any) => { const model = { ...payload, id: 'MODEL-1', status: 'developing' }; savedTestAssets.set(model.id, model); return model; }),
+  createModelVersion: vi.fn(async (_id: string, payload: any) => { const model = { ...payload, id: 'MODEL-VERSION-1', status: 'developing' }; savedTestAssets.set(model.id, model); return model; }),
+  updateModel: vi.fn(async (id: string, payload: any) => { const model = { ...savedTestAssets.get(id), ...payload, id, status: 'developing' }; savedTestAssets.set(id, model); return model; }),
+  returnModelToDraft: vi.fn(async (id: string) => { const model = { ...savedTestAssets.get(id), id, status: 'developing' }; savedTestAssets.set(id, model); return model; }),
+  getTestTask: vi.fn(),
   publishModel: vi.fn(async (id: string) => ({ id, status: 'published' })),
-  testModel: vi.fn(async (id: string) => ({ id, status: 'trial' })),
+  testModel: vi.fn(async (id: string) => { const model = { ...savedTestAssets.get(id), id, status: 'trial' }; savedTestAssets.set(id, model); return model; }),
 }));
+
+vi.mock('../../api/modelTestTracking', async importOriginal => ({ ...(await importOriginal<typeof import('../../api/modelTestTracking')>()), getModelTestTask: modelApi.getTestTask }));
 
 vi.mock('../../api/models', () => ({
   getModel: modelApi.getModel,
@@ -81,24 +89,32 @@ vi.mock('../../api/models', () => ({
   updateModel: modelApi.updateModel,
   publishModel: modelApi.publishModel,
   testModel: modelApi.testModel,
+  returnModelToDraft: modelApi.returnModelToDraft,
 }));
 
 beforeEach(() => {
   useModelCreationStore.getState().reset();
+  localStorage.clear(); sessionStorage.clear();
+  savedTestAssets.clear();
+  modelApi.returnModelToDraft.mockClear();
   modelApi.createModel.mockClear();
   modelApi.createModelVersion.mockClear();
   modelApi.getModel.mockClear();
   modelApi.updateModel.mockClear();
   modelApi.publishModel.mockClear();
   modelApi.testModel.mockClear();
+  modelApi.getTestTask.mockReset();
   templateApi.getTemplateDetail.mockClear();
   systemApi.scenarioItems = [{ code: 'day_ahead_unit_commitment', label: '日前机组组合优化', enabled: true, sort_order: 1 }];
   systemApi.getSystemConfig.mockClear();
 });
 
+function CurrentWorkspaceLocation() { return <span data-testid="workspace-location">{useLocation().pathname}</span>; }
+
 function renderPage(initialEntries = ['/models/create']) {
   return renderWithQueryClient(
     <MemoryRouter initialEntries={initialEntries}>
+      <CurrentWorkspaceLocation />
       <Routes>
         <Route path="/models/create" element={<ModelCreationPage />} />
         <Route path="/models/:id/edit" element={<ModelCreationPage />} />
@@ -253,7 +269,7 @@ test('editing while a test is running keeps the returned snapshot outdated', asy
   expect(screen.getByRole('button', { name: /发布模型/ })).toBeDisabled();
 });
 
-test('the latest test request wins when responses arrive out of order', async () => {
+test('repeated clicks share an active test and a changed draft requires a subsequent test', async () => {
   const testA = deferred<{ id: string; status: string; marker: string }>();
   const testB = deferred<{ id: string; status: string; marker: string }>();
   modelApi.testModel
@@ -284,11 +300,15 @@ test('the latest test request wins when responses arrive out of order', async ()
     });
   });
   fireEvent.click(getTestRunButton());
+  expect(modelApi.testModel).toHaveBeenCalledTimes(1);
+  await act(async () => testA.resolve({ id: 'MODEL-1', status: 'trial', marker: 'A' }));
+  await waitFor(() => expect(getTestRunButton()).not.toBeDisabled());
+  expect(screen.getByRole('button', { name: /发布模型/ })).toBeDisabled();
+  fireEvent.click(getTestRunButton());
   await waitFor(() => expect(modelApi.testModel).toHaveBeenCalledTimes(2));
 
   await act(async () => testB.resolve({ id: 'MODEL-1', status: 'trial', marker: 'B' }));
   await waitFor(() => expect(screen.getByRole('button', { name: /发布模型/ })).not.toBeDisabled());
-  await act(async () => testA.resolve({ id: 'MODEL-1', status: 'trial', marker: 'A' }));
 
   expect(screen.getByRole('button', { name: /发布模型/ })).not.toBeDisabled();
   expect(screen.getByText(/"marker": "B"/)).toBeInTheDocument();
@@ -480,4 +500,87 @@ test('asset load failure blocks the workspace and never displays the previous dr
   expect(screen.queryByText('不应显示的旧模型')).not.toBeInTheDocument();
   expect(screen.getByRole('button', { name: '重新加载' })).toBeInTheDocument();
   expect(screen.getByRole('button', { name: '返回模型资产' })).toBeInTheDocument();
+});
+
+
+function prepareRecoveredTest(contentHash = 'bound-v1') {
+  const draft = createBlankDraft();
+  draft.basic_info = { ...draft.basic_info, name: '合成续接模型', scenario: '测试场景', builder_mode: 'component_based' };
+  draft.components = [{ component_id: 'power_balance', enabled: true }];
+  const normalized = normalizeModelDraft(draft);
+  const snapshot = JSON.stringify(normalized);
+  const model = { ...buildModelDraftPayload(draft), id: 'MODEL-1', status: 'trial', version: 'v1', content_hash: contentHash,
+    tested_content_hash: contentHash, tested_model_id: 'MODEL-1', test_task_id: 'TEST-1',
+    dry_run_result: { structure_check: { status: 'passed' }, solver_check: { status: 'passed' } } };
+  savedTestAssets.set('MODEL-1', model);
+  const state = useModelCreationStore.getState();
+  state.initializeWorkspace({ mode: 'edit', sourceModelId: 'MODEL-1', currentAssetId: 'MODEL-1', sessionId: 'edit:MODEL-1::' }, normalized, 4);
+  useModelCreationStore.setState({ lastSavedSnapshot: snapshot, lastSavedContentHash: 'bound-v1', testSnapshot: { modelId: 'MODEL-1', snapshot, contentHash: 'source-v1' } });
+  simulateWorkspaceReload();
+}
+function simulateWorkspaceReload() {
+  const draft = createBlankDraft();
+  useModelCreationStore.setState({ draft, modelDraft: draft, currentDraftModelId: undefined, lastSavedSnapshot: undefined, lastSavedContentHash: undefined, testSnapshot: undefined,
+    workspace: { mode: 'new', sessionId: 'reloading', initialized: false, dirty: false } });
+}
+const recoveredTask = (status: string) => ({ id: 'TEST-1', status, progress: status === 'SUCCESS' ? 100 : 40,
+  trace: { model_test: { model_id: 'MODEL-1', tested_content_hash: 'bound-v1' } } });
+
+test('refresh and network recovery show the same model test and verify current evidence', async () => {
+  prepareRecoveredTest();
+  modelApi.getTestTask.mockResolvedValue(recoveredTask('SOLVING'));
+  const first = renderPage(['/models/MODEL-1/edit']);
+  expect(await screen.findByText(/模型测试任务：TEST-1.*SOLVING/)).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: '发布模型' })).toBeDisabled();
+  expect(useModelCreationStore.getState().step).toBe(4);
+  first.unmount(); simulateWorkspaceReload();
+  modelApi.getTestTask.mockRejectedValueOnce(new Error('503')).mockResolvedValue(recoveredTask('SUCCESS'));
+  renderPage(['/models/MODEL-1/edit']);
+  fireEvent.click(await screen.findByRole('button', { name: '恢复测试记录' }));
+  await waitFor(() => expect(screen.getByRole('button', { name: '发布模型' })).toBeEnabled());
+  expect(modelApi.testModel).not.toHaveBeenCalled();
+  expect(modelApi.createModel).not.toHaveBeenCalled();
+  act(() => { const state = useModelCreationStore.getState(); state.setDraft({ ...state.draft, basic_info: { ...state.draft.basic_info, name: '测试后修改' } }); });
+  expect(screen.getByRole('button', { name: '发布模型' })).toBeDisabled();
+});
+
+test('a restored SUCCESS cannot publish a different current model hash', async () => {
+  prepareRecoveredTest('changed-v2');
+  modelApi.getTestTask.mockResolvedValue(recoveredTask('SUCCESS'));
+  renderPage(['/models/MODEL-1/edit']);
+  expect(await screen.findByText('当前内容与该任务的有效测试证据不一致，请测试当前修订。')).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: '发布模型' })).toBeDisabled();
+  expect(modelApi.publishModel).not.toHaveBeenCalled();
+});
+
+test('autosave accepts partial semantics and updates the same located draft', async () => {
+  renderPage(); await screen.findByText('新建模型');
+  act(() => {
+    const state = useModelCreationStore.getState();
+    state.setDraft({ ...state.draft, basic_info: { ...state.draft.basic_info, name: '自动保存半成品', scenario: '测试场景' },
+      semantic: { sets: [{ code: 'site', values: ['B', 'A'] }], parameters: [{ code: 'cost', dimension: ['site'] }], variables: [] } });
+    state.setStep(1);
+  });
+  await waitFor(() => expect(modelApi.createModel).toHaveBeenCalledTimes(1), { timeout: 6000 });
+  await waitFor(() => expect(screen.getByTestId('workspace-location').textContent).toBe('/models/MODEL-1/edit'));
+  expect(screen.getByRole('button', { name: '发布模型' })).toBeDisabled();
+  act(() => { const state = useModelCreationStore.getState(); state.setDraft({ ...state.draft, runtime_parameters: { cost: [10, 20] } }); });
+  await waitFor(() => expect(modelApi.updateModel).toHaveBeenCalledTimes(1), { timeout: 6000 });
+  expect(modelApi.createModel).toHaveBeenCalledTimes(1);
+  expect(useModelCreationStore.getState().currentDraftModelId).toBe('MODEL-1');
+});
+
+test('a failed save retains the local unsubmitted copy across a fresh workspace', async () => {
+  modelApi.createModel.mockRejectedValueOnce(new Error('503 保存失败'));
+  const first = renderPage(); await screen.findByText('新建模型');
+  act(() => { const state = useModelCreationStore.getState(); state.setDraft({ ...state.draft, basic_info: { ...state.draft.basic_info, name: '未提交恢复副本', scenario: '测试场景' } }); state.setStep(1); });
+  fireEvent.click(screen.getByRole('button', { name: '保存草稿' }));
+  await screen.findByText('草稿尚未保存到服务端');
+  expect(readWorkspaceRecovery('new:::')?.draft.basic_info.name).toBe('未提交恢复副本');
+  first.unmount(); simulateWorkspaceReload();
+  expect(readWorkspaceRecovery('new:::')?.draft.basic_info.name).toBe('未提交恢复副本');
+  renderPage();
+  await waitFor(() => expect(useModelCreationStore.getState().draft.basic_info.name).toBe('未提交恢复副本'));
+  expect(useModelCreationStore.getState().step).toBe(1);
+  expect(useModelCreationStore.getState().currentDraftModelId).toBeUndefined();
 });

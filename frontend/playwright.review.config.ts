@@ -2,7 +2,7 @@ import { defineConfig } from '@playwright/test';
 declare const process: { env: Record<string, string | undefined> };
 
 export default defineConfig({
-  testDir: './src/tests/e2e', testMatch: 'review_recovery.spec.ts', workers: 1,
+  testDir: './src/tests/e2e', testMatch: ['review_recovery.spec.ts', 'review_incremental.spec.ts'], workers: 1,
   timeout: 120_000, expect: { timeout: 15_000 },
   reporter: [['list']], outputDir: 'test-results/review',
   use: {

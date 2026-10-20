@@ -26,3 +26,6 @@ pytest_tmp/
 __chrome_*_profile*/
 .optiforge-config-secret
 reports/review_20261017_evidence/*.png
+
+reports/review_20261020_evidence/*.png
+reports/review_20261020_local/

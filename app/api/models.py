@@ -56,7 +56,9 @@ def get_model(model_id: str) -> ModelView:
 
 @router.put("/models/{model_id}", response_model=ModelView)
 def update_model(model_id: str, model: dict[str, Any]) -> ModelView:
-    return model_service.update_model(model_id, _model_package_from_payload(model))
+    payload = deepcopy(model)
+    expected_hash = payload.pop("expected_content_hash", None)
+    return model_service.update_model(model_id, _model_package_from_payload(payload), expected_content_hash=expected_hash)
 
 
 @router.post("/models/{model_id}/publish", response_model=ModelView)
@@ -80,8 +82,8 @@ def offline_model(model_id: str) -> ModelView:
 
 
 @router.post("/models/{model_id}/return-to-draft", response_model=ModelView)
-def return_model_to_draft(model_id: str) -> ModelView:
-    return model_service.return_model_to_draft(model_id)
+def return_model_to_draft(model_id: str, body: dict | None = None) -> ModelView:
+    return model_service.return_model_to_draft(model_id, expected_content_hash=(body or {}).get("expected_content_hash"))
 
 
 @router.delete("/models/{model_id}")

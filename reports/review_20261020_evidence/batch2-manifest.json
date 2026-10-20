@@ -1,0 +1,26 @@
+{
+  "batch2-backend.log": {
+    "sha256": "02560a5150b64978bc73c1a56f2abcebfffe3ec9c7d059c1656f897b21e71877",
+    "bytes": 1012
+  },
+  "batch2-backend.xml": {
+    "sha256": "3ffab684dd12e4ae3b3bdca4342d49e3db520d6ae925de63e3f53547815541f2",
+    "bytes": 8295
+  },
+  "batch2-browser.log": {
+    "sha256": "fcfcdd3a3da84f9ebc0e14756cfbdcd3c8c443e0348f849bfec590f951bd0671",
+    "bytes": 865
+  },
+  "batch2-build.log": {
+    "sha256": "76db36a60d13154da02f43f8a16e9db6b1cf3b20d5212522b68668ff6a371afd",
+    "bytes": 4897
+  },
+  "batch2-frontend.log": {
+    "sha256": "6d1250dbbeb54628b15f3f0f126e4c38ffaf1c38971fae4c9ae405bacb6f2d9e",
+    "bytes": 1962
+  },
+  "batch2-page-retest.log": {
+    "sha256": "9f0752a9013a8bc30bef51e4fbe03fd77b46e40876d53f4a0f8f190d05b18ea1",
+    "bytes": 454
+  }
+}

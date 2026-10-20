@@ -41,6 +41,9 @@ class JobService:
             task_id = f"OPT-{uuid.uuid4().hex[:10].upper()}"
             record = TaskRecord(id=task_id, request=req, max_retries=max(0, req.max_retries))
             record.trace["request_fingerprint"] = fingerprint
+            if testing_model is not None:
+                record.trace["model_test"] = {"model_id": testing_model.id, "tested_content_hash": model_service._content_hash(testing_model),
+                    "source_content_hash": req.payload["_model_test"]["source_hash"], "submission_key": req.idempotency_key}
             STORE.tasks[task_id] = record
             STORE.save_runtime()
         if os.getenv("OPTIFORGE_SYNC_JOBS") == "true" or req.async_run is False:

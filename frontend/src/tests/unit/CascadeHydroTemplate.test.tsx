@@ -125,10 +125,10 @@ test('Step3 展示梯级水电核心组件', () => {
   expect(screen.getAllByText('期末库容约束').length).toBeGreaterThan(0);
 });
 
-test('负荷跟踪关闭时负荷预测非必填，出力模式决定 LP/MILP', () => {
+test('负荷跟踪关闭时负荷预测非必填，启用严格一维函数后线性出力仍为 MILP', () => {
   const draft = cascadeDraft();
   // This case exercises inference without an explicit/compiled declaration.
-  // Declared problem_type intentionally has higher priority in production.
+  // Enabled strict 1D function mappings still introduce segment binaries.
   delete (draft.basic_info as unknown as Record<string, unknown>).problem_type;
   delete draft.semantic.ui_metadata?.problem_type;
   delete draft.advanced.ui_metadata?.problem_type;
@@ -144,7 +144,7 @@ test('负荷跟踪关闭时负荷预测非必填，出力模式决定 LP/MILP', 
   const loadRow = buildRuntimeParameterRows(draft).find(row => row.code === 'load_forecast');
   expect(loadRow?.required).toBe(false);
   expect(loadRow?.disabled).toBe(true);
-  expect(inferModelProblemType(draft)).toBe('LP');
+  expect(inferModelProblemType(draft)).toBe('MILP');
   draft.runtime_parameters.hydro_power_mode = 'pwl_2d';
   expect(inferModelProblemType(draft)).toBe('MILP');
 });
