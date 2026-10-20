@@ -1,0 +1,41 @@
+{
+  "fixtures": {
+    "path": "tests/fixtures/review_20261017_poc.json",
+    "sha256": "a6313e770220dde79519b204961f0345464e2ef39b6b126825d2e54aaa2629a9"
+  },
+  "raw_results_kept_local": true,
+  "results": {
+    "ED-24H-infeasible.result.json": {
+      "sha256": "b09a5af4bbe35e5ebb76be79543f737a9c30ff62baa875516e074581a0a482f3",
+      "bytes": 14007
+    },
+    "ED-24H-near-capacity.result.json": {
+      "sha256": "508f77e28ba98ef2b61fd9085b7ea63fa9525dff93d744cd9db8f3796d36791f",
+      "bytes": 31669
+    },
+    "ED-24H-normal.result.json": {
+      "sha256": "2d00f6b83a034fd8f6d7825ef4840ebecbba251a44d4605cc6b2d9913789d6a1",
+      "bytes": 31630
+    },
+    "HYDRO-96QH-hard-load-infeasible.result.json": {
+      "sha256": "afe7cae7845ec5c978f6f90169690648e9d9a149fee6d0b6a2b7d8908b2690a9",
+      "bytes": 51485
+    },
+    "HYDRO-96QH-low-inflow.result.json": {
+      "sha256": "be3b91290a6de8800b3bc20f8972c81e7ede82d80e1e5655ddfb531a49f0b4a9",
+      "bytes": 851004
+    },
+    "HYDRO-96QH-maintenance-delay.result.json": {
+      "sha256": "ea19c3462733c1c0147cf0211599fcbf49ecc1bf536d1466eef9ab4aae560a1b",
+      "bytes": 852056
+    },
+    "PV-96QH-arbitrage.result.json": {
+      "sha256": "b5f7c3e13c617ef0c429512baeaeb7f323767491c13b573592e88c72952fd7bd",
+      "bytes": 676052
+    },
+    "PV-96QH-grid-congestion.result.json": {
+      "sha256": "3e2ff434f9cf71af0bfad1bb49c0abf094ec8bfa99b8d4bc37c629be74456ca4",
+      "bytes": 676272
+    }
+  }
+}

@@ -1,0 +1,75 @@
+{
+  "review_baseline": "bb9a95ac351a677117428447df09585af3b711f2",
+  "actual_initial_head": "bb9a95ac351a677117428447df09585af3b711f2",
+  "historical_only_baseline": "9f35c9f50562b946bfaf65e66a03cdc4c84094fb",
+  "backend_default": {
+    "passed": 655,
+    "skipped": 5,
+    "failures": 0,
+    "selection": "pytest default excludes slow; relevant slow tests included in batch-specific runs",
+    "evidence": [
+      "final-backend.xml",
+      "final-backend.log"
+    ]
+  },
+  "frontend": {
+    "passed": 477,
+    "files": 84,
+    "evidence": "final-frontend.log"
+  },
+  "build": {
+    "passed": true,
+    "evidence": "final-build.log",
+    "existing_large_chunk_warning": true
+  },
+  "browser": {
+    "passed": 4,
+    "real_chrome": true,
+    "real_highs": true,
+    "synthetic_inputs": true,
+    "delay_fixture_seconds": 35,
+    "evidence": "batch2-browser.log"
+  },
+  "synthetic_business": {
+    "passed": 11,
+    "total": 11,
+    "customer_data": false,
+    "evidence": "synthetic-business-acceptance.json"
+  },
+  "llm": {
+    "provider": "volcengine_ark",
+    "model": "doubao-seed-2-0-lite-260428",
+    "production_protocol": "responses_tools",
+    "function_calling_probe": true,
+    "synthetic_journey_passed": true,
+    "evidence_fallback_for_power_sum_units": true,
+    "evidence": [
+      "llm-live-probe.json",
+      "llm-live-journey.json",
+      "llm-persistence-repair.json"
+    ]
+  },
+  "migration": {
+    "actual_copy_read_write_verified": true,
+    "unknown_history_tasks": 2,
+    "no_custom_models_in_available_copy": true,
+    "user_key_persisted_after_backup": true,
+    "other_data_sections_unchanged": true
+  },
+  "unexecuted": [
+    "Customer representative data and acceptance signoff",
+    "Target-scale latency distribution, concurrency SLA, production deployment",
+    "This round did not rerun historical Docker Ipopt NLP tests; local default suite has five environment skips",
+    "Unknown historical snapshots cannot be reconstructed"
+  ],
+  "privacy": {
+    "screenshots": "local only",
+    "api_key_files": "local only",
+    "raw_runtime_and_conversations": "local only"
+  },
+  "preserved_user_files": {
+    "OPERATION_MANUAL.md": "687fa477abccf83335e7168b695736f8749966658b3128ca675f8badd12298da",
+    "README.md": "503b545abc0b55c08d8ddedde74f13a4634d231e738924281313ebf762c70c98",
+    "docs/user-manual.md": "84b6b24278335216e379c6408da8cdd9729f8a1e0605c7d4357fe30cb704abc6"
+  }
+}

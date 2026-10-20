@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import importlib
 import tempfile
 import uuid
 from pathlib import Path
@@ -101,19 +100,19 @@ def test_runtime_store_path_unified(monkeypatch) -> None:
 def test_llm_config_persists_after_restart(monkeypatch) -> None:
     store_path = Path(tempfile.gettempdir()) / f"runtime_store_test_{uuid.uuid4().hex}.json"
     monkeypatch.setenv("RUNTIME_STORE_PATH", str(store_path))
-    import app.storage.memory_store as memory_store
+    from app.storage.memory_store import MemoryStore
     import app.services.llm_service as llm_module
 
-    reloaded_store = importlib.reload(memory_store)
-    monkeypatch.setattr(llm_module, "STORE", reloaded_store.STORE)
+    reloaded_store = MemoryStore()
+    monkeypatch.setattr(llm_module, "STORE", reloaded_store)
     service = llm_module.LLMService()
     saved = service.update_config({"provider": "volcengine_ark", "base_url": "https://ark.example/v3", "model": "endpoint", "enabled": True, "api_key": "secret"})
     assert saved["api_key_configured"] is True
     assert saved["config_source"] == "runtime_store"
     assert saved["persistence_path"] == str(store_path)
 
-    reloaded_store = importlib.reload(memory_store)
-    monkeypatch.setattr(llm_module, "STORE", reloaded_store.STORE)
+    reloaded_store = MemoryStore()
+    monkeypatch.setattr(llm_module, "STORE", reloaded_store)
     restored = llm_module.LLMService().config()
     assert restored["enabled"] is True
     assert restored["api_key_configured"] is True

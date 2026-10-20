@@ -730,7 +730,7 @@ def test_default_request_without_candidates_is_rewritten_as_actionable_parameter
     assert "没有可直接确认使用的默认参数" in result["agent_message"]
     assert "优化时段数" in result["agent_message"]
     assert result["agent_skill_name"] == "contract_spot_exposure_v1"
-    assert analyzed_bodies[0]["skill_name"] == "contract_spot_exposure_v1"
+    assert analyzed_bodies[0]["skill_name"] == "run_contract_spot_exposure_v1"
     assert analyzed_bodies[0]["agent_skill_name"] == "contract_spot_exposure_v1"
 
 

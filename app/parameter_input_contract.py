@@ -67,7 +67,8 @@ def validate_parameter_input(item: dict, value: Any, supplied: dict | None = Non
         if not isinstance(node, (list, dict)):
             return {"key": key, "field": location, "error": "indexed parameter requires array or mapping", "expected": axis["set"], "actual": type(node).__name__}
         if members and isinstance(node, list) and len(node) != len(members):
-            return {"key": key, "field": location, "error": "length mismatch", "expected": len(members), "actual": len(node)}
+            return {"key": key, "field": location, "error": "length mismatch", "expected": len(members), "actual": len(node),
+                    "message": f"参数 {location} 按 {axis['set']} 轴需要 {len(members)} 个值，实际 {len(node)} 个。"}
         if members and isinstance(node, dict) and set(map(str, node)) != set(map(str, members)):
             missing = sorted(set(map(str, members)) - set(map(str, node)))
             return {"key": key, "field": location, "error": f"{axis['set']} 索引与集合定义不一致：缺少 {', '.join(missing)}", "expected": list(map(str, members)), "actual": list(map(str, node))}

@@ -1,0 +1,144 @@
+{
+  "synthetic_inputs": true,
+  "customer_data": false,
+  "real_provider_calls": true,
+  "stages": [
+    {
+      "stage": "missing_input",
+      "http_status": 200,
+      "duration_seconds": 37.038,
+      "tasks": [
+        {
+          "task_id": "TASK-9F2E51D31D42",
+          "status": "WAITING_INPUT",
+          "workflow": "PARAM_COLLECTING"
+        }
+      ]
+    },
+    {
+      "stage": "invalid_input",
+      "http_status": 200,
+      "duration_seconds": 22.073,
+      "tasks": [
+        {
+          "task_id": "TASK-9F2E51D31D42",
+          "status": "WAITING_INPUT",
+          "workflow": "PARAM_COLLECTING"
+        }
+      ]
+    },
+    {
+      "stage": "corrected_input",
+      "http_status": 200,
+      "duration_seconds": 27.94,
+      "tasks": [
+        {
+          "task_id": "TASK-9F2E51D31D42",
+          "status": "APPROVAL_REQUIRED",
+          "workflow": "READY_TO_INVOKE"
+        }
+      ]
+    },
+    {
+      "stage": "approval",
+      "action": "confirm_invoke",
+      "status": "SUCCEEDED"
+    },
+    {
+      "stage": "actual_solve",
+      "task_id": "OPT-36D00424AA",
+      "status": "SUCCESS",
+      "model_id": "MODEL-POWER-ECONOMIC-DISPATCH",
+      "version": "v1.0",
+      "model_content_hash": null,
+      "function_manifest": {},
+      "expected_objective": 160300,
+      "actual_objective": 160300.0,
+      "independent_checks": {
+        "objective": 160300.0,
+        "closed_form_optimum": 160300.0,
+        "max_power_residual_MW": 0.0,
+        "max_bound_violation_MW": 0.0,
+        "max_ramp_violation_MW": 0.0
+      },
+      "prepared_model_snapshot_sha256": "5c3adce799f0e98c744d0c7162426806101a48e7267ddf999401057a92c439ac",
+      "historical_builtin_published_hash_absent": true
+    },
+    {
+      "stage": "duplicate_confirmation",
+      "http_status": 200,
+      "same_solver_task": true
+    },
+    {
+      "stage": "duplicate_confirmation",
+      "http_status": 200,
+      "same_solver_task": true
+    },
+    {
+      "stage": "duplicate_confirmation",
+      "http_status": 200,
+      "same_solver_task": true
+    },
+    {
+      "stage": "provider_recovered_new_turn",
+      "http_status": 200,
+      "duration_seconds": 35.516,
+      "tasks": [
+        {
+          "task_id": "TASK-D4A41E9CD328",
+          "status": "WAITING_INPUT",
+          "workflow": "PARAM_COLLECTING"
+        }
+      ]
+    },
+    {
+      "stage": "provider_failure_recovery",
+      "fault_injected": "nonexistent_model",
+      "failure_http_status": 502,
+      "retry_http_status": 409,
+      "same_turn_retried": false,
+      "real_model_restored": "doubao-seed-2-0-lite-260428",
+      "configuration_error_preserved_new_turn_succeeded": true
+    },
+    {
+      "stage": "cancel",
+      "status": "CANCELLED",
+      "no_solve_started": true
+    },
+    {
+      "stage": "resume_after_solve",
+      "same_conversation": true,
+      "same_task_id": "OPT-36D00424AA",
+      "no_recalculation": true
+    },
+    {
+      "stage": "duplicate_confirmation",
+      "http_status": 200,
+      "same_solver_task": true
+    },
+    {
+      "stage": "explanation",
+      "http_status": 200,
+      "duration_seconds": 19.395,
+      "tasks": []
+    },
+    {
+      "stage": "grounded_explanation",
+      "text": "根据已保存的求解证据：模型版本 v1.0，求解器 HiGHS。\n目标值为 160300.0，目标定义为 Min total generation cost。\n记录的时段长度为 1.0 小时。各时段出力使用 MW；累计电量使用 MWh。\nunit_output 累计电量为 675 MWh。\n功率平衡按每个时段核对；出力上下限和爬坡约束按本次模型及逐时结果复核。目标的业务含义按上述模型定义解释，方案须经人工复核。",
+      "no_new_solver_task": true,
+      "energy_unit_verified": true,
+      "grounding_audit": {
+        "status": "evidence_fallback",
+        "reason": "power_sum_unit_mismatch"
+      }
+    }
+  ],
+  "passed": true,
+  "provider": "volcengine_ark",
+  "model": "doubao-seed-2-0-lite-260428",
+  "limits": [
+    "One synthetic economic dispatch journey, not all business scenarios or customer acceptance.",
+    "The managed builtin has no recorded published content hash. The prepared model definition is frozen and independently fingerprinted; no historical hash was invented.",
+    "The dimensional fallback addresses the observed power-sum unit error, not all possible language-model errors."
+  ]
+}

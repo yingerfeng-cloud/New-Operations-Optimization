@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import importlib
 import tempfile
 from pathlib import Path
 import uuid
@@ -260,10 +259,10 @@ def test_llm_health_probe_uses_the_same_forced_tool_protocol_as_agent_turns(monk
 def test_llm_config_save_and_reload(monkeypatch) -> None:
     store_path = Path(tempfile.gettempdir()) / f"runtime_store_test_{uuid.uuid4().hex}.json"
     monkeypatch.setenv("RUNTIME_STORE_PATH", str(store_path))
-    import app.storage.memory_store as memory_store
+    from app.storage.memory_store import MemoryStore
 
-    reloaded_store = importlib.reload(memory_store)
-    monkeypatch.setattr("app.services.llm_service.STORE", reloaded_store.STORE)
+    reloaded_store = MemoryStore()
+    monkeypatch.setattr("app.services.llm_service.STORE", reloaded_store)
     service = LLMService()
     saved = service.update_config(
         {
@@ -277,8 +276,8 @@ def test_llm_config_save_and_reload(monkeypatch) -> None:
     assert saved["api_key_configured"] is True
     assert "api_key" not in saved
 
-    reloaded_store = importlib.reload(memory_store)
-    monkeypatch.setattr("app.services.llm_service.STORE", reloaded_store.STORE)
+    reloaded_store = MemoryStore()
+    monkeypatch.setattr("app.services.llm_service.STORE", reloaded_store)
     restored = LLMService().config()
     assert restored["provider"] == "openai_compatible"
     assert restored["model"] == "test-model"

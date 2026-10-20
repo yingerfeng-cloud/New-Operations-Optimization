@@ -6,6 +6,32 @@
       "time"
     ],
     "type": "array",
+    "allowed_formats": [
+      "array"
+    ],
+    "axis_order": [
+      "time"
+    ],
+    "axes": [
+      {
+        "set": "time",
+        "members": [
+          0,
+          1,
+          2,
+          3
+        ]
+      }
+    ],
+    "format_description": "允许格式：array；轴顺序：time；数组逐轴按声明集合顺序；映射逐轴按业务键匹配",
+    "format_examples": {
+      "array": [
+        160,
+        190,
+        175,
+        150
+      ]
+    },
     "unit": "MW",
     "required": true,
     "description": "",
@@ -36,7 +62,7 @@
       "default_horizon": 4,
       "time_set": "time",
       "state_time_set": null,
-      "interval_minutes": 60,
+      "interval_minutes": 60.0,
       "editable": true,
       "derive_from": null,
       "allowed_horizons": []
@@ -54,6 +80,30 @@
       "unit"
     ],
     "type": "dict",
+    "allowed_formats": [
+      "dict"
+    ],
+    "axis_order": [
+      "unit"
+    ],
+    "axes": [
+      {
+        "set": "unit",
+        "members": [
+          "U1",
+          "U2",
+          "U3"
+        ]
+      }
+    ],
+    "format_description": "允许格式：dict；轴顺序：unit；数组逐轴按声明集合顺序；映射逐轴按业务键匹配",
+    "format_examples": {
+      "dict": {
+        "U1": 30,
+        "U2": 20,
+        "U3": 10
+      }
+    },
     "unit": "MW",
     "required": true,
     "description": "",
@@ -86,7 +136,7 @@
       "default_horizon": 4,
       "time_set": "time",
       "state_time_set": null,
-      "interval_minutes": 60,
+      "interval_minutes": 60.0,
       "editable": true,
       "derive_from": null,
       "allowed_horizons": []
@@ -104,6 +154,30 @@
       "unit"
     ],
     "type": "dict",
+    "allowed_formats": [
+      "dict"
+    ],
+    "axis_order": [
+      "unit"
+    ],
+    "axes": [
+      {
+        "set": "unit",
+        "members": [
+          "U1",
+          "U2",
+          "U3"
+        ]
+      }
+    ],
+    "format_description": "允许格式：dict；轴顺序：unit；数组逐轴按声明集合顺序；映射逐轴按业务键匹配",
+    "format_examples": {
+      "dict": {
+        "U1": 120,
+        "U2": 90,
+        "U3": 70
+      }
+    },
     "unit": "MW",
     "required": true,
     "description": "",
@@ -132,7 +206,7 @@
       "default_horizon": 4,
       "time_set": "time",
       "state_time_set": null,
-      "interval_minutes": 60,
+      "interval_minutes": 60.0,
       "editable": true,
       "derive_from": null,
       "allowed_horizons": []
@@ -150,6 +224,30 @@
       "unit"
     ],
     "type": "dict",
+    "allowed_formats": [
+      "dict"
+    ],
+    "axis_order": [
+      "unit"
+    ],
+    "axes": [
+      {
+        "set": "unit",
+        "members": [
+          "U1",
+          "U2",
+          "U3"
+        ]
+      }
+    ],
+    "format_description": "允许格式：dict；轴顺序：unit；数组逐轴按声明集合顺序；映射逐轴按业务键匹配",
+    "format_examples": {
+      "dict": {
+        "U1": 220,
+        "U2": 260,
+        "U3": 360
+      }
+    },
     "unit": "元/MWh",
     "required": true,
     "description": "",
@@ -178,7 +276,7 @@
       "default_horizon": 4,
       "time_set": "time",
       "state_time_set": null,
-      "interval_minutes": 60,
+      "interval_minutes": 60.0,
       "editable": true,
       "derive_from": null,
       "allowed_horizons": []
@@ -196,6 +294,30 @@
       "unit"
     ],
     "type": "dict",
+    "allowed_formats": [
+      "dict"
+    ],
+    "axis_order": [
+      "unit"
+    ],
+    "axes": [
+      {
+        "set": "unit",
+        "members": [
+          "U1",
+          "U2",
+          "U3"
+        ]
+      }
+    ],
+    "format_description": "允许格式：dict；轴顺序：unit；数组逐轴按声明集合顺序；映射逐轴按业务键匹配",
+    "format_examples": {
+      "dict": {
+        "U1": 80,
+        "U2": 60,
+        "U3": 50
+      }
+    },
     "unit": "MW/h",
     "required": true,
     "description": "",
@@ -228,7 +350,7 @@
       "default_horizon": 4,
       "time_set": "time",
       "state_time_set": null,
-      "interval_minutes": 60,
+      "interval_minutes": 60.0,
       "editable": true,
       "derive_from": null,
       "allowed_horizons": []
@@ -246,6 +368,30 @@
       "unit"
     ],
     "type": "dict",
+    "allowed_formats": [
+      "dict"
+    ],
+    "axis_order": [
+      "unit"
+    ],
+    "axes": [
+      {
+        "set": "unit",
+        "members": [
+          "U1",
+          "U2",
+          "U3"
+        ]
+      }
+    ],
+    "format_description": "允许格式：dict；轴顺序：unit；数组逐轴按声明集合顺序；映射逐轴按业务键匹配",
+    "format_examples": {
+      "dict": {
+        "U1": 80,
+        "U2": 60,
+        "U3": 50
+      }
+    },
     "unit": "MW/h",
     "required": true,
     "description": "",
@@ -278,7 +424,77 @@
       "default_horizon": 4,
       "time_set": "time",
       "state_time_set": null,
-      "interval_minutes": 60,
+      "interval_minutes": 60.0,
+      "editable": true,
+      "derive_from": null,
+      "allowed_horizons": []
+    },
+    "dispatch_mode": "economic_dispatch",
+    "validation": {
+      "type": "dict",
+      "min": 0
+    }
+  },
+  {
+    "key": "initial_unit_output",
+    "name": "初始机组出力",
+    "dimension": [
+      "unit"
+    ],
+    "type": "dict",
+    "allowed_formats": [
+      "dict"
+    ],
+    "axis_order": [
+      "unit"
+    ],
+    "axes": [
+      {
+        "set": "unit",
+        "members": [
+          "U1",
+          "U2",
+          "U3"
+        ]
+      }
+    ],
+    "format_description": "允许格式：dict；轴顺序：unit；数组逐轴按声明集合顺序；映射逐轴按业务键匹配",
+    "format_examples": {
+      "dict": {
+        "U1": 80,
+        "U2": 50,
+        "U3": 30
+      }
+    },
+    "unit": "MW",
+    "required": false,
+    "description": "",
+    "default_value": null,
+    "sample_value": {
+      "U1": 80,
+      "U2": 50,
+      "U3": 30
+    },
+    "default_policy": "sample_only",
+    "source_system": "SCADA",
+    "runtime_injected": true,
+    "field_role": "parameter",
+    "runtime_editable": true,
+    "sets": {
+      "unit": [
+        "U1",
+        "U2",
+        "U3"
+      ]
+    },
+    "time_dimension": {
+      "schema_version": 1,
+      "enabled": true,
+      "policy": "runtime_variable",
+      "default_horizon": 4,
+      "time_set": "time",
+      "state_time_set": null,
+      "interval_minutes": 60.0,
       "editable": true,
       "derive_from": null,
       "allowed_horizons": []

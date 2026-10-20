@@ -1,0 +1,16 @@
+{
+  "user_provided_key_persisted": true,
+  "before_sha256": "e30057e3b1c56b0f41c2f9dbf39944c5f422268a2029cab3684b18c43159a55b",
+  "after_sha256": "a6670dd26b4ffbe5ce61b810c762d7f1654980f642ba47d1ec682c552907b622",
+  "only_llm_config_changed": true,
+  "original_file_backup_kept_local": true,
+  "key_format": "fernet:v1",
+  "portable_secret_created": true,
+  "key_decryption_verified": true,
+  "provider_probe_previously_passed_for_same_key": true,
+  "runtime_permissions": "0o600",
+  "secret_permissions": "0o600",
+  "credentials_uploaded": false,
+  "fresh_container_read_only_decryption_verified": true,
+  "fresh_container_network_disabled": true
+}

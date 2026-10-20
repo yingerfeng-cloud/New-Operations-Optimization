@@ -25,6 +25,7 @@ __pycache__/
 pytest_tmp/
 __chrome_*_profile*/
 .optiforge-config-secret
+llm.local.json
 reports/review_20261017_evidence/*.png
 
 reports/review_20261020_evidence/*.png

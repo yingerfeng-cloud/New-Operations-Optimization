@@ -1,0 +1,291 @@
+{
+  "synthetic": true,
+  "customer_acceptance": false,
+  "tolerances": {
+    "physical_absolute": 1e-05,
+    "objective_absolute": 0.02,
+    "optimality_gap": 1e-06
+  },
+  "model_ids": {
+    "economic": "MODEL-93099A51",
+    "pv_storage": "MODEL-F81BC0E6",
+    "hydro": "MODEL-C1086718"
+  },
+  "passed": 11,
+  "total": 11,
+  "outcomes": [
+    {
+      "case_id": "ED-24H-normal",
+      "expected": "SUCCESS",
+      "http_status": 200,
+      "api_duration_seconds": 5.8358,
+      "actual": "SUCCESS",
+      "task_id": "OPT-625C5F8105",
+      "solver": "HiGHS",
+      "termination": "optimal",
+      "solve_time_seconds": 0.0017,
+      "model_size": {
+        "variable_count": 72,
+        "constraint_count": 240,
+        "solver_status": "optimal",
+        "objective_value": 1192600.0,
+        "solver_gap": null
+      },
+      "checks": {
+        "objective": 1192600.0,
+        "closed_form_optimum": 1192600.0,
+        "max_power_residual_MW": 0.0,
+        "max_bound_violation_MW": 0.0,
+        "max_ramp_violation_MW": 0.0
+      },
+      "reported_objective": 1192600.0,
+      "passed": true
+    },
+    {
+      "case_id": "ED-24H-near-capacity",
+      "expected": "SUCCESS",
+      "http_status": 200,
+      "api_duration_seconds": 5.7645,
+      "actual": "SUCCESS",
+      "task_id": "OPT-3FE293C1DF",
+      "solver": "HiGHS",
+      "termination": "optimal",
+      "solve_time_seconds": 0.002,
+      "model_size": {
+        "variable_count": 72,
+        "constraint_count": 240,
+        "solver_status": "optimal",
+        "objective_value": 1782720.0,
+        "solver_gap": null
+      },
+      "checks": {
+        "objective": 1782720.0,
+        "closed_form_optimum": 1782720.0,
+        "max_power_residual_MW": 0.0,
+        "max_bound_violation_MW": 0.0,
+        "max_ramp_violation_MW": 0.0
+      },
+      "reported_objective": 1782720.0,
+      "passed": true
+    },
+    {
+      "case_id": "ED-24H-infeasible",
+      "expected": "INFEASIBLE",
+      "http_status": 200,
+      "api_duration_seconds": 3.7625,
+      "actual": "INFEASIBLE",
+      "task_id": "OPT-30C87648BD",
+      "solver": null,
+      "termination": null,
+      "solve_time_seconds": null,
+      "model_size": {
+        "variable_count": 72,
+        "constraint_count": 240,
+        "solver_status": "infeasible",
+        "objective_value": null,
+        "solver_gap": null
+      },
+      "passed": true
+    },
+    {
+      "case_id": "ED-24H-missing-period",
+      "expected": "INVALID",
+      "http_status": 422,
+      "api_duration_seconds": 0.0022,
+      "actual": "INVALID",
+      "diagnostic": {
+        "message": "当前调度时段 horizon=24，但参数 load_forecast 实际提供 23 个点，需要 24 个点。",
+        "errors": [
+          {
+            "field": "load_forecast",
+            "error": "time_series_length_mismatch",
+            "expected": 24,
+            "actual": 23,
+            "message": "当前调度时段 horizon=24，但参数 load_forecast 实际提供 23 个点，需要 24 个点。"
+          }
+        ]
+      },
+      "passed": true
+    },
+    {
+      "case_id": "PV-96QH-arbitrage",
+      "expected": "SUCCESS",
+      "http_status": 200,
+      "api_duration_seconds": 6.1929,
+      "actual": "SUCCESS",
+      "task_id": "OPT-6A2A1F5EC3",
+      "solver": "HiGHS",
+      "termination": "optimal",
+      "solve_time_seconds": 0.1454,
+      "model_size": {
+        "variable_count": 1059,
+        "constraint_count": 1445,
+        "solver_status": "optimal",
+        "objective_value": -78491.97230263159,
+        "solver_gap": null
+      },
+      "checks": {
+        "objective": -78491.97231849999,
+        "no_battery_policy_objective": -61795.36775,
+        "improvement_CNY": 16696.60456849999,
+        "revenue_CNY": 78532.02494999999,
+        "cycle_cost_CNY": 40.052631500000004,
+        "curtailment_cost_CNY": 0.0,
+        "max_power_residual_MW": 0.0,
+        "max_SOC_residual_MWh": 7.499999987170547e-07,
+        "max_bound_violation": 0.0,
+        "max_charge_discharge_overlap_MW": 0.0,
+        "terminal_SOC_error_MWh": 0.0
+      },
+      "reported_objective": -78491.97230263159,
+      "passed": true
+    },
+    {
+      "case_id": "PV-96QH-grid-congestion",
+      "expected": "SUCCESS",
+      "http_status": 200,
+      "api_duration_seconds": 7.9966,
+      "actual": "SUCCESS",
+      "task_id": "OPT-1AB6B0A9C1",
+      "solver": "HiGHS",
+      "termination": "optimal",
+      "solve_time_seconds": 0.4489,
+      "model_size": {
+        "variable_count": 1059,
+        "constraint_count": 1445,
+        "solver_status": "optimal",
+        "objective_value": -45485.98551454831,
+        "solver_gap": null
+      },
+      "checks": {
+        "objective": -45485.98552325,
+        "no_battery_policy_objective": -21454.70075,
+        "improvement_CNY": 24031.284773249998,
+        "revenue_CNY": 56323.98425,
+        "cycle_cost_CNY": 114.25540174999999,
+        "curtailment_cost_CNY": 10723.743325,
+        "max_power_residual_MW": 3.552713678800501e-15,
+        "max_SOC_residual_MWh": 6.250000006424727e-07,
+        "max_bound_violation": 0.0,
+        "max_charge_discharge_overlap_MW": 0.0,
+        "terminal_SOC_error_MWh": 0.0
+      },
+      "reported_objective": -45485.98551454831,
+      "passed": true
+    },
+    {
+      "case_id": "PV-96QH-invalid-efficiency",
+      "expected": "INVALID",
+      "http_status": 422,
+      "api_duration_seconds": 0.0249,
+      "actual": "INVALID",
+      "diagnostic": [
+        {
+          "field": "runtime_parameters",
+          "error": "组件化模型参数错误：eta_ch 不得大于 1。",
+          "expected": "组件化模型参数校验通过",
+          "actual": "校验失败"
+        }
+      ],
+      "passed": true
+    },
+    {
+      "case_id": "HYDRO-96QH-maintenance-delay",
+      "expected": "SUCCESS",
+      "http_status": 200,
+      "api_duration_seconds": 9.3162,
+      "actual": "SUCCESS",
+      "task_id": "OPT-5B8F910E60",
+      "solver": "HiGHS",
+      "termination": "optimal",
+      "solve_time_seconds": 0.0149,
+      "model_size": {
+        "variable_count": 3081,
+        "constraint_count": 2697,
+        "solver_status": "optimal",
+        "objective_value": -1220640.6020687614,
+        "solver_gap": null
+      },
+      "checks": {
+        "objective": -1220640.6020769994,
+        "feasible_water_conserving_policy_objective": 4251972.392512919,
+        "generation_MWh": 7437.967070000001,
+        "revenue_CNY": 2231390.1210000003,
+        "max_water_residual_million_m3": 9.265000041336346e-07,
+        "max_power_or_outflow_residual": 1.0000000258969521e-06,
+        "max_bound_violation": 0.0,
+        "terminal_volume_deviation_million_m3": 0.0
+      },
+      "reported_objective": -1220640.6020687614,
+      "passed": true
+    },
+    {
+      "case_id": "HYDRO-96QH-low-inflow",
+      "expected": "SUCCESS",
+      "http_status": 200,
+      "api_duration_seconds": 14.732,
+      "actual": "SUCCESS",
+      "task_id": "OPT-3922E47A6F",
+      "solver": "HiGHS",
+      "termination": "optimal",
+      "solve_time_seconds": 0.014,
+      "model_size": {
+        "variable_count": 3081,
+        "constraint_count": 2697,
+        "solver_status": "optimal",
+        "objective_value": 1074290.2952941037,
+        "solver_gap": null
+      },
+      "checks": {
+        "objective": 1074290.2956102486,
+        "feasible_water_conserving_policy_objective": 1890022.4703009697,
+        "generation_MWh": 6893.587058750003,
+        "revenue_CNY": 2068076.117625001,
+        "max_water_residual_million_m3": 9.810000006910125e-07,
+        "max_power_or_outflow_residual": 1.9999998812636477e-07,
+        "max_bound_violation": 0.0,
+        "terminal_volume_deviation_million_m3": 0.0
+      },
+      "reported_objective": 1074290.2952941037,
+      "passed": true
+    },
+    {
+      "case_id": "HYDRO-96QH-hard-load-infeasible",
+      "expected": "INFEASIBLE",
+      "http_status": 200,
+      "api_duration_seconds": 15.7785,
+      "actual": "INFEASIBLE",
+      "task_id": "OPT-ECF15EFD57",
+      "solver": null,
+      "termination": null,
+      "solve_time_seconds": null,
+      "model_size": {
+        "variable_count": 3081,
+        "constraint_count": 2697,
+        "solver_status": "infeasible",
+        "objective_value": null,
+        "solver_gap": null
+      },
+      "passed": true
+    },
+    {
+      "case_id": "HYDRO-96QH-duration-conflict",
+      "expected": "INVALID",
+      "http_status": 422,
+      "api_duration_seconds": 0.0682,
+      "actual": "INVALID",
+      "diagnostic": {
+        "message": "time_step_seconds 与模型时间维度契约不一致，请统一秒、分钟和小时配置。",
+        "errors": [
+          {
+            "field": "time_step_seconds",
+            "error": "time_granularity_mismatch",
+            "expected": 900.0,
+            "actual": 3600
+          }
+        ]
+      },
+      "passed": true
+    }
+  ]
+}

@@ -1,0 +1,24 @@
+{
+  "provenance": "local_docker_bind_mount_copy",
+  "source_sha256": "e30057e3b1c56b0f41c2f9dbf39944c5f422268a2029cab3684b18c43159a55b",
+  "original_file_unchanged": true,
+  "copy_load_and_save_executed": true,
+  "original_result_objects_unchanged": true,
+  "function_assets_unchanged": true,
+  "llm_ciphertext_unchanged": true,
+  "fixed_service_bindings_unchanged": true,
+  "stored_custom_models": 0,
+  "historical_tasks": 20,
+  "unknown_history_tasks": 2,
+  "history_issues": {
+    "missing_snapshot": 8
+  },
+  "old_key_format": "host_bound_xor",
+  "old_key_recovered": false,
+  "key_recovery_candidates": [
+    "stopped_container_metadata",
+    "current_native_environment"
+  ],
+  "real_llm_call_executed": false,
+  "limits": "No custom model migration could be accepted on this copy because it stores no custom models. Builtins are seeded separately. Raw runtime, conversations, results and credentials remain local."
+}

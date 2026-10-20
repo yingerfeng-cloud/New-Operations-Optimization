@@ -186,7 +186,9 @@ def test_runtime_parameter_length_validated_against_time_set() -> None:
     )
 
     assert errors
-    assert "load_forecast" in errors[0]["error"]
+    assert errors[0]["field"] == "load_forecast"
+    assert "load_forecast" in errors[0]["message"]
+    assert (errors[0]["expected"], errors[0]["actual"]) == (3, 2)
 
 
 def test_non_time_model_response_does_not_default_time_granularity() -> None:

@@ -1,0 +1,11 @@
+{
+  "executed": true,
+  "provider": "volcengine_ark",
+  "model": "doubao-seed-2-0-lite-260428",
+  "http_status": 200,
+  "ok": true,
+  "enabled": true,
+  "elapsed_seconds": 8.875,
+  "function_calling": true,
+  "protocol": "responses_tools"
+}

@@ -1,0 +1,10 @@
+{
+  "provider": "volcengine_ark",
+  "base_url": "https://ark.cn-beijing.volces.com/api/v3",
+  "model": "",
+  "api_key": "",
+  "enabled": true,
+  "timeout_seconds": 60,
+  "temperature": 0.2,
+  "max_tokens": 4096
+}

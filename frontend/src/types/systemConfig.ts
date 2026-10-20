@@ -32,6 +32,8 @@ export interface LlmConfig {
   api_key_recovery_error?: string | null;
   supported_providers: string[];
   persistence_path?: string;
+  local_config_file?: string;
+  last_imported_from?: string | null;
   config_source?: string;
   last_updated_at?: string | null;
 }

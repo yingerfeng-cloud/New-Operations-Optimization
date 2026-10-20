@@ -75,9 +75,9 @@ class OptimizationTaskEngine:
         # known workflow into a scene-clarification prompt.
         effective_skill = (
             skill_name
-            or task.get("workflow_key")
             or previous.get("api_skill_name")
             or previous.get("resolved_skill_name")
+            or task.get("workflow_key")
             or previous.get("agent_skill_name")
         )
         response = agent_runtime_service.analyze(
@@ -87,7 +87,7 @@ class OptimizationTaskEngine:
                 # never run on a model paraphrase.
                 "message": context.user_message,
                 "skill_name": effective_skill,
-                "agent_skill_name": effective_skill,
+                "agent_skill_name": previous.get("agent_skill_name") or task.get("workflow_key") or (str(effective_skill).removeprefix("run_") if effective_skill else None),
             }
         )
         self._clarify_unavailable_defaults(task, context.user_message, response)

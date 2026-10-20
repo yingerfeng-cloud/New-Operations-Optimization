@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import shutil
 import faulthandler
 import sys
 import tempfile
@@ -83,10 +84,20 @@ def pytest_configure(config: pytest.Config) -> None:
     if not worker_input:
         return
     worker_id = worker_input.get("workerid", "worker")
+    skills_copy = Path(tempfile.mkdtemp(prefix=f"optiforge_agent_skills_{worker_id}_")) / "agent_skills"
+    shutil.copytree(Path(__file__).resolve().parents[1] / "agent_skills", skills_copy, ignore=shutil.ignore_patterns(".DS_Store"))
+    config._optiforge_skills_copy = skills_copy.parent
+    os.environ["OPTIFORGE_AGENT_SKILLS_DIR"] = str(skills_copy)
     os.environ["RUNTIME_STORE_PATH"] = str(
         Path(tempfile.gettempdir())
         / f"optiforge_runtime_store_pytest_{worker_id}_{uuid.uuid4().hex}.json"
     )
+
+
+def pytest_unconfigure(config: pytest.Config) -> None:
+    copy_path = getattr(config, "_optiforge_skills_copy", None)
+    if copy_path:
+        shutil.rmtree(copy_path, ignore_errors=True)
 
 try:
     faulthandler.enable()

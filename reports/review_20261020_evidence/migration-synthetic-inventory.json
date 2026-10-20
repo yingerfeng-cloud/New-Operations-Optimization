@@ -1,0 +1,88 @@
+{
+  "read_only": true,
+  "schema_version": 7,
+  "models": [
+    {
+      "model_id": "PINNED",
+      "version": "v1",
+      "status": "published",
+      "issues": []
+    },
+    {
+      "model_id": "LEGACY",
+      "version": "v0",
+      "status": "published",
+      "issues": [
+        {
+          "function_id": "F",
+          "issue": "missing_snapshot",
+          "action": "verified_backup_or_explicit_new_version"
+        },
+        {
+          "issue": "time_contract_conflict",
+          "values": [
+            {
+              "field": "model.parameters.time_step_seconds",
+              "seconds": 900
+            },
+            {
+              "field": "model.ui_metadata.time_dimension.interval_minutes",
+              "seconds": 3600
+            }
+          ],
+          "action": "keep_original_create_consistent_version_and_retest"
+        }
+      ]
+    }
+  ],
+  "tasks": [
+    {
+      "task_id": "REPLAYABLE",
+      "model_id": "PINNED",
+      "replayability": "recorded_inputs_available",
+      "has_result": true,
+      "issues": []
+    },
+    {
+      "task_id": "RESULT_ONLY",
+      "model_id": "LEGACY",
+      "replayability": "result_only_unknown_history",
+      "has_result": true,
+      "issues": [
+        {
+          "function_id": "F",
+          "issue": "missing_snapshot",
+          "action": "verified_backup_or_explicit_new_version"
+        }
+      ]
+    }
+  ],
+  "service_bindings": [
+    {
+      "skill": "fixed_skill",
+      "model_id": "PINNED",
+      "recorded_version": "v1",
+      "check": "fixed_target_retained",
+      "action": "review_binding_explicitly_no_automatic_migration"
+    }
+  ],
+  "llm": {
+    "key_state": "legacy_xor_original_host_user_path_required",
+    "enabled": true,
+    "decryption_executed": false
+  },
+  "summary": {
+    "model_count": 2,
+    "models_requiring_review": 1,
+    "task_count": 2,
+    "tasks_with_unknown_history": 1
+  },
+  "limits": [
+    "Missing historical curves or secrets are never reconstructed from current assets.",
+    "Recorded inputs do not guarantee identical solver output across environments; recheck objectives and constraints.",
+    "Run upgrade acceptance on a copy with retained secret material before changing the live deployment."
+  ],
+  "source_sha256": "c1fe65a9e2e89d60150e9cc9ca8f6fb14b5b081fd7653f6bf89d81923899dbd6",
+  "synthetic_fixture": true,
+  "provenance": "synthetic"
+}

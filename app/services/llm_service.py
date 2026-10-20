@@ -568,6 +568,50 @@ class DisabledFallbackAdapter(BaseLLMAdapter):
 
 
 class LLMService:
+    def local_config_path(self) -> Path:
+        configured = os.getenv("OPTIFORGE_LLM_CONFIG_FILE", "")
+        return Path(configured).expanduser() if configured else STORE.persistence_path.parent / "llm.local.json"
+
+    def import_local_config(self) -> dict[str, Any]:
+        """Explicit import keeps later settings changes authoritative."""
+        path = self.local_config_path()
+        if not path.is_file():
+            raise HTTPException(status_code=404, detail="本机 LLM 配置文件不存在，请先在设置页所示路径创建文件。")
+        try:
+            if path.stat().st_size > 65536:
+                raise ValueError("oversized")
+            body = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, ValueError, UnicodeError):
+            raise HTTPException(status_code=422, detail="本机 LLM 配置文件须为不超过 64 KiB 的有效 UTF-8 JSON。") from None
+        allowed = {"provider", "base_url", "model", "enabled", "temperature", "max_tokens", "timeout_seconds",
+                   "transport_max_attempts", "circuit_failure_threshold", "circuit_cooldown_seconds", "http2", "api_key"}
+        if not isinstance(body, dict) or body.keys() - allowed:
+            raise HTTPException(status_code=422, detail="配置文件包含不支持的字段；请使用 llm.local.example.json 的格式。")
+        for field in ("provider", "base_url", "model", "api_key"):
+            if not isinstance(body.get(field), str) or not body[field].strip():
+                raise HTTPException(status_code=422, detail=f"请在本机配置文件中填写 {field}。")
+            body[field] = body[field].strip()
+        try:
+            from pydantic import TypeAdapter, ValidationError, StrictBool, StrictFloat, StrictInt
+            for field in ("enabled", "http2"):
+                if field in body:
+                    body[field] = TypeAdapter(StrictBool).validate_python(body[field])
+            for field in ("max_tokens", "transport_max_attempts", "circuit_failure_threshold"):
+                if field in body:
+                    body[field] = TypeAdapter(StrictInt).validate_python(body[field])
+            for field in ("temperature", "timeout_seconds", "circuit_cooldown_seconds"):
+                if field in body:
+                    body[field] = TypeAdapter(StrictFloat).validate_python(body[field])
+            if not 1 <= body.get("timeout_seconds", 60) <= 600 or not 0 <= body.get("temperature", 0.2) <= 2 or not 1 <= body.get("max_tokens", 4096) <= 1000000:
+                raise ValueError("invalid limits")
+        except (ValueError, ValidationError):
+            raise HTTPException(status_code=422, detail="配置文件的开关须为 true/false，数值须为有效数字；请检查超时、温度和 token 范围。") from None
+        result = self.update_config(body)
+        with STORE.lock:
+            STORE.llm_config["last_imported_from"] = str(path)
+            STORE.save_runtime()
+        return {**result, "last_imported_from": str(path)}
+
     def _override(self, key: str, default: Any = None) -> Any:
         with STORE.lock:
             value = STORE.llm_config.get(key, default)
@@ -600,6 +644,8 @@ class LLMService:
             "api_key_recovery_error": getattr(self, "_key_recovery_error", None),
             "supported_providers": sorted(SUPPORTED_PROVIDERS),
             "persistence_path": str(STORE.persistence_path),
+            "local_config_file": str(self.local_config_path()),
+            "last_imported_from": self._override("last_imported_from", None),
             "config_source": self._config_source(),
             "last_updated_at": self._override("last_updated_at", None),
         }

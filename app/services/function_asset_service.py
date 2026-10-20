@@ -3,8 +3,6 @@ from __future__ import annotations
 import csv
 import math
 import uuid
-import hashlib
-import json
 from copy import deepcopy
 from io import StringIO
 from typing import Any
@@ -12,6 +10,7 @@ from typing import Any
 from fastapi import HTTPException
 
 from app.schemas.function_asset import FunctionAsset
+from app.function_asset_content import function_asset_hash
 from app.storage.memory_store import STORE
 from app.utils import now_text
 
@@ -745,14 +744,6 @@ def function_asset_references(function_id: str, revision: int | None = None) -> 
                 "function_revision": dependency.get("revision"), "function_hash": dependency.get("content_hash"),
                 "referenced_at": task.created_at})
     return rows
-
-
-def function_asset_hash(asset: dict[str, Any]) -> str:
-    normalized = FunctionAsset.model_validate(asset).model_dump(mode="json")
-    content = {key: value for key, value in normalized.items() if key not in {
-        "revision", "content_hash", "_versions", "referenced_by", "created_at", "updated_at",
-    }}
-    return hashlib.sha256(json.dumps(content, sort_keys=True, ensure_ascii=False, separators=(",", ":")).encode()).hexdigest()
 
 
 def get_function_asset_points(function_id: str, snapshots: dict | None = None) -> list[list[float]]:

@@ -1,0 +1,62 @@
+
+> optiforge-platform-frontend@1.0.0 test
+> vitest run --run --reporter=dot
+
+
+ RUN  v4.1.9 /Users/joiefu/Project/OPTIFORGE/frontend
+
+·························································stderr | src/tests/unit/ComponentLibraryPage.test.tsx > renders component library list and structured detail drawer
+Warning: [antd: Descriptions] Sum of column `span` in a line not match `column` of Descriptions.
+Warning: [antd: Descriptions] Sum of column `span` in a line not match `column` of Descriptions.
+
+··stderr | src/tests/unit/AgentWorkbenchPage.test.tsx > loads agent status, skills and sends a V3 Agent turn
+`NaN` is an invalid value for the `height` css style property.
+
+···········stderr | src/tests/unit/ComponentLibraryPage.test.tsx > draft component copies can be deleted from more actions
+Warning: [antd: Modal] Static function can not consume context like dynamic theme. Please use 'App' component instead.
+
+·stderr | src/tests/unit/ComponentLibraryPage.test.tsx > legacy formula fields are normalized for editing and synchronized on save
+`NaN` is an invalid value for the `height` css style property.
+
+····················································································································································stderr | src/tests/unit/ReviewDraftLeave.test.tsx > continue editing preserves draft and only explicit discard clears it
+Warning: [antd: Modal] `maskClosable` is deprecated. Please use `mask.closable` instead.
+
+stderr | src/tests/unit/ReviewDraftLeave.test.tsx > continue editing preserves draft and only explicit discard clears it
+Warning: [antd: Modal] `maskClosable` is deprecated. Please use `mask.closable` instead.
+
+stderr | src/tests/unit/ReviewDraftLeave.test.tsx > failed save prevents navigation and successful retry leaves
+Warning: [antd: Modal] `maskClosable` is deprecated. Please use `mask.closable` instead.
+
+stderr | src/tests/unit/ReviewDraftLeave.test.tsx > failed save prevents navigation and successful retry leaves
+Warning: [antd: Modal] `maskClosable` is deprecated. Please use `mask.closable` instead.
+
+stderr | src/tests/unit/ReviewDraftLeave.test.tsx > failed save prevents navigation and successful retry leaves
+Warning: [antd: Modal] `maskClosable` is deprecated. Please use `mask.closable` instead.
+
+stderr | src/tests/unit/ReviewDraftLeave.test.tsx > failed save prevents navigation and successful retry leaves
+Warning: [antd: Modal] `maskClosable` is deprecated. Please use `mask.closable` instead.
+
+stderr | src/tests/unit/ReviewDraftLeave.test.tsx > failed save prevents navigation and successful retry leaves
+Warning: [antd: Modal] `maskClosable` is deprecated. Please use `mask.closable` instead.
+
+·stderr | src/tests/unit/ReviewDraftLeave.test.tsx > browser history navigation is guarded and clean drafts leave normally
+Warning: [antd: Modal] `maskClosable` is deprecated. Please use `mask.closable` instead.
+
+·····stderr | src/tests/unit/RuntimeWorkspaceComponents.test.tsx > fullscreen matrix saves edits and cancel does not save
+An update to ForwardRef(StickyScrollBar) inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+····························································································································································································································································
+
+ Test Files  84 passed (84)
+      Tests  477 passed (477)
+   Start at  22:33:45
+   Duration  178.06s (transform 1.40s, setup 9.39s, import 8.02s, tests 318.52s, environment 15.53s)

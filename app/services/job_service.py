@@ -112,6 +112,8 @@ class JobService:
         from app.schemas.model import ModelPackage
         from app.services.function_dependencies import dependency_snapshots
         payload = task.request.payload
+        if not any(payload.get(key) for key in ("semantic_spec", "component_spec", "generic_spec")):
+            raise HTTPException(status_code=409, detail={"code": "TASK_HISTORY_UNREPLAYABLE", "message": "任务未保留当时的模型定义，原结果保留；请明确建立当前模型后重新计算。"})
         context = payload.get("_result_context") or {}
         model = ModelPackage(name=task.request.model, scene=task.request.scene,
             semantic_spec=payload.get("semantic_spec") or {}, component_spec=payload.get("component_spec") or {},

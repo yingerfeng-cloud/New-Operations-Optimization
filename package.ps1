@@ -10,6 +10,7 @@ $IncludeItems = @(
   ".github",
   "agent_skills",
   "app",
+  "config",
   "data",
   "docs",
   "frontend",
@@ -96,6 +97,8 @@ $RemovePatterns = @(
   "\\data\\runtime_store\.json$",
   "\\data\\runtime_store\.local\.json$",
   "\\data\\runtime_store_test_[^\\]*\.json$",
+  "\\llm\.local\.json$",
+  "\\\.optiforge-config-secret$",
   "\.pyc$",
   "\.pyo$"
 )

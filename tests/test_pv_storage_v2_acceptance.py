@@ -24,8 +24,7 @@ def test_v2_runtime_parameter_validation_rejects_bad_closing_params() -> None:
     errors = RuntimeParameterValidator().validate(template, params)
 
     assert errors
-    text = " ".join(error["error"] for error in errors)
-    assert "deviation_limit" in text or "soc_max" in text
+    assert any(error["field"] == "deviation_limit" and error["error"] == "length mismatch" for error in errors)
 
 
 def test_rolling_service_reports_partial_success_and_soc_handoff(monkeypatch) -> None:

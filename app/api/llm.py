@@ -20,3 +20,8 @@ def get_llm_config() -> dict:
 @router.put("/config")
 def update_llm_config(body: dict) -> dict:
     return llm_service.update_config(body)
+
+
+@router.post("/config/import-local")
+def import_local_llm_config() -> dict:
+    return llm_service.import_local_config()

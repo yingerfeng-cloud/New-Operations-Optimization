@@ -338,6 +338,7 @@ def _economic_dispatch() -> dict[str, Any]:
             _param("fuel_cost", "燃料成本", "元/MWh", ["unit"], "cost_system", sample["fuel_cost"], {"type": "dict", "min": 0}),
             _param("ramp_up_limit", "上爬坡限制", "MW/h", ["unit"], "EAM", sample["ramp_up_limit"], {"type": "dict", "min": 0}, "default_allowed"),
             _param("ramp_down_limit", "下爬坡限制", "MW/h", ["unit"], "EAM", sample["ramp_down_limit"], {"type": "dict", "min": 0}, "default_allowed"),
+            {**_param("initial_unit_output", "初始机组出力", "MW", ["unit"], "SCADA", sample["initial_unit_output"], {"type": "dict", "min": 0}), "required": False},
         ],
         variables=[_var("unit_output", "机组出力", "MW", ["unit", "time"])],
         constraints=[
@@ -2226,5 +2227,3 @@ def _compute_power_coordination_day_ahead_v1() -> dict[str, Any]:
             "capability_boundary": "当前模板面向单园区聚合任务池的日前联合优化，不包含跨园区迁移和自动控制下发。",
         },
     }
-
-

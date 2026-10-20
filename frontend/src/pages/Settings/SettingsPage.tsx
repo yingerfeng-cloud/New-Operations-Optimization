@@ -1,4 +1,4 @@
-import { Alert, Button, Card, Col, Descriptions, Form, Input, InputNumber, Row, Select, Space, Switch, Table, Tag, message } from 'antd';
+import { Alert, Button, Card, Col, Descriptions, Form, Input, InputNumber, Row, Select, Space, Switch, Table, Tag, Typography, message } from 'antd';
 import { DeleteOutlined, PlusOutlined, ReloadOutlined } from '@ant-design/icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
@@ -6,7 +6,7 @@ import { PageHeader } from '../../components/PageHeader';
 import { MetricCard, MetricGrid } from '../../components/WorkspaceUI';
 import { apiClient, unwrap } from '../../api/client';
 import { getSolverStatus } from '../../api/solvers';
-import { getLlmConfig, getSystemConfig, resetSystemConfig, testLlmConfig, updateLlmConfig, updateSystemDictionaries } from '../../api/systemConfig';
+import { getLlmConfig, getSystemConfig, importLocalLlmConfig, resetSystemConfig, testLlmConfig, updateLlmConfig, updateSystemDictionaries } from '../../api/systemConfig';
 import type { DictionaryItem, LlmConfig, SystemDictionaries } from '../../types/systemConfig';
 import type { TableProps } from 'antd';
 
@@ -217,6 +217,14 @@ function LlmConfigPanel({ config }: { config?: LlmConfig }) {
     },
   });
   const provider = Form.useWatch('provider', form) || config?.provider;
+  const importLocal = useMutation({
+    mutationFn: importLocalLlmConfig,
+    onSuccess: () => {
+      message.success('本机配置已导入并加密保存');
+      qc.invalidateQueries({ queryKey: ['llm-config'] });
+      qc.invalidateQueries({ queryKey: ['agent-status'] });
+    },
+  });
   const providerOptions = (config?.supported_providers || ['disabled', 'openai_compatible', 'volcengine_ark']).map(value => ({ value, label: value }));
   return (
     <Card className="content-card llm-config-card" title="大模型配置">
@@ -252,9 +260,15 @@ function LlmConfigPanel({ config }: { config?: LlmConfig }) {
           <Descriptions.Item label="配置来源">{config?.config_source || '-'}</Descriptions.Item>
           <Descriptions.Item label="Key 状态">{config?.api_key_configured ? '已配置' : '未配置'}</Descriptions.Item>
           <Descriptions.Item label="持久化文件" span={2}>{config?.persistence_path || '-'}</Descriptions.Item>
+          <Descriptions.Item label="本机配置文件" span={2}>{config?.local_config_file || '-'}</Descriptions.Item>
           <Descriptions.Item label="更新时间" span={2}>{config?.last_updated_at || '-'}</Descriptions.Item>
         </Descriptions>
+        <Typography.Paragraph type="secondary" className="section-gap">
+          可在服务端本机配置文件填写 API Key，再点击导入。导入后加密保存；后续设置页修改继续生效。
+          迁移或重建时，请同时保留数据目录和其中的 .optiforge-config-secret 文件。
+        </Typography.Paragraph>
         <div className="settings-action-bar">
+          <Button onClick={() => importLocal.mutate()} loading={importLocal.isPending}>从本机配置文件导入</Button>
           <Button onClick={() => test.mutate()} loading={test.isPending}>测试连接</Button>
           <Button htmlType="submit" type="primary" loading={save.isPending}>保存大模型配置</Button>
         </div>

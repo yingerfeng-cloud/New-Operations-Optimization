@@ -379,6 +379,8 @@ class ModelService:
 
     def copy_model(self, model_id: str) -> ModelView:
         model = self.get_model(model_id)
+        from app.services.function_dependencies import dependency_snapshots
+        dependency_snapshots(model, require_pinned=bool(model.published_at))
         copied = ModelPackage(**model.model_dump(exclude={
             "id", "created_at", "updated_at", "published_at", "model_family_id",
             "supersedes_model_id", "is_active_version", "published_by", "tested_at",

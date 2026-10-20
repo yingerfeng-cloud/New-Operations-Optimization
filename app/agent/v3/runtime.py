@@ -28,6 +28,10 @@ allocation, or planning task, call optimization_create_or_continue immediately, 
 The Skill owns task state and missing-parameter discovery; do not replace that call by listing parameters yourself.
 Conceptual questions about optimization that do not request a task should still be answered directly.
 Never claim that a tool ran unless you received its output. Keep consequential recommendations subject to human review.
+Completed-task evidence is read-only. Explain its recorded solver facts without starting another solve.
+Do not describe a cost or weighted objective as profit unless the recorded model defines it as profit.
+Never label a sum of power samples over periods as a total MW quantity. Use recorded energy in MWh,
+and distinguish per-period MW from energy integrated with the recorded time step.
 When a tool reports missing information, ask for the smallest useful next input in plain business language.
 The runtime owns durable task identity. Never invent, mention, request, or reuse internal task/run/conversation IDs.
 """
@@ -466,6 +470,11 @@ class AgentV3Runtime:
         if final_turn is None or final_turn.tool_calls:
             raise HTTPException(status_code=502, detail="Agent did not produce a final response")
         final_content = final_turn.content[:50_000]
+        from app.agent.v3.result_grounding import ground_completed_explanation
+        if not created_task_ids and any(key in message for key in ("结果", "解释", "刚才")):
+            final_content, audit = ground_completed_explanation(final_content, task_context)
+            if audit:
+                agent_v3_store.update_turn(turn_id, grounding_audit=audit)
         return self._finalize_turn_response(
             conversation_id,
             turn_id,
@@ -1011,9 +1020,32 @@ class AgentV3Runtime:
 
     @staticmethod
     def _task_context(conversation_id: str) -> list[dict[str, Any]]:
+        from app.storage.memory_store import STORE
         context: list[dict[str, Any]] = []
+        completed: list[dict[str, Any]] = []
         for task in agent_v3_store.list_tasks(conversation_id):
             if task.get("status") in {TaskStatus.SUCCEEDED.value, TaskStatus.FAILED.value, TaskStatus.CANCELLED.value}:
+                result = task.get("result") if isinstance(task.get("result"), dict) else {}
+                evidence = result.get("evidence_package") if isinstance(result.get("evidence_package"), dict) else {}
+                invocation = result.get("result") if isinstance(result.get("result"), dict) else {}
+                raw = invocation.get("raw_result") if isinstance(invocation.get("raw_result"), dict) else {}
+                metadata = raw.get("result_metadata") if isinstance(raw.get("result_metadata"), dict) else {}
+                with STORE.lock:
+                    job = STORE.tasks.get(invocation.get("task_id"))
+                    frozen = copy.deepcopy((job.request.payload.get("_result_context") or {}) if job else {})
+                    hours = job.request.payload.get("delta_t") if job else None
+                manifest = frozen.get("function_dependencies", metadata.get("function_dependencies"))
+                energy = {}
+                if isinstance(hours, (int, float)) and not isinstance(hours, bool) and hours > 0:
+                    for variable in evidence.get("variables_summary") or []:
+                        if isinstance(variable, dict) and variable.get("unit") == "MW" and "time" in (variable.get("dimension") or []) and isinstance(variable.get("sum"), (int, float)):
+                            energy[str(variable.get("name"))] = {"value": variable["sum"] * hours, "unit": "MWh"}
+                completed.append({"title": task.get("title"), "status": task.get("status"), "read_only": True,
+                    "recorded_result": {key: copy.deepcopy(evidence[key]) for key in ("model", "solver", "inputs_summary", "variables_summary", "constraint_checks", "derived_metrics", "business_outcomes", "explanation_limits") if key in evidence},
+                    "model_binding": {key: frozen.get(key) for key in ("id", "version", "content_hash")} if frozen else None,
+                    "function_dependencies": copy.deepcopy(manifest), "function_manifest_known": manifest is not None,
+                    "recorded_time_step_hours": hours, "physical_aggregates": energy,
+                    "error": task.get("error")})
                 continue
             result = task.get("result") if isinstance(task.get("result"), dict) else {}
             context.append(
@@ -1026,7 +1058,7 @@ class AgentV3Runtime:
                     "invalid_parameters": result.get("invalid_parameters") or [],
                 }
             )
-        return context
+        return context + list(reversed(completed[-3:]))
 
 
 agent_v3_runtime = AgentV3Runtime()

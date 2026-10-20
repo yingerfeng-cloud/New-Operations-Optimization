@@ -1005,7 +1005,15 @@ class AgentOrchestrator:
             if item.get("skill_name") == skill_name or skill_name in (item.get("skill_aliases") or [])
         ]
         if not matches:
-            return skill_name
+            # A V3 workflow key / UI selection is an Agent Skill name, while
+            # the callable registry owns its concrete API Skill name.
+            try:
+                canonical = agent_skill_service.get_skill_local(skill_name).get("canonical_api_skill_name")
+            except HTTPException:
+                canonical = None
+            matches = [item for item in skills if canonical and item.get("skill_name") == canonical]
+            if not matches:
+                return skill_name
         if prefer_custom:
             matches.sort(key=lambda item: (str(item.get("model_id") or "").startswith("MODEL-POWER-"), str(item.get("skill_name") or "")))
         else:

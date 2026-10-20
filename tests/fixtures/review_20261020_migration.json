@@ -1,0 +1,186 @@
+{
+  "schema_version": 7,
+  "models": {
+    "PINNED": {
+      "name": "Synthetic pinned",
+      "version": "v1",
+      "status": "published",
+      "component_spec": {
+        "components": [
+          {
+            "type": "function_mapping_component",
+            "function_asset_id": "F"
+          }
+        ]
+      },
+      "function_dependencies": {
+        "F": {
+          "revision": 1,
+          "content_hash": "bada698c06e88dc80631eb9351b06fdbe801331835b43120a1c6348b719241d4",
+          "asset": {
+            "function_id": "F",
+            "name": "Synthetic F",
+            "revision": 1,
+            "points": [
+              [
+                0,
+                0
+              ],
+              [
+                20,
+                20
+              ]
+            ],
+            "solve_strategy": "segment_binary"
+          }
+        }
+      },
+      "parameters": {
+        "time_step_seconds": 900
+      },
+      "ui_metadata": {
+        "time_dimension": {
+          "interval_minutes": 15,
+          "delta_t": 0.25
+        }
+      }
+    },
+    "LEGACY": {
+      "name": "Synthetic unknown history",
+      "version": "v0",
+      "status": "published",
+      "component_spec": {
+        "components": [
+          {
+            "type": "function_mapping_component",
+            "function_asset_id": "F"
+          }
+        ]
+      },
+      "parameters": {
+        "time_step_seconds": 900
+      },
+      "ui_metadata": {
+        "time_dimension": {
+          "interval_minutes": 60
+        }
+      }
+    }
+  },
+  "function_assets": {
+    "F": {
+      "function_id": "F",
+      "name": "Synthetic F",
+      "revision": 2,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          20,
+          40
+        ]
+      ],
+      "solve_strategy": "segment_binary"
+    }
+  },
+  "tasks": {
+    "REPLAYABLE": {
+      "request": {
+        "model_id": "PINNED",
+        "payload": {
+          "component_spec": {
+            "components": [
+              {
+                "type": "function_mapping_component",
+                "function_asset_id": "F"
+              }
+            ]
+          },
+          "semantic_spec": {
+            "components": [
+              {
+                "type": "function_mapping_component",
+                "function_asset_id": "F"
+              }
+            ]
+          },
+          "_result_context": {
+            "function_dependencies": {
+              "F": {
+                "revision": 1,
+                "content_hash": "bada698c06e88dc80631eb9351b06fdbe801331835b43120a1c6348b719241d4",
+                "asset": {
+                  "function_id": "F",
+                  "name": "Synthetic F",
+                  "revision": 1,
+                  "points": [
+                    [
+                      0,
+                      0
+                    ],
+                    [
+                      20,
+                      20
+                    ]
+                  ],
+                  "solve_strategy": "segment_binary"
+                }
+              }
+            }
+          },
+          "_function_asset_snapshots": {
+            "F": {
+              "function_id": "F",
+              "name": "Synthetic F",
+              "revision": 1,
+              "points": [
+                [
+                  0,
+                  0
+                ],
+                [
+                  20,
+                  20
+                ]
+              ],
+              "solve_strategy": "segment_binary"
+            }
+          }
+        }
+      },
+      "result": {
+        "objective_value": 10
+      }
+    },
+    "RESULT_ONLY": {
+      "request": {
+        "model_id": "LEGACY",
+        "payload": {
+          "component_spec": {
+            "components": [
+              {
+                "type": "function_mapping_component",
+                "function_asset_id": "F"
+              }
+            ]
+          }
+        }
+      },
+      "result": {
+        "objective_value": 10
+      }
+    }
+  },
+  "llm_config": {
+    "enabled": true,
+    "key_ciphertext": "synthetic-legacy-ciphertext"
+  },
+  "skills": {
+    "fixed_skill": {
+      "model_id": "PINNED",
+      "model_version": "v1"
+    }
+  }
+}
