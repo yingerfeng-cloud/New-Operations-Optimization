@@ -1,0 +1,8 @@
+
+Running 1 test using 1 worker
+
+(node:20566) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  1 src/tests/e2e/cloud_review_lifecycle.spec.ts:9:1 › cloud review: retry the naturally terminated native attempt through UI without replacing frozen inputs (14.1s)
+
+  1 passed (15.0s)

@@ -79,6 +79,11 @@ def main() -> int:
     unit_files = sorted([*unit_dir.glob("*.test.ts"), *unit_dir.glob("*.test.tsx")])
     e2e_files = sorted(e2e_dir.glob("*.spec.ts"))
     backend_files = sorted(backend_dir.glob("test_*.py"))
+    dedicated_live_specs = {
+        spec.name for spec in e2e_files
+        if spec.name.startswith('cloud_review_')
+        or spec.name in {'review_incremental.spec.ts', 'review_recovery.spec.ts'}
+    }
     visual_dir = ROOT / "docs" / "visual-acceptance" / "ui-special-iteration"
     if not unit_files or not e2e_files or not backend_files:
         failures.append("one or more test suites are empty")
@@ -115,10 +120,14 @@ def main() -> int:
         tagged_real = "@real" in spec.read_text(encoding="utf-8")
         if spec.name in REAL_E2E_SPECS and not tagged_real:
             failures.append(f"real E2E spec is missing @real classification: {spec.name}")
-        if spec.name not in REAL_E2E_SPECS and tagged_real:
+        if spec.name not in REAL_E2E_SPECS | dedicated_live_specs and tagged_real:
             failures.append(f"mock E2E spec unexpectedly contains @real: {spec.name}")
     require_snippets(ROOT / "frontend" / "playwright.frontend-mock.config.ts", ["grepInvert: /@real/"], failures)
     require_snippets(ROOT / "frontend" / "playwright.real-backend.config.ts", ["grep: /@real/"], failures)
+    require_snippets(ROOT / "frontend" / "playwright.frontend-mock.config.ts",
+                     ['**/cloud_review_*.spec.ts', '**/review_incremental.spec.ts', '**/review_recovery.spec.ts'], failures)
+    require_snippets(ROOT / "frontend" / "playwright.cloud-review.config.ts", ["cloud_review_*.spec.ts"], failures)
+    require_snippets(ROOT / "frontend" / "playwright.review.config.ts", ['review_incremental.spec.ts', 'review_recovery.spec.ts'], failures)
 
     require_snippets(
         ROOT / ".github" / "workflows" / "ci.yml",
@@ -154,7 +163,7 @@ def main() -> int:
 
     print("TEST_MATRIX_OK")
     print(f"- complete frontend unit suite: {len(unit_files)} files")
-    print(f"- classified E2E inventory: {len(e2e_files) - len(REAL_E2E_SPECS)} mock / {len(REAL_E2E_SPECS)} real specs")
+    print(f"- classified E2E inventory: {len(e2e_files) - len(REAL_E2E_SPECS) - len(dedicated_live_specs)} mock / {len(REAL_E2E_SPECS)} controlled real / {len(dedicated_live_specs)} dedicated live specs")
     print(f"- complete backend pytest inventory: {len(backend_files)} files")
     print(f"- visual evidence: {len(list(visual_dir.glob('*.png')))} screenshots + README")
     print("- covered gates: runtime workspace, model interaction, persistence, horizon, hydro, PWL, Mock/Real E2E, CI, packaging")

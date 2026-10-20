@@ -98,3 +98,5 @@ python -m pytest -q -m slow tests/test_review_synthetic_poc.py
 真实后端门槛应设置全新临时 RUNTIME_STORE_PATH、OPTIFORGE_RUNTIME_STORE 和 OPTIFORGE_AGENT_SKILLS_DIR；不要加载客户正在使用的运行文件。`playwright.cloud-review.config.ts` 连接预先启动的隔离本机 API/Vite 与 Docker NLP 服务，不使用 Mock。
 
 原有 `playwright.review.config.ts` 另依赖其历史慢任务环境，不属于 Mock 43 项；本次对应恢复行为由当前真实丢响应、自然运行的求解进程和重试专项覆盖，没有把旧慢任务名字当作本次 35 秒求解性能事实。崩溃验收是在观察真实 Ipopt CPU 后杀容器注入故障，未暂停进程或编辑任务状态；脚本只能用于 `optiforge-cloud-review-*` 专用容器，禁止对实际部署执行。
+
+推送后的交付矩阵检查另外发现：生命周期专项在未提供夹具时使用了仓库禁止的 skip 写法。后续提交改为仅在明确提供观测夹具时注册专项，保留全部业务断言；未配置的专项不列作已执行。另用新的真实原生取消夹具执行该入口并通过。矩阵分类同步为 20 个 Mock 文件、4 个受控真实文件及 8 个独立真实服务专项文件，不再把后者算成 Mock。交付矩阵自检与组件公式审计通过，新增文字证据在同目录；没有放宽禁止 only/skip 的规则。

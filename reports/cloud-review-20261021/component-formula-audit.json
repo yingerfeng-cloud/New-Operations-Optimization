@@ -1,0 +1,10 @@
+{
+  "component_count": 37,
+  "builtin_component_count": 27,
+  "fixture_component_count": 10,
+  "constraint_count": 51,
+  "objective_count": 10,
+  "empty_formula_count": 0,
+  "compile_failure_count": 0,
+  "participation_mismatch_count": 0
+}

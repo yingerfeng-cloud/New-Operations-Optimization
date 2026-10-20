@@ -3,8 +3,10 @@ import { expect, test } from '@playwright/test';
 import { readFile, writeFile } from 'node:fs/promises';
 
 const source = process.env.OPTIFORGE_LIFECYCLE_EVIDENCE;
+// This destructive acceptance is registered only after the explicit native
+// observer has produced its fixture. Default suites never manufacture history.
+if (source) {
 test('cloud review: retry the naturally terminated native attempt through UI without replacing frozen inputs', async ({ page, request }) => {
-  test.skip(!source, 'Run after the opt-in native cancel/crash observer has created its evidence file.');
   const evidence = JSON.parse(await readFile(source!, 'utf-8'));
   const origin = 'http://127.0.0.1:18031';
   const before = await (await request.get(`${origin}/api/tasks/${evidence.task_id}`)).json();
@@ -37,3 +39,4 @@ test('cloud review: retry the naturally terminated native attempt through UI wit
     individual_physical_checks: 4096 * 7, unchanged_frozen_inputs: true };
   await writeFile(source!, JSON.stringify(evidence, null, 2));
 });
+}

@@ -178,8 +178,16 @@
       "sha256": "8d3d9b0703d02cca2178e6b11eb698b9e98b13c468de7a59aa760864fcb816ac"
     },
     {
+      "file": "component-formula-audit.json",
+      "sha256": "5278517b7536fcbcf9d1f19376041032523fc74f4828b04a1ad2a89f3e110e7f"
+    },
+    {
       "file": "crash-browser.log",
       "sha256": "e082536e02d26c8768510e95d0189190787ed2271613081d44599faddf04e4cc"
+    },
+    {
+      "file": "delivery-self-check.log",
+      "sha256": "b95a6f67ad7e3c227c09ba22d6de9bd74d17bd41cd40fb06f0359418f1b14c41"
     },
     {
       "file": "dependency-audit.json",
@@ -190,8 +198,16 @@
       "sha256": "5194c5d9ff7f77e9a0a242457ccbd794562b866b52710400d894d55031586c76"
     },
     {
+      "file": "explicit-lifecycle.log",
+      "sha256": "f56b7c17136eace4e0611498521aa0d32efae18e8494b0ce73598afe86ad5a14"
+    },
+    {
       "file": "fixed-skill-binding.log",
       "sha256": "5aaf74d38623a7fbda19375377c617c718dc8823a5b8ac7f9e27394cc99c29f3"
+    },
+    {
+      "file": "followup-typecheck.log",
+      "sha256": "6fe4f90e33c39ab446ab3a95ec032449f66b97f0b84a574bc4098e756064e2b5"
     },
     {
       "file": "frontend-node22.log",
@@ -237,5 +253,22 @@
       "file": "ui-known-answers.json",
       "sha256": "7ea699bc1e11612d11c12b27b36a196ef6bfef01c1041f2adc262b94e7529d23"
     }
-  ]
+  ],
+  "collection_followup": {
+    "business_assertions_unchanged": true,
+    "lifecycle_registered_only_with_explicit_observed_fixture": true,
+    "skip_or_only_rule_not_relaxed": true,
+    "delivery_matrix": "PASS",
+    "explicit_native_lifecycle_retest": "PASS",
+    "component_formula_audit": {
+      "component_count": 37,
+      "builtin_component_count": 27,
+      "fixture_component_count": 10,
+      "constraint_count": 51,
+      "objective_count": 10,
+      "empty_formula_count": 0,
+      "compile_failure_count": 0,
+      "participation_mismatch_count": 0
+    }
+  }
 }
