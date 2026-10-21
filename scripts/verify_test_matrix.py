@@ -129,6 +129,15 @@ def main() -> int:
                      ['**/cloud_review_*.spec.ts', '**/review_incremental.spec.ts', '**/review_recovery.spec.ts'], failures)
     require_snippets(ROOT / "frontend" / "playwright.cloud-review.config.ts", ["cloud_review_*.spec.ts"], failures)
     require_snippets(ROOT / "frontend" / "playwright.review.config.ts", ['review_incremental.spec.ts', 'review_recovery.spec.ts'], failures)
+    require_snippets(ROOT / "tests" / "test_reverification_component_lifecycle.py", [
+        "test_rv01_component_apply_then_ordinary_version_survives_repeated_stale_saves",
+        "test_rv01_real_formal_switch_still_rejects_stale_candidate_after_editor_save",
+        "test_rv02_revoked_model_can_select_safe_revision_test_and_publish",
+        "test_rv02_retained_indirect_revocation_and_incomplete_replacement_cannot_run",
+        "test_rv02_repair_inspection_does_not_accept_corrupt_or_client_owned_history",
+    ], failures)
+    require_snippets(ROOT / "frontend" / "src" / "tests" / "e2e" / "cloud_review_iteration.spec.ts",
+                     ["RV-01 merge blocker", "iteration RV-02:", "max_constraint_violation"], failures)
 
     require_snippets(
         ROOT / ".github" / "workflows" / "ci.yml",

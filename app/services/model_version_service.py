@@ -99,7 +99,7 @@ class ModelVersionService:
             }
         )
         metadata = deepcopy(data.get("ui_metadata") or {})
-        for key in ("publish_info", "test_result", "version_info", "function_update", "managed_default_template", "managed_template_version"):
+        for key in ("publish_info", "test_result", "version_info", "function_update", "component_update", "managed_default_template", "managed_template_version"):
             metadata.pop(key, None)
         metadata["supersedes_model_id"] = source.id
         metadata["model_family_id"] = data["model_family_id"]
@@ -108,7 +108,42 @@ class ModelVersionService:
         if draft:
             draft.setdefault("basic_info", {})["version"] = data["version"]
             data["model_draft"] = draft
-        return ModelPackage.model_validate(data)
+        return self.with_update_contexts(ModelPackage.model_validate(data))
+
+    def with_update_contexts(self, model: ModelPackage, source: ModelPackage | None = None) -> ModelPackage:
+        """Keep operation controls only at the authoritative asset metadata.
+
+        Editor/recovery mirrors cannot restore an old operation or remove the
+        current candidate's conflict guard. Historical source assets are untouched.
+        """
+        keys = {"function_update", "component_update"}
+
+        def clean(value):
+            if isinstance(value, list):
+                return [clean(item) for item in value]
+            if not isinstance(value, dict):
+                return deepcopy(value)
+            return {key: ({k: clean(v) for k, v in item.items() if k not in keys}
+                          if key == "ui_metadata" and isinstance(item, dict) else clean(item))
+                    for key, item in value.items()}
+
+        fields = {key: clean(getattr(model, key)) for key in
+                  ("model_draft", "semantic_spec", "component_spec", "generic_spec")}
+        fields["ui_metadata"] = {key: deepcopy(value) for key, value in model.ui_metadata.items() if key not in keys}
+        if source is not None:
+            parent = STORE.models.get(source.supersedes_model_id)
+            for key in keys:
+                if key not in source.ui_metadata:
+                    continue
+                context = source.ui_metadata[key]
+                # Repair a pre-fix ordinary draft only when its direct published
+                # parent's preserved audit proves this is an inherited operation.
+                inherited = (not source.published_at and parent and parent.published_at
+                             and isinstance(context, dict) and context.get("source_model_id") != parent.id
+                             and context == parent.ui_metadata.get(key))
+                if not inherited:
+                    fields["ui_metadata"][key] = deepcopy(context)
+        return model.model_copy(update=fields)
 
     def next_family_version(self, source: ModelView, family_models: Iterable[ModelView]) -> str:
         family_id = str(source.model_family_id or f"FAMILY-{source.id}")

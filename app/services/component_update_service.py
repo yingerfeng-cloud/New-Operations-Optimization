@@ -6,7 +6,7 @@ from fastapi import HTTPException
 from app.schemas.model import ModelPackage
 from app.services.component_dependencies import (
     catalog_definition, component_hash, component_id, component_refs, digest,
-    prepare_model_dependencies, validate_manifest,
+    prepare_model_dependencies, inspect_manifest,
 )
 from app.services.model_service import model_service
 from app.services.model_version_service import model_version_service
@@ -24,7 +24,7 @@ def revision_diff(before, after):
 
 def model_component_updates(model_id):
     model = model_service.get_model(model_id)
-    assets = validate_manifest(model.component_dependencies, component_refs(model))
+    assets = inspect_manifest(model.component_dependencies, component_refs(model))
     rows = []
     for identifier, entry in assets.items():
         family = entry["family_id"]
@@ -34,13 +34,14 @@ def model_component_updates(model_id):
                           and row.get("status") == "published"
                           and row.get("component_id") not in (STORE.system_config.get("component_revocations") or {})]
         rows.append({"component_id": identifier, "name": entry["definition"].get("name", identifier), "binding": entry,
+            "revocation": deepcopy((STORE.system_config.get("component_revocations") or {}).get(identifier)),
             "versions": [{"component_id": component_id(row), "revision": int(row.get("revision") or 1), "version": row.get("version"),
                           "content_hash": component_hash(row), "diff": revision_diff(entry["definition"], row)} for row in candidates]})
     return {"model_id": model.id, "dependencies": rows}
 
 
 def selected_package(source, selections):
-    assets = validate_manifest(source.component_dependencies, component_refs(source))
+    assets = inspect_manifest(source.component_dependencies, component_refs(source))
     if not selections or selections.keys() - assets.keys():
         raise HTTPException(status_code=422, detail={"code": "INVALID_COMPONENT_SELECTION", "message": "请选择已绑定组件及目标修订。"})
     targets = {}

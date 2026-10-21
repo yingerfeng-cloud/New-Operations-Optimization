@@ -92,11 +92,19 @@ def _validate_graph(assets, selected):
         fail("COMPONENT_DEPENDENCY_CYCLE", "组件依赖存在循环。", cycles=cycles)
 
 
-def validate_manifest(manifest, references=None):
+def inspect_manifest(manifest, references=None):
+    """Read trusted history for repair; this never grants execution permission."""
     try:
         return _validate_manifest(manifest, references)
     except (KeyError, TypeError, ValueError, AttributeError):
         fail("COMPONENT_SNAPSHOT_CORRUPT", "组件依赖清单结构或内容已损坏。")
+
+
+def validate_manifest(manifest, references=None):
+    assets = inspect_manifest(manifest, references)
+    for identifier in assets:
+        assert_not_revoked(identifier)
+    return assets
 
 
 def _validate_manifest(manifest, references=None):
@@ -112,7 +120,6 @@ def _validate_manifest(manifest, references=None):
     if not isinstance(assets, dict) or not isinstance(instances, list):
         fail("COMPONENT_SNAPSHOT_CORRUPT", "组件依赖清单结构已损坏。")
     for identifier, entry in assets.items():
-        assert_not_revoked(identifier)
         definition = entry.get("definition") or {}
         if (component_id(definition) != identifier or component_hash(definition) != entry.get("content_hash")
                 or str(definition.get("version", "1.0.0")) != entry.get("version")
@@ -134,7 +141,7 @@ def _validate_manifest(manifest, references=None):
 def capture_components(model):
     references = component_refs(model)
     previous = model.component_dependencies or {}
-    previous_assets = validate_manifest(previous) if previous else {}
+    previous_assets = inspect_manifest(previous) if previous else {}
     if model.published_at and references and not previous:
         fail("COMPONENT_HISTORY_UNPINNED", "旧发布模型没有可信历史组件清单；保留原结果，请明确创建新版本并测试。")
     assets, instances, families = {}, [], {}
@@ -159,6 +166,9 @@ def capture_components(model):
     _validate_graph(assets, set(assets))
     manifest = {"schema_version": 1, "assets": assets, "instances": instances}
     manifest["manifest_hash"] = digest(manifest)
+    # Only the final effective binding grants execution. Old revoked entries
+    # may be read to replace them, but no direct or indirect survivor may run.
+    validate_manifest(manifest, references)
     return manifest if references else {}
 
 

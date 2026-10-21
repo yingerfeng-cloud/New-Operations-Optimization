@@ -52,6 +52,7 @@ LOGGER = logging.getLogger(__name__)
 
 class ModelService:
     def create_model(self, model: ModelPackage, *, inherited_dependencies: dict | None = None, inherited_components: dict | None = None) -> ModelView:
+        model = model_version_service.with_update_contexts(model, model)
         model = model.model_copy(update={
             "ui_metadata": {key: value for key, value in (model.ui_metadata or {}).items() if key not in {"managed_default_template", "managed_template_version"}},
             "function_dependencies": deepcopy(inherited_dependencies or {}),
@@ -117,6 +118,7 @@ class ModelService:
 
     def _update_model_locked(self, model_id: str, model: ModelPackage) -> ModelView:
         existing = self.get_model(model_id)
+        model = model_version_service.with_update_contexts(model, existing)
         # Version is the identity prepared when this asset was created, rather
         # than a default in an older editor's incomplete PUT payload.
         draft = deepcopy(model.model_draft or {})

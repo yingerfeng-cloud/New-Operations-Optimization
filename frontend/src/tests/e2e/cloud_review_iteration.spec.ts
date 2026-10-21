@@ -73,6 +73,51 @@ test('iteration: selective component update survives lost response, refresh and 
   }
   const candidates = await (await request.get('/api/models')).json();
   expect(candidates.filter((row: any) => row.ui_metadata?.component_update?.source_model_id === a)).toHaveLength(1);
+  // RV-01 merge blocker: continue the same real journey beyond update/apply.
+  await page.getByRole('button', { name: '创建新版本并修改', exact: true }).click();
+  await page.getByRole('button', { name: /1 基础信息/ }).click();
+  const name = page.locator('[data-field-code="name"] input');
+  await name.fill(`合成组件更新后普通版本 ${suffix}`);
+  await page.getByRole('button', { name: '保存草稿', exact: true }).click();
+  await expect(page).toHaveURL(/\/models\/MODEL-[^/]+\/edit$/);
+  const nextId = new URL(page.url()).pathname.split('/')[2];
+  await page.reload();
+  await page.getByRole('button', { name: /1 基础信息/ }).click();
+  await expect(name).toHaveValue(`合成组件更新后普通版本 ${suffix}`);
+  await name.fill(`合成组件更新后再次保存 ${suffix}`);
+  await page.getByRole('button', { name: '保存草稿', exact: true }).click();
+  await expect(page.getByText('草稿已保存', { exact: true }).first()).toBeVisible();
+  await page.reload();
+  const next = await (await request.get(`/api/models/${nextId}`)).json();
+  expect(next.version).toBe('v0.3');
+  expect(next.supersedes_model_id).toBe(captured.model.id);
+  for (const metadata of [next.ui_metadata, next.model_draft.advanced.ui_metadata]) {
+    expect(metadata).not.toHaveProperty('component_update');
+    expect(metadata).not.toHaveProperty('function_update');
+  }
+  await page.getByRole('button', { name: /5 校验发布/ }).click();
+  const tested = page.waitForResponse(response => response.request().method() === 'POST' && response.url().endsWith(`/api/models/${nextId}/test-jobs`));
+  await page.getByTestId('model-test-run-button').click();
+  const testResponse = await tested;
+  expect(testResponse.ok(), await testResponse.text()).toBeTruthy();
+  const nextTask = await testResponse.json();
+  await expect.poll(async () => (await (await request.get(`/api/tasks/${nextTask.id}`)).json()).status, { timeout: 60_000 }).toBe('SUCCESS');
+  const nextResult = await (await request.get(`/api/tasks/${nextTask.id}/result`)).json();
+  expect(nextResult.objective_value).toBeCloseTo(72, 7);
+  expect(Object.values(nextResult.variable_values.output)).toEqual([12, 12]);
+  expect(nextResult.solution_evidence.max_constraint_violation).toBe(0);
+  await expect(page.getByRole('button', { name: '发布模型', exact: true })).toBeEnabled();
+  await page.getByRole('button', { name: '发布模型', exact: true }).click();
+  await expect(page).toHaveURL(new RegExp(`/models/${nextId}$`));
+  const final = await (await request.get(`/api/models/${nextId}`)).json();
+  expect(final.status).toBe('published');
+  expect(final.tested_content_hash).toBe(final.content_hash);
+  expect(Object.keys(final.component_dependencies.assets)).toEqual([c2]);
+  await info.attach('rv01-continuous-versions', { body: JSON.stringify({ source: a, applied: captured.model.id, ordinary: nextId,
+    version: final.version, task: nextTask.id, objective: nextResult.objective_value,
+    max_residual: nextResult.solution_evidence.max_constraint_violation, content_hash: final.content_hash,
+    environment: nextResult.execution_environment }), contentType: 'application/json' });
+  await page.screenshot({ path: info.outputPath('rv01-ordinary-version-published.png'), fullPage: true });
   await page.goto(`/tasks?task=${captured.task.id}`);
   await page.getByRole('tab', { name: '输入参数', exact: true }).click();
   const environment = page.getByTestId('execution-environment');
@@ -80,6 +125,64 @@ test('iteration: selective component update survives lost response, refresh and 
   await expect(environment.getByText('未知（当前进程无法可信取得）')).toBeVisible();
   await page.getByRole('button', { name: '原环境历史重放', exact: true }).click();
   await expect(page.getByText('原环境未提供恢复能力，请使用当前内核重算；这不能作为严格历史复现。')).toBeVisible();
+});
+
+test('iteration RV-02: revoke then inspect, replace, test and publish a safe component revision', async ({ page, request }, info) => {
+  const suffix = Date.now(); const c1 = `rv02_browser_${suffix}`; const c2 = `${c1}_safe`;
+  const constraint = { constraint_id: 'floor', indices: [{ set: 'time', alias: 't' }], expression: 'output[t] >= demand[t]' };
+  const parameters = [{ code: 'demand', dimension: ['time'], default: [10, 10] }];
+  await post(request, '/api/components/catalog', { component_id: c1, name: '合成撤销恢复供给', version: '1.0.0', sets: [{ code: 'time' }], parameters,
+    variables: [{ code: 'output', dimension: ['time'], type: 'continuous', lower_bound: 0 }], constraints: [constraint] });
+  await post(request, `/api/components/${c1}/publish`);
+  await post(request, `/api/components/${c1}/copy-version`, { component_id: c2, version: '2.0.0' });
+  expect((await request.put(`/api/components/${c2}`, { data: { constraints: [{ ...constraint, expression: 'output[t] >= 1.2 * demand[t]' }] } })).ok()).toBeTruthy();
+  await post(request, `/api/components/${c2}/publish`);
+  const spec = { model_code: `rv02_model_${suffix}`, build_mode: 'component_based', sets: [{ code: 'time', values: [0, 1] }], parameters,
+    variables: [{ code: 'output', name: 'output', indices: ['time'], dimension: ['time'], unit: 'MW', lower_bound: 0, upper_bound: 100 }],
+    components: [{ type: c1 }], objective: { sense: 'minimize', terms: [{ term_id: 'cost', expression: 'sum(3 * output[t] for t in time)', weight: 1,
+      weight_key: 'cost', supported_by_backend: true, solve_participation: 'solve_active' }] } };
+  const source = await post(request, '/api/models', { name: spec.model_code, scene: '合成供给', build_mode: 'component_based', problem_type: 'LP', model_problem_type: 'LP', component_spec: spec,
+    semantic_spec: { ...spec, parameters: [{ code: 'demand', dimension: ['time'], value_type: 'number', sample_value: [10, 10] }] }, parameters: { horizon: 2, demand: [10, 10] } });
+  const oldTest = await post(request, `/api/models/${source.id}/test-jobs`, { parameters: { horizon: 2, demand: [10, 10] } });
+  await expect.poll(async () => (await (await request.get(`/api/tasks/${oldTest.id}`)).json()).status, { timeout: 60_000 }).toBe('SUCCESS');
+  const oldResult = await (await request.get(`/api/tasks/${oldTest.id}/result`)).json();
+  expect(oldResult.objective_value).toBeCloseTo(60, 7);
+  await post(request, `/api/models/${source.id}/publish`);
+  const impact = await (await request.get(`/api/components/${c1}/revocation-impact`)).json();
+  const reason = '合成安全撤销：通过安全修订恢复';
+  await post(request, `/api/components/${c1}/revoke`, { reason, expected_impact_hash: impact.impact_hash });
+  const blocked = await request.post('/api/tasks', { data: { model_id: source.id, parameters: { horizon: 2, demand: [10, 10] } } });
+  expect(blocked.status()).toBe(409); expect((await blocked.json()).detail.code).toBe('COMPONENT_REVOKED');
+  const replay = await request.post(`/api/tasks/${oldTest.id}/replay`, { data: { mode: 'current_kernel' } });
+  expect(replay.status()).toBe(409); expect((await replay.json()).detail.code).toBe('COMPONENT_REVOKED');
+  await page.goto(`/models/${source.id}`);
+  await page.getByRole('tab', { name: '组件更新与修订' }).click();
+  await expect(page.getByText(`已安全撤销：${reason}。仅可查看并替换，禁止执行。`)).toBeVisible();
+  await page.getByRole('combobox', { name: `${c1} 组件目标修订` }).click();
+  await page.locator('.ant-select-item-option-content').getByText('r2 · 2.0.0', { exact: true }).click();
+  const submitted = page.waitForResponse(response => response.request().method() === 'POST' && response.url().endsWith('/component-updates/test'));
+  await page.getByRole('button', { name: '更新组件并测试', exact: true }).click();
+  const accepted = await submitted; expect(accepted.ok(), await accepted.text()).toBeTruthy();
+  const candidate = await accepted.json();
+  await expect.poll(async () => (await (await request.get(`/api/tasks/${candidate.task.id}`)).json()).status, { timeout: 60_000 }).toBe('SUCCESS');
+  const actual = await (await request.get(`/api/tasks/${candidate.task.id}/result`)).json();
+  expect(actual.objective_value).toBeCloseTo(72, 7);
+  expect(Object.values(actual.variable_values.output)).toEqual([12, 12]);
+  expect(actual.solution_evidence.max_constraint_violation).toBe(0);
+  await expect(page.getByTestId('update-business-comparison').getByText('实际决策与物理量')).toBeVisible();
+  await page.reload();
+  await page.getByRole('tab', { name: '组件更新与修订' }).click();
+  await expect(page.getByRole('button', { name: '应用组件更新', exact: true })).toBeEnabled();
+  await page.getByRole('button', { name: '应用组件更新', exact: true }).click();
+  await expect(page).toHaveURL(new RegExp(`/models/${candidate.model.id}$`));
+  const fixed = await (await request.get(`/api/models/${candidate.model.id}`)).json();
+  expect(fixed.status).toBe('published');
+  expect(Object.keys(fixed.component_dependencies.assets)).toEqual([c2]);
+  expect(fixed.tested_content_hash).toBe(fixed.content_hash);
+  await page.screenshot({ path: info.outputPath('rv02-safe-revision-published.png'), fullPage: true });
+  await info.attach('rv02-recovery', { body: JSON.stringify({ source: source.id, candidate: fixed.id, old_task: oldTest.id, task: candidate.task.id,
+    old_objective: oldResult.objective_value, objective: actual.objective_value, max_residual: actual.solution_evidence.max_constraint_violation,
+    content_hash: fixed.content_hash, dependencies: fixed.component_dependencies, revocation_impact: impact }), contentType: 'application/json' });
 });
 
 test('iteration: function update shows physical changes with declared units', async ({ page, request }, info) => {

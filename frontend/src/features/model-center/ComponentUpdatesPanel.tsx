@@ -46,7 +46,10 @@ export function ComponentUpdatesPanel({ model, onApplied }: { model: ModelAsset;
     <Alert type="info" showIcon title="按模型版本固定组件及完整依赖" description="只更新明确选择的组件；未选择的组件、函数修订和参数绑定保持原样。普通停用不改变合法旧绑定；安全撤销会明确阻止执行。测试后更换依赖必须重测。" />
     <QueryState query={updates} title="组件依赖">
       <Table<ComponentUpdateRow> rowKey="component_id" size="small" pagination={false} dataSource={updates.data?.dependencies || []} columns={[
-        { title: '组件', render: (_, row) => `${row.name} (${row.component_id})` },
+        { title: '组件', render: (_, row) => <Space orientation="vertical">
+          <span>{row.name} ({row.component_id})</span>
+          {row.revocation && <Typography.Text type="danger">已安全撤销：{row.revocation.reason}。仅可查看并替换，禁止执行。</Typography.Text>}
+        </Space> },
         { title: '当前修订', render: (_, row) => `r${row.binding.revision} · ${row.binding.version}` },
         { title: '目标修订', render: (_, row) => <Select aria-label={`${row.component_id} 组件目标修订`} style={{ width: 250 }} allowClear placeholder="保留当前修订" disabled={!!pending}
           value={selections[row.component_id]} onChange={value => setSelections(current => { const next = { ...current }; if (value) next[row.component_id] = value; else delete next[row.component_id]; return next; })}
