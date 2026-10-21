@@ -8,19 +8,19 @@
 
 开发分支：`codex/iteration-dependency-closure`。
 
-| 提交 | 范围 |
-|---|---|
-| `ec4264ae6cdb9cd509a45d4f86e3a3763029b914` | 第一批：组件固定依赖、选择更新、普通停用与安全撤销、参数维数边界、必跑回归 |
-| `cd597f6eae8a87d2624acf5ed5b5d859e4aca60f` | 第二批：实际执行环境、重放边界、新旧业务对比、输入/设置一致性、QP/MIQP 声明、依赖审计补丁及复测证据 |
+| 整理时本地提交 | 对应远端提交（文件树一致） | 范围 |
+|---|---|---|
+| `ec4264ae6cdb9cd509a45d4f86e3a3763029b914` | `25c9865c18a3edf5c64e1d6eba7f5a6ca6c2bd19` | 第一批：组件固定依赖、选择更新、普通停用与安全撤销、参数维数边界、必跑回归 |
+| `cd597f6eae8a87d2624acf5ed5b5d859e4aca60f` | `1fe9c6e4fe4450f8c0d81e72556d3191937e6d63` | 第二批：实际执行环境、重放边界、新旧业务对比、输入/设置一致性、QP/MIQP 声明、依赖审计补丁及复测证据 |
 
-本报告是随后整理的文字交付索引。**以上提交仅在本地，未推送、未合并、未部署。** 新增 GitHub Actions 尚未在云端触发，不能把本地验证称为本轮云端 CI 成功。
+发布状态更新（2026-10-21）：上述批次已发布到远端开发分支，原交付 HEAD 为 `ac4fda070d1b30431051b1365bba7cb9c1c0910c`。通过 GitHub 连接发布时作者/时间元数据使提交编号变化，逐批文件树已核对一致；历史运行记录中的原本地身份不改写。[该 HEAD 的云端 CI](https://github.com/yingerfeng-cloud/New-Operations-Optimization/actions/runs/39543155675) 已完成且五个 job 全部成功。这是上一轮历史云端记录，与下文当时执行的本地测试分开。RV-01/RV-02 后续修复、复测及合并交付见 [复验补修说明](reverification-20261021-delivery.md)。本报告原先“仅本地、云端尚未触发”的陈述已过时；实际部署不由推送或合并自动认定。
 
 可审查差异：
 
 ```bash
-git diff 46cc8a2bd8d2dda6b996f840eebf27ff7162ed91..cd597f6 -- app frontend tests scripts .github docs
-git show --stat ec4264a
-git show --stat cd597f6
+git diff 46cc8a2bd8d2dda6b996f840eebf27ff7162ed91..1fe9c6e -- app frontend tests scripts .github docs
+git show --stat 25c9865
+git show --stat 1fe9c6e
 ```
 
 ## 逐项状态、实际行为与代码

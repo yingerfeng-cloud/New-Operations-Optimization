@@ -1,0 +1,63 @@
+{
+  "baseline": "ac4fda070d1b30431051b1365bba7cb9c1c0910c",
+  "code_commit": "c242bedc73f293368067e2c8cce14b5964dcdc75",
+  "application_source_hash": "53aad01eab8814297aa6d0d0402d13b3ab02a39d105d4f9f4b5b5b7a0b5bf743",
+  "attachment_sha256": "a97c5d9b2f131c9aa2085d72b1a9f4ce8d0df4a48862917546cd4e7af76d6672",
+  "created_at": "2026-10-21T07:31:26.651704+00:00",
+  "local_versions": {
+    "python": "Python 3.12.14",
+    "node": "v24.19.0",
+    "npm": "11.17.0"
+  },
+  "protected_file_count": 28,
+  "protected_files_unchanged": true,
+  "proof_data_class": "synthetic only",
+  "screenshots_and_traces": "local ignored directory only; not uploaded",
+  "final_results": {
+    "backend": {
+      "passed": 716,
+      "skipped": 5
+    },
+    "frontend": {
+      "files": 88,
+      "passed": 487
+    },
+    "browser": {
+      "journeys": 3,
+      "task_executions": 10
+    },
+    "new_api_contracts": {
+      "passed": 7,
+      "included_in_full_backend": true
+    }
+  },
+  "initial_failures_retained": {
+    "before-fix-api.log": "Two defects reproduced",
+    "backend-full.log": "Two real socket binds refused by sandbox; full unchanged rerun passed",
+    "typecheck.log": "Initial new-test TypeScript field access corrected"
+  },
+  "historical_ci": {
+    "id": 39543155675,
+    "head": "ac4fda070d1b30431051b1365bba7cb9c1c0910c",
+    "conclusion": "success",
+    "separate_from_current_execution": true
+  },
+  "artifacts": {
+    "after-fix-api-initial.log": "72e2168fad232ca3760697268289417e6d1c6760bc8b1774dbd814ecf0b775dc",
+    "backend-full-verified.log": "4a3c68c7305141e2d0c04ca02d10c1b58a20e3658565ae62571510b095358182",
+    "backend-full.log": "e6028da0840bc8daf3ea13be4d454fa9a79f7a700aea7cb0fa61b17541474d43",
+    "before-fix-api.log": "68b85190acd3a2a4f61e334758ba8a25008e427f902c67e4d365497f96589ed4",
+    "browser-final.log": "003c17862bd35e433ea16d097d831fb6b02b0fcc8b69d1bd15c61be1c275b109",
+    "browser-initial.log": "8991e876a7f31d0fe0f94cbc7f7c6606531e027ec37ce4ea7b8a367dd720adb6",
+    "build.log": "25f3487d4d1c3bfd1150b11dbde3c23f23e4f214b394130b30fc875ad63db0ec",
+    "final-new-api-contracts.log": "49928532456ff304c8deceff5bc785da86442ef796d18a99c2f16d119c64310c",
+    "focused-api.log": "5e4d6ff703256cf2837a46d10c38298fb8841601a2378353d23a31fa1127303d",
+    "frontend-targeted.log": "9cc99a6aa1dbe5b0bc58bc2d33bcab2802071e18e32cb257a13331963ec74b51",
+    "live-api-proof.json": "84e76c05a1fc5126062ec8f72e3f55568ef7783a8ccd67a17d3aefd3e45e2a09",
+    "source-identity.json": "8852a20c1f85e7e31818fffb78d747a848a1fd54519474aaa3c0f5be25b6ba52",
+    "stop-isolated-stack.log": "13b0d7ad6c07778c1888694b7e06b3fd9cd587fce78d6efe621b3348f00bcf10",
+    "test-matrix.log": "5fb5e5033330ac457dea8394004201ce9995e1a51185d45025f21f32238cd4f2",
+    "typecheck-final.log": "fb79a6d4617d7c017f566420ac217a33d8902927f1aeca361869d5dca9422ee5",
+    "typecheck.log": "c145061c7e9198dc451d0c3f1721a7854041fa08266810b5dd0bdb51c7fc48e9"
+  }
+}
