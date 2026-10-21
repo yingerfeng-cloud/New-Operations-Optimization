@@ -40,7 +40,7 @@ BOUNDARY_STRATEGY_ALIASES = {
 }
 
 
-def validate_component_definition(component: dict[str, Any]) -> dict[str, Any]:
+def validate_component_definition(component: dict[str, Any], *, dependency_catalog: dict | None = None) -> dict[str, Any]:
     errors: list[dict[str, Any]] = []
     component_id = str(component.get("component_id") or component.get("type") or "")
     if not component_id:
@@ -50,7 +50,7 @@ def validate_component_definition(component: dict[str, Any]) -> dict[str, Any]:
 
     if errors:
         return {"valid": False, "execution_ready": False, "errors": errors}
-    dependency_errors = _validate_dependencies(component)
+    dependency_errors = _validate_dependencies(component, dependency_catalog)
     if dependency_errors:
         return {"valid": False, "execution_ready": False, "errors": dependency_errors}
     status = str(component.get("status") or "").lower()
@@ -290,7 +290,7 @@ class DynamicFormulaComponent:
         self.component_type = self.definition["component_id"]
 
     def validate(self, spec: dict[str, Any], context: dict[str, Any]) -> None:
-        result = validate_component_definition(self.definition)
+        result = validate_component_definition(self.definition, dependency_catalog=context.get("_bound_component_catalog"))
         if not result["valid"]:
             raise RuntimeError("；".join(item["message"] for item in result["errors"]))
 
@@ -608,18 +608,21 @@ def _refresh_formula_function_suggestions(errors: list[dict[str, Any]]) -> None:
             error["suggestion"] = f"当前仅允许 {allowed}。"
 
 
-def _validate_dependencies(component: dict[str, Any]) -> list[dict[str, Any]]:
+def _validate_dependencies(component: dict[str, Any], frozen_catalog: dict | None = None) -> list[dict[str, Any]]:
     from app.model_components.registry import list_component_catalog
 
     errors: list[dict[str, Any]] = []
     identifier = str(component.get("component_id") or component.get("type") or "").strip()
     dependencies = component_dependency_ids(component)
-    with STORE.lock:
-        custom_components = [deepcopy(item) for item in STORE.custom_components.values()]
-    catalog = {
-        str(item.get("component_id") or item.get("type") or ""): item
-        for item in [*list_component_catalog(), *custom_components]
-    }
+    if frozen_catalog is not None:
+        catalog = deepcopy(frozen_catalog)
+    else:
+        with STORE.lock:
+            custom_components = [deepcopy(item) for item in STORE.custom_components.values()]
+        catalog = {
+            str(item.get("component_id") or item.get("type") or ""): item
+            for item in [*list_component_catalog(), *custom_components]
+        }
     catalog[identifier] = {**component, "component_id": identifier, "depends_on": dependencies, "dependencies": dependencies}
 
     for dependency in dependencies:

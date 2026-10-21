@@ -1,5 +1,6 @@
 import { listWorkspaceRecoveries, recoveryUrl } from '../../features/model-creation/utils/workspaceRecovery';
 import { FunctionUpdatesPanel } from '../../features/model-center/FunctionUpdatesPanel';
+import { ComponentUpdatesPanel } from '../../features/model-center/ComponentUpdatesPanel';
 import { MoreOutlined } from '@ant-design/icons';
 import { Button, Card, Drawer, Dropdown, Input, Modal, Select, Space, Tabs, Tag, Tooltip, message } from 'antd';
 import type { MenuProps } from 'antd';
@@ -419,6 +420,7 @@ export function ModelCenterPage() {
                 { key: 'component', label: '组件装配', children: <ModelComponentPanel model={current} detail={currentAssetDetail} /> },
               ] : []),
               ...(Object.keys(current.function_dependencies || {}).length ? [{ key: 'functions', label: '函数更新与修订', children: <FunctionUpdatesPanel key={current.id} model={current} onApplied={model => { refresh(model.id); refresh(current.id); nav(`/models/${encodeURIComponent(model.id)}`); }} /> }] : []),
+              ...(Object.keys(current.component_dependencies || {}).length ? [{ key: 'component-updates', label: '组件更新与修订', children: <ComponentUpdatesPanel key={current.id} model={current} onApplied={model => { refresh(model.id); refresh(current.id); nav(`/models/${encodeURIComponent(model.id)}`); }} /> }] : []),
               { key: 'runtime', label: '运行参数', children: <ModelRuntimePanel model={current} detail={currentAssetDetail} /> },
               { key: 'documentation', label: '模型说明', children: <ModelDemoPanel model={current} detail={currentAssetDetail} /> },
               { key: 'governance', label: '发布治理', children: <ModelGovernancePanel model={current} detail={currentAssetDetail} /> },

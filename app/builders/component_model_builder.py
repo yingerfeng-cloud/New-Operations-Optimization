@@ -57,8 +57,21 @@ class ComponentModelBuilder:
             if self._component_enabled(component, runtime_parameters)
         ]
         prepared_components = []
-        for component in components:
-            builder = self._component_builder(component)
+        manifest = runtime_parameters.get("_component_dependencies")
+        frozen = None
+        if manifest is not None:
+            from app.services.component_dependencies import bound_components
+            frozen = bound_components(model_spec, manifest)
+            context["_bound_component_catalog"] = {definition["component_id"]: definition for _, definition in frozen}
+        for index, component in enumerate(components):
+            if frozen is not None:
+                definition = context["_bound_component_catalog"][str(component.get("type") or component.get("component_id"))]
+                try:
+                    builder = get_component_builder(str(component.get("type") or component.get("component_id")))
+                except RuntimeError:
+                    builder = DynamicFormulaComponent(definition)
+            else:
+                builder = self._component_builder(component)
             component_context = self._component_context(component, context)
             builder.validate(component, component_context)
             prepared_components.append((component, builder, component_context))

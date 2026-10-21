@@ -41,7 +41,7 @@ class JobService:
             self._prepare_request(req, testing_model=testing_model)
             if testing_model is not None:
                 original = model_service.get_model(testing_model.id)
-                req.payload["_model_test"] = {"source_hash": model_service._content_hash(original), "dependencies": deepcopy(testing_model.function_dependencies)}
+                req.payload["_model_test"] = {"source_hash": model_service._content_hash(original), "dependencies": deepcopy(testing_model.function_dependencies), "component_dependencies": deepcopy(testing_model.component_dependencies)}
             task_id = f"OPT-{uuid.uuid4().hex[:10].upper()}"
             record = TaskRecord(id=task_id, request=req, max_retries=max(0, req.max_retries))
             record.trace["request_fingerprint"] = fingerprint
@@ -125,7 +125,15 @@ class JobService:
         model = ModelPackage(name=task.request.model, scene=task.request.scene,
             semantic_spec=payload.get("semantic_spec") or {}, component_spec=payload.get("component_spec") or {},
             parameters={"function_asset_bindings": payload.get("function_asset_bindings") or {}},
-            function_dependencies=context.get("function_dependencies") or {})
+            function_dependencies=context.get("function_dependencies") or {}, component_dependencies=context.get("component_dependencies") or {})
+        from app.services.component_dependencies import validate_manifest, component_refs
+        validate_manifest(model.component_dependencies, component_refs(model))
+        actual_components = payload.get("_component_dependencies") or {}
+        if model.component_dependencies and not actual_components:
+            raise HTTPException(status_code=409, detail={"code": "TASK_HISTORY_UNREPLAYABLE", "message": "历史任务缺少组件执行快照。"})
+        validate_manifest(actual_components, component_refs(model))
+        if model.component_dependencies != (payload.get("_component_dependencies") or {}):
+            raise HTTPException(status_code=409, detail={"code": "TASK_HISTORY_UNREPLAYABLE", "message": "历史任务的组件清单不完整或不一致。"})
         expected = dependency_snapshots(model, require_pinned=True)
         actual = payload.get("_function_asset_snapshots") or {}
         from app.services.function_asset_service import function_asset_hash
@@ -285,6 +293,13 @@ class JobService:
         merged = {**self._default_parameters_from_model(model), **deepcopy(runtime_parameters), **deepcopy(req.payload)}
         from app.services.function_dependencies import dependency_snapshots
         merged["_function_asset_snapshots"] = dependency_snapshots(model, require_pinned=bool(model.published_at))
+        from app.services.component_dependencies import validate_manifest, component_refs
+        refs = component_refs(model)
+        if refs:
+            validate_manifest(model.component_dependencies, refs)
+            merged["_component_dependencies"] = deepcopy(model.component_dependencies)
+        else:
+            merged.pop("_component_dependencies", None)
         if explicit_horizon is not None:
             merged["horizon"] = explicit_horizon
         if req.interval_minutes is not None:
@@ -344,6 +359,7 @@ class JobService:
             "version": model.version,
             "content_hash": model.content_hash,
             "function_dependencies": deepcopy(model.function_dependencies),
+            "component_dependencies": deepcopy(model.component_dependencies),
             "objective": model.objective,
             "tags": list(model.tags or []),
             "semantic_spec": deepcopy(semantic_spec),

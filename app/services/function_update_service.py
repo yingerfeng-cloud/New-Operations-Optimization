@@ -84,7 +84,7 @@ def prepare_candidate(model_id: str, revisions: dict[str, int], idempotency_key:
                                        "idempotency_key": idempotency_key, "signature": signature,
                                        "source_objective": ((source.dry_run_result or {}).get("solver_check") or {}).get("objective_value")}
         package = package.model_copy(update={"ui_metadata": metadata})
-        return model_service.create_model(package, inherited_dependencies=dependencies)
+        return model_service.create_model(package, inherited_dependencies=dependencies, inherited_components=deepcopy(source.component_dependencies))
 
 
 def test_candidate(model_id: str, revisions: dict[str, int], idempotency_key: str) -> dict:
@@ -92,7 +92,7 @@ def test_candidate(model_id: str, revisions: dict[str, int], idempotency_key: st
     context = candidate.ui_metadata["function_update"]
     source = model_service.get_model(context["source_model_id"])
     parameters = source.last_test_parameters or model_service._default_test_parameters(source)
-    task = model_service.start_model_test(candidate.id, {"parameters": parameters, "idempotency_key": f"function-update:{candidate.id}:{candidate.content_hash}"})
+    task = model_service.start_model_test(candidate.id, {"parameters": parameters, "solver_config": deepcopy(source.last_test_solver_config), "idempotency_key": f"function-update:{candidate.id}:{candidate.content_hash}"})
     return {"model": model_service.get_model(candidate.id), "task": task.view()}
 
 
@@ -115,7 +115,7 @@ def select_candidate_revisions(model_id: str, revisions: dict[str, int]):
 def apply_candidate(model_id: str):
     with STORE.lock:
         candidate = model_service.get_model(model_id)
-        context = candidate.ui_metadata.get("function_update") or {}
+        context = candidate.ui_metadata.get("function_update") or candidate.ui_metadata.get("component_update") or {}
         if not context:
             raise HTTPException(status_code=409, detail="不是函数更新候选版本。")
         if candidate.status == "published":

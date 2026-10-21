@@ -11,6 +11,7 @@ COMPONENT_LIFECYCLE_STATUSES = {
     COMPONENT_DRAFT_STATUS,
     COMPONENT_PUBLISHED_STATUS,
     COMPONENT_OFFLINE_STATUS,
+    "revoked",
 }
 
 
@@ -22,6 +23,8 @@ def component_lifecycle_status(component: Mapping[str, Any]) -> str:
         return COMPONENT_OFFLINE_STATUS
     if raw in {"published", "trial", "tested"}:
         return COMPONENT_PUBLISHED_STATUS
+    if raw == "revoked":
+        return "revoked"
     if raw in {"offline", "disabled", "inactive"}:
         return COMPONENT_OFFLINE_STATUS
     return COMPONENT_DRAFT_STATUS

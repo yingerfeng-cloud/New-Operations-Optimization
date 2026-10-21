@@ -41,6 +41,9 @@ def _model_package_from_payload(payload: dict[str, Any] | ModelPackage) -> Model
 
 @router.post("/models", response_model=ModelView)
 def create_model(model: dict[str, Any]) -> ModelView:
+    if model.get("component_dependencies"):
+        from fastapi import HTTPException
+        raise HTTPException(status_code=422, detail={"code": "COMPONENT_MANIFEST_SERVER_OWNED", "message": "组件清单由服务端合法绑定时生成，不能由客户端提供。"})
     return model_service.create_model(_model_package_from_payload(model))
 
 
@@ -58,6 +61,9 @@ def get_model(model_id: str) -> ModelView:
 def update_model(model_id: str, model: dict[str, Any]) -> ModelView:
     payload = deepcopy(model)
     expected_hash = payload.pop("expected_content_hash", None)
+    if "component_dependencies" in payload and payload["component_dependencies"] != model_service.get_model(model_id).component_dependencies:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=422, detail={"code": "COMPONENT_MANIFEST_SERVER_OWNED", "message": "不能修改服务端组件快照；请使用受控更新并重新测试。"})
     return model_service.update_model(model_id, _model_package_from_payload(payload), expected_content_hash=expected_hash)
 
 
@@ -146,5 +152,32 @@ def select_function_revisions(model_id: str, body: DependencySelectionRequest):
 
 @router.post("/models/{model_id}/function-updates/apply", response_model=ModelView)
 def apply_function_updates(model_id: str):
+    from app.services.function_update_service import apply_candidate
+    return apply_candidate(model_id)
+
+
+@router.get("/models/{model_id}/component-updates")
+def component_updates(model_id: str):
+    from app.services.component_update_service import model_component_updates
+    return model_component_updates(model_id)
+
+
+from app.schemas.model import ComponentUpdateRequest, ComponentSelectionRequest
+
+
+@router.post("/models/{model_id}/component-updates/test")
+def test_component_updates(model_id: str, body: ComponentUpdateRequest):
+    from app.services.component_update_service import test_candidate
+    return test_candidate(model_id, body.selections, body.idempotency_key)
+
+
+@router.put("/models/{model_id}/component-dependencies", response_model=ModelView)
+def select_component_revisions(model_id: str, body: ComponentSelectionRequest):
+    from app.services.component_update_service import select_candidate_components
+    return select_candidate_components(model_id, body.selections)
+
+
+@router.post("/models/{model_id}/component-updates/apply", response_model=ModelView)
+def apply_component_updates(model_id: str):
     from app.services.function_update_service import apply_candidate
     return apply_candidate(model_id)

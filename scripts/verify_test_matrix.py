@@ -18,6 +18,7 @@ REQUIRED_UNIT_COVERAGE = {
 }
 
 REQUIRED_BACKEND_COVERAGE = {
+    "incremental binding and rank contracts": ["test_iteration_component_bindings.py", "test_iteration_parameter_rank.py", "test_review_20261020_rules.py", "test_review_20261020_recovery.py", "test_review_math_contracts.py", "test_review_execution_contracts.py"],
     "persistence and active version resolver": ["test_runtime_persistence_and_active_versions.py"],
     "horizon": ["test_model_time_dimension_contract.py", "test_runtime_horizon_policy.py"],
     "dimension contracts": ["test_model_dimension_normalization.py", "test_model_set_reference_validation.py"],
@@ -131,7 +132,7 @@ def main() -> int:
 
     require_snippets(
         ROOT / ".github" / "workflows" / "ci.yml",
-        ["npm run typecheck", "npm run build", "npm run test:unit", "python -m pytest -q", "npm run test:e2e:mock", "package.ps1", "cancel-in-progress: true"],
+        ["npm run typecheck", "npm run build", "npm run test:unit", "run: python -m pytest -q\n", "cloud_review_iteration.spec.ts", "Iteration API Solver Browser", "npm run test:e2e:mock", "package.ps1", "cancel-in-progress: true"],
         failures,
     )
     require_snippets(

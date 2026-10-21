@@ -142,6 +142,7 @@ class ModelPackage(BaseModel):
     ui_metadata: dict[str, Any] = Field(default_factory=dict)
     parameters: dict[str, Any] = Field(default_factory=dict)
     function_dependencies: dict[str, dict[str, Any]] = Field(default_factory=dict)
+    component_dependencies: dict[str, Any] = Field(default_factory=dict)
     parameter_bindings: list[dict[str, Any]] = Field(default_factory=list)
     parameter_schema: dict[str, Any] = Field(default_factory=dict)
     input_contract: dict[str, Any] = Field(default_factory=dict)
@@ -154,6 +155,7 @@ class ModelPackage(BaseModel):
     tested_at: str | None = None
     test_task_id: str | None = None
     last_test_parameters: dict[str, Any] = Field(default_factory=dict)
+    last_test_solver_config: dict[str, Any] = Field(default_factory=dict)
     created_at: str | None = None
     updated_at: str | None = None
     published_at: str | None = None
@@ -191,3 +193,12 @@ class FunctionUpdateRequest(BaseModel):
 
 class DependencySelectionRequest(BaseModel):
     revisions: dict[str, PositiveInt]
+
+
+class ComponentUpdateRequest(BaseModel):
+    selections: dict[str, str] = Field(min_length=1)
+    idempotency_key: str = Field(min_length=1, max_length=200)
+
+
+class ComponentSelectionRequest(BaseModel):
+    selections: dict[str, str] = Field(min_length=1)

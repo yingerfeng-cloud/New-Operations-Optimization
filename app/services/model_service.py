@@ -51,11 +51,12 @@ LOGGER = logging.getLogger(__name__)
 
 
 class ModelService:
-    def create_model(self, model: ModelPackage, *, inherited_dependencies: dict | None = None) -> ModelView:
+    def create_model(self, model: ModelPackage, *, inherited_dependencies: dict | None = None, inherited_components: dict | None = None) -> ModelView:
         model = model.model_copy(update={
             "ui_metadata": {key: value for key, value in (model.ui_metadata or {}).items() if key not in {"managed_default_template", "managed_template_version"}},
             "function_dependencies": deepcopy(inherited_dependencies or {}),
-            "test_task_id": None, "last_test_parameters": {},
+            "component_dependencies": deepcopy(inherited_components or {}),
+            "test_task_id": None, "last_test_parameters": {}, "last_test_solver_config": {},
             "status": "developing",
             "is_active_version": False,
             "published_by": None,
@@ -98,7 +99,7 @@ class ModelService:
             from app.services.function_dependencies import dependency_ids, dependency_snapshots
             dependency_snapshots(source, require_pinned=bool(source.published_at))
             inherited = {key: value for key, value in source.function_dependencies.items() if key in dependency_ids(package)}
-            return self.create_model(package, inherited_dependencies=inherited)
+            return self.create_model(package, inherited_dependencies=inherited, inherited_components=deepcopy(source.component_dependencies))
 
     def get_model(self, model_id: str) -> ModelView:
         with STORE.lock:
@@ -126,7 +127,7 @@ class ModelService:
         if existing.status in IMMUTABLE_MODEL_STATUSES or existing.published_at:
             raise HTTPException(status_code=409, detail="Online and historical model versions are immutable; create a new version before editing")
         from app.services.function_dependencies import dependency_ids
-        model = model.model_copy(update={"function_dependencies": {key: deepcopy(value) for key, value in existing.function_dependencies.items() if key in dependency_ids(model)}, "last_test_parameters": deepcopy(existing.last_test_parameters), "test_task_id": existing.test_task_id})
+        model = model.model_copy(update={"function_dependencies": {key: deepcopy(value) for key, value in existing.function_dependencies.items() if key in dependency_ids(model)}, "component_dependencies": deepcopy(existing.component_dependencies), "last_test_parameters": deepcopy(existing.last_test_parameters), "test_task_id": existing.test_task_id})
         model = self._normalize_component_model(model)
         model = self._normalize_generic_formula_model(model)
         model = self._apply_generalized_top_level_fields(model)
@@ -149,7 +150,7 @@ class ModelService:
     def _publish_model_locked(self, model_id: str) -> ModelView:
         model = self.get_model(model_id)
         from app.services.function_dependencies import assert_dependencies_current
-        context = (model.ui_metadata or {}).get("function_update") or {}
+        context = (model.ui_metadata or {}).get("function_update") or (model.ui_metadata or {}).get("component_update") or {}
         if context and not model.published_at:
             active = [row for row in STORE.models.values() if row.model_family_id == model.model_family_id and row.is_active_version]
             if active and active[0].id != context.get("source_model_id"):
@@ -207,6 +208,8 @@ class ModelService:
             except HTTPException:
                 raise
         assert_dependencies_current(model)
+        from app.services.component_dependencies import validate_manifest, component_refs
+        validate_manifest(model.component_dependencies, component_refs(model))
         if model.tested_model_id and model.tested_model_id != model.id:
             raise HTTPException(status_code=409, detail={"code": "MODEL_TEST_MISMATCH", "message": "测试资产与发布资产不一致，请重新测试当前模型。"})
         if not model.tested_model_id or not model.tested_content_hash:
@@ -410,7 +413,7 @@ class ModelService:
             for key, value in (copied.ui_metadata or {}).items()
             if key not in {
                 "supersedes_model_id", "model_family_id", "publish_info", "version_info",
-                "managed_default_template", "managed_template_version", "function_update",
+                "managed_default_template", "managed_template_version", "function_update", "component_update",
             }
         }
         copied.template_id = new_code
@@ -427,7 +430,7 @@ class ModelService:
         draft_advanced_component = ((copied.model_draft or {}).get("advanced") or {}).get("component_spec")
         if isinstance(draft_advanced_component, dict):
             self._replace_model_code(draft_advanced_component, new_code)
-        return self.create_model(copied, inherited_dependencies=deepcopy(model.function_dependencies))
+        return self.create_model(copied, inherited_dependencies=deepcopy(model.function_dependencies), inherited_components=deepcopy(model.component_dependencies))
 
     def find_model_by_code(self, model_code: str) -> ModelView:
         return self.resolve_model(model_code=model_code)
@@ -678,9 +681,11 @@ class ModelService:
                 "id", "status", "model_family_id", "supersedes_model_id", "is_active_version",
                 "scenario_id",
                 "published_by", "published_at", "tested_at", "created_at", "updated_at",
-                "validation_warnings", "dry_run_result", "content_hash", "tested_content_hash", "tested_model_id", "test_task_id", "last_test_parameters",
+                "validation_warnings", "dry_run_result", "content_hash", "tested_content_hash", "tested_model_id", "test_task_id", "last_test_parameters", "last_test_solver_config",
             },
         )
+        if not payload.get("component_dependencies"):
+            payload.pop("component_dependencies", None)
         metadata = deepcopy(payload.get("ui_metadata") or {})
         for key in ("publish_info", "test_result", "version_info"):
             metadata.pop(key, None)
@@ -841,8 +846,8 @@ class ModelService:
     def run_model_test_case(self, model_id: str, test_case: dict[str, Any]) -> ModelView:
         model = self.get_model(model_id)
         source_hash = self._content_hash(model)
-        from app.services.function_dependencies import capture_dependencies
-        model = model.model_copy(update={"function_dependencies": capture_dependencies(model)})
+        from app.services.component_dependencies import prepare_model_dependencies
+        model = prepare_model_dependencies(model)
         params = test_case.get("parameters") if "parameters" in test_case else test_case
         if not isinstance(params, dict) or not params:
             params = self._default_test_parameters(model)
@@ -867,7 +872,8 @@ class ModelService:
         from app.services.function_dependencies import capture_dependencies
         from app.services.job_service import job_service
         model = self.get_model(model_id)
-        model = model.model_copy(update={"function_dependencies": capture_dependencies(model)})
+        from app.services.component_dependencies import prepare_model_dependencies
+        model = prepare_model_dependencies(model)
         parameters = test_case.get("parameters") or self._default_test_parameters(model)
         from app.solvers.run_settings import validate_run_settings
         settings = validate_run_settings(test_case.get("solver_config") or {})
@@ -891,7 +897,7 @@ class ModelService:
         model = self.get_model(task.request.model_id)
         if self._content_hash(model) != context["source_hash"]:
             raise RuntimeError("MODEL_TEST_OUTDATED: 模型在测试期间发生修改，请测试当前版本。")
-        model = model.model_copy(update={"function_dependencies": context["dependencies"],
+        model = model.model_copy(update={"function_dependencies": context["dependencies"], "component_dependencies": context["component_dependencies"],
             "solver": task.result.get("solver_name") or task.request.solver,
             "problem_type": task.result.get("problem_type") or model.problem_type,
             "model_problem_type": task.result.get("problem_type") or model.model_problem_type})
@@ -901,7 +907,7 @@ class ModelService:
             "status": "published" if model.status == "published" else "trial",
             "content_hash": content_hash, "tested_content_hash": content_hash,
             "tested_model_id": model.id, "tested_at": now_text(), "updated_at": now_text(),
-            "test_task_id": task.id, "last_test_parameters": deepcopy(task.request.parameters),
+            "test_task_id": task.id, "last_test_parameters": deepcopy(task.request.parameters), "last_test_solver_config": deepcopy(task.request.solver_config),
             "solver": task.result.get("solver_name") or task.request.solver,
             "problem_type": task.result.get("problem_type") or model.problem_type,
             "model_problem_type": task.result.get("problem_type") or model.model_problem_type,
@@ -1000,8 +1006,16 @@ class ModelService:
                     errors.append(objective_mode_error)
                 if not model.mathematical_expansion:
                     errors.append({"field": "mathematical_expansion", "error": "数学展开未生成", "suggestion": "请从 Model Draft 重新生成数学展开"})
-                errors.extend(self._validate_component_library_references(component_spec))
-                errors.extend(self._validate_component_dependency_integrity(component_spec))
+                if model.component_dependencies:
+                    from app.services.component_dependencies import validate_manifest, component_refs
+                    assets = validate_manifest(model.component_dependencies, component_refs(model))
+                    catalog = {key: entry["definition"] for key, entry in assets.items()}
+                    for definition in catalog.values():
+                        result = validate_component_definition(definition, dependency_catalog=catalog)
+                        errors.extend(result["errors"])
+                else:
+                    errors.extend(self._validate_component_library_references(component_spec))
+                    errors.extend(self._validate_component_dependency_integrity(component_spec))
             errors.extend(self._validate_generic_formula_compile_status(generic_spec))
             if not is_component_based and not is_template_backed and not generic_spec:
                 errors.append({"field": "generic_spec", "error": "generic_spec is required before publish"})
@@ -1389,6 +1403,8 @@ class ModelService:
                 from app.services.function_dependencies import dependency_snapshots
                 if model.function_dependencies:
                     dry_parameters["_function_asset_snapshots"] = dependency_snapshots(model)
+                if model.component_dependencies:
+                    dry_parameters["_component_dependencies"] = deepcopy(model.component_dependencies)
                 self._fill_component_dry_parameters(dry_parameters, component_spec)
                 self._normalize_component_dry_parameters(dry_parameters, str(component_spec.get("model_code") or semantic.get("model_code") or ""))
                 from app.services.time_dimension_service import normalize_runtime_time_dimension, resolve_time_dimension_config
@@ -1882,7 +1898,9 @@ class ModelService:
         with STORE.lock:
             for model_id, model in list(STORE.models.items()):
                 if self._is_managed_default(model) and model_id not in existing_model_ids and not model.function_dependencies:
-                    model = model.model_copy(update={"function_dependencies": capture_dependencies(model.model_copy(update={"published_at": None}))})
+                    from app.services.component_dependencies import prepare_model_dependencies
+                    captured = prepare_model_dependencies(model.model_copy(update={"published_at": None}))
+                    model = model.model_copy(update={"function_dependencies": captured.function_dependencies, "component_dependencies": captured.component_dependencies})
                     STORE.models[model_id] = model
                 if self._is_managed_default(model) and STORE.template_status.get(f"model:{model_id}") == "offline":
                     STORE.models[model_id] = model.model_copy(update={"status": "offline", "is_active_version": False})

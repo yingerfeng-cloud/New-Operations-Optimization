@@ -1,0 +1,88 @@
+F.FF.....                                                                [100%]
+=================================== FAILURES ===================================
+________ test_selective_component_update_offline_and_formal_governance _________
+
+client = <tests.conftest.ManagedTestClient object at 0x10b5dd670>
+
+    def test_selective_component_update_offline_and_formal_governance(client):
+        c1 = component(client)
+        a, b = model(client, c1), model(client, c1)
+        test_publish(client, a); test_publish(client, b)
+        original = invoke(client, b)
+        c2 = component(client, 1.2, c1)
+        selected = candidate(client, a, {c1: c2})
+        c3 = component(client, 1.5, c1)
+        assert client.post(f"/api/components/{c1}/offline").status_code == 200
+        invoke(client, b)
+        assert client.post(f"/api/models/{selected}/component-updates/apply").status_code == 200
+        invoke(client, selected, 1.2)
+        invoke(client, b)
+        assert client.post(f"/api/models/{a}/invoke", json={"parameters": {}}).status_code == 409
+        replay = client.post(f"/api/tasks/{original['task_id']}/replay")
+        assert replay.status_code == 200, replay.text
+        assert replay.json()["objective_value"] == pytest.approx(60)
+        pinned = client.get(f"/api/models/{selected}").json()["component_dependencies"]
+        assert c2 in pinned["assets"] and c3 not in pinned["assets"]
+        # Explicit rebinding after a successful test must invalidate evidence.
+        next_candidate = candidate(client, b, {c1: c2})
+        change = client.put(f"/api/models/{next_candidate}/component-dependencies", json={"selections": {c2: c3}})
+        assert change.status_code == 200, change.text
+        blocked = client.post(f"/api/models/{next_candidate}/component-updates/apply")
+        assert blocked.status_code == 409, blocked.text
+>       assert blocked.json()["detail"]["code"] == "MODEL_NOT_TESTED"
+E       AssertionError: assert 'COMPONENT_BINDING_CHANGED' == 'MODEL_NOT_TESTED'
+E         
+E         - MODEL_NOT_TESTED
+E         + COMPONENT_BINDING_CHANGED
+
+tests/test_iteration_component_bindings.py:99: AssertionError
+___ test_client_snapshot_forgery_corruption_and_missing_history_are_rejected ___
+
+client = <tests.conftest.ManagedTestClient object at 0x10fc4b080>
+
+    def test_client_snapshot_forgery_corruption_and_missing_history_are_rejected(client):
+        c = component(client)
+        a = model(client, c); test_publish(client, a)
+        view = client.get(f"/api/models/{a}").json()
+        forged = deepcopy(view); forged.pop("id"); forged["name"] = "forged"
+        assert client.post("/api/models", json=forged).json()["detail"]["code"] == "COMPONENT_MANIFEST_SERVER_OWNED"
+        result = invoke(client, a)
+        task = job_service.get_task(result["task_id"])
+        task.request.payload["_component_dependencies"]["assets"][c]["definition"]["constraints"][0]["expression"] = "output[t] >= 0"
+>       assert client.post(f"/api/tasks/{task.id}/replay").json()["detail"]["code"] == "COMPONENT_SNAPSHOT_CORRUPT"
+E       AssertionError: assert 'TASK_HISTORY_UNREPLAYABLE' == 'COMPONENT_SNAPSHOT_CORRUPT'
+E         
+E         - COMPONENT_SNAPSHOT_CORRUPT
+E         + TASK_HISTORY_UNREPLAYABLE
+
+tests/test_iteration_component_bindings.py:135: AssertionError
+______ test_revocation_is_explicit_impact_checked_and_blocks_old_bindings ______
+
+client = <tests.conftest.ManagedTestClient object at 0x10c294ad0>
+
+    def test_revocation_is_explicit_impact_checked_and_blocks_old_bindings(client):
+        c = component(client)
+        a = model(client, c); test_publish(client, a)
+        task = invoke(client, a)
+        assert client.post(f"/api/components/{c}/revoke", json={"reason": "安全问题，需要撤销"}).status_code == 409
+        affected = client.get(f"/api/components/{c}/revocation-impact").json()
+        assert a in affected["model_ids"] and task["task_id"] in affected["task_ids"]
+        response = client.post(f"/api/components/{c}/revoke", json={"reason": "安全问题，需要撤销", "expected_impact_hash": affected["impact_hash"]})
+        assert response.status_code == 200, response.text
+        blocked = client.post(f"/api/models/{a}/invoke", json={"parameters": {"demand": [10, 10]}})
+>       assert blocked.status_code == 409 and blocked.json()["detail"]["code"] == "COMPONENT_REVOKED"
+E       assert (200 == 409)
+E        +  where 200 = <Response [200 OK]>.status_code
+
+tests/test_iteration_component_bindings.py:150: AssertionError
+=============================== warnings summary ===============================
+.venv-mac/lib/python3.12/site-packages/fastapi/testclient.py:1
+  /Users/joiefu/Project/OPTIFORGE/.venv-mac/lib/python3.12/site-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+    from starlette.testclient import TestClient as TestClient  # noqa
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/test_iteration_component_bindings.py::test_selective_component_update_offline_and_formal_governance
+FAILED tests/test_iteration_component_bindings.py::test_client_snapshot_forgery_corruption_and_missing_history_are_rejected
+FAILED tests/test_iteration_component_bindings.py::test_revocation_is_explicit_impact_checked_and_blocks_old_bindings
+3 failed, 6 passed, 1 warning in 32.81s
