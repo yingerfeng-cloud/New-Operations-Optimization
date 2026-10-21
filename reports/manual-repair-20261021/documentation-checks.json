@@ -1,0 +1,41 @@
+{
+  "checked_at": "2026-10-21T18:47:56.726668+08:00",
+  "documents": [
+    {
+      "file": "README.md",
+      "local_links": 9,
+      "sha256": "eeb85633c4112005d3f6378c2cf289daa58916628b3fb4c9b1238cc5a178da3e"
+    },
+    {
+      "file": "OPERATION_MANUAL.md",
+      "local_links": 1,
+      "sha256": "57d4786cca2f70959c0859a1dcbcb6ca25f409bdddbcdb884359437a4af3ac63"
+    },
+    {
+      "file": "docs/user-manual.md",
+      "local_links": 65,
+      "sha256": "376ebe70e83d7b5536471798abf10f178253355725f895362b720d127c354444"
+    },
+    {
+      "file": "docs/manual-repair-acceptance-2026-10-21.md",
+      "local_links": 57,
+      "sha256": "be0a4bfaf153bd9101becf591631268674b5a8a31978f5f259f8c4b222301d76"
+    },
+    {
+      "file": "docs/user-manual-validation-2026-10-21.md",
+      "local_links": 24,
+      "sha256": "87a6a839a2666a6b62b49906224d9facc1bb064c4a099d54eaa18714defab596"
+    },
+    {
+      "file": "docs/independent-ui-acceptance-2026-10-21.md",
+      "local_links": 53,
+      "sha256": "7a2aa16ccc16beafec758808f93bf77bfff67bc96b4c326ef01aad7abbaabb82"
+    }
+  ],
+  "missing": [],
+  "sample_json_valid": true,
+  "json_files_checked": 11,
+  "source_files_checked": 31,
+  "source_files_changed_since_test": [],
+  "evidence_file_hashes_match": true
+}

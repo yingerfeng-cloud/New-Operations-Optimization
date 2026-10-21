@@ -8,7 +8,12 @@ export interface AuthoritativeCompileContext {
 
 const scopeOf = (formula: FormulaDef) => formula.scope?.length
   ? formula.scope
-  : formula.free_indices.map((alias, index) => ({ alias, set: formula.foreach[index] || alias }));
+  : formula.free_indices.flatMap((alias, index) => {
+    const set = formula.foreach[index];
+    // Keep a declared alias->axis mapping; leave unresolved aliases to the
+    // backend instead of inventing time->time alongside its inferred t->time.
+    return set && set !== alias ? [{ alias, set }] : [];
+  });
 
 // Boundary policy belongs to the formula; callers may also carry it in their
 // context. Canonicalize once so requests and both sides of the apply gate agree.

@@ -1,0 +1,70 @@
+F                                                                        [100%]
+=================================== FAILURES ===================================
+____________________ test_synthetic_business_day_acceptance ____________________
+
+client = <tests.conftest.ManagedTestClient object at 0x10c72ed50>
+
+    @pytest.mark.slow
+    def test_synthetic_business_day_acceptance(client):
+>       report = run_acceptance(client, json.loads(FIXTURES.read_text(encoding="utf-8")))
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_review_synthetic_poc.py:9: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+api = <tests.conftest.ManagedTestClient object at 0x10c72ed50>
+document = {'cases': [{'case_id': 'ED-24H-normal', 'expected': 'SUCCESS', 'family': 'economic', 'parameters': {'fuel_cost': {'U1'.....}}, ...], 'period': 'synthetic 24-hour operating day', 'seed': 'deterministic-no-randomness', 'synthetic': True, ...}
+output_dir = None
+
+    def run_acceptance(api, document, output_dir=None):
+        bases = {"economic": "MODEL-POWER-ECONOMIC-DISPATCH", "pv_storage": "MODEL-POWER-PV-STORAGE-DAY-AHEAD-DISPATCH-V2", "hydro": "MODEL-POWER-CASCADE-HYDRO-DISPATCH"}
+        ids = {}
+        for family, base_id in bases.items():
+            base = api.get(f"/api/models/{base_id}")
+            assert base.status_code == 200, base.text
+            model = base.json()
+            payload = {key: deepcopy(model[key]) for key in ("name", "scene", "template_id", "build_mode", "solver", "problem_type", "model_problem_type", "semantic_spec", "generic_spec", "component_spec", "ui_metadata") if key in model}
+            payload["name"] = f"Synthetic acceptance {family}"
+            params = next(case["parameters"] for case in document["cases"] if case["family"] == family)
+            payload["parameters"] = deepcopy(params)
+            payload["problem_type"] = payload["model_problem_type"] = "MILP" if family == "pv_storage" else "LP"
+            payload["semantic_spec"]["sample_runtime_parameters"] = deepcopy(params)
+            for source in (payload, payload.get("semantic_spec", {}), payload.get("component_spec", {}), payload.get("semantic_spec", {}).get("component_spec", {})):
+                if source:
+                    config = source.setdefault("ui_metadata", {}).setdefault("time_dimension", {})
+                    config.update(default_horizon=params["horizon"], interval_minutes=15 if family != "economic" else 60, delta_t=0.25 if family != "economic" else 1)
+                    for row in source.get("sets", []):
+                        if row.get("code") in {"time", "time_volume"}:
+                            row["values"] = list(range(params["horizon"] + int(row["code"] == "time_volume")))
+                            if "members" in row:
+                                row["members"] = deepcopy(row["values"])
+                            row["horizon"] = params["horizon"]
+                    for row in source.get("parameters", []) if isinstance(source.get("parameters"), list) else []:
+                        if row.get("code") in params:
+                            row["sample_value"] = deepcopy(params[row["code"]])
+            created = api.post("/api/models", json=payload)
+            assert created.status_code == 200, created.text
+            model_id = created.json()["id"]
+            tested = api.post(f"/api/models/{model_id}/test-jobs", json={"parameters": params, "idempotency_key": f"poc-test-{model_id}"})
+            assert tested.status_code == 200, tested.text
+            task = tested.json()
+            deadline = time.monotonic() + 90
+            while task["status"] not in {"SUCCESS", "FAILED", "INFEASIBLE", "TIMEOUT"} and time.monotonic() < deadline:
+                time.sleep(0.1)
+                task = api.get(f"/api/tasks/{task['id']}").json()
+            assert task["status"] == "SUCCESS", task
+            published = api.post(f"/api/models/{model_id}/publish")
+>           assert published.status_code == 200, published.text
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E           AssertionError: {"detail":{"message":"problem type diagnosis does not allow publish","errors":[{"field":"model_draft.basic_info.problem_type","error":"当前模型包含二进制变量 binary/integer，系统推荐 MILP，不能发布为 LP。","actual":"LP","expected":"MILP","suggestion":"请改用系统推荐类型，或先移除导致问题类型升级的整数变量/二次/非线性表达式。"}],"problem_type_diagnosis":{"inferred_problem_type":"MILP","recommended_problem_type":"MILP","recommended_solver":"HiGHS","requested_problem_type":"LP","effective_problem_type":"LP","expression_class":"linear","has_integer_variables":true,"variable_types":["binary","continuous"],"integer_variable_details":[],"solver":"HiGHS","solver_supported":true,"solver_supported_problem_types":["LP","MILP"],"reasons":["检测到 binary/integer 变量","约束和目标函数为线性表达式","因此推荐 MILP"],"warnings":["手动指定 LP 与系统诊断 MILP 不一致，发布前会强校验。"],"function_assets_used":[{"function_asset_id":"cascade_hydro_power_flow_v1","component":"function_mapping_component","solve_strategy":"segment_binary"},{"function_asset_id":"cascade_hydro_level_storage_v1","component":"function_mapping_component","solve_strategy":"segment_binary"},{"function_asset_id":"cascade_hydro_tailwater_outflow_v1","component":"function_mapping_component","solve_strategy":"segment_binary"},{"function_asset_id":"cascade_hydro_power_surface_v1","component":"function_mapping_2d_component","solve_strategy":"triangulated_milp_exact"}],"linearization_strategy":["segment_binary","triangulated_milp_exact"],"nonlinear_diagnostics":{"count":4,"relationships":[{"expression":"station_power[s,t] == f(q_gen[s,t])","nonlinear_type":"function_1d","involved_variables":["q_gen[s,t]"],"source":"component_spec.components[4]","converted":true,"strategies":["piecewise_1d"],"risk":"low","message":"一维函数资产已通过 piecewise_1d 组件转换，可由 HiGHS 路径求解。","supported_by_current_solver":true,"recommended_strategy":["piecewise_1d"],"blocking":false},{"expression":"forebay_level[s,t] == f(volume[s,t])","nonlinear_type":"function_1d","involved_variables":["volume[s,t]"],"source":"component_spec.components[5]","converted":true,"strategies":["piecewise_1d"],"risk":"low","message":"一维函数资产已通过 piecewise_1d 组件转换，可由 HiGHS 路径求解。","supported_by_current_solver":true,"recommended_strategy":["piecewise_1d"],"blocking":false},{"expression":"tailwater_level[s,t] == f(q_out[s,t])","nonlinear_type":"function_1d","involved_variables":["q_out[s,t]"],"source":"component_spec.components[6]","converted":true,"strategies":["piecewise_1d"],"risk":"low","message":"一维函数资产已通过 piecewise_1d 组件转换，可由 HiGHS 路径求解。","supported_by_current_solver":true,"recommended_strategy":["piecewise_1d"],"blocking":false},{"expression":"station_power[s,t] == f(q_gen[s,t], head[s,t])","nonlinear_type":"function_2d","involved_variables":["q_gen[s,t]","head[s,t]"],"source":"component_spec.components[8]","converted":true,"strategies":["piecewise_2d"],"risk":"medium","message":"二维函数资产已通过 piecewise_2d 组件转换；注意 MILP 规模风险。","supported_by_current_solver":true,"recommended_strategy":["piecewise_2d"],"blocking":false}],"blocking_items":[],"warning_items":[],"has_blocking_nonlinearity":false,"converted_count":4,"message":"未发现阻断发布的未转换非线性表达式。"},"publish_valid":false}}}
+
+tests/review_synthetic_poc.py:238: AssertionError
+=============================== warnings summary ===============================
+.venv-mac/lib/python3.12/site-packages/fastapi/testclient.py:1
+  /Users/joiefu/Project/OPTIFORGE/.venv-mac/lib/python3.12/site-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+    from starlette.testclient import TestClient as TestClient  # noqa
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/test_review_synthetic_poc.py::test_synthetic_business_day_acceptance
+1 failed, 1 warning in 18.91s

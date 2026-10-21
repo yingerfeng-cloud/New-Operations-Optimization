@@ -1,0 +1,459 @@
+{
+  "model_id": "MODEL-8FA60674",
+  "task_id": "OPT-9A70A436E5",
+  "status": "trial",
+  "objective": 40,
+  "solver_status": "optimal",
+  "evidence": {
+    "schema_version": 1,
+    "business_inputs": {
+      "cost": [
+        2,
+        3
+      ],
+      "delta_t": 0.5,
+      "demand": [
+        10,
+        20
+      ],
+      "horizon": 2,
+      "interval_minutes": 30,
+      "time": [
+        0,
+        1
+      ]
+    },
+    "settings": {
+      "backend": "HiGHS",
+      "problem_type": "MILP",
+      "mip_gap": 0.001,
+      "time_limit_seconds": 300,
+      "thread_num": null,
+      "presolve": true,
+      "nlp_tolerance": null,
+      "max_iter": null,
+      "acceptable_tol": null,
+      "initial_values": {}
+    },
+    "decisions": [
+      {
+        "key": "p[0]",
+        "code": "p",
+        "coordinate": "p[0]",
+        "name": "p",
+        "unit": "MW",
+        "definition": {
+          "dimension": [
+            "time"
+          ],
+          "unit": "MW"
+        },
+        "value": 10
+      },
+      {
+        "key": "p[1]",
+        "code": "p",
+        "coordinate": "p[1]",
+        "name": "p",
+        "unit": "MW",
+        "definition": {
+          "dimension": [
+            "time"
+          ],
+          "unit": "MW"
+        },
+        "value": 20
+      },
+      {
+        "key": "fee[0]",
+        "code": "fee",
+        "coordinate": "fee[0]",
+        "name": "fee",
+        "unit": "元/h",
+        "definition": {
+          "dimension": [
+            "time"
+          ],
+          "unit": "元/h"
+        },
+        "value": 20
+      },
+      {
+        "key": "fee[1]",
+        "code": "fee",
+        "coordinate": "fee[1]",
+        "name": "fee",
+        "unit": "元/h",
+        "definition": {
+          "dimension": [
+            "time"
+          ],
+          "unit": "元/h"
+        },
+        "value": 60
+      },
+      {
+        "key": "function_mapping_1792576626547_lambda[0,0]",
+        "code": "function_mapping_1792576626547_lambda",
+        "coordinate": "function_mapping_1792576626547_lambda[0,0]",
+        "name": "function_mapping_1792576626547_lambda",
+        "unit": "未声明",
+        "definition": {
+          "dimension": [],
+          "unit": "未声明"
+        },
+        "value": 0
+      },
+      {
+        "key": "function_mapping_1792576626547_lambda[0,1]",
+        "code": "function_mapping_1792576626547_lambda",
+        "coordinate": "function_mapping_1792576626547_lambda[0,1]",
+        "name": "function_mapping_1792576626547_lambda",
+        "unit": "未声明",
+        "definition": {
+          "dimension": [],
+          "unit": "未声明"
+        },
+        "value": 1
+      },
+      {
+        "key": "function_mapping_1792576626547_lambda[0,2]",
+        "code": "function_mapping_1792576626547_lambda",
+        "coordinate": "function_mapping_1792576626547_lambda[0,2]",
+        "name": "function_mapping_1792576626547_lambda",
+        "unit": "未声明",
+        "definition": {
+          "dimension": [],
+          "unit": "未声明"
+        },
+        "value": 0
+      },
+      {
+        "key": "function_mapping_1792576626547_lambda[1,0]",
+        "code": "function_mapping_1792576626547_lambda",
+        "coordinate": "function_mapping_1792576626547_lambda[1,0]",
+        "name": "function_mapping_1792576626547_lambda",
+        "unit": "未声明",
+        "definition": {
+          "dimension": [],
+          "unit": "未声明"
+        },
+        "value": 0
+      },
+      {
+        "key": "function_mapping_1792576626547_lambda[1,1]",
+        "code": "function_mapping_1792576626547_lambda",
+        "coordinate": "function_mapping_1792576626547_lambda[1,1]",
+        "name": "function_mapping_1792576626547_lambda",
+        "unit": "未声明",
+        "definition": {
+          "dimension": [],
+          "unit": "未声明"
+        },
+        "value": 0
+      },
+      {
+        "key": "function_mapping_1792576626547_lambda[1,2]",
+        "code": "function_mapping_1792576626547_lambda",
+        "coordinate": "function_mapping_1792576626547_lambda[1,2]",
+        "name": "function_mapping_1792576626547_lambda",
+        "unit": "未声明",
+        "definition": {
+          "dimension": [],
+          "unit": "未声明"
+        },
+        "value": 1
+      },
+      {
+        "key": "function_mapping_1792576626547_segment_selected[0,0]",
+        "code": "function_mapping_1792576626547_segment_selected",
+        "coordinate": "function_mapping_1792576626547_segment_selected[0,0]",
+        "name": "function_mapping_1792576626547_segment_selected",
+        "unit": "未声明",
+        "definition": {
+          "dimension": [],
+          "unit": "未声明"
+        },
+        "value": 1
+      },
+      {
+        "key": "function_mapping_1792576626547_segment_selected[0,1]",
+        "code": "function_mapping_1792576626547_segment_selected",
+        "coordinate": "function_mapping_1792576626547_segment_selected[0,1]",
+        "name": "function_mapping_1792576626547_segment_selected",
+        "unit": "未声明",
+        "definition": {
+          "dimension": [],
+          "unit": "未声明"
+        },
+        "value": 0
+      },
+      {
+        "key": "function_mapping_1792576626547_segment_selected[1,0]",
+        "code": "function_mapping_1792576626547_segment_selected",
+        "coordinate": "function_mapping_1792576626547_segment_selected[1,0]",
+        "name": "function_mapping_1792576626547_segment_selected",
+        "unit": "未声明",
+        "definition": {
+          "dimension": [],
+          "unit": "未声明"
+        },
+        "value": 0
+      },
+      {
+        "key": "function_mapping_1792576626547_segment_selected[1,1]",
+        "code": "function_mapping_1792576626547_segment_selected",
+        "coordinate": "function_mapping_1792576626547_segment_selected[1,1]",
+        "name": "function_mapping_1792576626547_segment_selected",
+        "unit": "未声明",
+        "definition": {
+          "dimension": [],
+          "unit": "未声明"
+        },
+        "value": 1
+      }
+    ],
+    "constraints": [
+      {
+        "key": "function_mapping_1792576626547_lambda_sum[0]",
+        "execution_name": "function_mapping_1792576626547_lambda_sum[0]",
+        "body": 1,
+        "lower": 1,
+        "upper": 1,
+        "violation": 0,
+        "definition": "function_mapping_1792576626547_lambda[0,0] + function_mapping_1792576626547_lambda[0,1] + function_mapping_1792576626547_lambda[0,2]  ==  1",
+        "unit": "按模型约束定义"
+      },
+      {
+        "key": "function_mapping_1792576626547_lambda_sum[1]",
+        "execution_name": "function_mapping_1792576626547_lambda_sum[1]",
+        "body": 1,
+        "lower": 1,
+        "upper": 1,
+        "violation": 0,
+        "definition": "function_mapping_1792576626547_lambda[1,0] + function_mapping_1792576626547_lambda[1,1] + function_mapping_1792576626547_lambda[1,2]  ==  1",
+        "unit": "按模型约束定义"
+      },
+      {
+        "key": "function_mapping_1792576626547_segment_sum[0]",
+        "execution_name": "function_mapping_1792576626547_segment_sum[0]",
+        "body": 1,
+        "lower": 1,
+        "upper": 1,
+        "violation": 0,
+        "definition": "function_mapping_1792576626547_segment_selected[0,0] + function_mapping_1792576626547_segment_selected[0,1]  ==  1",
+        "unit": "按模型约束定义"
+      },
+      {
+        "key": "function_mapping_1792576626547_segment_sum[1]",
+        "execution_name": "function_mapping_1792576626547_segment_sum[1]",
+        "body": 1,
+        "lower": 1,
+        "upper": 1,
+        "violation": 0,
+        "definition": "function_mapping_1792576626547_segment_selected[1,0] + function_mapping_1792576626547_segment_selected[1,1]  ==  1",
+        "unit": "按模型约束定义"
+      },
+      {
+        "key": "function_mapping_1792576626547_adjacency[0,0]",
+        "execution_name": "function_mapping_1792576626547_adjacency[0,0]",
+        "body": -1,
+        "lower": null,
+        "upper": 0,
+        "violation": 0,
+        "definition": "function_mapping_1792576626547_lambda[0,0]  <=  function_mapping_1792576626547_segment_selected[0,0]",
+        "unit": "按模型约束定义"
+      },
+      {
+        "key": "function_mapping_1792576626547_adjacency[0,1]",
+        "execution_name": "function_mapping_1792576626547_adjacency[0,1]",
+        "body": 0,
+        "lower": null,
+        "upper": 0,
+        "violation": 0,
+        "definition": "function_mapping_1792576626547_lambda[0,1]  <=  function_mapping_1792576626547_segment_selected[0,0] + function_mapping_1792576626547_segment_selected[0,1]",
+        "unit": "按模型约束定义"
+      },
+      {
+        "key": "function_mapping_1792576626547_adjacency[0,2]",
+        "execution_name": "function_mapping_1792576626547_adjacency[0,2]",
+        "body": 0,
+        "lower": null,
+        "upper": 0,
+        "violation": 0,
+        "definition": "function_mapping_1792576626547_lambda[0,2]  <=  function_mapping_1792576626547_segment_selected[0,1]",
+        "unit": "按模型约束定义"
+      },
+      {
+        "key": "function_mapping_1792576626547_adjacency[1,0]",
+        "execution_name": "function_mapping_1792576626547_adjacency[1,0]",
+        "body": 0,
+        "lower": null,
+        "upper": 0,
+        "violation": 0,
+        "definition": "function_mapping_1792576626547_lambda[1,0]  <=  function_mapping_1792576626547_segment_selected[1,0]",
+        "unit": "按模型约束定义"
+      },
+      {
+        "key": "function_mapping_1792576626547_adjacency[1,1]",
+        "execution_name": "function_mapping_1792576626547_adjacency[1,1]",
+        "body": -1,
+        "lower": null,
+        "upper": 0,
+        "violation": 0,
+        "definition": "function_mapping_1792576626547_lambda[1,1]  <=  function_mapping_1792576626547_segment_selected[1,0] + function_mapping_1792576626547_segment_selected[1,1]",
+        "unit": "按模型约束定义"
+      },
+      {
+        "key": "function_mapping_1792576626547_adjacency[1,2]",
+        "execution_name": "function_mapping_1792576626547_adjacency[1,2]",
+        "body": 0,
+        "lower": null,
+        "upper": 0,
+        "violation": 0,
+        "definition": "function_mapping_1792576626547_lambda[1,2]  <=  function_mapping_1792576626547_segment_selected[1,1]",
+        "unit": "按模型约束定义"
+      },
+      {
+        "key": "function_mapping_1792576626547_x_link[0]",
+        "execution_name": "function_mapping_1792576626547_x_link[0]",
+        "body": 0,
+        "lower": 0,
+        "upper": 0,
+        "violation": 0,
+        "definition": "p[0]  ==  0.0*function_mapping_1792576626547_lambda[0,0] + 10.0*function_mapping_1792576626547_lambda[0,1] + 20.0*function_mapping_1792576626547_lambda[0,2]",
+        "unit": "按模型约束定义"
+      },
+      {
+        "key": "function_mapping_1792576626547_x_link[1]",
+        "execution_name": "function_mapping_1792576626547_x_link[1]",
+        "body": 0,
+        "lower": 0,
+        "upper": 0,
+        "violation": 0,
+        "definition": "p[1]  ==  0.0*function_mapping_1792576626547_lambda[1,0] + 10.0*function_mapping_1792576626547_lambda[1,1] + 20.0*function_mapping_1792576626547_lambda[1,2]",
+        "unit": "按模型约束定义"
+      },
+      {
+        "key": "function_mapping_1792576626547_y_link[0]",
+        "execution_name": "function_mapping_1792576626547_y_link[0]",
+        "body": 0,
+        "lower": 0,
+        "upper": 0,
+        "violation": 0,
+        "definition": "fee[0]  ==  0.0*function_mapping_1792576626547_lambda[0,0] + 20.0*function_mapping_1792576626547_lambda[0,1] + 60.0*function_mapping_1792576626547_lambda[0,2]",
+        "unit": "按模型约束定义"
+      },
+      {
+        "key": "function_mapping_1792576626547_y_link[1]",
+        "execution_name": "function_mapping_1792576626547_y_link[1]",
+        "body": 0,
+        "lower": 0,
+        "upper": 0,
+        "violation": 0,
+        "definition": "fee[1]  ==  0.0*function_mapping_1792576626547_lambda[1,0] + 20.0*function_mapping_1792576626547_lambda[1,1] + 60.0*function_mapping_1792576626547_lambda[1,2]",
+        "unit": "按模型约束定义"
+      },
+      {
+        "key": "model_formula_2ccb4ba3_293e_405a_a49b_be2ad760a214[0]",
+        "execution_name": "model_formula_2ccb4ba3_293e_405a_a49b_be2ad760a214[0]",
+        "body": 10,
+        "lower": 10,
+        "upper": null,
+        "violation": 0,
+        "definition": "10  <=  p[0]",
+        "unit": "按模型约束定义"
+      },
+      {
+        "key": "model_formula_2ccb4ba3_293e_405a_a49b_be2ad760a214[1]",
+        "execution_name": "model_formula_2ccb4ba3_293e_405a_a49b_be2ad760a214[1]",
+        "body": 20,
+        "lower": 20,
+        "upper": null,
+        "violation": 0,
+        "definition": "20  <=  p[1]",
+        "unit": "按模型约束定义"
+      }
+    ],
+    "metrics": [],
+    "variable_checks": [
+      {
+        "key": "p[0]",
+        "violation": 0,
+        "integrality_violation": 0
+      },
+      {
+        "key": "p[1]",
+        "violation": 0,
+        "integrality_violation": 0
+      },
+      {
+        "key": "fee[0]",
+        "violation": 0,
+        "integrality_violation": 0
+      },
+      {
+        "key": "fee[1]",
+        "violation": 0,
+        "integrality_violation": 0
+      },
+      {
+        "key": "function_mapping_1792576626547_lambda[0,0]",
+        "violation": 0,
+        "integrality_violation": 0
+      },
+      {
+        "key": "function_mapping_1792576626547_lambda[0,1]",
+        "violation": 0,
+        "integrality_violation": 0
+      },
+      {
+        "key": "function_mapping_1792576626547_lambda[0,2]",
+        "violation": 0,
+        "integrality_violation": 0
+      },
+      {
+        "key": "function_mapping_1792576626547_lambda[1,0]",
+        "violation": 0,
+        "integrality_violation": 0
+      },
+      {
+        "key": "function_mapping_1792576626547_lambda[1,1]",
+        "violation": 0,
+        "integrality_violation": 0
+      },
+      {
+        "key": "function_mapping_1792576626547_lambda[1,2]",
+        "violation": 0,
+        "integrality_violation": 0
+      },
+      {
+        "key": "function_mapping_1792576626547_segment_selected[0,0]",
+        "violation": 0,
+        "integrality_violation": 0
+      },
+      {
+        "key": "function_mapping_1792576626547_segment_selected[0,1]",
+        "violation": 0,
+        "integrality_violation": 0
+      },
+      {
+        "key": "function_mapping_1792576626547_segment_selected[1,0]",
+        "violation": 0,
+        "integrality_violation": 0
+      },
+      {
+        "key": "function_mapping_1792576626547_segment_selected[1,1]",
+        "violation": 0,
+        "integrality_violation": 0
+      }
+    ],
+    "max_constraint_violation": 0,
+    "objective": {
+      "value": 40,
+      "definition": "0.5*fee[0] + 0.5*fee[1]",
+      "sense": "minimize",
+      "unit": "模型加权目标"
+    }
+  }
+}

@@ -1,0 +1,129 @@
+{
+  "baseline_commit": "4d81a3f952af97536918886fd9dc2dfe589e38a5",
+  "files": [
+    {
+      "path": "app/api/components.py",
+      "sha256": "976974672e60655cca0e53baec9da25dd8603fd6ace4fc9392776571484156db"
+    },
+    {
+      "path": "app/builders/component_model_builder.py",
+      "sha256": "4fc5a34a060316913399e181e7d659b7ff5b76abc781d3e49dbfc99aa012dec2"
+    },
+    {
+      "path": "app/formulas/service.py",
+      "sha256": "495b9ff6dd6200c7a09f710a9558f910b50131ded18a6f9468b1bb201c96be00"
+    },
+    {
+      "path": "app/model_components/objective_components.py",
+      "sha256": "483193a0a128389417036a1f35c070310a4646d1f262cc3cd79c8e152c261847"
+    },
+    {
+      "path": "app/model_draft.py",
+      "sha256": "3b788e420c3f2e533afae81a919555611307a9c43488fcc114f8f36e1d863e83"
+    },
+    {
+      "path": "app/model_formula_bridge.py",
+      "sha256": "5e818d5a16ae5025b701bcb83be3ca26516ca8c3ce63c7d2a3b41d46dcf8969a"
+    },
+    {
+      "path": "app/services/job_service.py",
+      "sha256": "3cf690144f92159ff9514b66483441a9c4294310c5a19c12ad179dd76371f41d"
+    },
+    {
+      "path": "app/services/model_service.py",
+      "sha256": "ea5503a7fe8d9be66a5e21acfc5e45b7f1f1fe0482cd9aa315ae157edd0490a4"
+    },
+    {
+      "path": "app/services/model_set_reference_validator.py",
+      "sha256": "9482184c13e444146b77adc9efb0eac67ec55b5198e328565258f6bc40dd94d2"
+    },
+    {
+      "path": "app/services/model_time_dimension_service.py",
+      "sha256": "f8e7aee1cb16d7f34f68d6712327153306fe2a7e67d4d55eddc76f76832a6feb"
+    },
+    {
+      "path": "frontend/src/api/client.ts",
+      "sha256": "cebc57b1709acf9a9e3799af276f3ad7f855633f22313403674c260226fb1f9a"
+    },
+    {
+      "path": "frontend/src/features/component-library/ComponentEditor.tsx",
+      "sha256": "d55badade696f0421440c98fd6ea51923e63fb59ccc56cf025c711ac9ce11084"
+    },
+    {
+      "path": "frontend/src/features/formula-editor/FormulaBuilderModal.tsx",
+      "sha256": "fb5ba34d39aeee4e0037e622e17c33903fb22e9b418d6f8c3e2a52578df9f6ba"
+    },
+    {
+      "path": "frontend/src/features/formula-editor/FormulaDisplay.tsx",
+      "sha256": "97cf8f3a10d5cbe68e7a1beaa9473e4fa220ccc8b67a022b8479c04821089b2d"
+    },
+    {
+      "path": "frontend/src/features/formula-editor/FormulaManagementPanel.tsx",
+      "sha256": "13f647d442a3b02d3cddeec6410f5cbc5132eb7a2206864828f3a056f5d41894"
+    },
+    {
+      "path": "frontend/src/features/formula-editor/authoritativeCompilation.ts",
+      "sha256": "5b579b989066ffa219d83bf4c7733db99053a083b73f82fcdf24caa963f6bee5"
+    },
+    {
+      "path": "frontend/src/features/formula-editor/formulaDsl.ts",
+      "sha256": "3e8040e912cdadd321a7b5138d2444026a4fcb1354671a08d24a880c952ff3a2"
+    },
+    {
+      "path": "frontend/src/features/formula-editor/formulaValidator.ts",
+      "sha256": "f2bfe04926ff62e435b3ae6616fee9a58e2ff18d0fa2bcc4bb57adf9f8850ee7"
+    },
+    {
+      "path": "frontend/src/features/model-center/ModelAssetPanels.tsx",
+      "sha256": "e00d00d67c67ff413feddb98c89c93f7e8253e712ae4bb86fbb30dd8aaa0b732"
+    },
+    {
+      "path": "frontend/src/features/model-creation/ModelCreationPage.tsx",
+      "sha256": "c42d79a30d0fe6792ddf2e44ac873f60a3931dd458a843b5a715aabfa1461ded"
+    },
+    {
+      "path": "frontend/src/features/model-creation/components/ParameterBindingDrawer.tsx",
+      "sha256": "89fa50e55cecb471e13b683629834c73a6b77e75000dd9d89ce5329084f1d7c4"
+    },
+    {
+      "path": "frontend/src/features/model-creation/steps/Step3MathExpansion.tsx",
+      "sha256": "0a1d2835f1d85080a719b895c905935f0e1d948404b2a08553e710f73a636829"
+    },
+    {
+      "path": "frontend/src/features/model-creation/steps/Step5ReviewPublish.tsx",
+      "sha256": "18481095af836263a9ead4b8cf3ecfe000ed8a9362eb52a26c05b5b03c641484"
+    },
+    {
+      "path": "frontend/src/features/model-creation/utils/saveModelDraftAsset.ts",
+      "sha256": "33c0fd8246ae9cee8a24d6d2497ef9782f6e539ee219fa21e2bd39c184f201f8"
+    },
+    {
+      "path": "frontend/src/tests/unit/FormulaEditor.test.tsx",
+      "sha256": "d717c443dcea352b0ea95f834d0090843ae229e4fc3b1e3bb41e0eafc40b7411"
+    },
+    {
+      "path": "frontend/src/tests/unit/ManualWorkflowRepairs.test.tsx",
+      "sha256": "8c4510680a663cc7f28fb1537276b6177582b8516d667e391ba23ad33365257b"
+    },
+    {
+      "path": "frontend/src/tests/unit/ModelCreationPage.test.tsx",
+      "sha256": "36106557298d3dea950a9e8dc5dc5c09b7e1d6941a4ffa3ea97dae64aa226673"
+    },
+    {
+      "path": "frontend/src/tests/unit/Step3MathExpansion.test.tsx",
+      "sha256": "728505bff41073e18a69f0036f43878251803a7ab49f72d1413631c3ef07edad"
+    },
+    {
+      "path": "frontend/src/tests/unit/formulaDsl.test.ts",
+      "sha256": "8c654cb8657a24d481a4c8a6d314b7c298cf1eea281b140460d8ac92237c96b9"
+    },
+    {
+      "path": "frontend/src/tests/unit/formulaValidator.test.ts",
+      "sha256": "10ecabfc77f128791667e1dc8afbff918a4efbf5424a10c1fd5c15c695fede6e"
+    },
+    {
+      "path": "tests/test_manual_workflow_repairs.py",
+      "sha256": "6bfee1b7dbffd87f09db11a371ae75ecc89c2b13679c92f8de7e7faf99db53b1"
+    }
+  ]
+}

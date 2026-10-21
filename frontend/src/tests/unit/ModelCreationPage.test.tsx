@@ -553,6 +553,23 @@ test('a restored SUCCESS cannot publish a different current model hash', async (
   expect(modelApi.publishModel).not.toHaveBeenCalled();
 });
 
+test('saving identical content acknowledges a dirty notification without another server write', async () => {
+  renderPage(); await screen.findByText('新建模型');
+  act(() => {
+    const state = useModelCreationStore.getState();
+    state.setDraft({ ...state.draft, basic_info: { ...state.draft.basic_info, name: '重复保存', scenario: '日前机组组合优化' } });
+  });
+  fireEvent.click(screen.getByRole('button', { name: '保存草稿' }));
+  await waitFor(() => expect(useModelCreationStore.getState().workspace.dirty).toBe(false));
+  expect(modelApi.createModel).toHaveBeenCalledTimes(1);
+  act(() => { const state = useModelCreationStore.getState(); state.setDraft(structuredClone(state.draft)); });
+  expect(useModelCreationStore.getState().workspace.dirty).toBe(true);
+  fireEvent.click(screen.getByRole('button', { name: '保存草稿' }));
+  await waitFor(() => expect(useModelCreationStore.getState().workspace.dirty).toBe(false));
+  expect(modelApi.createModel).toHaveBeenCalledTimes(1);
+  expect(modelApi.updateModel).not.toHaveBeenCalled();
+});
+
 test('autosave accepts partial semantics and updates the same located draft', async () => {
   renderPage(); await screen.findByText('新建模型');
   act(() => {

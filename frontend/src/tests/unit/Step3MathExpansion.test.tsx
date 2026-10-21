@@ -78,17 +78,19 @@ vi.mock('../../api/functionAssets', () => ({
 beforeEach(() => {
   expandFormulaMock.mockImplementation(async (payload: Record<string, unknown>) => {
     const objective = payload.formula_type === 'objective';
+    // The real compiler infers t->time when the editor leaves scope unresolved.
+    const scope = Array.isArray(payload.scope) && payload.scope.length ? payload.scope : objective ? [] : [{ alias: 't', set: 'time' }];
     return {
       success: true,
       ast_version: '1.0',
       compiler_version: '2.0.0',
       normalized_expression: payload.formula,
-      expression_class: 'linear', diagnostics: [], references: [], scope: payload.scope,
+      expression_class: 'linear', diagnostics: [], references: [], scope,
       participation: 'solve_active', estimated_expansion: { constraint_count: objective ? 0 : 1, term_count: 2, exact: true },
       status: 'compile_valid', checks: { syntax: 'passed', symbol_dimension_unit: 'passed', classification: 'linear', compile: 'passed' },
       compiled_fragment: objective
         ? { type: 'objective', direction: 'minimize', terms: [{ var: 'p', key: ['u', 't'], aggregate_scope: [{ alias: 'u', set: 'unit' }, { alias: 't', set: 'time' }], coefficient: { numeric: 1, factors: [{ parameter: 'cost', indices: ['u'], power: 1 }] } }] }
-        : { type: 'constraint', constraints: [{ source_formula_id: payload.formula_id, split_sequence: 1, sense: '>=', scope: payload.scope, terms: [{ var: 'p', key: ['u', 't'], aggregate_scope: [{ alias: 'u', set: 'unit' }], coefficient: { numeric: 1, factors: [] } }], rhs: 0, rhs_terms: [{ numeric: 1, factors: [{ parameter: 'load', indices: ['t'], power: 1 }] }] }] },
+        : { type: 'constraint', constraints: [{ source_formula_id: payload.formula_id, split_sequence: 1, sense: '>=', scope, terms: [{ var: 'p', key: ['u', 't'], aggregate_scope: [{ alias: 'u', set: 'unit' }], coefficient: { numeric: 1, factors: [] } }], rhs: 0, rhs_terms: [{ numeric: 1, factors: [{ parameter: 'load', indices: ['t'], power: 1 }] }] }] },
     };
   });
   vi.spyOn(Modal, 'success').mockImplementation(() => ({ destroy: vi.fn(), update: vi.fn() }) as ReturnType<typeof Modal.success>);

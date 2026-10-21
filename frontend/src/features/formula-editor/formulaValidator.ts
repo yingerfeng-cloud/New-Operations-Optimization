@@ -1,6 +1,6 @@
 import type { FormulaDef, FormulaToken } from '../../types/formula';
 import { splitRelation, type FormulaSymbols } from './formulaParser';
-import { collectReferences } from './formulaDsl';
+import { collectReferences, indexAliasNames } from './formulaDsl';
 
 export interface FormulaValidation {
   valid: boolean;
@@ -71,6 +71,15 @@ export function validateFormula(
   }
 
   const foreachSet = new Set(foreach);
+  const coverAliases = (items: FormulaToken[]) => items.forEach(token => {
+    if (token.type === 'aggregate' || token.type === 'function') coverAliases(token.bodyTokens);
+    if (token.type === 'variable' || token.type === 'parameter') {
+      (token.indexAliases || []).forEach((alias, index) => {
+        if (token.indices?.[index] && foreachSet.has(token.indices[index])) indexAliasNames(alias).forEach(name => foreachSet.add(name));
+      });
+    }
+  });
+  coverAliases(tokens);
   refs.free_indices.forEach(code => {
     if (!foreachSet.has(code)) errors.push(`自由索引未被作用范围覆盖：${code}`);
   });
@@ -89,5 +98,5 @@ export const validateFormulaDef = (formula: FormulaDef) => validateFormula(
   formula.kind,
   formula.tokens,
   {},
-  formula.foreach.length ? formula.foreach : formula.free_indices,
+  [...(formula.foreach.length ? formula.foreach : formula.free_indices), ...(formula.scope || []).map(row => row.alias)],
 );

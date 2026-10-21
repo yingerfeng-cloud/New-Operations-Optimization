@@ -1,0 +1,177 @@
+
+> optiforge-platform-frontend@1.0.0 test:unit
+> vitest run src/tests/unit
+
+
+ RUN  v4.1.12 /Users/joiefu/Project/OPTIFORGE/frontend
+
+ ❯ src/tests/unit/FormulaEditor.test.tsx (18 tests | 1 failed) 40298ms
+   × applying an inferred iterator saves the real set code for draft round trips 2817ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/tests/unit/FormulaEditor.test.tsx > applying an inferred iterator saves the real set code for draft round trips
+Error: expect(element).toBeEnabled()
+
+Received element is not enabled:
+  <button
+  class="ant-btn css-dev-only-do-not-override-9injdo css-var-root ant-btn-primary ant-btn-color-primary ant-btn-variant-solid"
+  disabled=""
+  type="button"
+/>
+
+Ignored nodes: comments, script, style
+[36m<html>[39m
+  [36m<head />[39m
+  [36m<body[39m
+    [33mclass[39m=[32m""[39m
+  [36m>[39m
+    [36m<div>[39m
+      [36m<div[39m
+        [33mclass[39m=[32m"formula-builder"[39m
+      [36m>[39m
+        [36m<div[39m
+          [33mclass[39m=[32m"formula-builder-head"[39m
+        [36m>[39m
+          [36m<div[39m
+            [33mclass[39m=[32m"formula-builder-details"[39m
+          [36m>[39m
+            [36m<div[39m
+              [33mclass[39m=[32m"formula-builder-meta-grid"[39m
+            [36m>[39m
+              [36m<div[39m
+                [33mclass[39m=[32m"ant-form-item css-var-root ant-form-css-var css-dev-only-do-not-override-9injdo ant-form-item-horizontal"[39m
+              [36m>[39m
+                [36m<div[39m
+                  [33mclass[39m=[32m"ant-row ant-form-item-row css-dev-only-do-not-override-9injdo css-var-root"[39m
+                [36m>[39m
+                  [36m<div[39m
+                    [33mclass[39m=[32m"ant-col ant-form-item-label css-dev-only-do-not-override-9injdo css-var-root"[39m
+                  [36m>[39m
+                    [36m<label[39m
+                      [33mclass[39m=[32m"ant-form-item-required"[39m
+                      [33mtitle[39m=[32m"公式名称"[39m
+                    [36m>[39m
+                      [0m公式名称[0m
+                    [36m</label>[39m
+                  [36m</div>[39m
+                  [36m<div[39m
+                    [33mclass[39m=[32m"ant-col ant-form-item-control css-dev-only-do-not-override-9injdo css-var-root"[39m
+                  [36m>[39m
+                    [36m<div[39m
+                      [33mclass[39m=[32m"ant-form-item-control-input"[39m
+                    [36m>[39m
+                      [36m<div[39m
+                        [33mclass[39m=[32m"ant-form-item-control-input-content"[39m
+                      [36m>[39m
+                        [36m<input[39m
+                          [33maria-label[39m=[32m"公式名称"[39m
+                          [33mclass[39m=[32m"ant-input css-dev-only-do-not-override-9injdo ant-input-outlined css-var-root ant-input-css-var"[39m
+                          [33mtype[39m=[32m"text"[39m
+                          [33mvalue[39m=[32m"新约束"[39m
+                        [36m/>[39m
+                      [36m</div>[39m
+                    [36m</div>[39m
+                  [36m</div>[39m
+                [36m</div>[39m
+              [36m</div>[39m
+              [36m<div[39m
+                [33mclass[39m=[32m"ant-form-item css-var-root ant-form-css-var css-dev-only-do-not-override-9injdo ant-form-item-with-help ant-form-item-horizontal"[39m
+              [36m>[39m
+                [36m<div[39m
+                  [33mclass[39m=[32m"ant-row ant-form-item-row css-dev-only-do-not-override-9injdo css-var-root"[39m
+                [36m>[39m
+                  [36m<div[39m
+                    [33mclass[39m=[32m"ant-col ant-form-item-label css-dev-only-do-not-override-9injdo css-var-root"[39m
+                  [36m>[39m
+                    [36m<label[39m
+                      [33mclass[39m=[32m"ant-form-item-required"[39m
+                      [33mtitle[39m=[32m"公式编码"[39m
+                    [36m>[39m
+                      [0m公式编码[0m
+                    [36m</label>[39m
+                  [36m</div>[39m
+                  [36m<div[39m
+                    [33mclass[39m=[32m"ant-col ant-form-item-control css-dev-only-do-not-override-9injdo css-var-root"[39m
+                  [36m>[39m
+                    [36m<div[39m
+                      [33mclass[39m=[32m"ant-form-item-control-input"[39m
+                    [36m>[39m
+                      [36m<div[39m
+                        [33mclass[39m=[32m"ant-form-item-control-input-content"[39m
+                      [36m>[39m
+                        [36m<input[39m
+                          [33maria-label[39m=[32m"公式编码"[39m
+                          [33mclass[39m=[32m"ant-input css-dev-only-do-not-override-9injdo ant-input-outlined css-var-root ant-input-css-var"[39m
+                          [33mtype[39m=[32m"text"[39m
+                          [33mvalue[39m=[32m"916c7b14-38a2-47b5-ac57-85fcb78a5f9b"[39m
+                        [36m/>[39m
+                      [36m</div>[39m
+                    [36m</div>[39m
+                    [36m<div[39m
+                      [33mclass[39m=[32m"ant-form-item-additional"[39m
+                    [36m>[39m
+                      [36m<div[39m
+                        [33mclass[39m=[32m"ant-form-item-explain css-var-root ant-form-css-var ant-form-item-explain-connected css-dev-only-do-not-override-9injdo"[39m
+                      [36m>[39m
+                        [36m<div[39m
+                          [33mclass[39m=[32m""[39m
+                        [36m>[39m
+                          [0m新建时自动生成，可按需修改[0m
+                        [36m</div>[39m
+                      [36m</div>[39m
+                    [36m</div>[39m
+                  [36m</div>[39m
+                [36m</div>[39m
+              [36m</div>[39m
+              [36m<div[39m
+                [33mclass[39m=[32m"ant-form-item css-var-root ant-form-css-var css-dev-only-do-not-override-9injdo ant-form-item-horizontal"[39m
+              [36m>[39m
+                [36m<div[39m
+                  [33mclass[39m=[32m"ant-row ant-form-item-row css-dev-only-do-not-override-9injdo css-var-root"[39m
+                [36m>[39m
+                  [36m<div[39m
+                    [33mclass[39m=[32m"ant-col ant-form-item-label css-dev-only-do-not-override-9injdo css-var-root"[39m
+                  [36m>[39m
+                    [36m<label[39m
+                      [33mclass[39m=[32m""[39m
+                      [33mtitle[39m=[32m"业务分组"[39m
+                    [36m>[39m
+                      [0m业务分组[0m
+                    [36m</label>[39m
+                  [36m</div>[39m
+                  [36m<div[39m
+                    [33mclass[39m=[32m"ant-col ant-form-item-control css-dev-only-do-not-override-9injdo css-var-root"[39m
+                  [36m>[39m
+                    [36m<div[39m
+                      [33mclass[39m=[32m"ant-form-item-control-input"[39m
+                    [36m>[39m
+                      [36m<div[39m
+                        [33mclass[39m=[32m"ant-form-item-control-input-content"[39m
+                      [36m>[39m
+                        [36m<input[39m
+                          [33maria-label[39m=[32m"业务分组"[39m
+                          [33mclass[39m=[32m"ant-input css-dev-only-do-not-override-9injdo ant-input-outlined css-var-root ant-input-css-var"[39m
+                          [33mplaceholder[39m=[32m"例如：状态递推"[39m
+                          [33mtype[39m=[32m"text"[39m
+                          [33mvalue[39m=[32m""[39m
+                     ...
+ ❯ src/tests/unit/FormulaEditor.test.tsx:99:76
+     97|   analyzeFormulaMock.mockResolvedValueOnce({ ...compiledResult(express…
+     98|   fireEvent.click(screen.getByRole('button', { name: '后端编译与展开' }));
+     99|   await waitFor(() => expect(screen.getByRole('button', { name: '应用公式'…
+       |                                                                            ^
+    100|   fireEvent.click(screen.getByRole('button', { name: '应用公式' }));
+    101|   expect(onChange).toHaveBeenCalledWith(expect.objectContaining({
+ ❯ runWithExpensiveErrorDiagnosticsDisabled node_modules/@testing-library/dom/dist/config.js:47:12
+ ❯ checkCallback node_modules/@testing-library/dom/dist/wait-for.js:124:77
+ ❯ Timeout.checkRealTimersCallback node_modules/@testing-library/dom/dist/wait-for.js:118:16
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed | 89 passed (90)
+      Tests  1 failed | 498 passed (499)
+   Start at  21:10:20
+   Duration  251.65s (transform 1.83s, setup 11.17s, import 10.73s, tests 457.57s, environment 18.53s)
+

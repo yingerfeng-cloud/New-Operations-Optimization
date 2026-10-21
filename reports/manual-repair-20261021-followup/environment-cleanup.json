@@ -1,0 +1,32 @@
+{
+  "checked_at": "2026-10-21T23:31:23.880144+08:00",
+  "isolated_services": "STOPPED",
+  "port_checks": [
+    {
+      "port": 18042,
+      "listener_present": false,
+      "check_exit_code": 1,
+      "stderr": ""
+    },
+    {
+      "port": 15175,
+      "listener_present": false,
+      "check_exit_code": 1,
+      "stderr": ""
+    }
+  ],
+  "isolated_runtime_preserved": true,
+  "runtime_path": "/var/folders/c7/2hr808j95834qjhmhfxzqwtm0000gn/T/optiforge-manual-followup-gh2ezd8e",
+  "service_logs": [
+    {
+      "path": "acceptance-backend.log",
+      "sha256": "4bdee4d11c4fb074fb74c145e826596a317d5595fa02d27dfdcac1ba292e4905"
+    },
+    {
+      "path": "acceptance-frontend.log",
+      "sha256": "edc6e1c4ccd53266b54fd2e8f67f53b06347c063e3d7fae29ddaf153fe8d66ec"
+    }
+  ],
+  "root_created_iab_tab": "CLOSED; empty IAB tab inventory verified",
+  "native_chrome_test_tab": "CLOSED; independent agent confirmed Cmd+W on its own 127.0.0.1:15175 tab; user tabs preserved"
+}

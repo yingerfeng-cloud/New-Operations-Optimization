@@ -156,6 +156,7 @@ class FormulaAnalyzer:
         self._security_check(tree)
         self._validate_formula_shape(tree.body)
         self._validate_symbols(tree.body, dict(self.aliases))
+        self._remove_redundant_legacy_scope(tree)
         self._validate_units(tree.body, dict(self.aliases))
         expression_class = self._classify(tree.body)
         capability = _capability(expression_class)
@@ -249,6 +250,19 @@ class FormulaAnalyzer:
                 node=node,
                 fix_hint="在目标配置中选择最小化或最大化。",
             )
+
+    def _remove_redundant_legacy_scope(self, tree: ast.AST) -> None:
+        # Old editor metadata used dimension names as aliases and then added
+        # the actual DSL alias (time + t), forming a redundant Cartesian axis.
+        # Preserve genuinely distinct aliases i,j over the same set.
+        used = {node.id for parent in ast.walk(tree) if isinstance(parent, ast.Subscript)
+                for node in ast.walk(parent.slice) if isinstance(node, ast.Name)}
+        removed = {row["alias"] for row in self.scope
+                   if row["alias"] == row["set"] and row["alias"] not in used
+                   and any(other["set"] == row["set"] and other["alias"] in used for other in self.scope)}
+        self.scope = [row for row in self.scope if row["alias"] not in removed]
+        for alias in removed:
+            self.aliases.pop(alias, None)
 
     def _validate_scope_contract(self) -> None:
         seen: set[str] = set()

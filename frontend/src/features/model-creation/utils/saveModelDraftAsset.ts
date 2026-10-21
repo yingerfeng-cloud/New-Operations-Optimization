@@ -30,7 +30,13 @@ function componentItems(draft: ModelDraft, key: string) {
     const definition = component.definition;
     if (!definition || typeof definition !== 'object') return [];
     const rows = (definition as Record<string, unknown>)[key];
-    return Array.isArray(rows) ? rows.filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === 'object') : [];
+    const bindings = Array.isArray(component.parameter_bindings) ? component.parameter_bindings as Array<Record<string, unknown>> : [];
+    const mapped = new Set(bindings.filter(binding => {
+      const target = binding.model_parameter || binding.runtime_key;
+      return target && target !== (binding.component_parameter || binding.parameter);
+    }).map(binding => String(binding.component_parameter || binding.parameter || '')));
+    return Array.isArray(rows) ? rows.filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === 'object')
+      .filter(item => key !== 'parameters' || !mapped.has(String(item.code))) : [];
   });
 }
 

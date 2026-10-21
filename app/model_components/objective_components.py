@@ -156,7 +156,10 @@ def _build_dynamic_objective_terms(model: Any, terms: list[dict[str, Any]], weig
             continue
         try:
             body = ast.parse(expression, mode="eval").body
-            expr += float(weights.get(key, term.get("weight", 1.0) or 1.0)) * _eval_formula_node(body, model, context, {})
+            term_runtime = context.get("component_runtime_parameters", {}).get(str(term.get("source_component") or ""))
+            term_context = {**context, "runtime_parameters": term_runtime} if term_runtime is not None else context
+            weight = weights.get(key, term.get("weight", 1.0))
+            expr += float(1.0 if weight is None else weight) * _eval_formula_node(body, model, term_context, {})
         except Exception as exc:
             raise RuntimeError(f"目标项 {term.get('term_id') or key or term.get('name')} 无法编译为 Pyomo Objective：{exc}") from exc
     return expr

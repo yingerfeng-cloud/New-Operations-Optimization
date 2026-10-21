@@ -1,0 +1,64 @@
+{
+  "source": "浏览器任务优化结果与技术日志，人工摘录后在测试代理内纯算术复算",
+  "model_id": "MODEL-POWER-ECONOMIC-DISPATCH",
+  "task_id": "OPT-FF2815CF71",
+  "status": "SUCCESS",
+  "termination_condition": "optimal",
+  "objective_value": 160300,
+  "gap": "0.00%",
+  "unit_output": {
+    "U1": [
+      120,
+      120,
+      120,
+      120
+    ],
+    "U2": [
+      30,
+      60,
+      45,
+      20
+    ],
+    "U3": [
+      10,
+      10,
+      10,
+      10
+    ]
+  },
+  "period_cost": [
+    37800,
+    45600,
+    41700,
+    35200
+  ],
+  "balance_residual": [
+    0,
+    0,
+    0,
+    0
+  ],
+  "total_cost": 160300,
+  "initial_ramp": {
+    "U1": 40,
+    "U2": -20,
+    "U3": -20
+  },
+  "later_ramp": {
+    "U1": [
+      0,
+      0,
+      0
+    ],
+    "U2": [
+      30,
+      -15,
+      -25
+    ],
+    "U3": [
+      0,
+      0,
+      0
+    ]
+  }
+}

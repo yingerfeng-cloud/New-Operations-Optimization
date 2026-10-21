@@ -51,7 +51,7 @@ function mergeFormula(base: FormulaDef, dsl: string, symbols: FormulaSymbols): F
   const tokens = parseFormulaDsl(dsl, symbols);
   const refs = collectReferences(tokens);
   const foreach = base.foreach.length ? base.foreach : refs.free_indices;
-  const check = validateFormula(dsl, base.kind, tokens, symbols, foreach);
+  const check = validateFormula(dsl, base.kind, tokens, symbols, [...foreach, ...(base.scope || []).map(row => row.alias)]);
   return {
     ...base,
     dsl_formula: dsl,
@@ -178,7 +178,7 @@ export function FormulaBuilder({
     ? operatorTokens.filter(item => item.includes(normalizedKeyword))
     : operatorTokens;
   const check = useMemo(
-    () => validateFormula(formula.dsl_formula, formula.kind, formula.tokens, symbols, formula.foreach),
+    () => validateFormula(formula.dsl_formula, formula.kind, formula.tokens, symbols, [...formula.foreach, ...(formula.scope || []).map(row => row.alias)]),
     [formula, symbols],
   );
   const nonlinearDiagnostics = useMemo(
@@ -220,7 +220,8 @@ export function FormulaBuilder({
       if (latestCompileSignature.current !== requestedSignature) return;
       setAuthoritative(result);
       setFormula(current => {
-        const compiled = { ...current, scope: result.scope };
+        const compiled = { ...current, scope: result.scope,
+          foreach: result.scope.map(row => row.set), free_indices: result.scope.map(row => row.alias) };
         const artifact = artifactFromResult(compiled, effectiveCompileContext, result);
         return markFormulaCompiled({
           ...compiled,

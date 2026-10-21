@@ -1,0 +1,65 @@
+{
+  "checked_at": "2026-10-21T22:59:58.180358+08:00",
+  "source_manifest": "source-manifest.json",
+  "source_fingerprints_match": true,
+  "source_file_count": 47,
+  "backend_default": {
+    "passed": 725,
+    "skipped": 5,
+    "failed": 0
+  },
+  "extended_integration": {
+    "passed": 57,
+    "failed": 0,
+    "groups": [
+      42,
+      14,
+      1
+    ]
+  },
+  "frontend_default": {
+    "files_passed": 90,
+    "passed": 502,
+    "failed": 0
+  },
+  "original_three_failure_cases": "PASS; version switching executes real Skill and Agent gateway solves",
+  "typecheck": "PASS",
+  "production_build": "PASS_WITH_EXISTING_CHUNK_WARNING",
+  "logs": [
+    {
+      "path": "backend-full.log",
+      "expected_summary": "725 passed, 5 skipped",
+      "sha256": "67f6e50a9098ed1e6ee3de54b175165f6e06d85da5401ef14ca64a54aea7b456"
+    },
+    {
+      "path": "backend-integration.log",
+      "expected_summary": "42 passed",
+      "sha256": "6f3396848cea6e4e1747353ab8952f469b474afcf56c2ba23c0c560276a549d3"
+    },
+    {
+      "path": "market-templates-integration.log",
+      "expected_summary": "14 passed",
+      "sha256": "b99caf5a9c938c00d3e00d2453e90383d1889991db7beb54a1e8334566d352fa"
+    },
+    {
+      "path": "pv-storage-components-integration.log",
+      "expected_summary": "1 passed",
+      "sha256": "dfc9e1d48cd60a5f3cea505dc7021ec0e023aac716dbe1411820ba892339a78b"
+    },
+    {
+      "path": "frontend-full-complete.log",
+      "expected_summary": "502 passed",
+      "sha256": "3f83539e2c8c1b4919ff948d686bc4c9a65ac858da879452b07136e377907f3c"
+    },
+    {
+      "path": "focused-backend.log",
+      "expected_summary": "7 passed",
+      "sha256": "402d3827672c4cc7578b7d3fd2794fc61f99d1553632ede97c51775e5115a374"
+    },
+    {
+      "path": "time-axis-row-fix.log",
+      "expected_summary": "47 passed",
+      "sha256": "c3003693dbcbcc9ad55cafcac92b4e8e665657ef70d0d23ef526f1bd3aa3043d"
+    }
+  ]
+}

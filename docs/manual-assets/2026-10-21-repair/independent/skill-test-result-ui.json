@@ -1,0 +1,2593 @@
+{
+  "invocation_id": "INV-AF678C6D0E",
+  "task_id": "OPT-9798E11455",
+  "model_id": "MODEL-97B90D47",
+  "resolved_model_id": "MODEL-97B90D47",
+  "resolved_model_code": "model_mvhwj971_q40p",
+  "status": "SUCCESS",
+  "objective_value": 40,
+  "variable_values": {
+    "p": {
+      "0": 10,
+      "1": 20
+    }
+  },
+  "result": {
+    "job_id": "OPT-9798E11455",
+    "attempt_id": "0bdeb5f2707c4a2bad2f9da8ca32a40d",
+    "model_id": "MODEL-97B90D47",
+    "model_code": "model_mvhwj971_q40p",
+    "status": "SUCCESS",
+    "solver": "HiGHS",
+    "solver_name": "HiGHS",
+    "solver_type": "LP",
+    "solver_available": true,
+    "problem_type": "LP",
+    "termination_condition": "optimal",
+    "raw_termination_condition": "optimal",
+    "constraint_violation_summary": {},
+    "local_optimum_warning": false,
+    "solver_config": {
+      "backend": "HiGHS",
+      "problem_type": "LP",
+      "mip_gap": 0.001,
+      "time_limit_seconds": 300,
+      "thread_num": null,
+      "presolve": true,
+      "nlp_tolerance": null,
+      "max_iter": null,
+      "acceptable_tol": null,
+      "initial_values": {}
+    },
+    "objective_value": 40,
+    "solve_time": 0.0008,
+    "variable_values": {
+      "p": {
+        "0": 10,
+        "1": 20
+      }
+    },
+    "solver_log": "HiGHS termination_condition=optimal",
+    "diagnosis": [],
+    "trace": {
+      "request_fingerprint": "0aa074ec3bfcd49f2c9c76b02fa16aa377d1f3531fde8bda6009ca514050e049",
+      "stage_timings": {
+        "RUNNING": {
+          "started_at": "2026-10-21 18:24:04",
+          "finished_at": "2026-10-21 18:24:04"
+        },
+        "VALIDATING": {
+          "started_at": "2026-10-21 18:24:04",
+          "finished_at": "2026-10-21 18:24:04",
+          "duration_seconds": 0.0483
+        },
+        "BUILDING_MODEL": {
+          "started_at": "2026-10-21 18:24:04",
+          "finished_at": "2026-10-21 18:24:05",
+          "duration_seconds": 0.0006
+        },
+        "SOLVING": {
+          "started_at": "2026-10-21 18:24:05",
+          "finished_at": "2026-10-21 18:24:05",
+          "duration_seconds": 0.0429
+        },
+        "FORMATTING_RESULT": {
+          "started_at": "2026-10-21 18:24:05"
+        }
+      },
+      "execution_environment": {
+        "schema_version": 1,
+        "observed_at": "2026-10-21 18:24:05",
+        "platform_commit": "4d81a3f952af97536918886fd9dc2dfe589e38a5",
+        "working_tree_modified": true,
+        "identity": {
+          "platform_source_hash": "4e942e9431baedb40dd1e121be5f63d691377f5025986480401732e2e8397b4c",
+          "loaded_code_hash": "ec3cbf91149c473e087242dd9855104ad5c4d1260d694a03e7e1ce564b26a7af",
+          "loaded_adapter_hashes": {
+            "app.solvers.base.SolverAdapter.available": "156f673f1135e55bfaaa0ab5cb0fda77d31d390b6b04add8f4b5158ccd24264c",
+            "app.solvers.base.SolverAdapter.solve": "2aa1b3059b329e9c79c63e9864dc0684dbe057644a2173217557c61571823143",
+            "app.solvers.base.SolverAdapter.__subclasshook__": "542db00912bb2c59e0c17d460e55160f65ac5a21c71bfc346d28b5ff82c2fc88",
+            "app.solvers.base.SolverAdapter.__init__": "5b56104861680ddf5ce43d5e6169eb9fdc177f7df345f0f200876c7c0c050c8b",
+            "app.solvers.base.UnavailableSolverAdapter.__init__": "695211cc6f08c5f572928f4d539cb1d21db358f5cba0053db8ba29c262421a19",
+            "app.solvers.base.UnavailableSolverAdapter.available": "b1db9549f25a01fd012fed67764fab16f31f37a395aec103d084870b84d895d4",
+            "app.solvers.base.UnavailableSolverAdapter.solve": "9766ebbb00e0ef234b6c625b99b1fbc92bcfbc297bf0ad92e6e10b14de04e656",
+            "app.solvers.highs_adapter.HiGHSAdapter.available": "7fbd000dcb66fed384224c243a6dde085eb4aa065ee3f5bfd31837fb2cc9ce5d",
+            "app.solvers.highs_adapter.HiGHSAdapter.solve": "b6bfec58ca817384516c93a433f1c550647f2f8180adb2085cb3c3bed86e006d",
+            "app.solvers.highs_adapter.HiGHSAdapter._solve_serial": "9cbe0990d09bff01e62dd515f3293008c47092caa4ec28deb16b98a0c354bb07",
+            "app.solvers.highs_adapter.HiGHSAdapter._configure_progress_callback": "29d39bcb142bbfaeaa717bf988958767d2b1d40b84ec87e1b89d2fe97be5efee",
+            "app.solvers.highs_adapter.HiGHSAdapter._emit_lp_iteration_summary": "f1d8e1cd234ccdd1c2979856d02921c0c0b852ef050c945e118e771d71c3400b",
+            "app.solvers.highs_adapter.HiGHSAdapter._finite_number": "c3f4fa2b13ae7b7af97b89f0428daeb9385ba6e4e248dcd2ff0a19d4b252bd11",
+            "app.solvers.highs_adapter.HiGHSAdapter._finite_integer": "c9522d091f5c15217e249b9fa4f6dc827227d7af2e80f612277cd78255d0e007",
+            "app.solvers.highs_adapter.HiGHSAdapter._extract_variables": "02c08df70a8e8dcd85206b4dee3f38ee77bab1ee9b2a49177716ee89e998c329",
+            "app.solvers.highs_adapter.HiGHSAdapter._label": "a9410a7380d5a154fa8f3801323abd91304f98751c916223af085cf4bb1a0f8b",
+            "app.solvers.nlp_adapter.NLPSolverAdapter.available": "61c93dea7a60111ac15a9406733563f0f44b6e4948afc4e171c2db33fe9e0b08",
+            "app.solvers.nlp_adapter.NLPSolverAdapter.availability_message": "aeecec41efa0518113cc7477d49c2c769ee845ca01b22b09fe1a8039ef67b1cd",
+            "app.solvers.nlp_adapter.NLPSolverAdapter.solve": "0cc06afb237ca7b948ab4ab25fb5a9ed8d3d6d1d137da7a925b8cc76bf5a3c9d",
+            "app.solvers.nlp_adapter.NLPSolverAdapter._cpu_limit_reached": "30abe38daba7038b46b068c52fa0f21a86d9287d358e0bb182771cdd88e1f6ca",
+            "app.solvers.nlp_adapter.NLPSolverAdapter._failed_result": "46b7e7d48018a3aa349891344260c63fecbf16fd5f95834227f1f150491bdd94",
+            "app.solvers.nlp_adapter.NLPSolverAdapter._has_integer_variables": "df327469fa9ef7ddaab08fdcaeadb6af8ca2ab1dfed447d01200b54e8dc965f7",
+            "app.solvers.nlp_adapter.NLPSolverAdapter._initialize_unset_variables": "8e5095de29753edfe9ef7b81fcc2044c4002657c991a0a3f1e5a764805ac24f9",
+            "app.solvers.nlp_adapter.NLPSolverAdapter._objective_value": "db4387109010b32c48c8cdb1e09d5f5885d43665e7824e302b6afbe7ffa98cc6",
+            "app.solvers.nlp_adapter.NLPSolverAdapter.extract_variables": "e1137606a1d7b477e5c7d2ea6f07df64b06b037428f2b90029b0aeb9e821019f",
+            "app.solvers.nlp_adapter.NLPSolverAdapter.constraint_violations": "71c3aa10a0259981b844d8f9a42e6ad8def0cfb7adb0176a8661386c4c6d9b5d",
+            "app.solvers.nlp_adapter.NLPSolverAdapter._status_from_termination": "e022357d45ba914c40deeee3471ce733991887f14ec80348a06522205bd953b5",
+            "app.solvers.nlp_adapter.NLPSolverAdapter._label": "eff8d9d624acba1fc17da1318cdc0501de4dbfdea464752b2e2a538b0ec8a35e",
+            "app.solvers.run_settings.validate_run_settings.validate_run_settings": "7c9905ce86cd63347599ff19ba43ef2e2c245ff98845b3459b7932ce026ff43e",
+            "app.solvers.run_settings.apply_initial_values.apply_initial_values": "8529c65da55cf52a9583b62b5732c37c9ef06abe6dfe7e9afe9052696a5af6f0",
+            "app.solvers.solver_router.SolverRouteError.__init__": "8239e1593da145ff43fffb80c4037ffa79d71c13feb700e65f1c95b66bdfc91f",
+            "app.solvers.solver_router.ScipAdapter.__init__": "f9bc50513c9cf5a219fb3835b79fec61ea0f63ba16d5bb0eab59a9b1011615dd",
+            "app.solvers.solver_router.SolverRouter.__init__": "32b05b8e35836d5898d2fe8ab4be2455d82b9bf0cfac223a15cdafe5c6624c5f",
+            "app.solvers.solver_router.SolverRouter.route": "aa292bb6852612990de8dfb7cd4e4aec9f1bb41690e544aaa6865f255771945a",
+            "app.solvers.solver_router.SolverRouter.solve": "862706f8cabe4faaccfce5bf9465bedad6024f0175486f3ad0e649e01912fac1",
+            "app.solvers.solver_router.SolverRouter.infer_problem_type_from_model": "e15584df123a16108675b3b3188c4cc080ad5bad828a6863536f867443873261",
+            "app.solvers.solver_router.SolverRouter._key": "ec62ad98a144f93789eef008d80b41b1db359fbc0ee6e308713c65721d07c5f4",
+            "app.solvers.solver_router.SolverRouter._message": "0d7a2049374f362bdc0a8c7a5e1fd75b7343774a285e7b61f2c8dce7ce3bef37",
+            "app.solvers.solver_router.SolverRouter._assert_highs_can_accept_model": "29e845dced6d232f6c47c252a9bf4ee3133ced2d35c33e34d0edd90518bb03d1",
+            "app.solvers.solver_router.SolverRouter._model_has_nonlinearity": "40a962711af581685cd03c607a5c094d8cb7eefb9638ea7624977ae47778efca",
+            "app.solvers.status.ipopt_unavailable_explanation.ipopt_unavailable_explanation": "991835cafe391fc166395d14b753e7a274a86d428fa40f693ece9a82c0ccfcf4",
+            "app.solvers.status._package_version._package_version": "ea037bf7820e35b08b59040700ca77ab6492b2a6c418937b0f4a611783a27354",
+            "app.solvers.status._solver_available._solver_available": "ba3af93ae8fc9a4ecd8bf6227f5f01e76098c9f89b290682d905d2c1b02dfb4a",
+            "app.solvers.status._ipopt_version._ipopt_version": "10e97df05ef33272c65833e66f3c2b451edbc05e25a886b95c6ac4345d4a40f9",
+            "app.solvers.status.solver_status.solver_status": "217d8f4f653e3b90532d825d8cfae979eee3cd0ac8d3e3afff9521e65ee25ff6"
+          },
+          "source_hash_scope": "磁盘源码与已加载 Python code object 分别记录；二者不冒充旧镜像证明。",
+          "image_digest": "unknown",
+          "python": "3.12.14",
+          "system": "Darwin",
+          "machine": "arm64",
+          "packages": {
+            "pyomo": "6.10.1",
+            "highspy": "1.15.1",
+            "numpy": "2.5.2",
+            "scipy": "unknown"
+          },
+          "compiler_hashes": {
+            "app/generic_formula_compiler.py": "6f2bf2ca449cdb28b06714f4247bfcc907d3c18772e42497ed7cccaebfe4d156",
+            "app/model_components/formula_components.py": "d528e10ea30d6b6d63f72c55b7cddccd0311ae69a3f499cb06d1c37654f2ed66",
+            "app/builders/component_model_builder.py": "4fc5a34a060316913399e181e7d659b7ff5b76abc781d3e49dbfc99aa012dec2",
+            "app/function_strategy.py": "69a596f275fcc72094f4583cfcb39ab3ebc202d301ffc4cd0193dca945a6fd81"
+          },
+          "builtin_implementations": {},
+          "solver": {
+            "name": "HiGHS",
+            "version": "1.15.1",
+            "executable_hash": "unknown",
+            "binary_hash": "27633861039f85ade740e5ddf06e7795989ddcf92566e32d94f0980d09e2782f",
+            "adapter_hash": "fd52bcba447227d2daff18ae1ca8ff72279a255d5feb47782d0ef18ddae4ca0a"
+          },
+          "requested_settings": {
+            "time_limit_seconds": 300,
+            "mip_gap": 0.001,
+            "threads": null,
+            "presolve": true
+          },
+          "effective_settings": {
+            "time_limit": 300,
+            "mip_rel_gap": 0.001,
+            "threads": "solver_default",
+            "presolve": "solver_default; adapter does not override"
+          },
+          "initial_values": {},
+          "numeric_environment": {
+            "OMP_NUM_THREADS": "unknown",
+            "OPENBLAS_NUM_THREADS": "unknown",
+            "MKL_NUM_THREADS": "unknown"
+          }
+        },
+        "identity_hash": "ade959c8f0897716bc9d4692085e8b6aaaf4a04fdb22652369f4745d39952a43",
+        "image_note": "当前进程无法可信取得镜像 digest，未用可随意填写的环境变量冒充镜像证明。",
+        "replay_note": "清单记录实际代码和数值环境；不提供旧环境，也不承诺跨环境逐字节一致。"
+      },
+      "validation_seconds": 0.0483,
+      "model_build_seconds": 0.0006,
+      "problem_type": "LP",
+      "solver_progress": {
+        "schema_version": "1.1",
+        "solver": "HiGHS",
+        "problem_type": "LP",
+        "search_mode": "LP_ITERATION",
+        "status": "COMPLETED",
+        "supported": true,
+        "message": "该连续模型快速完成，共执行 0 次预处理/直接求解迭代；求解时间过短，未产生可绘制的分段采样轨迹。",
+        "points": [
+          {
+            "elapsed_seconds": 0.00079,
+            "incumbent_objective": null,
+            "best_bound": null,
+            "gap": null,
+            "node_count": null,
+            "iteration_count": 0,
+            "algorithm": "预处理/直接求解",
+            "kind": "iteration_final"
+          },
+          {
+            "elapsed_seconds": 0.0429,
+            "incumbent_objective": 40,
+            "best_bound": null,
+            "gap": 0,
+            "node_count": null,
+            "iteration_count": null,
+            "algorithm": null,
+            "kind": "final"
+          }
+        ],
+        "events": [
+          {
+            "kind": "search_started",
+            "label": "开始搜索最优解",
+            "elapsed_seconds": 0
+          },
+          {
+            "kind": "gap_milestone",
+            "label": "Gap 降至 0.1% 以下",
+            "elapsed_seconds": 0.0429,
+            "value": 0
+          },
+          {
+            "kind": "optimality_proven",
+            "label": "求解器已证明当前解最优",
+            "elapsed_seconds": 0.0429,
+            "value": 40
+          }
+        ],
+        "latest": {
+          "elapsed_seconds": 0.0429,
+          "iteration_count": 0,
+          "algorithm": "预处理/直接求解",
+          "incumbent_objective": 40,
+          "gap": 0
+        },
+        "gap_milestones": [
+          0.001
+        ],
+        "point_count": 2,
+        "final_status": "optimal"
+      },
+      "solve_seconds": 0.0429,
+      "format_seconds": 0.0004
+    },
+    "logs": [
+      "2026-10-21 18:24:04 [INFO] 任务已进入执行队列",
+      "2026-10-21 18:24:04 [INFO] 参数校验开始",
+      "2026-10-21 18:24:04 [INFO] 参数校验完成，耗时=0.0483s",
+      "2026-10-21 18:24:05 [INFO] 开始构建模型 model_code=model_mvhwj971_q40p, build_mode=generic_linear",
+      "2026-10-21 18:24:05 [INFO] 模型构建完成，变量数=2，约束数=2，耗时=0.0006s",
+      "2026-10-21 18:24:05 [INFO] 开始调用路由求解器，time_limit_seconds=300.0",
+      "2026-10-21 18:24:05 [INFO] 求解完成，HiGHS termination_condition=optimal，耗时=0.0429s",
+      "2026-10-21 18:24:06 [INFO] 开始格式化业务结果"
+    ],
+    "run_metrics": {
+      "variable_count": 2,
+      "constraint_count": 2,
+      "solver_status": "optimal",
+      "objective_value": 40,
+      "solver_gap": null
+    },
+    "model": "独立验收 教程一 时段供电成本 R3",
+    "scene": "经济负荷分配",
+    "submitted_at": "2026-10-21 18:24:04",
+    "started_at": "2026-10-21 18:24:04",
+    "finished_at": "2026-10-21 18:24:06",
+    "series": [],
+    "chart": {},
+    "metrics": {
+      "objective_value": 40,
+      "total_cost": 40,
+      "gap": "0.00%",
+      "risk": "low"
+    },
+    "business_output": {
+      "variable_values": {
+        "p": {
+          "0": 10,
+          "1": 20
+        }
+      },
+      "constraint_check": {},
+      "mccormick_relaxations": []
+    },
+    "business_explanation": {
+      "explanation_schema_version": "2.0",
+      "facts": [
+        "模型已通过统一 Pyomo 建模引擎和 HiGHS 求解链路完成求解。",
+        "求解状态为 success。",
+        "objective的求解值为 40.0。",
+        "平台不会自动下发生产控制指令。所有方案须经人工复核。",
+        "objective为 40.0。",
+        "供给功率 · min_value为 10.0MW。",
+        "供给功率 · max_value为 20.0MW。",
+        "供给功率 · sum_value为 30.0MW。",
+        "供给功率 · non_zero_count为 2count。",
+        "变量“供给功率”摘要：min=10.0, max=20.0, sum=30.0, non_zero_count=2。"
+      ],
+      "fact_items": [
+        {
+          "text": "模型已通过统一 Pyomo 建模引擎和 HiGHS 求解链路完成求解。",
+          "evidence_refs": [
+            "formatter.summary",
+            "formatter.metrics"
+          ]
+        },
+        {
+          "text": "求解状态为 success。",
+          "evidence_refs": [
+            "solver.status",
+            "solver.termination_condition"
+          ]
+        },
+        {
+          "text": "objective的求解值为 40.0。",
+          "evidence_refs": [
+            "solver.objective_value",
+            "model.objective"
+          ]
+        },
+        {
+          "text": "平台不会自动下发生产控制指令。所有方案须经人工复核。",
+          "evidence_refs": [
+            "model.execution_policy",
+            "model.requires_human_review"
+          ]
+        },
+        {
+          "text": "objective为 40.0。",
+          "evidence_refs": [
+            "derived_metrics.objective_value"
+          ]
+        },
+        {
+          "text": "供给功率 · min_value为 10.0MW。",
+          "evidence_refs": [
+            "derived_metrics.variable_p_min_value"
+          ]
+        },
+        {
+          "text": "供给功率 · max_value为 20.0MW。",
+          "evidence_refs": [
+            "derived_metrics.variable_p_max_value"
+          ]
+        },
+        {
+          "text": "供给功率 · sum_value为 30.0MW。",
+          "evidence_refs": [
+            "derived_metrics.variable_p_sum_value"
+          ]
+        },
+        {
+          "text": "供给功率 · non_zero_count为 2count。",
+          "evidence_refs": [
+            "derived_metrics.variable_p_non_zero_count"
+          ]
+        },
+        {
+          "text": "变量“供给功率”摘要：min=10.0, max=20.0, sum=30.0, non_zero_count=2。",
+          "evidence_refs": [
+            "variables_summary.p"
+          ]
+        }
+      ],
+      "inferences": [],
+      "inference_items": [],
+      "recommendations": [
+        "Verify input provenance, freshness, units, and dimensional completeness.",
+        "Review constraint satisfaction, violations, and binding margins against the declared model contract.",
+        "Confirm the recommendation with an authorized reviewer before operational use."
+      ],
+      "recommendation_items": [
+        {
+          "text": "Verify input provenance, freshness, units, and dimensional completeness.",
+          "evidence_refs": [
+            "manual_review_points"
+          ]
+        },
+        {
+          "text": "Review constraint satisfaction, violations, and binding margins against the declared model contract.",
+          "evidence_refs": [
+            "manual_review_points"
+          ]
+        },
+        {
+          "text": "Confirm the recommendation with an authorized reviewer before operational use.",
+          "evidence_refs": [
+            "manual_review_points"
+          ]
+        }
+      ],
+      "risk_notes": [],
+      "manual_review_points": [
+        "Verify input provenance, freshness, units, and dimensional completeness.",
+        "Review constraint satisfaction, violations, and binding margins against the declared model contract.",
+        "Confirm the recommendation with an authorized reviewer before operational use."
+      ],
+      "limitations": [
+        "结果未返回可核验的约束检查明细。",
+        "The explanation describes the returned solver evidence and does not prove real-world causality.",
+        "The platform does not infer undeclared thresholds, business rules, or external actions.",
+        "本结果仅用于辅助分析和决策参考，不构成自动控制指令。实际生产调度、交易申报或安全生产处置需结合现场规程、业务审批和人工复核后执行。"
+      ],
+      "summary": "模型已通过统一 Pyomo 建模引擎和 HiGHS 求解链路完成求解。 求解状态为 success。 objective的求解值为 40.0。 平台不会自动下发生产控制指令。所有方案须经人工复核。",
+      "disclaimer": "本结果仅用于辅助分析和决策参考，不构成自动控制指令。实际生产调度、交易申报或安全生产处置需结合现场规程、业务审批和人工复核后执行。",
+      "grounded_on": "evidence_package"
+    },
+    "execution_environment": {
+      "schema_version": 1,
+      "observed_at": "2026-10-21 18:24:05",
+      "platform_commit": "4d81a3f952af97536918886fd9dc2dfe589e38a5",
+      "working_tree_modified": true,
+      "identity": {
+        "platform_source_hash": "4e942e9431baedb40dd1e121be5f63d691377f5025986480401732e2e8397b4c",
+        "loaded_code_hash": "ec3cbf91149c473e087242dd9855104ad5c4d1260d694a03e7e1ce564b26a7af",
+        "loaded_adapter_hashes": {
+          "app.solvers.base.SolverAdapter.available": "156f673f1135e55bfaaa0ab5cb0fda77d31d390b6b04add8f4b5158ccd24264c",
+          "app.solvers.base.SolverAdapter.solve": "2aa1b3059b329e9c79c63e9864dc0684dbe057644a2173217557c61571823143",
+          "app.solvers.base.SolverAdapter.__subclasshook__": "542db00912bb2c59e0c17d460e55160f65ac5a21c71bfc346d28b5ff82c2fc88",
+          "app.solvers.base.SolverAdapter.__init__": "5b56104861680ddf5ce43d5e6169eb9fdc177f7df345f0f200876c7c0c050c8b",
+          "app.solvers.base.UnavailableSolverAdapter.__init__": "695211cc6f08c5f572928f4d539cb1d21db358f5cba0053db8ba29c262421a19",
+          "app.solvers.base.UnavailableSolverAdapter.available": "b1db9549f25a01fd012fed67764fab16f31f37a395aec103d084870b84d895d4",
+          "app.solvers.base.UnavailableSolverAdapter.solve": "9766ebbb00e0ef234b6c625b99b1fbc92bcfbc297bf0ad92e6e10b14de04e656",
+          "app.solvers.highs_adapter.HiGHSAdapter.available": "7fbd000dcb66fed384224c243a6dde085eb4aa065ee3f5bfd31837fb2cc9ce5d",
+          "app.solvers.highs_adapter.HiGHSAdapter.solve": "b6bfec58ca817384516c93a433f1c550647f2f8180adb2085cb3c3bed86e006d",
+          "app.solvers.highs_adapter.HiGHSAdapter._solve_serial": "9cbe0990d09bff01e62dd515f3293008c47092caa4ec28deb16b98a0c354bb07",
+          "app.solvers.highs_adapter.HiGHSAdapter._configure_progress_callback": "29d39bcb142bbfaeaa717bf988958767d2b1d40b84ec87e1b89d2fe97be5efee",
+          "app.solvers.highs_adapter.HiGHSAdapter._emit_lp_iteration_summary": "f1d8e1cd234ccdd1c2979856d02921c0c0b852ef050c945e118e771d71c3400b",
+          "app.solvers.highs_adapter.HiGHSAdapter._finite_number": "c3f4fa2b13ae7b7af97b89f0428daeb9385ba6e4e248dcd2ff0a19d4b252bd11",
+          "app.solvers.highs_adapter.HiGHSAdapter._finite_integer": "c9522d091f5c15217e249b9fa4f6dc827227d7af2e80f612277cd78255d0e007",
+          "app.solvers.highs_adapter.HiGHSAdapter._extract_variables": "02c08df70a8e8dcd85206b4dee3f38ee77bab1ee9b2a49177716ee89e998c329",
+          "app.solvers.highs_adapter.HiGHSAdapter._label": "a9410a7380d5a154fa8f3801323abd91304f98751c916223af085cf4bb1a0f8b",
+          "app.solvers.nlp_adapter.NLPSolverAdapter.available": "61c93dea7a60111ac15a9406733563f0f44b6e4948afc4e171c2db33fe9e0b08",
+          "app.solvers.nlp_adapter.NLPSolverAdapter.availability_message": "aeecec41efa0518113cc7477d49c2c769ee845ca01b22b09fe1a8039ef67b1cd",
+          "app.solvers.nlp_adapter.NLPSolverAdapter.solve": "0cc06afb237ca7b948ab4ab25fb5a9ed8d3d6d1d137da7a925b8cc76bf5a3c9d",
+          "app.solvers.nlp_adapter.NLPSolverAdapter._cpu_limit_reached": "30abe38daba7038b46b068c52fa0f21a86d9287d358e0bb182771cdd88e1f6ca",
+          "app.solvers.nlp_adapter.NLPSolverAdapter._failed_result": "46b7e7d48018a3aa349891344260c63fecbf16fd5f95834227f1f150491bdd94",
+          "app.solvers.nlp_adapter.NLPSolverAdapter._has_integer_variables": "df327469fa9ef7ddaab08fdcaeadb6af8ca2ab1dfed447d01200b54e8dc965f7",
+          "app.solvers.nlp_adapter.NLPSolverAdapter._initialize_unset_variables": "8e5095de29753edfe9ef7b81fcc2044c4002657c991a0a3f1e5a764805ac24f9",
+          "app.solvers.nlp_adapter.NLPSolverAdapter._objective_value": "db4387109010b32c48c8cdb1e09d5f5885d43665e7824e302b6afbe7ffa98cc6",
+          "app.solvers.nlp_adapter.NLPSolverAdapter.extract_variables": "e1137606a1d7b477e5c7d2ea6f07df64b06b037428f2b90029b0aeb9e821019f",
+          "app.solvers.nlp_adapter.NLPSolverAdapter.constraint_violations": "71c3aa10a0259981b844d8f9a42e6ad8def0cfb7adb0176a8661386c4c6d9b5d",
+          "app.solvers.nlp_adapter.NLPSolverAdapter._status_from_termination": "e022357d45ba914c40deeee3471ce733991887f14ec80348a06522205bd953b5",
+          "app.solvers.nlp_adapter.NLPSolverAdapter._label": "eff8d9d624acba1fc17da1318cdc0501de4dbfdea464752b2e2a538b0ec8a35e",
+          "app.solvers.run_settings.validate_run_settings.validate_run_settings": "7c9905ce86cd63347599ff19ba43ef2e2c245ff98845b3459b7932ce026ff43e",
+          "app.solvers.run_settings.apply_initial_values.apply_initial_values": "8529c65da55cf52a9583b62b5732c37c9ef06abe6dfe7e9afe9052696a5af6f0",
+          "app.solvers.solver_router.SolverRouteError.__init__": "8239e1593da145ff43fffb80c4037ffa79d71c13feb700e65f1c95b66bdfc91f",
+          "app.solvers.solver_router.ScipAdapter.__init__": "f9bc50513c9cf5a219fb3835b79fec61ea0f63ba16d5bb0eab59a9b1011615dd",
+          "app.solvers.solver_router.SolverRouter.__init__": "32b05b8e35836d5898d2fe8ab4be2455d82b9bf0cfac223a15cdafe5c6624c5f",
+          "app.solvers.solver_router.SolverRouter.route": "aa292bb6852612990de8dfb7cd4e4aec9f1bb41690e544aaa6865f255771945a",
+          "app.solvers.solver_router.SolverRouter.solve": "862706f8cabe4faaccfce5bf9465bedad6024f0175486f3ad0e649e01912fac1",
+          "app.solvers.solver_router.SolverRouter.infer_problem_type_from_model": "e15584df123a16108675b3b3188c4cc080ad5bad828a6863536f867443873261",
+          "app.solvers.solver_router.SolverRouter._key": "ec62ad98a144f93789eef008d80b41b1db359fbc0ee6e308713c65721d07c5f4",
+          "app.solvers.solver_router.SolverRouter._message": "0d7a2049374f362bdc0a8c7a5e1fd75b7343774a285e7b61f2c8dce7ce3bef37",
+          "app.solvers.solver_router.SolverRouter._assert_highs_can_accept_model": "29e845dced6d232f6c47c252a9bf4ee3133ced2d35c33e34d0edd90518bb03d1",
+          "app.solvers.solver_router.SolverRouter._model_has_nonlinearity": "40a962711af581685cd03c607a5c094d8cb7eefb9638ea7624977ae47778efca",
+          "app.solvers.status.ipopt_unavailable_explanation.ipopt_unavailable_explanation": "991835cafe391fc166395d14b753e7a274a86d428fa40f693ece9a82c0ccfcf4",
+          "app.solvers.status._package_version._package_version": "ea037bf7820e35b08b59040700ca77ab6492b2a6c418937b0f4a611783a27354",
+          "app.solvers.status._solver_available._solver_available": "ba3af93ae8fc9a4ecd8bf6227f5f01e76098c9f89b290682d905d2c1b02dfb4a",
+          "app.solvers.status._ipopt_version._ipopt_version": "10e97df05ef33272c65833e66f3c2b451edbc05e25a886b95c6ac4345d4a40f9",
+          "app.solvers.status.solver_status.solver_status": "217d8f4f653e3b90532d825d8cfae979eee3cd0ac8d3e3afff9521e65ee25ff6"
+        },
+        "source_hash_scope": "磁盘源码与已加载 Python code object 分别记录；二者不冒充旧镜像证明。",
+        "image_digest": "unknown",
+        "python": "3.12.14",
+        "system": "Darwin",
+        "machine": "arm64",
+        "packages": {
+          "pyomo": "6.10.1",
+          "highspy": "1.15.1",
+          "numpy": "2.5.2",
+          "scipy": "unknown"
+        },
+        "compiler_hashes": {
+          "app/generic_formula_compiler.py": "6f2bf2ca449cdb28b06714f4247bfcc907d3c18772e42497ed7cccaebfe4d156",
+          "app/model_components/formula_components.py": "d528e10ea30d6b6d63f72c55b7cddccd0311ae69a3f499cb06d1c37654f2ed66",
+          "app/builders/component_model_builder.py": "4fc5a34a060316913399e181e7d659b7ff5b76abc781d3e49dbfc99aa012dec2",
+          "app/function_strategy.py": "69a596f275fcc72094f4583cfcb39ab3ebc202d301ffc4cd0193dca945a6fd81"
+        },
+        "builtin_implementations": {},
+        "solver": {
+          "name": "HiGHS",
+          "version": "1.15.1",
+          "executable_hash": "unknown",
+          "binary_hash": "27633861039f85ade740e5ddf06e7795989ddcf92566e32d94f0980d09e2782f",
+          "adapter_hash": "fd52bcba447227d2daff18ae1ca8ff72279a255d5feb47782d0ef18ddae4ca0a"
+        },
+        "requested_settings": {
+          "time_limit_seconds": 300,
+          "mip_gap": 0.001,
+          "threads": null,
+          "presolve": true
+        },
+        "effective_settings": {
+          "time_limit": 300,
+          "mip_rel_gap": 0.001,
+          "threads": "solver_default",
+          "presolve": "solver_default; adapter does not override"
+        },
+        "initial_values": {},
+        "numeric_environment": {
+          "OMP_NUM_THREADS": "unknown",
+          "OPENBLAS_NUM_THREADS": "unknown",
+          "MKL_NUM_THREADS": "unknown"
+        }
+      },
+      "identity_hash": "ade959c8f0897716bc9d4692085e8b6aaaf4a04fdb22652369f4745d39952a43",
+      "image_note": "当前进程无法可信取得镜像 digest，未用可随意填写的环境变量冒充镜像证明。",
+      "replay_note": "清单记录实际代码和数值环境；不提供旧环境，也不承诺跨环境逐字节一致。"
+    },
+    "solution_evidence": {
+      "schema_version": 1,
+      "business_inputs": {
+        "cost": [
+          2,
+          3
+        ],
+        "delta_t": 0.5,
+        "demand": [
+          10,
+          20
+        ],
+        "horizon": 2,
+        "interval_minutes": 30,
+        "time": [
+          0,
+          1
+        ]
+      },
+      "settings": {
+        "backend": "HiGHS",
+        "problem_type": "LP",
+        "mip_gap": 0.001,
+        "time_limit_seconds": 300,
+        "thread_num": null,
+        "presolve": true,
+        "nlp_tolerance": null,
+        "max_iter": null,
+        "acceptable_tol": null,
+        "initial_values": {}
+      },
+      "decisions": [
+        {
+          "key": "p[0]",
+          "code": "p",
+          "coordinate": "0",
+          "name": "供给功率",
+          "unit": "MW",
+          "definition": {
+            "dimension": [
+              "time"
+            ],
+            "unit": "MW"
+          },
+          "value": 10
+        },
+        {
+          "key": "p[1]",
+          "code": "p",
+          "coordinate": "1",
+          "name": "供给功率",
+          "unit": "MW",
+          "definition": {
+            "dimension": [
+              "time"
+            ],
+            "unit": "MW"
+          },
+          "value": 20
+        }
+      ],
+      "constraints": [
+        {
+          "key": "con_满足时段需求_0_0_1",
+          "execution_name": "con_满足时段需求_0_0_1",
+          "body": 10,
+          "lower": 10,
+          "upper": null,
+          "violation": 0,
+          "definition": "10.0  <=  var_p_0",
+          "unit": "按模型约束定义"
+        },
+        {
+          "key": "con_满足时段需求_1_0_2",
+          "execution_name": "con_满足时段需求_1_0_2",
+          "body": 20,
+          "lower": 20,
+          "upper": null,
+          "violation": 0,
+          "definition": "20.0  <=  var_p_1",
+          "unit": "按模型约束定义"
+        }
+      ],
+      "metrics": [],
+      "variable_checks": [
+        {
+          "key": "var_p_0",
+          "violation": 0,
+          "integrality_violation": 0
+        },
+        {
+          "key": "var_p_1",
+          "violation": 0,
+          "integrality_violation": 0
+        }
+      ],
+      "max_constraint_violation": 0,
+      "objective": {
+        "value": 40,
+        "definition": "var_p_0 + 1.5*var_p_1",
+        "sense": "minimize",
+        "unit": "模型加权目标"
+      }
+    },
+    "evidence_package": {
+      "evidence_schema_version": "2.0",
+      "solver": {
+        "status": "success",
+        "termination_condition": "optimal",
+        "objective_value": 40,
+        "solver_name": "HiGHS",
+        "error": null,
+        "problem_type": "LP",
+        "local_optimum_warning": false,
+        "constraint_violation_summary": {}
+      },
+      "model": {
+        "model_id": "MODEL-97B90D47",
+        "model_version": "v0.1",
+        "skill_name": "run_model_mvhwj971_q40p",
+        "schema_version": "unknown",
+        "profile_name": "generic",
+        "skill_definition_revision": 1,
+        "skill_definition_hash": "7f3e915eee95f9e96d0602b961b5446e35761b54252f17f9a7ab1519ba957fd9",
+        "explanation_spec_version": "1.0",
+        "objective": {
+          "key": "objective",
+          "name": "objective",
+          "sense": "minimize",
+          "unit": "",
+          "description": "",
+          "expression_declared": true
+        },
+        "execution_policy": "advisory_only",
+        "requires_human_review": true
+      },
+      "inputs_summary": {
+        "parameters": {
+          "demand": [
+            10,
+            20
+          ],
+          "cost": [
+            2,
+            3
+          ],
+          "delta_t": 0.5
+        },
+        "parameter_sources": {
+          "demand": "USER_INPUT",
+          "cost": "USER_INPUT",
+          "delta_t": "USER_INPUT"
+        },
+        "missing_params": []
+      },
+      "variables_summary": [
+        {
+          "name": "p",
+          "business_name": "供给功率",
+          "unit": "MW",
+          "dimension": [
+            "time"
+          ],
+          "min": 10,
+          "max": 20,
+          "sum": 30,
+          "non_zero_count": 2,
+          "max_period": "1",
+          "evidence_ref": "variables_summary.p"
+        }
+      ],
+      "constraint_checks": [],
+      "derived_metrics": {
+        "objective_value": {
+          "label": "objective",
+          "value": 40,
+          "unit": "",
+          "function": "identity",
+          "source": {
+            "kind": "objective",
+            "key": null
+          },
+          "evidence_ref": "derived_metrics.objective_value"
+        },
+        "variable_p_min_value": {
+          "label": "供给功率 · min_value",
+          "value": 10,
+          "unit": "MW",
+          "function": "min_value",
+          "source": {
+            "kind": "variable",
+            "key": "p"
+          },
+          "evidence_ref": "derived_metrics.variable_p_min_value"
+        },
+        "variable_p_max_value": {
+          "label": "供给功率 · max_value",
+          "value": 20,
+          "unit": "MW",
+          "function": "max_value",
+          "source": {
+            "kind": "variable",
+            "key": "p"
+          },
+          "evidence_ref": "derived_metrics.variable_p_max_value"
+        },
+        "variable_p_sum_value": {
+          "label": "供给功率 · sum_value",
+          "value": 30,
+          "unit": "MW",
+          "function": "sum_value",
+          "source": {
+            "kind": "variable",
+            "key": "p"
+          },
+          "evidence_ref": "derived_metrics.variable_p_sum_value"
+        },
+        "variable_p_non_zero_count": {
+          "label": "供给功率 · non_zero_count",
+          "value": 2,
+          "unit": "count",
+          "function": "non_zero_count",
+          "source": {
+            "kind": "variable",
+            "key": "p"
+          },
+          "evidence_ref": "derived_metrics.variable_p_non_zero_count"
+        }
+      },
+      "formatter": {
+        "source": "SolveResultFormatter",
+        "summary": "模型已通过统一 Pyomo 建模引擎和 HiGHS 求解链路完成求解。",
+        "explanation": {
+          "summary": "模型已通过统一 Pyomo 建模引擎和 HiGHS 求解链路完成求解。",
+          "model_code": "generic_linear",
+          "relaxation_advisory": null
+        },
+        "metrics": {
+          "objective_value": {
+            "value": 40,
+            "unit": "",
+            "label": "objective_value",
+            "source": "result.metrics.objective_value"
+          },
+          "total_cost": {
+            "value": 40,
+            "unit": "",
+            "label": "total_cost",
+            "source": "result.metrics.total_cost"
+          },
+          "gap": {
+            "value": "0.00%",
+            "unit": "",
+            "label": "gap",
+            "source": "result.metrics.gap"
+          },
+          "risk": {
+            "value": "low",
+            "unit": "",
+            "label": "risk",
+            "source": "result.metrics.risk"
+          }
+        }
+      },
+      "business_outcomes": {
+        "facts": []
+      },
+      "risk_notes": [],
+      "manual_review_points": [
+        "Verify input provenance, freshness, units, and dimensional completeness.",
+        "Review constraint satisfaction, violations, and binding margins against the declared model contract.",
+        "Confirm the recommendation with an authorized reviewer before operational use."
+      ],
+      "data_quality_notes": [],
+      "explanation_limits": [
+        "结果未返回可核验的约束检查明细。",
+        "The explanation describes the returned solver evidence and does not prove real-world causality.",
+        "The platform does not infer undeclared thresholds, business rules, or external actions."
+      ],
+      "evidence_index": {
+        "formatter": [
+          "formatter.summary",
+          "formatter.metrics"
+        ],
+        "solver": [
+          "solver.status",
+          "solver.termination_condition",
+          "solver.objective_value",
+          "solver.local_optimum_warning",
+          "solver.constraint_violation_summary"
+        ],
+        "variables": [
+          "variables_summary.p"
+        ],
+        "constraints": [],
+        "metrics": [
+          "derived_metrics.objective_value",
+          "derived_metrics.variable_p_min_value",
+          "derived_metrics.variable_p_max_value",
+          "derived_metrics.variable_p_sum_value",
+          "derived_metrics.variable_p_non_zero_count"
+        ],
+        "business_outcomes": []
+      }
+    },
+    "explanation_structured": {
+      "explanation_schema_version": "2.0",
+      "facts": [
+        "模型已通过统一 Pyomo 建模引擎和 HiGHS 求解链路完成求解。",
+        "求解状态为 success。",
+        "objective的求解值为 40.0。",
+        "平台不会自动下发生产控制指令。所有方案须经人工复核。",
+        "objective为 40.0。",
+        "供给功率 · min_value为 10.0MW。",
+        "供给功率 · max_value为 20.0MW。",
+        "供给功率 · sum_value为 30.0MW。",
+        "供给功率 · non_zero_count为 2count。",
+        "变量“供给功率”摘要：min=10.0, max=20.0, sum=30.0, non_zero_count=2。"
+      ],
+      "fact_items": [
+        {
+          "text": "模型已通过统一 Pyomo 建模引擎和 HiGHS 求解链路完成求解。",
+          "evidence_refs": [
+            "formatter.summary",
+            "formatter.metrics"
+          ]
+        },
+        {
+          "text": "求解状态为 success。",
+          "evidence_refs": [
+            "solver.status",
+            "solver.termination_condition"
+          ]
+        },
+        {
+          "text": "objective的求解值为 40.0。",
+          "evidence_refs": [
+            "solver.objective_value",
+            "model.objective"
+          ]
+        },
+        {
+          "text": "平台不会自动下发生产控制指令。所有方案须经人工复核。",
+          "evidence_refs": [
+            "model.execution_policy",
+            "model.requires_human_review"
+          ]
+        },
+        {
+          "text": "objective为 40.0。",
+          "evidence_refs": [
+            "derived_metrics.objective_value"
+          ]
+        },
+        {
+          "text": "供给功率 · min_value为 10.0MW。",
+          "evidence_refs": [
+            "derived_metrics.variable_p_min_value"
+          ]
+        },
+        {
+          "text": "供给功率 · max_value为 20.0MW。",
+          "evidence_refs": [
+            "derived_metrics.variable_p_max_value"
+          ]
+        },
+        {
+          "text": "供给功率 · sum_value为 30.0MW。",
+          "evidence_refs": [
+            "derived_metrics.variable_p_sum_value"
+          ]
+        },
+        {
+          "text": "供给功率 · non_zero_count为 2count。",
+          "evidence_refs": [
+            "derived_metrics.variable_p_non_zero_count"
+          ]
+        },
+        {
+          "text": "变量“供给功率”摘要：min=10.0, max=20.0, sum=30.0, non_zero_count=2。",
+          "evidence_refs": [
+            "variables_summary.p"
+          ]
+        }
+      ],
+      "inferences": [],
+      "inference_items": [],
+      "recommendations": [
+        "Verify input provenance, freshness, units, and dimensional completeness.",
+        "Review constraint satisfaction, violations, and binding margins against the declared model contract.",
+        "Confirm the recommendation with an authorized reviewer before operational use."
+      ],
+      "recommendation_items": [
+        {
+          "text": "Verify input provenance, freshness, units, and dimensional completeness.",
+          "evidence_refs": [
+            "manual_review_points"
+          ]
+        },
+        {
+          "text": "Review constraint satisfaction, violations, and binding margins against the declared model contract.",
+          "evidence_refs": [
+            "manual_review_points"
+          ]
+        },
+        {
+          "text": "Confirm the recommendation with an authorized reviewer before operational use.",
+          "evidence_refs": [
+            "manual_review_points"
+          ]
+        }
+      ],
+      "risk_notes": [],
+      "manual_review_points": [
+        "Verify input provenance, freshness, units, and dimensional completeness.",
+        "Review constraint satisfaction, violations, and binding margins against the declared model contract.",
+        "Confirm the recommendation with an authorized reviewer before operational use."
+      ],
+      "limitations": [
+        "结果未返回可核验的约束检查明细。",
+        "The explanation describes the returned solver evidence and does not prove real-world causality.",
+        "The platform does not infer undeclared thresholds, business rules, or external actions.",
+        "本结果仅用于辅助分析和决策参考，不构成自动控制指令。实际生产调度、交易申报或安全生产处置需结合现场规程、业务审批和人工复核后执行。"
+      ],
+      "summary": "模型已通过统一 Pyomo 建模引擎和 HiGHS 求解链路完成求解。 求解状态为 success。 objective的求解值为 40.0。 平台不会自动下发生产控制指令。所有方案须经人工复核。",
+      "disclaimer": "本结果仅用于辅助分析和决策参考，不构成自动控制指令。实际生产调度、交易申报或安全生产处置需结合现场规程、业务审批和人工复核后执行。",
+      "grounded_on": "evidence_package"
+    },
+    "explanation_audit": {
+      "processor": "result_post_processor_v2",
+      "definition_source": "persisted_skill",
+      "skill_name": "run_model_mvhwj971_q40p",
+      "skill_definition_revision": 1,
+      "skill_definition_hash": "7f3e915eee95f9e96d0602b961b5446e35761b54252f17f9a7ab1519ba957fd9",
+      "explanation_spec_version": "1.0",
+      "fallback": {
+        "used": false,
+        "reason": null
+      },
+      "llm": {
+        "enabled": false,
+        "attempted": false,
+        "fallback_used": false,
+        "reason": "LLM_SUMMARY_NOT_REQUESTED"
+      }
+    },
+    "profile_name": "generic",
+    "disclaimer": "本结果仅用于辅助分析和决策参考，不构成自动控制指令。实际生产调度、交易申报或安全生产处置需结合现场规程、业务审批和人工复核后执行。",
+    "execution_policy": "advisory_only",
+    "requires_human_review": true,
+    "explanation": "模型已通过统一 Pyomo 建模引擎和 HiGHS 求解链路完成求解。 求解状态为 success。 objective的求解值为 40.0。 平台不会自动下发生产控制指令。所有方案须经人工复核。",
+    "result_metadata": {
+      "problem_type": "LP",
+      "explanation_type": null,
+      "capabilities": [
+        "metrics",
+        "timeseries",
+        "business_output",
+        "explanation",
+        "raw"
+      ],
+      "presentation_schema_version": "1.0",
+      "views": [
+        {
+          "key": "overview",
+          "label": "结果概览",
+          "kind": "metrics",
+          "source": "metrics"
+        },
+        {
+          "key": "curves",
+          "label": "变量曲线",
+          "kind": "timeseries",
+          "source": "variable_values"
+        },
+        {
+          "key": "business_output",
+          "label": "业务输出",
+          "kind": "business_output",
+          "source": "business_output"
+        },
+        {
+          "key": "advice",
+          "label": "业务建议",
+          "kind": "explanation",
+          "source": "business_explanation"
+        },
+        {
+          "key": "raw",
+          "label": "原始结果",
+          "kind": "raw",
+          "source": "$"
+        }
+      ]
+    },
+    "result_views": [
+      {
+        "key": "overview",
+        "label": "结果概览",
+        "kind": "metrics",
+        "source": "metrics"
+      },
+      {
+        "key": "curves",
+        "label": "变量曲线",
+        "kind": "timeseries",
+        "source": "variable_values"
+      },
+      {
+        "key": "business_output",
+        "label": "业务输出",
+        "kind": "business_output",
+        "source": "business_output"
+      },
+      {
+        "key": "advice",
+        "label": "业务建议",
+        "kind": "explanation",
+        "source": "business_explanation"
+      },
+      {
+        "key": "raw",
+        "label": "原始结果",
+        "kind": "raw",
+        "source": "$"
+      }
+    ],
+    "result_capabilities": [
+      "metrics",
+      "timeseries",
+      "business_output",
+      "explanation",
+      "raw"
+    ]
+  },
+  "business_result": {
+    "variable_values": {
+      "p": {
+        "0": 10,
+        "1": 20
+      }
+    },
+    "constraint_check": {},
+    "mccormick_relaxations": []
+  },
+  "charts": [],
+  "constraint_checks": {},
+  "business_variables": {
+    "p": {
+      "name": "供给功率",
+      "dimension": [
+        "time"
+      ],
+      "rows": [
+        {
+          "value": 10,
+          "variable": "p",
+          "variable_name": "供给功率",
+          "unit_name": "MW",
+          "time": "0"
+        },
+        {
+          "value": 20,
+          "variable": "p",
+          "variable_name": "供给功率",
+          "unit_name": "MW",
+          "time": "1"
+        }
+      ]
+    }
+  },
+  "explanation": "模型已通过统一 Pyomo 建模引擎和 HiGHS 求解链路完成求解。 求解状态为 success。 objective的求解值为 40.0。 平台不会自动下发生产控制指令。所有方案须经人工复核。",
+  "business_explanation": {
+    "explanation_schema_version": "2.0",
+    "facts": [
+      "模型已通过统一 Pyomo 建模引擎和 HiGHS 求解链路完成求解。",
+      "求解状态为 success。",
+      "objective的求解值为 40.0。",
+      "平台不会自动下发生产控制指令。所有方案须经人工复核。",
+      "objective为 40.0。",
+      "供给功率 · min_value为 10.0MW。",
+      "供给功率 · max_value为 20.0MW。",
+      "供给功率 · sum_value为 30.0MW。",
+      "供给功率 · non_zero_count为 2count。",
+      "变量“供给功率”摘要：min=10.0, max=20.0, sum=30.0, non_zero_count=2。"
+    ],
+    "fact_items": [
+      {
+        "text": "模型已通过统一 Pyomo 建模引擎和 HiGHS 求解链路完成求解。",
+        "evidence_refs": [
+          "formatter.summary",
+          "formatter.metrics"
+        ]
+      },
+      {
+        "text": "求解状态为 success。",
+        "evidence_refs": [
+          "solver.status",
+          "solver.termination_condition"
+        ]
+      },
+      {
+        "text": "objective的求解值为 40.0。",
+        "evidence_refs": [
+          "solver.objective_value",
+          "model.objective"
+        ]
+      },
+      {
+        "text": "平台不会自动下发生产控制指令。所有方案须经人工复核。",
+        "evidence_refs": [
+          "model.execution_policy",
+          "model.requires_human_review"
+        ]
+      },
+      {
+        "text": "objective为 40.0。",
+        "evidence_refs": [
+          "derived_metrics.objective_value"
+        ]
+      },
+      {
+        "text": "供给功率 · min_value为 10.0MW。",
+        "evidence_refs": [
+          "derived_metrics.variable_p_min_value"
+        ]
+      },
+      {
+        "text": "供给功率 · max_value为 20.0MW。",
+        "evidence_refs": [
+          "derived_metrics.variable_p_max_value"
+        ]
+      },
+      {
+        "text": "供给功率 · sum_value为 30.0MW。",
+        "evidence_refs": [
+          "derived_metrics.variable_p_sum_value"
+        ]
+      },
+      {
+        "text": "供给功率 · non_zero_count为 2count。",
+        "evidence_refs": [
+          "derived_metrics.variable_p_non_zero_count"
+        ]
+      },
+      {
+        "text": "变量“供给功率”摘要：min=10.0, max=20.0, sum=30.0, non_zero_count=2。",
+        "evidence_refs": [
+          "variables_summary.p"
+        ]
+      }
+    ],
+    "inferences": [],
+    "inference_items": [],
+    "recommendations": [
+      "Verify input provenance, freshness, units, and dimensional completeness.",
+      "Review constraint satisfaction, violations, and binding margins against the declared model contract.",
+      "Confirm the recommendation with an authorized reviewer before operational use."
+    ],
+    "recommendation_items": [
+      {
+        "text": "Verify input provenance, freshness, units, and dimensional completeness.",
+        "evidence_refs": [
+          "manual_review_points"
+        ]
+      },
+      {
+        "text": "Review constraint satisfaction, violations, and binding margins against the declared model contract.",
+        "evidence_refs": [
+          "manual_review_points"
+        ]
+      },
+      {
+        "text": "Confirm the recommendation with an authorized reviewer before operational use.",
+        "evidence_refs": [
+          "manual_review_points"
+        ]
+      }
+    ],
+    "risk_notes": [],
+    "manual_review_points": [
+      "Verify input provenance, freshness, units, and dimensional completeness.",
+      "Review constraint satisfaction, violations, and binding margins against the declared model contract.",
+      "Confirm the recommendation with an authorized reviewer before operational use."
+    ],
+    "limitations": [
+      "结果未返回可核验的约束检查明细。",
+      "The explanation describes the returned solver evidence and does not prove real-world causality.",
+      "The platform does not infer undeclared thresholds, business rules, or external actions.",
+      "本结果仅用于辅助分析和决策参考，不构成自动控制指令。实际生产调度、交易申报或安全生产处置需结合现场规程、业务审批和人工复核后执行。"
+    ],
+    "summary": "模型已通过统一 Pyomo 建模引擎和 HiGHS 求解链路完成求解。 求解状态为 success。 objective的求解值为 40.0。 平台不会自动下发生产控制指令。所有方案须经人工复核。",
+    "disclaimer": "本结果仅用于辅助分析和决策参考，不构成自动控制指令。实际生产调度、交易申报或安全生产处置需结合现场规程、业务审批和人工复核后执行。",
+    "grounded_on": "evidence_package"
+  },
+  "explanation_structured": {
+    "explanation_schema_version": "2.0",
+    "facts": [
+      "模型已通过统一 Pyomo 建模引擎和 HiGHS 求解链路完成求解。",
+      "求解状态为 success。",
+      "objective的求解值为 40.0。",
+      "平台不会自动下发生产控制指令。所有方案须经人工复核。",
+      "objective为 40.0。",
+      "供给功率 · min_value为 10.0MW。",
+      "供给功率 · max_value为 20.0MW。",
+      "供给功率 · sum_value为 30.0MW。",
+      "供给功率 · non_zero_count为 2count。",
+      "变量“供给功率”摘要：min=10.0, max=20.0, sum=30.0, non_zero_count=2。"
+    ],
+    "fact_items": [
+      {
+        "text": "模型已通过统一 Pyomo 建模引擎和 HiGHS 求解链路完成求解。",
+        "evidence_refs": [
+          "formatter.summary",
+          "formatter.metrics"
+        ]
+      },
+      {
+        "text": "求解状态为 success。",
+        "evidence_refs": [
+          "solver.status",
+          "solver.termination_condition"
+        ]
+      },
+      {
+        "text": "objective的求解值为 40.0。",
+        "evidence_refs": [
+          "solver.objective_value",
+          "model.objective"
+        ]
+      },
+      {
+        "text": "平台不会自动下发生产控制指令。所有方案须经人工复核。",
+        "evidence_refs": [
+          "model.execution_policy",
+          "model.requires_human_review"
+        ]
+      },
+      {
+        "text": "objective为 40.0。",
+        "evidence_refs": [
+          "derived_metrics.objective_value"
+        ]
+      },
+      {
+        "text": "供给功率 · min_value为 10.0MW。",
+        "evidence_refs": [
+          "derived_metrics.variable_p_min_value"
+        ]
+      },
+      {
+        "text": "供给功率 · max_value为 20.0MW。",
+        "evidence_refs": [
+          "derived_metrics.variable_p_max_value"
+        ]
+      },
+      {
+        "text": "供给功率 · sum_value为 30.0MW。",
+        "evidence_refs": [
+          "derived_metrics.variable_p_sum_value"
+        ]
+      },
+      {
+        "text": "供给功率 · non_zero_count为 2count。",
+        "evidence_refs": [
+          "derived_metrics.variable_p_non_zero_count"
+        ]
+      },
+      {
+        "text": "变量“供给功率”摘要：min=10.0, max=20.0, sum=30.0, non_zero_count=2。",
+        "evidence_refs": [
+          "variables_summary.p"
+        ]
+      }
+    ],
+    "inferences": [],
+    "inference_items": [],
+    "recommendations": [
+      "Verify input provenance, freshness, units, and dimensional completeness.",
+      "Review constraint satisfaction, violations, and binding margins against the declared model contract.",
+      "Confirm the recommendation with an authorized reviewer before operational use."
+    ],
+    "recommendation_items": [
+      {
+        "text": "Verify input provenance, freshness, units, and dimensional completeness.",
+        "evidence_refs": [
+          "manual_review_points"
+        ]
+      },
+      {
+        "text": "Review constraint satisfaction, violations, and binding margins against the declared model contract.",
+        "evidence_refs": [
+          "manual_review_points"
+        ]
+      },
+      {
+        "text": "Confirm the recommendation with an authorized reviewer before operational use.",
+        "evidence_refs": [
+          "manual_review_points"
+        ]
+      }
+    ],
+    "risk_notes": [],
+    "manual_review_points": [
+      "Verify input provenance, freshness, units, and dimensional completeness.",
+      "Review constraint satisfaction, violations, and binding margins against the declared model contract.",
+      "Confirm the recommendation with an authorized reviewer before operational use."
+    ],
+    "limitations": [
+      "结果未返回可核验的约束检查明细。",
+      "The explanation describes the returned solver evidence and does not prove real-world causality.",
+      "The platform does not infer undeclared thresholds, business rules, or external actions.",
+      "本结果仅用于辅助分析和决策参考，不构成自动控制指令。实际生产调度、交易申报或安全生产处置需结合现场规程、业务审批和人工复核后执行。"
+    ],
+    "summary": "模型已通过统一 Pyomo 建模引擎和 HiGHS 求解链路完成求解。 求解状态为 success。 objective的求解值为 40.0。 平台不会自动下发生产控制指令。所有方案须经人工复核。",
+    "disclaimer": "本结果仅用于辅助分析和决策参考，不构成自动控制指令。实际生产调度、交易申报或安全生产处置需结合现场规程、业务审批和人工复核后执行。",
+    "grounded_on": "evidence_package"
+  },
+  "profile_name": "generic",
+  "evidence_package": {
+    "evidence_schema_version": "2.0",
+    "solver": {
+      "status": "success",
+      "termination_condition": "optimal",
+      "objective_value": 40,
+      "solver_name": "HiGHS",
+      "error": null,
+      "problem_type": "LP",
+      "local_optimum_warning": false,
+      "constraint_violation_summary": {}
+    },
+    "model": {
+      "model_id": "MODEL-97B90D47",
+      "model_version": "v0.1",
+      "skill_name": "run_model_mvhwj971_q40p",
+      "schema_version": "unknown",
+      "profile_name": "generic",
+      "skill_definition_revision": 1,
+      "skill_definition_hash": "7f3e915eee95f9e96d0602b961b5446e35761b54252f17f9a7ab1519ba957fd9",
+      "explanation_spec_version": "1.0",
+      "objective": {
+        "key": "objective",
+        "name": "objective",
+        "sense": "minimize",
+        "unit": "",
+        "description": "",
+        "expression_declared": true
+      },
+      "execution_policy": "advisory_only",
+      "requires_human_review": true
+    },
+    "inputs_summary": {
+      "parameters": {
+        "demand": [
+          10,
+          20
+        ],
+        "cost": [
+          2,
+          3
+        ],
+        "delta_t": 0.5
+      },
+      "parameter_sources": {
+        "demand": "USER_INPUT",
+        "cost": "USER_INPUT",
+        "delta_t": "USER_INPUT"
+      },
+      "missing_params": []
+    },
+    "variables_summary": [
+      {
+        "name": "p",
+        "business_name": "供给功率",
+        "unit": "MW",
+        "dimension": [
+          "time"
+        ],
+        "min": 10,
+        "max": 20,
+        "sum": 30,
+        "non_zero_count": 2,
+        "max_period": "1",
+        "evidence_ref": "variables_summary.p"
+      }
+    ],
+    "constraint_checks": [],
+    "derived_metrics": {
+      "objective_value": {
+        "label": "objective",
+        "value": 40,
+        "unit": "",
+        "function": "identity",
+        "source": {
+          "kind": "objective",
+          "key": null
+        },
+        "evidence_ref": "derived_metrics.objective_value"
+      },
+      "variable_p_min_value": {
+        "label": "供给功率 · min_value",
+        "value": 10,
+        "unit": "MW",
+        "function": "min_value",
+        "source": {
+          "kind": "variable",
+          "key": "p"
+        },
+        "evidence_ref": "derived_metrics.variable_p_min_value"
+      },
+      "variable_p_max_value": {
+        "label": "供给功率 · max_value",
+        "value": 20,
+        "unit": "MW",
+        "function": "max_value",
+        "source": {
+          "kind": "variable",
+          "key": "p"
+        },
+        "evidence_ref": "derived_metrics.variable_p_max_value"
+      },
+      "variable_p_sum_value": {
+        "label": "供给功率 · sum_value",
+        "value": 30,
+        "unit": "MW",
+        "function": "sum_value",
+        "source": {
+          "kind": "variable",
+          "key": "p"
+        },
+        "evidence_ref": "derived_metrics.variable_p_sum_value"
+      },
+      "variable_p_non_zero_count": {
+        "label": "供给功率 · non_zero_count",
+        "value": 2,
+        "unit": "count",
+        "function": "non_zero_count",
+        "source": {
+          "kind": "variable",
+          "key": "p"
+        },
+        "evidence_ref": "derived_metrics.variable_p_non_zero_count"
+      }
+    },
+    "formatter": {
+      "source": "SolveResultFormatter",
+      "summary": "模型已通过统一 Pyomo 建模引擎和 HiGHS 求解链路完成求解。",
+      "explanation": {
+        "summary": "模型已通过统一 Pyomo 建模引擎和 HiGHS 求解链路完成求解。",
+        "model_code": "generic_linear",
+        "relaxation_advisory": null
+      },
+      "metrics": {
+        "objective_value": {
+          "value": 40,
+          "unit": "",
+          "label": "objective_value",
+          "source": "result.metrics.objective_value"
+        },
+        "total_cost": {
+          "value": 40,
+          "unit": "",
+          "label": "total_cost",
+          "source": "result.metrics.total_cost"
+        },
+        "gap": {
+          "value": "0.00%",
+          "unit": "",
+          "label": "gap",
+          "source": "result.metrics.gap"
+        },
+        "risk": {
+          "value": "low",
+          "unit": "",
+          "label": "risk",
+          "source": "result.metrics.risk"
+        }
+      }
+    },
+    "business_outcomes": {
+      "facts": []
+    },
+    "risk_notes": [],
+    "manual_review_points": [
+      "Verify input provenance, freshness, units, and dimensional completeness.",
+      "Review constraint satisfaction, violations, and binding margins against the declared model contract.",
+      "Confirm the recommendation with an authorized reviewer before operational use."
+    ],
+    "data_quality_notes": [],
+    "explanation_limits": [
+      "结果未返回可核验的约束检查明细。",
+      "The explanation describes the returned solver evidence and does not prove real-world causality.",
+      "The platform does not infer undeclared thresholds, business rules, or external actions."
+    ],
+    "evidence_index": {
+      "formatter": [
+        "formatter.summary",
+        "formatter.metrics"
+      ],
+      "solver": [
+        "solver.status",
+        "solver.termination_condition",
+        "solver.objective_value",
+        "solver.local_optimum_warning",
+        "solver.constraint_violation_summary"
+      ],
+      "variables": [
+        "variables_summary.p"
+      ],
+      "constraints": [],
+      "metrics": [
+        "derived_metrics.objective_value",
+        "derived_metrics.variable_p_min_value",
+        "derived_metrics.variable_p_max_value",
+        "derived_metrics.variable_p_sum_value",
+        "derived_metrics.variable_p_non_zero_count"
+      ],
+      "business_outcomes": []
+    }
+  },
+  "explanation_audit": {
+    "processor": "result_post_processor_v2",
+    "definition_source": "persisted_skill",
+    "skill_name": "run_model_mvhwj971_q40p",
+    "skill_definition_revision": 1,
+    "skill_definition_hash": "7f3e915eee95f9e96d0602b961b5446e35761b54252f17f9a7ab1519ba957fd9",
+    "explanation_spec_version": "1.0",
+    "fallback": {
+      "used": false,
+      "reason": null
+    },
+    "llm": {
+      "enabled": false,
+      "attempted": false,
+      "fallback_used": false,
+      "reason": "LLM_SUMMARY_NOT_REQUESTED"
+    }
+  },
+  "disclaimer": "本结果仅用于辅助分析和决策参考，不构成自动控制指令。实际生产调度、交易申报或安全生产处置需结合现场规程、业务审批和人工复核后执行。",
+  "warnings": [],
+  "execution_policy": "advisory_only",
+  "requires_human_review": true,
+  "raw_result": {
+    "job_id": "OPT-9798E11455",
+    "attempt_id": "0bdeb5f2707c4a2bad2f9da8ca32a40d",
+    "model_id": "MODEL-97B90D47",
+    "model_code": "model_mvhwj971_q40p",
+    "status": "SUCCESS",
+    "solver": "HiGHS",
+    "solver_name": "HiGHS",
+    "solver_type": "LP",
+    "solver_available": true,
+    "problem_type": "LP",
+    "termination_condition": "optimal",
+    "raw_termination_condition": "optimal",
+    "constraint_violation_summary": {},
+    "local_optimum_warning": false,
+    "solver_config": {
+      "backend": "HiGHS",
+      "problem_type": "LP",
+      "mip_gap": 0.001,
+      "time_limit_seconds": 300,
+      "thread_num": null,
+      "presolve": true,
+      "nlp_tolerance": null,
+      "max_iter": null,
+      "acceptable_tol": null,
+      "initial_values": {}
+    },
+    "objective_value": 40,
+    "solve_time": 0.0008,
+    "variable_values": {
+      "p": {
+        "0": 10,
+        "1": 20
+      }
+    },
+    "solver_log": "HiGHS termination_condition=optimal",
+    "diagnosis": [],
+    "trace": {
+      "request_fingerprint": "0aa074ec3bfcd49f2c9c76b02fa16aa377d1f3531fde8bda6009ca514050e049",
+      "stage_timings": {
+        "RUNNING": {
+          "started_at": "2026-10-21 18:24:04",
+          "finished_at": "2026-10-21 18:24:04"
+        },
+        "VALIDATING": {
+          "started_at": "2026-10-21 18:24:04",
+          "finished_at": "2026-10-21 18:24:04",
+          "duration_seconds": 0.0483
+        },
+        "BUILDING_MODEL": {
+          "started_at": "2026-10-21 18:24:04",
+          "finished_at": "2026-10-21 18:24:05",
+          "duration_seconds": 0.0006
+        },
+        "SOLVING": {
+          "started_at": "2026-10-21 18:24:05",
+          "finished_at": "2026-10-21 18:24:05",
+          "duration_seconds": 0.0429
+        },
+        "FORMATTING_RESULT": {
+          "started_at": "2026-10-21 18:24:05"
+        }
+      },
+      "execution_environment": {
+        "schema_version": 1,
+        "observed_at": "2026-10-21 18:24:05",
+        "platform_commit": "4d81a3f952af97536918886fd9dc2dfe589e38a5",
+        "working_tree_modified": true,
+        "identity": {
+          "platform_source_hash": "4e942e9431baedb40dd1e121be5f63d691377f5025986480401732e2e8397b4c",
+          "loaded_code_hash": "ec3cbf91149c473e087242dd9855104ad5c4d1260d694a03e7e1ce564b26a7af",
+          "loaded_adapter_hashes": {
+            "app.solvers.base.SolverAdapter.available": "156f673f1135e55bfaaa0ab5cb0fda77d31d390b6b04add8f4b5158ccd24264c",
+            "app.solvers.base.SolverAdapter.solve": "2aa1b3059b329e9c79c63e9864dc0684dbe057644a2173217557c61571823143",
+            "app.solvers.base.SolverAdapter.__subclasshook__": "542db00912bb2c59e0c17d460e55160f65ac5a21c71bfc346d28b5ff82c2fc88",
+            "app.solvers.base.SolverAdapter.__init__": "5b56104861680ddf5ce43d5e6169eb9fdc177f7df345f0f200876c7c0c050c8b",
+            "app.solvers.base.UnavailableSolverAdapter.__init__": "695211cc6f08c5f572928f4d539cb1d21db358f5cba0053db8ba29c262421a19",
+            "app.solvers.base.UnavailableSolverAdapter.available": "b1db9549f25a01fd012fed67764fab16f31f37a395aec103d084870b84d895d4",
+            "app.solvers.base.UnavailableSolverAdapter.solve": "9766ebbb00e0ef234b6c625b99b1fbc92bcfbc297bf0ad92e6e10b14de04e656",
+            "app.solvers.highs_adapter.HiGHSAdapter.available": "7fbd000dcb66fed384224c243a6dde085eb4aa065ee3f5bfd31837fb2cc9ce5d",
+            "app.solvers.highs_adapter.HiGHSAdapter.solve": "b6bfec58ca817384516c93a433f1c550647f2f8180adb2085cb3c3bed86e006d",
+            "app.solvers.highs_adapter.HiGHSAdapter._solve_serial": "9cbe0990d09bff01e62dd515f3293008c47092caa4ec28deb16b98a0c354bb07",
+            "app.solvers.highs_adapter.HiGHSAdapter._configure_progress_callback": "29d39bcb142bbfaeaa717bf988958767d2b1d40b84ec87e1b89d2fe97be5efee",
+            "app.solvers.highs_adapter.HiGHSAdapter._emit_lp_iteration_summary": "f1d8e1cd234ccdd1c2979856d02921c0c0b852ef050c945e118e771d71c3400b",
+            "app.solvers.highs_adapter.HiGHSAdapter._finite_number": "c3f4fa2b13ae7b7af97b89f0428daeb9385ba6e4e248dcd2ff0a19d4b252bd11",
+            "app.solvers.highs_adapter.HiGHSAdapter._finite_integer": "c9522d091f5c15217e249b9fa4f6dc827227d7af2e80f612277cd78255d0e007",
+            "app.solvers.highs_adapter.HiGHSAdapter._extract_variables": "02c08df70a8e8dcd85206b4dee3f38ee77bab1ee9b2a49177716ee89e998c329",
+            "app.solvers.highs_adapter.HiGHSAdapter._label": "a9410a7380d5a154fa8f3801323abd91304f98751c916223af085cf4bb1a0f8b",
+            "app.solvers.nlp_adapter.NLPSolverAdapter.available": "61c93dea7a60111ac15a9406733563f0f44b6e4948afc4e171c2db33fe9e0b08",
+            "app.solvers.nlp_adapter.NLPSolverAdapter.availability_message": "aeecec41efa0518113cc7477d49c2c769ee845ca01b22b09fe1a8039ef67b1cd",
+            "app.solvers.nlp_adapter.NLPSolverAdapter.solve": "0cc06afb237ca7b948ab4ab25fb5a9ed8d3d6d1d137da7a925b8cc76bf5a3c9d",
+            "app.solvers.nlp_adapter.NLPSolverAdapter._cpu_limit_reached": "30abe38daba7038b46b068c52fa0f21a86d9287d358e0bb182771cdd88e1f6ca",
+            "app.solvers.nlp_adapter.NLPSolverAdapter._failed_result": "46b7e7d48018a3aa349891344260c63fecbf16fd5f95834227f1f150491bdd94",
+            "app.solvers.nlp_adapter.NLPSolverAdapter._has_integer_variables": "df327469fa9ef7ddaab08fdcaeadb6af8ca2ab1dfed447d01200b54e8dc965f7",
+            "app.solvers.nlp_adapter.NLPSolverAdapter._initialize_unset_variables": "8e5095de29753edfe9ef7b81fcc2044c4002657c991a0a3f1e5a764805ac24f9",
+            "app.solvers.nlp_adapter.NLPSolverAdapter._objective_value": "db4387109010b32c48c8cdb1e09d5f5885d43665e7824e302b6afbe7ffa98cc6",
+            "app.solvers.nlp_adapter.NLPSolverAdapter.extract_variables": "e1137606a1d7b477e5c7d2ea6f07df64b06b037428f2b90029b0aeb9e821019f",
+            "app.solvers.nlp_adapter.NLPSolverAdapter.constraint_violations": "71c3aa10a0259981b844d8f9a42e6ad8def0cfb7adb0176a8661386c4c6d9b5d",
+            "app.solvers.nlp_adapter.NLPSolverAdapter._status_from_termination": "e022357d45ba914c40deeee3471ce733991887f14ec80348a06522205bd953b5",
+            "app.solvers.nlp_adapter.NLPSolverAdapter._label": "eff8d9d624acba1fc17da1318cdc0501de4dbfdea464752b2e2a538b0ec8a35e",
+            "app.solvers.run_settings.validate_run_settings.validate_run_settings": "7c9905ce86cd63347599ff19ba43ef2e2c245ff98845b3459b7932ce026ff43e",
+            "app.solvers.run_settings.apply_initial_values.apply_initial_values": "8529c65da55cf52a9583b62b5732c37c9ef06abe6dfe7e9afe9052696a5af6f0",
+            "app.solvers.solver_router.SolverRouteError.__init__": "8239e1593da145ff43fffb80c4037ffa79d71c13feb700e65f1c95b66bdfc91f",
+            "app.solvers.solver_router.ScipAdapter.__init__": "f9bc50513c9cf5a219fb3835b79fec61ea0f63ba16d5bb0eab59a9b1011615dd",
+            "app.solvers.solver_router.SolverRouter.__init__": "32b05b8e35836d5898d2fe8ab4be2455d82b9bf0cfac223a15cdafe5c6624c5f",
+            "app.solvers.solver_router.SolverRouter.route": "aa292bb6852612990de8dfb7cd4e4aec9f1bb41690e544aaa6865f255771945a",
+            "app.solvers.solver_router.SolverRouter.solve": "862706f8cabe4faaccfce5bf9465bedad6024f0175486f3ad0e649e01912fac1",
+            "app.solvers.solver_router.SolverRouter.infer_problem_type_from_model": "e15584df123a16108675b3b3188c4cc080ad5bad828a6863536f867443873261",
+            "app.solvers.solver_router.SolverRouter._key": "ec62ad98a144f93789eef008d80b41b1db359fbc0ee6e308713c65721d07c5f4",
+            "app.solvers.solver_router.SolverRouter._message": "0d7a2049374f362bdc0a8c7a5e1fd75b7343774a285e7b61f2c8dce7ce3bef37",
+            "app.solvers.solver_router.SolverRouter._assert_highs_can_accept_model": "29e845dced6d232f6c47c252a9bf4ee3133ced2d35c33e34d0edd90518bb03d1",
+            "app.solvers.solver_router.SolverRouter._model_has_nonlinearity": "40a962711af581685cd03c607a5c094d8cb7eefb9638ea7624977ae47778efca",
+            "app.solvers.status.ipopt_unavailable_explanation.ipopt_unavailable_explanation": "991835cafe391fc166395d14b753e7a274a86d428fa40f693ece9a82c0ccfcf4",
+            "app.solvers.status._package_version._package_version": "ea037bf7820e35b08b59040700ca77ab6492b2a6c418937b0f4a611783a27354",
+            "app.solvers.status._solver_available._solver_available": "ba3af93ae8fc9a4ecd8bf6227f5f01e76098c9f89b290682d905d2c1b02dfb4a",
+            "app.solvers.status._ipopt_version._ipopt_version": "10e97df05ef33272c65833e66f3c2b451edbc05e25a886b95c6ac4345d4a40f9",
+            "app.solvers.status.solver_status.solver_status": "217d8f4f653e3b90532d825d8cfae979eee3cd0ac8d3e3afff9521e65ee25ff6"
+          },
+          "source_hash_scope": "磁盘源码与已加载 Python code object 分别记录；二者不冒充旧镜像证明。",
+          "image_digest": "unknown",
+          "python": "3.12.14",
+          "system": "Darwin",
+          "machine": "arm64",
+          "packages": {
+            "pyomo": "6.10.1",
+            "highspy": "1.15.1",
+            "numpy": "2.5.2",
+            "scipy": "unknown"
+          },
+          "compiler_hashes": {
+            "app/generic_formula_compiler.py": "6f2bf2ca449cdb28b06714f4247bfcc907d3c18772e42497ed7cccaebfe4d156",
+            "app/model_components/formula_components.py": "d528e10ea30d6b6d63f72c55b7cddccd0311ae69a3f499cb06d1c37654f2ed66",
+            "app/builders/component_model_builder.py": "4fc5a34a060316913399e181e7d659b7ff5b76abc781d3e49dbfc99aa012dec2",
+            "app/function_strategy.py": "69a596f275fcc72094f4583cfcb39ab3ebc202d301ffc4cd0193dca945a6fd81"
+          },
+          "builtin_implementations": {},
+          "solver": {
+            "name": "HiGHS",
+            "version": "1.15.1",
+            "executable_hash": "unknown",
+            "binary_hash": "27633861039f85ade740e5ddf06e7795989ddcf92566e32d94f0980d09e2782f",
+            "adapter_hash": "fd52bcba447227d2daff18ae1ca8ff72279a255d5feb47782d0ef18ddae4ca0a"
+          },
+          "requested_settings": {
+            "time_limit_seconds": 300,
+            "mip_gap": 0.001,
+            "threads": null,
+            "presolve": true
+          },
+          "effective_settings": {
+            "time_limit": 300,
+            "mip_rel_gap": 0.001,
+            "threads": "solver_default",
+            "presolve": "solver_default; adapter does not override"
+          },
+          "initial_values": {},
+          "numeric_environment": {
+            "OMP_NUM_THREADS": "unknown",
+            "OPENBLAS_NUM_THREADS": "unknown",
+            "MKL_NUM_THREADS": "unknown"
+          }
+        },
+        "identity_hash": "ade959c8f0897716bc9d4692085e8b6aaaf4a04fdb22652369f4745d39952a43",
+        "image_note": "当前进程无法可信取得镜像 digest，未用可随意填写的环境变量冒充镜像证明。",
+        "replay_note": "清单记录实际代码和数值环境；不提供旧环境，也不承诺跨环境逐字节一致。"
+      },
+      "validation_seconds": 0.0483,
+      "model_build_seconds": 0.0006,
+      "problem_type": "LP",
+      "solver_progress": {
+        "schema_version": "1.1",
+        "solver": "HiGHS",
+        "problem_type": "LP",
+        "search_mode": "LP_ITERATION",
+        "status": "COMPLETED",
+        "supported": true,
+        "message": "该连续模型快速完成，共执行 0 次预处理/直接求解迭代；求解时间过短，未产生可绘制的分段采样轨迹。",
+        "points": [
+          {
+            "elapsed_seconds": 0.00079,
+            "incumbent_objective": null,
+            "best_bound": null,
+            "gap": null,
+            "node_count": null,
+            "iteration_count": 0,
+            "algorithm": "预处理/直接求解",
+            "kind": "iteration_final"
+          },
+          {
+            "elapsed_seconds": 0.0429,
+            "incumbent_objective": 40,
+            "best_bound": null,
+            "gap": 0,
+            "node_count": null,
+            "iteration_count": null,
+            "algorithm": null,
+            "kind": "final"
+          }
+        ],
+        "events": [
+          {
+            "kind": "search_started",
+            "label": "开始搜索最优解",
+            "elapsed_seconds": 0
+          },
+          {
+            "kind": "gap_milestone",
+            "label": "Gap 降至 0.1% 以下",
+            "elapsed_seconds": 0.0429,
+            "value": 0
+          },
+          {
+            "kind": "optimality_proven",
+            "label": "求解器已证明当前解最优",
+            "elapsed_seconds": 0.0429,
+            "value": 40
+          }
+        ],
+        "latest": {
+          "elapsed_seconds": 0.0429,
+          "iteration_count": 0,
+          "algorithm": "预处理/直接求解",
+          "incumbent_objective": 40,
+          "gap": 0
+        },
+        "gap_milestones": [
+          0.001
+        ],
+        "point_count": 2,
+        "final_status": "optimal"
+      },
+      "solve_seconds": 0.0429,
+      "format_seconds": 0.0004
+    },
+    "logs": [
+      "2026-10-21 18:24:04 [INFO] 任务已进入执行队列",
+      "2026-10-21 18:24:04 [INFO] 参数校验开始",
+      "2026-10-21 18:24:04 [INFO] 参数校验完成，耗时=0.0483s",
+      "2026-10-21 18:24:05 [INFO] 开始构建模型 model_code=model_mvhwj971_q40p, build_mode=generic_linear",
+      "2026-10-21 18:24:05 [INFO] 模型构建完成，变量数=2，约束数=2，耗时=0.0006s",
+      "2026-10-21 18:24:05 [INFO] 开始调用路由求解器，time_limit_seconds=300.0",
+      "2026-10-21 18:24:05 [INFO] 求解完成，HiGHS termination_condition=optimal，耗时=0.0429s",
+      "2026-10-21 18:24:06 [INFO] 开始格式化业务结果"
+    ],
+    "run_metrics": {
+      "variable_count": 2,
+      "constraint_count": 2,
+      "solver_status": "optimal",
+      "objective_value": 40,
+      "solver_gap": null
+    },
+    "model": "独立验收 教程一 时段供电成本 R3",
+    "scene": "经济负荷分配",
+    "submitted_at": "2026-10-21 18:24:04",
+    "started_at": "2026-10-21 18:24:04",
+    "finished_at": "2026-10-21 18:24:06",
+    "series": [],
+    "chart": {},
+    "metrics": {
+      "objective_value": 40,
+      "total_cost": 40,
+      "gap": "0.00%",
+      "risk": "low"
+    },
+    "business_output": {
+      "variable_values": {
+        "p": {
+          "0": 10,
+          "1": 20
+        }
+      },
+      "constraint_check": {},
+      "mccormick_relaxations": []
+    },
+    "business_explanation": {
+      "explanation_schema_version": "2.0",
+      "facts": [
+        "模型已通过统一 Pyomo 建模引擎和 HiGHS 求解链路完成求解。",
+        "求解状态为 success。",
+        "objective的求解值为 40.0。",
+        "平台不会自动下发生产控制指令。所有方案须经人工复核。",
+        "objective为 40.0。",
+        "供给功率 · min_value为 10.0MW。",
+        "供给功率 · max_value为 20.0MW。",
+        "供给功率 · sum_value为 30.0MW。",
+        "供给功率 · non_zero_count为 2count。",
+        "变量“供给功率”摘要：min=10.0, max=20.0, sum=30.0, non_zero_count=2。"
+      ],
+      "fact_items": [
+        {
+          "text": "模型已通过统一 Pyomo 建模引擎和 HiGHS 求解链路完成求解。",
+          "evidence_refs": [
+            "formatter.summary",
+            "formatter.metrics"
+          ]
+        },
+        {
+          "text": "求解状态为 success。",
+          "evidence_refs": [
+            "solver.status",
+            "solver.termination_condition"
+          ]
+        },
+        {
+          "text": "objective的求解值为 40.0。",
+          "evidence_refs": [
+            "solver.objective_value",
+            "model.objective"
+          ]
+        },
+        {
+          "text": "平台不会自动下发生产控制指令。所有方案须经人工复核。",
+          "evidence_refs": [
+            "model.execution_policy",
+            "model.requires_human_review"
+          ]
+        },
+        {
+          "text": "objective为 40.0。",
+          "evidence_refs": [
+            "derived_metrics.objective_value"
+          ]
+        },
+        {
+          "text": "供给功率 · min_value为 10.0MW。",
+          "evidence_refs": [
+            "derived_metrics.variable_p_min_value"
+          ]
+        },
+        {
+          "text": "供给功率 · max_value为 20.0MW。",
+          "evidence_refs": [
+            "derived_metrics.variable_p_max_value"
+          ]
+        },
+        {
+          "text": "供给功率 · sum_value为 30.0MW。",
+          "evidence_refs": [
+            "derived_metrics.variable_p_sum_value"
+          ]
+        },
+        {
+          "text": "供给功率 · non_zero_count为 2count。",
+          "evidence_refs": [
+            "derived_metrics.variable_p_non_zero_count"
+          ]
+        },
+        {
+          "text": "变量“供给功率”摘要：min=10.0, max=20.0, sum=30.0, non_zero_count=2。",
+          "evidence_refs": [
+            "variables_summary.p"
+          ]
+        }
+      ],
+      "inferences": [],
+      "inference_items": [],
+      "recommendations": [
+        "Verify input provenance, freshness, units, and dimensional completeness.",
+        "Review constraint satisfaction, violations, and binding margins against the declared model contract.",
+        "Confirm the recommendation with an authorized reviewer before operational use."
+      ],
+      "recommendation_items": [
+        {
+          "text": "Verify input provenance, freshness, units, and dimensional completeness.",
+          "evidence_refs": [
+            "manual_review_points"
+          ]
+        },
+        {
+          "text": "Review constraint satisfaction, violations, and binding margins against the declared model contract.",
+          "evidence_refs": [
+            "manual_review_points"
+          ]
+        },
+        {
+          "text": "Confirm the recommendation with an authorized reviewer before operational use.",
+          "evidence_refs": [
+            "manual_review_points"
+          ]
+        }
+      ],
+      "risk_notes": [],
+      "manual_review_points": [
+        "Verify input provenance, freshness, units, and dimensional completeness.",
+        "Review constraint satisfaction, violations, and binding margins against the declared model contract.",
+        "Confirm the recommendation with an authorized reviewer before operational use."
+      ],
+      "limitations": [
+        "结果未返回可核验的约束检查明细。",
+        "The explanation describes the returned solver evidence and does not prove real-world causality.",
+        "The platform does not infer undeclared thresholds, business rules, or external actions.",
+        "本结果仅用于辅助分析和决策参考，不构成自动控制指令。实际生产调度、交易申报或安全生产处置需结合现场规程、业务审批和人工复核后执行。"
+      ],
+      "summary": "模型已通过统一 Pyomo 建模引擎和 HiGHS 求解链路完成求解。 求解状态为 success。 objective的求解值为 40.0。 平台不会自动下发生产控制指令。所有方案须经人工复核。",
+      "disclaimer": "本结果仅用于辅助分析和决策参考，不构成自动控制指令。实际生产调度、交易申报或安全生产处置需结合现场规程、业务审批和人工复核后执行。",
+      "grounded_on": "evidence_package"
+    },
+    "execution_environment": {
+      "schema_version": 1,
+      "observed_at": "2026-10-21 18:24:05",
+      "platform_commit": "4d81a3f952af97536918886fd9dc2dfe589e38a5",
+      "working_tree_modified": true,
+      "identity": {
+        "platform_source_hash": "4e942e9431baedb40dd1e121be5f63d691377f5025986480401732e2e8397b4c",
+        "loaded_code_hash": "ec3cbf91149c473e087242dd9855104ad5c4d1260d694a03e7e1ce564b26a7af",
+        "loaded_adapter_hashes": {
+          "app.solvers.base.SolverAdapter.available": "156f673f1135e55bfaaa0ab5cb0fda77d31d390b6b04add8f4b5158ccd24264c",
+          "app.solvers.base.SolverAdapter.solve": "2aa1b3059b329e9c79c63e9864dc0684dbe057644a2173217557c61571823143",
+          "app.solvers.base.SolverAdapter.__subclasshook__": "542db00912bb2c59e0c17d460e55160f65ac5a21c71bfc346d28b5ff82c2fc88",
+          "app.solvers.base.SolverAdapter.__init__": "5b56104861680ddf5ce43d5e6169eb9fdc177f7df345f0f200876c7c0c050c8b",
+          "app.solvers.base.UnavailableSolverAdapter.__init__": "695211cc6f08c5f572928f4d539cb1d21db358f5cba0053db8ba29c262421a19",
+          "app.solvers.base.UnavailableSolverAdapter.available": "b1db9549f25a01fd012fed67764fab16f31f37a395aec103d084870b84d895d4",
+          "app.solvers.base.UnavailableSolverAdapter.solve": "9766ebbb00e0ef234b6c625b99b1fbc92bcfbc297bf0ad92e6e10b14de04e656",
+          "app.solvers.highs_adapter.HiGHSAdapter.available": "7fbd000dcb66fed384224c243a6dde085eb4aa065ee3f5bfd31837fb2cc9ce5d",
+          "app.solvers.highs_adapter.HiGHSAdapter.solve": "b6bfec58ca817384516c93a433f1c550647f2f8180adb2085cb3c3bed86e006d",
+          "app.solvers.highs_adapter.HiGHSAdapter._solve_serial": "9cbe0990d09bff01e62dd515f3293008c47092caa4ec28deb16b98a0c354bb07",
+          "app.solvers.highs_adapter.HiGHSAdapter._configure_progress_callback": "29d39bcb142bbfaeaa717bf988958767d2b1d40b84ec87e1b89d2fe97be5efee",
+          "app.solvers.highs_adapter.HiGHSAdapter._emit_lp_iteration_summary": "f1d8e1cd234ccdd1c2979856d02921c0c0b852ef050c945e118e771d71c3400b",
+          "app.solvers.highs_adapter.HiGHSAdapter._finite_number": "c3f4fa2b13ae7b7af97b89f0428daeb9385ba6e4e248dcd2ff0a19d4b252bd11",
+          "app.solvers.highs_adapter.HiGHSAdapter._finite_integer": "c9522d091f5c15217e249b9fa4f6dc827227d7af2e80f612277cd78255d0e007",
+          "app.solvers.highs_adapter.HiGHSAdapter._extract_variables": "02c08df70a8e8dcd85206b4dee3f38ee77bab1ee9b2a49177716ee89e998c329",
+          "app.solvers.highs_adapter.HiGHSAdapter._label": "a9410a7380d5a154fa8f3801323abd91304f98751c916223af085cf4bb1a0f8b",
+          "app.solvers.nlp_adapter.NLPSolverAdapter.available": "61c93dea7a60111ac15a9406733563f0f44b6e4948afc4e171c2db33fe9e0b08",
+          "app.solvers.nlp_adapter.NLPSolverAdapter.availability_message": "aeecec41efa0518113cc7477d49c2c769ee845ca01b22b09fe1a8039ef67b1cd",
+          "app.solvers.nlp_adapter.NLPSolverAdapter.solve": "0cc06afb237ca7b948ab4ab25fb5a9ed8d3d6d1d137da7a925b8cc76bf5a3c9d",
+          "app.solvers.nlp_adapter.NLPSolverAdapter._cpu_limit_reached": "30abe38daba7038b46b068c52fa0f21a86d9287d358e0bb182771cdd88e1f6ca",
+          "app.solvers.nlp_adapter.NLPSolverAdapter._failed_result": "46b7e7d48018a3aa349891344260c63fecbf16fd5f95834227f1f150491bdd94",
+          "app.solvers.nlp_adapter.NLPSolverAdapter._has_integer_variables": "df327469fa9ef7ddaab08fdcaeadb6af8ca2ab1dfed447d01200b54e8dc965f7",
+          "app.solvers.nlp_adapter.NLPSolverAdapter._initialize_unset_variables": "8e5095de29753edfe9ef7b81fcc2044c4002657c991a0a3f1e5a764805ac24f9",
+          "app.solvers.nlp_adapter.NLPSolverAdapter._objective_value": "db4387109010b32c48c8cdb1e09d5f5885d43665e7824e302b6afbe7ffa98cc6",
+          "app.solvers.nlp_adapter.NLPSolverAdapter.extract_variables": "e1137606a1d7b477e5c7d2ea6f07df64b06b037428f2b90029b0aeb9e821019f",
+          "app.solvers.nlp_adapter.NLPSolverAdapter.constraint_violations": "71c3aa10a0259981b844d8f9a42e6ad8def0cfb7adb0176a8661386c4c6d9b5d",
+          "app.solvers.nlp_adapter.NLPSolverAdapter._status_from_termination": "e022357d45ba914c40deeee3471ce733991887f14ec80348a06522205bd953b5",
+          "app.solvers.nlp_adapter.NLPSolverAdapter._label": "eff8d9d624acba1fc17da1318cdc0501de4dbfdea464752b2e2a538b0ec8a35e",
+          "app.solvers.run_settings.validate_run_settings.validate_run_settings": "7c9905ce86cd63347599ff19ba43ef2e2c245ff98845b3459b7932ce026ff43e",
+          "app.solvers.run_settings.apply_initial_values.apply_initial_values": "8529c65da55cf52a9583b62b5732c37c9ef06abe6dfe7e9afe9052696a5af6f0",
+          "app.solvers.solver_router.SolverRouteError.__init__": "8239e1593da145ff43fffb80c4037ffa79d71c13feb700e65f1c95b66bdfc91f",
+          "app.solvers.solver_router.ScipAdapter.__init__": "f9bc50513c9cf5a219fb3835b79fec61ea0f63ba16d5bb0eab59a9b1011615dd",
+          "app.solvers.solver_router.SolverRouter.__init__": "32b05b8e35836d5898d2fe8ab4be2455d82b9bf0cfac223a15cdafe5c6624c5f",
+          "app.solvers.solver_router.SolverRouter.route": "aa292bb6852612990de8dfb7cd4e4aec9f1bb41690e544aaa6865f255771945a",
+          "app.solvers.solver_router.SolverRouter.solve": "862706f8cabe4faaccfce5bf9465bedad6024f0175486f3ad0e649e01912fac1",
+          "app.solvers.solver_router.SolverRouter.infer_problem_type_from_model": "e15584df123a16108675b3b3188c4cc080ad5bad828a6863536f867443873261",
+          "app.solvers.solver_router.SolverRouter._key": "ec62ad98a144f93789eef008d80b41b1db359fbc0ee6e308713c65721d07c5f4",
+          "app.solvers.solver_router.SolverRouter._message": "0d7a2049374f362bdc0a8c7a5e1fd75b7343774a285e7b61f2c8dce7ce3bef37",
+          "app.solvers.solver_router.SolverRouter._assert_highs_can_accept_model": "29e845dced6d232f6c47c252a9bf4ee3133ced2d35c33e34d0edd90518bb03d1",
+          "app.solvers.solver_router.SolverRouter._model_has_nonlinearity": "40a962711af581685cd03c607a5c094d8cb7eefb9638ea7624977ae47778efca",
+          "app.solvers.status.ipopt_unavailable_explanation.ipopt_unavailable_explanation": "991835cafe391fc166395d14b753e7a274a86d428fa40f693ece9a82c0ccfcf4",
+          "app.solvers.status._package_version._package_version": "ea037bf7820e35b08b59040700ca77ab6492b2a6c418937b0f4a611783a27354",
+          "app.solvers.status._solver_available._solver_available": "ba3af93ae8fc9a4ecd8bf6227f5f01e76098c9f89b290682d905d2c1b02dfb4a",
+          "app.solvers.status._ipopt_version._ipopt_version": "10e97df05ef33272c65833e66f3c2b451edbc05e25a886b95c6ac4345d4a40f9",
+          "app.solvers.status.solver_status.solver_status": "217d8f4f653e3b90532d825d8cfae979eee3cd0ac8d3e3afff9521e65ee25ff6"
+        },
+        "source_hash_scope": "磁盘源码与已加载 Python code object 分别记录；二者不冒充旧镜像证明。",
+        "image_digest": "unknown",
+        "python": "3.12.14",
+        "system": "Darwin",
+        "machine": "arm64",
+        "packages": {
+          "pyomo": "6.10.1",
+          "highspy": "1.15.1",
+          "numpy": "2.5.2",
+          "scipy": "unknown"
+        },
+        "compiler_hashes": {
+          "app/generic_formula_compiler.py": "6f2bf2ca449cdb28b06714f4247bfcc907d3c18772e42497ed7cccaebfe4d156",
+          "app/model_components/formula_components.py": "d528e10ea30d6b6d63f72c55b7cddccd0311ae69a3f499cb06d1c37654f2ed66",
+          "app/builders/component_model_builder.py": "4fc5a34a060316913399e181e7d659b7ff5b76abc781d3e49dbfc99aa012dec2",
+          "app/function_strategy.py": "69a596f275fcc72094f4583cfcb39ab3ebc202d301ffc4cd0193dca945a6fd81"
+        },
+        "builtin_implementations": {},
+        "solver": {
+          "name": "HiGHS",
+          "version": "1.15.1",
+          "executable_hash": "unknown",
+          "binary_hash": "27633861039f85ade740e5ddf06e7795989ddcf92566e32d94f0980d09e2782f",
+          "adapter_hash": "fd52bcba447227d2daff18ae1ca8ff72279a255d5feb47782d0ef18ddae4ca0a"
+        },
+        "requested_settings": {
+          "time_limit_seconds": 300,
+          "mip_gap": 0.001,
+          "threads": null,
+          "presolve": true
+        },
+        "effective_settings": {
+          "time_limit": 300,
+          "mip_rel_gap": 0.001,
+          "threads": "solver_default",
+          "presolve": "solver_default; adapter does not override"
+        },
+        "initial_values": {},
+        "numeric_environment": {
+          "OMP_NUM_THREADS": "unknown",
+          "OPENBLAS_NUM_THREADS": "unknown",
+          "MKL_NUM_THREADS": "unknown"
+        }
+      },
+      "identity_hash": "ade959c8f0897716bc9d4692085e8b6aaaf4a04fdb22652369f4745d39952a43",
+      "image_note": "当前进程无法可信取得镜像 digest，未用可随意填写的环境变量冒充镜像证明。",
+      "replay_note": "清单记录实际代码和数值环境；不提供旧环境，也不承诺跨环境逐字节一致。"
+    },
+    "solution_evidence": {
+      "schema_version": 1,
+      "business_inputs": {
+        "cost": [
+          2,
+          3
+        ],
+        "delta_t": 0.5,
+        "demand": [
+          10,
+          20
+        ],
+        "horizon": 2,
+        "interval_minutes": 30,
+        "time": [
+          0,
+          1
+        ]
+      },
+      "settings": {
+        "backend": "HiGHS",
+        "problem_type": "LP",
+        "mip_gap": 0.001,
+        "time_limit_seconds": 300,
+        "thread_num": null,
+        "presolve": true,
+        "nlp_tolerance": null,
+        "max_iter": null,
+        "acceptable_tol": null,
+        "initial_values": {}
+      },
+      "decisions": [
+        {
+          "key": "p[0]",
+          "code": "p",
+          "coordinate": "0",
+          "name": "供给功率",
+          "unit": "MW",
+          "definition": {
+            "dimension": [
+              "time"
+            ],
+            "unit": "MW"
+          },
+          "value": 10
+        },
+        {
+          "key": "p[1]",
+          "code": "p",
+          "coordinate": "1",
+          "name": "供给功率",
+          "unit": "MW",
+          "definition": {
+            "dimension": [
+              "time"
+            ],
+            "unit": "MW"
+          },
+          "value": 20
+        }
+      ],
+      "constraints": [
+        {
+          "key": "con_满足时段需求_0_0_1",
+          "execution_name": "con_满足时段需求_0_0_1",
+          "body": 10,
+          "lower": 10,
+          "upper": null,
+          "violation": 0,
+          "definition": "10.0  <=  var_p_0",
+          "unit": "按模型约束定义"
+        },
+        {
+          "key": "con_满足时段需求_1_0_2",
+          "execution_name": "con_满足时段需求_1_0_2",
+          "body": 20,
+          "lower": 20,
+          "upper": null,
+          "violation": 0,
+          "definition": "20.0  <=  var_p_1",
+          "unit": "按模型约束定义"
+        }
+      ],
+      "metrics": [],
+      "variable_checks": [
+        {
+          "key": "var_p_0",
+          "violation": 0,
+          "integrality_violation": 0
+        },
+        {
+          "key": "var_p_1",
+          "violation": 0,
+          "integrality_violation": 0
+        }
+      ],
+      "max_constraint_violation": 0,
+      "objective": {
+        "value": 40,
+        "definition": "var_p_0 + 1.5*var_p_1",
+        "sense": "minimize",
+        "unit": "模型加权目标"
+      }
+    },
+    "evidence_package": {
+      "evidence_schema_version": "2.0",
+      "solver": {
+        "status": "success",
+        "termination_condition": "optimal",
+        "objective_value": 40,
+        "solver_name": "HiGHS",
+        "error": null,
+        "problem_type": "LP",
+        "local_optimum_warning": false,
+        "constraint_violation_summary": {}
+      },
+      "model": {
+        "model_id": "MODEL-97B90D47",
+        "model_version": "v0.1",
+        "skill_name": "run_model_mvhwj971_q40p",
+        "schema_version": "unknown",
+        "profile_name": "generic",
+        "skill_definition_revision": 1,
+        "skill_definition_hash": "7f3e915eee95f9e96d0602b961b5446e35761b54252f17f9a7ab1519ba957fd9",
+        "explanation_spec_version": "1.0",
+        "objective": {
+          "key": "objective",
+          "name": "objective",
+          "sense": "minimize",
+          "unit": "",
+          "description": "",
+          "expression_declared": true
+        },
+        "execution_policy": "advisory_only",
+        "requires_human_review": true
+      },
+      "inputs_summary": {
+        "parameters": {
+          "demand": [
+            10,
+            20
+          ],
+          "cost": [
+            2,
+            3
+          ],
+          "delta_t": 0.5
+        },
+        "parameter_sources": {
+          "demand": "USER_INPUT",
+          "cost": "USER_INPUT",
+          "delta_t": "USER_INPUT"
+        },
+        "missing_params": []
+      },
+      "variables_summary": [
+        {
+          "name": "p",
+          "business_name": "供给功率",
+          "unit": "MW",
+          "dimension": [
+            "time"
+          ],
+          "min": 10,
+          "max": 20,
+          "sum": 30,
+          "non_zero_count": 2,
+          "max_period": "1",
+          "evidence_ref": "variables_summary.p"
+        }
+      ],
+      "constraint_checks": [],
+      "derived_metrics": {
+        "objective_value": {
+          "label": "objective",
+          "value": 40,
+          "unit": "",
+          "function": "identity",
+          "source": {
+            "kind": "objective",
+            "key": null
+          },
+          "evidence_ref": "derived_metrics.objective_value"
+        },
+        "variable_p_min_value": {
+          "label": "供给功率 · min_value",
+          "value": 10,
+          "unit": "MW",
+          "function": "min_value",
+          "source": {
+            "kind": "variable",
+            "key": "p"
+          },
+          "evidence_ref": "derived_metrics.variable_p_min_value"
+        },
+        "variable_p_max_value": {
+          "label": "供给功率 · max_value",
+          "value": 20,
+          "unit": "MW",
+          "function": "max_value",
+          "source": {
+            "kind": "variable",
+            "key": "p"
+          },
+          "evidence_ref": "derived_metrics.variable_p_max_value"
+        },
+        "variable_p_sum_value": {
+          "label": "供给功率 · sum_value",
+          "value": 30,
+          "unit": "MW",
+          "function": "sum_value",
+          "source": {
+            "kind": "variable",
+            "key": "p"
+          },
+          "evidence_ref": "derived_metrics.variable_p_sum_value"
+        },
+        "variable_p_non_zero_count": {
+          "label": "供给功率 · non_zero_count",
+          "value": 2,
+          "unit": "count",
+          "function": "non_zero_count",
+          "source": {
+            "kind": "variable",
+            "key": "p"
+          },
+          "evidence_ref": "derived_metrics.variable_p_non_zero_count"
+        }
+      },
+      "formatter": {
+        "source": "SolveResultFormatter",
+        "summary": "模型已通过统一 Pyomo 建模引擎和 HiGHS 求解链路完成求解。",
+        "explanation": {
+          "summary": "模型已通过统一 Pyomo 建模引擎和 HiGHS 求解链路完成求解。",
+          "model_code": "generic_linear",
+          "relaxation_advisory": null
+        },
+        "metrics": {
+          "objective_value": {
+            "value": 40,
+            "unit": "",
+            "label": "objective_value",
+            "source": "result.metrics.objective_value"
+          },
+          "total_cost": {
+            "value": 40,
+            "unit": "",
+            "label": "total_cost",
+            "source": "result.metrics.total_cost"
+          },
+          "gap": {
+            "value": "0.00%",
+            "unit": "",
+            "label": "gap",
+            "source": "result.metrics.gap"
+          },
+          "risk": {
+            "value": "low",
+            "unit": "",
+            "label": "risk",
+            "source": "result.metrics.risk"
+          }
+        }
+      },
+      "business_outcomes": {
+        "facts": []
+      },
+      "risk_notes": [],
+      "manual_review_points": [
+        "Verify input provenance, freshness, units, and dimensional completeness.",
+        "Review constraint satisfaction, violations, and binding margins against the declared model contract.",
+        "Confirm the recommendation with an authorized reviewer before operational use."
+      ],
+      "data_quality_notes": [],
+      "explanation_limits": [
+        "结果未返回可核验的约束检查明细。",
+        "The explanation describes the returned solver evidence and does not prove real-world causality.",
+        "The platform does not infer undeclared thresholds, business rules, or external actions."
+      ],
+      "evidence_index": {
+        "formatter": [
+          "formatter.summary",
+          "formatter.metrics"
+        ],
+        "solver": [
+          "solver.status",
+          "solver.termination_condition",
+          "solver.objective_value",
+          "solver.local_optimum_warning",
+          "solver.constraint_violation_summary"
+        ],
+        "variables": [
+          "variables_summary.p"
+        ],
+        "constraints": [],
+        "metrics": [
+          "derived_metrics.objective_value",
+          "derived_metrics.variable_p_min_value",
+          "derived_metrics.variable_p_max_value",
+          "derived_metrics.variable_p_sum_value",
+          "derived_metrics.variable_p_non_zero_count"
+        ],
+        "business_outcomes": []
+      }
+    },
+    "explanation_structured": {
+      "explanation_schema_version": "2.0",
+      "facts": [
+        "模型已通过统一 Pyomo 建模引擎和 HiGHS 求解链路完成求解。",
+        "求解状态为 success。",
+        "objective的求解值为 40.0。",
+        "平台不会自动下发生产控制指令。所有方案须经人工复核。",
+        "objective为 40.0。",
+        "供给功率 · min_value为 10.0MW。",
+        "供给功率 · max_value为 20.0MW。",
+        "供给功率 · sum_value为 30.0MW。",
+        "供给功率 · non_zero_count为 2count。",
+        "变量“供给功率”摘要：min=10.0, max=20.0, sum=30.0, non_zero_count=2。"
+      ],
+      "fact_items": [
+        {
+          "text": "模型已通过统一 Pyomo 建模引擎和 HiGHS 求解链路完成求解。",
+          "evidence_refs": [
+            "formatter.summary",
+            "formatter.metrics"
+          ]
+        },
+        {
+          "text": "求解状态为 success。",
+          "evidence_refs": [
+            "solver.status",
+            "solver.termination_condition"
+          ]
+        },
+        {
+          "text": "objective的求解值为 40.0。",
+          "evidence_refs": [
+            "solver.objective_value",
+            "model.objective"
+          ]
+        },
+        {
+          "text": "平台不会自动下发生产控制指令。所有方案须经人工复核。",
+          "evidence_refs": [
+            "model.execution_policy",
+            "model.requires_human_review"
+          ]
+        },
+        {
+          "text": "objective为 40.0。",
+          "evidence_refs": [
+            "derived_metrics.objective_value"
+          ]
+        },
+        {
+          "text": "供给功率 · min_value为 10.0MW。",
+          "evidence_refs": [
+            "derived_metrics.variable_p_min_value"
+          ]
+        },
+        {
+          "text": "供给功率 · max_value为 20.0MW。",
+          "evidence_refs": [
+            "derived_metrics.variable_p_max_value"
+          ]
+        },
+        {
+          "text": "供给功率 · sum_value为 30.0MW。",
+          "evidence_refs": [
+            "derived_metrics.variable_p_sum_value"
+          ]
+        },
+        {
+          "text": "供给功率 · non_zero_count为 2count。",
+          "evidence_refs": [
+            "derived_metrics.variable_p_non_zero_count"
+          ]
+        },
+        {
+          "text": "变量“供给功率”摘要：min=10.0, max=20.0, sum=30.0, non_zero_count=2。",
+          "evidence_refs": [
+            "variables_summary.p"
+          ]
+        }
+      ],
+      "inferences": [],
+      "inference_items": [],
+      "recommendations": [
+        "Verify input provenance, freshness, units, and dimensional completeness.",
+        "Review constraint satisfaction, violations, and binding margins against the declared model contract.",
+        "Confirm the recommendation with an authorized reviewer before operational use."
+      ],
+      "recommendation_items": [
+        {
+          "text": "Verify input provenance, freshness, units, and dimensional completeness.",
+          "evidence_refs": [
+            "manual_review_points"
+          ]
+        },
+        {
+          "text": "Review constraint satisfaction, violations, and binding margins against the declared model contract.",
+          "evidence_refs": [
+            "manual_review_points"
+          ]
+        },
+        {
+          "text": "Confirm the recommendation with an authorized reviewer before operational use.",
+          "evidence_refs": [
+            "manual_review_points"
+          ]
+        }
+      ],
+      "risk_notes": [],
+      "manual_review_points": [
+        "Verify input provenance, freshness, units, and dimensional completeness.",
+        "Review constraint satisfaction, violations, and binding margins against the declared model contract.",
+        "Confirm the recommendation with an authorized reviewer before operational use."
+      ],
+      "limitations": [
+        "结果未返回可核验的约束检查明细。",
+        "The explanation describes the returned solver evidence and does not prove real-world causality.",
+        "The platform does not infer undeclared thresholds, business rules, or external actions.",
+        "本结果仅用于辅助分析和决策参考，不构成自动控制指令。实际生产调度、交易申报或安全生产处置需结合现场规程、业务审批和人工复核后执行。"
+      ],
+      "summary": "模型已通过统一 Pyomo 建模引擎和 HiGHS 求解链路完成求解。 求解状态为 success。 objective的求解值为 40.0。 平台不会自动下发生产控制指令。所有方案须经人工复核。",
+      "disclaimer": "本结果仅用于辅助分析和决策参考，不构成自动控制指令。实际生产调度、交易申报或安全生产处置需结合现场规程、业务审批和人工复核后执行。",
+      "grounded_on": "evidence_package"
+    },
+    "explanation_audit": {
+      "processor": "result_post_processor_v2",
+      "definition_source": "persisted_skill",
+      "skill_name": "run_model_mvhwj971_q40p",
+      "skill_definition_revision": 1,
+      "skill_definition_hash": "7f3e915eee95f9e96d0602b961b5446e35761b54252f17f9a7ab1519ba957fd9",
+      "explanation_spec_version": "1.0",
+      "fallback": {
+        "used": false,
+        "reason": null
+      },
+      "llm": {
+        "enabled": false,
+        "attempted": false,
+        "fallback_used": false,
+        "reason": "LLM_SUMMARY_NOT_REQUESTED"
+      }
+    },
+    "profile_name": "generic",
+    "disclaimer": "本结果仅用于辅助分析和决策参考，不构成自动控制指令。实际生产调度、交易申报或安全生产处置需结合现场规程、业务审批和人工复核后执行。",
+    "execution_policy": "advisory_only",
+    "requires_human_review": true,
+    "explanation": "模型已通过统一 Pyomo 建模引擎和 HiGHS 求解链路完成求解。 求解状态为 success。 objective的求解值为 40.0。 平台不会自动下发生产控制指令。所有方案须经人工复核。",
+    "result_metadata": {
+      "problem_type": "LP",
+      "explanation_type": null,
+      "capabilities": [
+        "metrics",
+        "timeseries",
+        "business_output",
+        "explanation",
+        "raw"
+      ],
+      "presentation_schema_version": "1.0",
+      "views": [
+        {
+          "key": "overview",
+          "label": "结果概览",
+          "kind": "metrics",
+          "source": "metrics"
+        },
+        {
+          "key": "curves",
+          "label": "变量曲线",
+          "kind": "timeseries",
+          "source": "variable_values"
+        },
+        {
+          "key": "business_output",
+          "label": "业务输出",
+          "kind": "business_output",
+          "source": "business_output"
+        },
+        {
+          "key": "advice",
+          "label": "业务建议",
+          "kind": "explanation",
+          "source": "business_explanation"
+        },
+        {
+          "key": "raw",
+          "label": "原始结果",
+          "kind": "raw",
+          "source": "$"
+        }
+      ]
+    },
+    "result_views": [
+      {
+        "key": "overview",
+        "label": "结果概览",
+        "kind": "metrics",
+        "source": "metrics"
+      },
+      {
+        "key": "curves",
+        "label": "变量曲线",
+        "kind": "timeseries",
+        "source": "variable_values"
+      },
+      {
+        "key": "business_output",
+        "label": "业务输出",
+        "kind": "business_output",
+        "source": "business_output"
+      },
+      {
+        "key": "advice",
+        "label": "业务建议",
+        "kind": "explanation",
+        "source": "business_explanation"
+      },
+      {
+        "key": "raw",
+        "label": "原始结果",
+        "kind": "raw",
+        "source": "$"
+      }
+    ],
+    "result_capabilities": [
+      "metrics",
+      "timeseries",
+      "business_output",
+      "explanation",
+      "raw"
+    ]
+  },
+  "skill_name": "run_model_mvhwj971_q40p"
+}

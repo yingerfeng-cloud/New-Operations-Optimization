@@ -272,7 +272,13 @@ export function ModelCreationPage() {
     const save = async () => {
       const state = useModelCreationStore.getState();
       if (state.workspace.generation !== generation) throw new Error('工作区已切换，未提交旧草稿');
-      if (state.currentDraftModelId && state.lastSavedSnapshot === snapshot && savedAssetRef.current?.id === state.currentDraftModelId) return savedAssetRef.current;
+      if (state.currentDraftModelId && state.lastSavedSnapshot === snapshot && savedAssetRef.current?.id === state.currentDraftModelId) {
+        // Controls can emit the same draft again after a test. A no-op save
+        // still has to acknowledge that content, without clearing newer edits
+        // when this request carries an older captured draft.
+        state.setWorkspace({ dirty: JSON.stringify(normalizeModelDraft(state.draft)) !== snapshot });
+        return savedAssetRef.current;
+      }
       const createAsset = state.workspace.mode === 'version' && state.workspace.sourceModelId
         ? (payload: Parameters<typeof createModel>[0]) => createModelVersion(state.workspace.sourceModelId!, payload) : createModel;
       const update = async (id: string, payload: Parameters<typeof updateModel>[1]) => {

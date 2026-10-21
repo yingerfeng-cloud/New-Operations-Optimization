@@ -1,0 +1,117 @@
+{
+  "model_id": "MODEL-A64B30D2",
+  "task_id": "OPT-C3D5D7BB59",
+  "status": "trial",
+  "objective": 20,
+  "solver_status": "optimal",
+  "evidence": {
+    "schema_version": 1,
+    "business_inputs": {
+      "capacity_limit": [
+        15,
+        25
+      ],
+      "cost": [
+        2,
+        3
+      ],
+      "delta_t": 0.5,
+      "demand": [
+        10,
+        20
+      ],
+      "horizon": 2,
+      "interval_minutes": 30,
+      "period_hours": 0.5,
+      "time": [
+        0,
+        1
+      ],
+      "unit_cost": 2
+    },
+    "settings": {
+      "backend": "HiGHS",
+      "problem_type": "LP",
+      "mip_gap": 0.001,
+      "time_limit_seconds": 300,
+      "thread_num": null,
+      "presolve": true,
+      "nlp_tolerance": null,
+      "max_iter": null,
+      "acceptable_tol": null,
+      "initial_values": {}
+    },
+    "decisions": [
+      {
+        "key": "p[0]",
+        "code": "p",
+        "coordinate": "p[0]",
+        "name": "p",
+        "unit": "MW",
+        "definition": {
+          "dimension": [
+            "time"
+          ],
+          "unit": "MW"
+        },
+        "value": 10
+      },
+      {
+        "key": "p[1]",
+        "code": "p",
+        "coordinate": "p[1]",
+        "name": "p",
+        "unit": "MW",
+        "definition": {
+          "dimension": [
+            "time"
+          ],
+          "unit": "MW"
+        },
+        "value": 10
+      }
+    ],
+    "constraints": [
+      {
+        "key": "manual_cap_cost_independent_constraint_1[0]",
+        "execution_name": "manual_cap_cost_independent_constraint_1[0]",
+        "body": 10,
+        "lower": null,
+        "upper": 15,
+        "violation": 0,
+        "definition": "p[0]  <=  15",
+        "unit": "按模型约束定义"
+      },
+      {
+        "key": "manual_cap_cost_independent_constraint_1[1]",
+        "execution_name": "manual_cap_cost_independent_constraint_1[1]",
+        "body": 10,
+        "lower": null,
+        "upper": 25,
+        "violation": 0,
+        "definition": "p[1]  <=  25",
+        "unit": "按模型约束定义"
+      }
+    ],
+    "metrics": [],
+    "variable_checks": [
+      {
+        "key": "p[0]",
+        "violation": 0,
+        "integrality_violation": 0
+      },
+      {
+        "key": "p[1]",
+        "violation": 0,
+        "integrality_violation": 0
+      }
+    ],
+    "max_constraint_violation": 0,
+    "objective": {
+      "value": 20,
+      "definition": "p[0] + p[1]",
+      "sense": "minimize",
+      "unit": "模型加权目标"
+    }
+  }
+}

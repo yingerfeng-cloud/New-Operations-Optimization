@@ -1,0 +1,74 @@
+
+> optiforge-platform-frontend@1.0.0 build
+> tsc -b && vite build
+
+vite v7.3.7 building client environment for production...
+transforming...
+✓ 5598 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                                 0.40 kB │ gzip:   0.33 kB
+dist/assets/index-CrImOLTm.css                131.12 kB │ gzip:  23.62 kB
+dist/assets/results-CBWoUOAu.js                 0.15 kB │ gzip:   0.14 kB
+dist/assets/solvers-C8xsv39q.js                 0.16 kB │ gzip:   0.15 kB
+dist/assets/index-Cb6-bMh1.js                   0.16 kB │ gzip:   0.16 kB
+dist/assets/functionUpdates-D908ai_n.js         0.29 kB │ gzip:   0.19 kB
+dist/assets/formatDuration-D6SmkALa.js          0.31 kB │ gzip:   0.23 kB
+dist/assets/systemConfig-CQBJH6Xj.js            0.39 kB │ gzip:   0.21 kB
+dist/assets/components-KD-N6FtT.js              0.54 kB │ gzip:   0.25 kB
+dist/assets/index-DdpA-Skw.js                   0.57 kB │ gzip:   0.38 kB
+dist/assets/index-CohPOAiO.js                   0.57 kB │ gzip:   0.32 kB
+dist/assets/modelDimensions-BC_flof2.js         0.61 kB │ gzip:   0.36 kB
+dist/assets/FormulaDisplay-BnQ6ZZeg.js          0.62 kB │ gzip:   0.36 kB
+dist/assets/index-YiBq1TDh.js                   0.67 kB │ gzip:   0.52 kB
+dist/assets/MoreOutlined-BbrFz9EV.js            0.77 kB │ gzip:   0.48 kB
+dist/assets/functionAssets-D7X7KWUQ.js          0.79 kB │ gzip:   0.36 kB
+dist/assets/index-BlWTgscz.js                   0.91 kB │ gzip:   0.61 kB
+dist/assets/DownloadOutlined-DBVUCxUZ.js        0.95 kB │ gzip:   0.62 kB
+dist/assets/DeleteOutlined-Cuxjwb5F.js          0.99 kB │ gzip:   0.66 kB
+dist/assets/index-Cb-iAYdy.js                   1.06 kB │ gzip:   0.49 kB
+dist/assets/scenarioCatalog-BQes2KZE.js         1.29 kB │ gzip:   0.62 kB
+dist/assets/index-BEdg32ed.js                   1.33 kB │ gzip:   0.74 kB
+dist/assets/ReloadOutlined-CyLTfaAF.js          1.34 kB │ gzip:   0.83 kB
+dist/assets/LinkOutlined-CDuD2M9o.js            1.34 kB │ gzip:   0.72 kB
+dist/assets/SolverRunSettings-Bx1vu9l-.js       1.76 kB │ gzip:   0.99 kB
+dist/assets/useBreakpoint-czW6kcVS.js           1.84 kB │ gzip:   0.88 kB
+dist/assets/useMutation-NtzAdYAs.js             2.21 kB │ gzip:   0.91 kB
+dist/assets/agents-u63KaD6j.js                  2.22 kB │ gzip:   0.96 kB
+dist/assets/row-vJL8CBfH.js                     2.47 kB │ gzip:   1.30 kB
+dist/assets/models-BL2mPuRt.js                  2.64 kB │ gzip:   1.31 kB
+dist/assets/resultLabels-oAFw7nb9.js            2.78 kB │ gzip:   1.33 kB
+dist/assets/demoCapabilities-BTq5Kw3o.js        4.19 kB │ gzip:   1.79 kB
+dist/assets/ScenarioLibraryPage-B_q4j8I8.js     4.20 kB │ gzip:   1.83 kB
+dist/assets/CommandSearch-DdhIuqtd.js           4.87 kB │ gzip:   2.23 kB
+dist/assets/index-BGClM6od.js                   7.45 kB │ gzip:   2.53 kB
+dist/assets/index-BphgJCJY.js                   8.45 kB │ gzip:   3.31 kB
+dist/assets/Collapse-DhMQQc61.js                9.66 kB │ gzip:   3.64 kB
+dist/assets/DashboardPage-Di09W0mE.js          10.93 kB │ gzip:   4.39 kB
+dist/assets/ModelServicesPage-DkP_Dr4J.js      11.56 kB │ gzip:   5.04 kB
+dist/assets/progress-CRwazQTJ.js               14.96 kB │ gzip:   5.76 kB
+dist/assets/ResultCenterPage-Dz_7P9Wm.js       16.05 kB │ gzip:   6.10 kB
+dist/assets/SettingsPage-BWhs76YT.js           17.71 kB │ gzip:   5.91 kB
+dist/assets/index-LIKm8osB.js                  21.66 kB │ gzip:   7.75 kB
+dist/assets/index-BOos47Xp.js                  21.89 kB │ gzip:   8.62 kB
+dist/assets/SkillCenterPage-B5vXRx9S.js        22.58 kB │ gzip:   8.51 kB
+dist/assets/index-DLh6wLkW.js                  28.49 kB │ gzip:   7.92 kB
+dist/assets/ComponentLibraryPage-CagDTbNy.js   31.86 kB │ gzip:  10.28 kB
+dist/assets/templates-DgJngExm.js              32.53 kB │ gzip:  10.23 kB
+dist/assets/ModelCenterPage-DXDmLUUq.js        46.03 kB │ gzip:  14.32 kB
+dist/assets/AgentWorkbenchPage-BBkFMO2C.js     53.04 kB │ gzip:  16.38 kB
+dist/assets/index-BfVs52mD.js                  65.24 kB │ gzip:  21.30 kB
+dist/assets/index-DcfqLkKB.js                  65.78 kB │ gzip:  23.52 kB
+dist/assets/FunctionAssetsPage-BGpnC3W0.js     69.74 kB │ gzip:  23.91 kB
+dist/assets/TaskCenterPage-NYACR1W3.js         92.39 kB │ gzip:  32.01 kB
+dist/assets/ModelCreationPage-DJF2-jSE.js     190.70 kB │ gzip:  58.39 kB
+dist/assets/Table-DMlqpwOJ.js                 197.61 kB │ gzip:  62.74 kB
+dist/assets/FormulaBuilderModal-B29C7k4z.js   514.10 kB │ gzip: 173.54 kB
+dist/assets/vendor-echarts-Crrd582t.js        659.84 kB │ gzip: 223.09 kB
+dist/assets/index-Zhsp1imN.js                 921.86 kB │ gzip: 302.79 kB
+
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 4.90s

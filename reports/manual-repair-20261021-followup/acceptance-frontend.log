@@ -1,0 +1,22 @@
+
+> optiforge-platform-frontend@1.0.0 dev
+> vite --host 0.0.0.0 --port 5173 --host 127.0.0.1 --port 15175 --strictPort
+
+
+  VITE v7.3.7  ready in 83 ms
+
+  ➜  Local:   http://127.0.0.1:15175/
+9:54:03 PM [vite] (client) hmr update /src/features/task-center/TaskPanels.tsx
+9:54:03 PM [vite] (client) hmr invalidate /src/features/task-center/TaskPanels.tsx Could not Fast Refresh ("isRetryableStatus" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports
+9:54:03 PM [vite] (client) hmr update /src/pages/TaskCenter/TaskCenterPage.tsx
+9:54:03 PM [vite] (client) hmr invalidate /src/pages/TaskCenter/TaskCenterPage.tsx Could not Fast Refresh ("defaultTaskTab" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports
+9:54:03 PM [vite] (client) hmr update /src/app/router.tsx
+9:54:03 PM [vite] (client) hmr invalidate /src/app/router.tsx Could not Fast Refresh ("router" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports
+9:54:03 PM [vite] (client) hmr update /src/App.tsx
+10:51:18 PM [vite] (client) hmr update /src/pages/TaskCenter/TaskCenterPage.tsx, /src/features/task-create/TaskCreateWizard.tsx, /src/features/task-create/components/RuntimeParameterGroupNav.tsx, /src/features/task-create/components/HistoricalTaskParameterModal.tsx
+10:51:18 PM [vite] (client) hmr invalidate /src/pages/TaskCenter/TaskCenterPage.tsx Could not Fast Refresh ("defaultTaskTab" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports
+10:51:18 PM [vite] (client) hmr update /src/app/router.tsx
+10:51:18 PM [vite] (client) hmr invalidate /src/features/task-create/TaskCreateWizard.tsx Could not Fast Refresh ("parseTaskRuntimeJson" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports
+10:51:18 PM [vite] (client) hmr update /src/pages/TaskCenter/TaskCenterPage.tsx
+10:51:18 PM [vite] (client) hmr invalidate /src/app/router.tsx Could not Fast Refresh ("router" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports
+10:51:18 PM [vite] (client) hmr update /src/App.tsx

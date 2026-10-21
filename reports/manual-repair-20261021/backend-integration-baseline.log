@@ -1,0 +1,230 @@
+FFF.                                                                     [100%]
+=================================== FAILURES ===================================
+__________ test_component_based_validator_returns_chinese_hydro_error __________
+
+    def test_component_based_validator_returns_chinese_hydro_error() -> None:
+        template = get_template("cascade_hydro_dispatch")
+        params = deepcopy(template["sample_runtime_parameters"])
+        params["availability"]["S1_U2"] = [1, 0, 1]
+        errors = RuntimeParameterValidator().validate(template, params)
+        assert errors
+>       assert "梯级水电模型参数错误：机组 S1_U2 的 availability 长度为 3，但 horizon 为 4。" in errors[0]["error"]
+E       AssertionError: assert '梯级水电模型参数错误：机组 S1_U2 的 availability 长度为 3，但 horizon 为 4。' in 'length mismatch'
+
+tests/test_component_based_hydro_model.py:209: AssertionError
+____________ test_hydro_invalid_availability_returns_chinese_error _____________
+
+    def test_hydro_invalid_availability_returns_chinese_error() -> None:
+        template = get_template("cascade_hydro_dispatch")
+        params = _sample_params()
+        params["availability"]["S1_U2"] = [1, 0, 1]
+        errors = RuntimeParameterValidator().validate(template, params)
+        assert errors
+>       assert "梯级水电模型参数错误" in errors[0]["error"]
+E       AssertionError: assert '梯级水电模型参数错误' in 'length mismatch'
+
+tests/test_component_builder_e2e.py:190: AssertionError
+________ test_publish_new_version_switches_skill_and_agent_to_new_asset ________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x10a249f40>
+
+    def test_publish_new_version_switches_skill_and_agent_to_new_asset(monkeypatch) -> None:
+        if not has_pyomo():
+            pytest.skip("pyomo is required for publish dry-run")
+        pytest.importorskip("highspy")
+        builtin = model_service.resolve_model(model_code="economic_dispatch")
+        builtin_copy = model_service.copy_model(builtin.id)
+        assert not (builtin_copy.ui_metadata or {}).get("managed_default_template")
+        model_service.delete_model(builtin_copy.id)
+    
+        payload = minimal_dispatch_payload()
+        code = f"active_version_{uuid.uuid4().hex[:8]}"
+        payload["semantic_spec"]["model_code"] = code
+        first_draft = model_service.create_model(ModelPackage.model_validate(payload))
+>       model_service.run_model_test_case(first_draft.id, {"parameters": first_draft.parameters})
+
+tests/test_runtime_persistence_and_active_versions.py:392: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+app/services/model_service.py:862: in run_model_test_case
+    job_service._prepare_request(SolveRequest(model_id=model_id, parameters=params, solver_config=settings), testing_model=model)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <app.services.job_service.JobService object at 0x10871ea20>
+req = SolveRequest(scene='经济调度', model='最小经济调度模型', model_code=None, model_id='MODEL-SKILL-2C5DA816', horizon=None, interval_...'horizon': 3}, payload={'resolved_model_id': 'MODEL-SKILL-2C5DA816', 'resolved_model_code': 'active_version_c33c2373'})
+
+    def _prepare_request(self, req: SolveRequest, *, testing_model=None) -> None:
+        user_parameter_keys = set(req.parameters or {})
+        user_runtime_keys = set(req.runtime_parameters or {})
+        user_payload_keys = set(req.payload or {})
+        explicit_keys = user_parameter_keys | user_runtime_keys | user_payload_keys
+        if req.interval_minutes is not None:
+            explicit_keys.add("interval_minutes")
+        explicit_horizon = self._explicit_horizon(req, explicit_keys)
+        if req.solver_config:
+            from app.solvers.run_settings import validate_run_settings
+            req.solver_config = validate_run_settings(req.solver_config)
+            if req.solver_config.get("time_limit") is not None:
+                req.time_limit_seconds = float(req.solver_config["time_limit"])
+            if req.solver_config.get("mip_gap") is not None:
+                req.mip_gap = float(req.solver_config["mip_gap"])
+            if req.solver_config.get("thread_num") is not None:
+                req.thread_num = int(req.solver_config["thread_num"])
+        if req.runtime_parameters:
+            req.parameters = {**req.parameters, **req.runtime_parameters}
+        if req.model_code and not req.model_id:
+            try:
+                resolved = model_service.resolve_model(model_code=req.model_code)
+                req.model_id = resolved.id
+                req.payload = {
+                    **req.payload,
+                    "resolved_model_id": resolved.id,
+                    "resolved_model_code": req.model_code,
+                }
+                warning = model_service.model_code_resolution_warning(req.model_code, resolved)
+                if warning:
+                    req.payload["resolution_warning"] = warning
+            except HTTPException as exc:
+                if exc.status_code != 404:
+                    raise
+                if model_service.find_models_by_code(req.model_code):
+                    raise HTTPException(
+                        status_code=409,
+                        detail={
+                            "code": "MODEL_NOT_PUBLISHED",
+                            "message": "该 model_code 当前没有已发布版本；试运行仅允许显式传入 model_id 调试。",
+                            "model_code": req.model_code,
+                        },
+                    )
+                template = deepcopy(template_library.get_template(req.model_code))
+                component_spec = deepcopy(template.get("component_spec") or {})
+                generic_spec = deepcopy(template.get("generic_spec") or {})
+                runtime_parameters = {**template.get("sample_runtime_parameters", {}), **req.parameters, **req.payload}
+                self._validate_set_references(template, component_spec, generic_spec)
+                if explicit_horizon is not None:
+                    runtime_parameters["horizon"] = explicit_horizon
+                time_dimension = resolve_time_dimension_config(
+                    model=None,
+                    semantic_spec=template,
+                    component_spec=component_spec,
+                    generic_spec=generic_spec,
+                    runtime_parameters=runtime_parameters,
+                )
+                runtime_parameters, component_spec, generic_spec, normalized_time_dimension = normalize_runtime_time_dimension(
+                    semantic_spec=template,
+                    component_spec=component_spec,
+                    generic_spec=generic_spec,
+                    runtime_parameters=runtime_parameters,
+                    explicit_horizon=explicit_horizon,
+                    explicitly_provided_keys=explicit_keys,
+                    time_dimension=time_dimension,
+                )
+                template.setdefault("ui_metadata", {})["time_dimension"] = normalized_time_dimension
+                if component_spec:
+                    template["component_spec"] = component_spec
+                    runtime_parameters["component_spec"] = component_spec
+                if generic_spec:
+                    runtime_parameters["generic_spec"] = self._instantiate_generic_spec(generic_spec, runtime_parameters)
+                runtime_parameters["semantic_spec"] = template
+                errors = RuntimeParameterValidator().validate(template, runtime_parameters)
+                if errors:
+                    raise HTTPException(status_code=422, detail=errors)
+                req.scene = template.get("scenario", req.scene)
+                req.model = template.get("name", req.model)
+                req.payload = {
+                    **runtime_parameters,
+                    "resolved_model_code": req.model_code,
+                }
+                return
+        if not req.model_id:
+            if req.model_code:
+                req.payload = {**req.parameters, **req.payload, "model_code": req.model_code}
+                return
+            raise HTTPException(status_code=422, detail="model_id or model_code is required for semantic optimization")
+    
+        model = testing_model or model_service.get_model(req.model_id)
+        if testing_model is None and model.status not in DIRECT_CALLABLE_STATUSES:
+            raise HTTPException(status_code=409, detail=f"Model is not callable in status: {model.status}")
+        req.scene = model.scene
+        req.model = model.name
+        model_code = (model.semantic_spec or {}).get("model_code") or model.template_id or req.model_code
+        req.payload = {
+            **req.payload,
+            "resolved_model_id": model.id,
+            "resolved_model_code": model_code,
+        }
+        semantic_spec = deepcopy(model.semantic_spec or {})
+        semantic_spec["build_mode"] = model.build_mode
+        if model.build_mode in {"template_based", "domain_builder"}:
+            template_code = model_service._template_code(model)
+            if template_code:
+                semantic_spec["template_code"] = template_code
+        component_spec = deepcopy(model.component_spec or semantic_spec.get("component_spec") or {})
+        generic_spec = deepcopy(model.generic_spec or semantic_spec.get("generic_spec") or {})
+        self._validate_set_references(semantic_spec, component_spec, generic_spec)
+        runtime_parameters = map_business_parameters(semantic_spec, req.parameters)
+        merged = {**self._default_parameters_from_model(model), **deepcopy(runtime_parameters), **deepcopy(req.payload)}
+        from app.services.function_dependencies import dependency_snapshots
+        merged["_function_asset_snapshots"] = dependency_snapshots(model, require_pinned=bool(model.published_at))
+        from app.services.component_dependencies import validate_manifest, component_refs
+        refs = component_refs(model)
+        if refs:
+            validate_manifest(model.component_dependencies, refs)
+            merged["_component_dependencies"] = deepcopy(model.component_dependencies)
+        else:
+            merged.pop("_component_dependencies", None)
+        if explicit_horizon is not None:
+            merged["horizon"] = explicit_horizon
+        if req.interval_minutes is not None:
+            merged["interval_minutes"] = req.interval_minutes
+        if req.objective_config:
+            merged["objective_config"] = req.objective_config
+        if req.constraint_config:
+            merged["constraint_config"] = req.constraint_config
+        time_dimension = resolve_time_dimension_config(
+            model=model,
+            semantic_spec=semantic_spec,
+            component_spec=component_spec,
+            generic_spec=generic_spec,
+            runtime_parameters=merged,
+        )
+        merged, component_spec, generic_spec, normalized_time_dimension = normalize_runtime_time_dimension(
+            semantic_spec=semantic_spec,
+            component_spec=component_spec,
+            generic_spec=generic_spec,
+            runtime_parameters=merged,
+            explicit_horizon=explicit_horizon,
+            explicitly_provided_keys=explicit_keys,
+            time_dimension=time_dimension,
+        )
+        semantic_spec.setdefault("ui_metadata", {})["time_dimension"] = normalized_time_dimension
+        if component_spec:
+            component_spec.setdefault("ui_metadata", {})["time_dimension"] = normalized_time_dimension
+            semantic_spec["component_spec"] = component_spec
+            merged["component_spec"] = component_spec
+        if generic_spec:
+            generic_spec.setdefault("ui_metadata", {})["time_dimension"] = normalized_time_dimension
+            semantic_spec["generic_spec"] = generic_spec
+        if generic_spec:
+            consistency_errors = RuntimeParameterValidator().validate_semantic_and_generic(semantic_spec, generic_spec)
+            if consistency_errors:
+                raise HTTPException(status_code=422, detail=consistency_errors)
+            merged["generic_spec"] = self._instantiate_generic_spec(generic_spec, merged)
+        if semantic_spec:
+            merged["semantic_spec"] = semantic_spec
+        errors = RuntimeParameterValidator().validate(semantic_spec, merged)
+        if errors:
+>           raise HTTPException(status_code=422, detail=errors)
+E           fastapi.exceptions.HTTPException: 422: [{'field': 'load_forecast', 'error': 'missing required parameter', 'expected': 'present', 'actual': None}, {'field': 'fuel_cost', 'error': 'missing required parameter', 'expected': 'present', 'actual': None}, {'field': 'unit_max_output', 'error': 'missing required parameter', 'expected': 'present', 'actual': None}]
+
+app/services/job_service.py:348: HTTPException
+=============================== warnings summary ===============================
+../../../../../../../Users/joiefu/Project/OPTIFORGE/.venv-mac/lib/python3.12/site-packages/fastapi/testclient.py:1
+  /Users/joiefu/Project/OPTIFORGE/.venv-mac/lib/python3.12/site-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+    from starlette.testclient import TestClient as TestClient  # noqa
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/test_component_based_hydro_model.py::test_component_based_validator_returns_chinese_hydro_error
+FAILED tests/test_component_builder_e2e.py::test_hydro_invalid_availability_returns_chinese_error
+FAILED tests/test_runtime_persistence_and_active_versions.py::test_publish_new_version_switches_skill_and_agent_to_new_asset
+3 failed, 1 passed, 1 warning in 104.48s (0:01:44)

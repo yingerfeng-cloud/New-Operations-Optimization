@@ -197,6 +197,15 @@ def normalize_model_time_dimension_contract(model: ModelPackage) -> ModelPackage
     if generic:
         generic = _sync_snapshot(generic, config)
         semantic["generic_spec"] = deepcopy(generic)
+    # Keep every persisted editor snapshot on the same canonical contract.
+    # Otherwise publish's next normalization changes the tested content hash.
+    if draft.get("advanced"):
+        if component:
+            draft["advanced"]["component_spec"] = deepcopy(component)
+        if generic:
+            draft["advanced"]["generic_spec"] = deepcopy(generic)
+    if semantic.get("model_draft"):
+        semantic["model_draft"] = deepcopy(draft)
     parameters = deepcopy(model.parameters or {})
     if config["policy"] == "not_applicable":
         parameters.pop("horizon", None)

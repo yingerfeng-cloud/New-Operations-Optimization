@@ -1,0 +1,13 @@
+
+> optiforge-platform-frontend@1.0.0 test:unit
+> vitest run src/tests/unit
+
+
+ RUN  v4.1.12 /Users/joiefu/Project/OPTIFORGE/frontend
+
+
+ Test Files  89 passed (89)
+      Tests  496 passed (496)
+   Start at  18:11:35
+   Duration  158.78s (transform 1.04s, setup 8.88s, import 7.30s, tests 282.31s, environment 14.68s)
+

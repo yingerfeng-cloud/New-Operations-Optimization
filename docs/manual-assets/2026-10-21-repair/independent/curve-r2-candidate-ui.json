@@ -1,0 +1,1634 @@
+[
+  {
+    "job_id": "OPT-0472C65401",
+    "attempt_id": "17aa7250e48b4da89397d27fd6dd0423",
+    "model_id": "MODEL-5F61FE23",
+    "model_code": "model_mvhxruag_f609",
+    "status": "SUCCESS",
+    "solver": "HiGHS",
+    "solver_name": "HiGHS",
+    "solver_type": "MILP",
+    "solver_available": true,
+    "problem_type": "MILP",
+    "termination_condition": "optimal",
+    "raw_termination_condition": "optimal",
+    "constraint_violation_summary": {},
+    "local_optimum_warning": false,
+    "solver_config": {
+      "backend": "HiGHS",
+      "problem_type": "MILP",
+      "mip_gap": 0.001,
+      "time_limit_seconds": 300,
+      "thread_num": null,
+      "presolve": true,
+      "nlp_tolerance": null,
+      "max_iter": null,
+      "acceptable_tol": null,
+      "initial_values": {}
+    },
+    "objective_value": 55,
+    "solve_time": 0.0169,
+    "variable_values": {
+      "p": {
+        "p[0]": 10,
+        "p[1]": 20
+      },
+      "fee": {
+        "fee[0]": 30,
+        "fee[1]": 80
+      },
+      "function_mapping_1792576626547_lambda": {
+        "function_mapping_1792576626547_lambda[0,0]": 0,
+        "function_mapping_1792576626547_lambda[0,1]": 1,
+        "function_mapping_1792576626547_lambda[0,2]": 0,
+        "function_mapping_1792576626547_lambda[1,0]": 0,
+        "function_mapping_1792576626547_lambda[1,1]": 0,
+        "function_mapping_1792576626547_lambda[1,2]": 1
+      },
+      "function_mapping_1792576626547_segment_selected": {
+        "function_mapping_1792576626547_segment_selected[0,0]": 1,
+        "function_mapping_1792576626547_segment_selected[0,1]": 0,
+        "function_mapping_1792576626547_segment_selected[1,0]": 0,
+        "function_mapping_1792576626547_segment_selected[1,1]": 1
+      }
+    },
+    "solver_log": "HiGHS termination_condition=optimal",
+    "diagnosis": [],
+    "trace": {
+      "request_fingerprint": "9ff0720a343a95a50ceb4dda7b7ca262eb2ccf321fc3953af16d0bf31062ec8a",
+      "model_test": {
+        "model_id": "MODEL-5F61FE23",
+        "tested_content_hash": "19f2954b293527c5c3725c732da027d8d9f5e73d1f6f719415423db410b63a1d",
+        "submitted_content_hash": "19f2954b293527c5c3725c732da027d8d9f5e73d1f6f719415423db410b63a1d",
+        "source_content_hash": "19f2954b293527c5c3725c732da027d8d9f5e73d1f6f719415423db410b63a1d",
+        "submission_key": "function-update:MODEL-5F61FE23:19f2954b293527c5c3725c732da027d8d9f5e73d1f6f719415423db410b63a1d"
+      },
+      "stage_timings": {
+        "RUNNING": {
+          "started_at": "2026-10-21 18:11:56",
+          "finished_at": "2026-10-21 18:11:56"
+        },
+        "VALIDATING": {
+          "started_at": "2026-10-21 18:11:56",
+          "finished_at": "2026-10-21 18:11:57",
+          "duration_seconds": 0.4556
+        },
+        "BUILDING_MODEL": {
+          "started_at": "2026-10-21 18:11:57",
+          "finished_at": "2026-10-21 18:11:58",
+          "duration_seconds": 0.0044
+        },
+        "SOLVING": {
+          "started_at": "2026-10-21 18:11:58",
+          "finished_at": "2026-10-21 18:11:58",
+          "duration_seconds": 0.123
+        },
+        "FORMATTING_RESULT": {
+          "started_at": "2026-10-21 18:11:58"
+        }
+      },
+      "execution_environment": {
+        "schema_version": 1,
+        "observed_at": "2026-10-21 18:11:58",
+        "platform_commit": "4d81a3f952af97536918886fd9dc2dfe589e38a5",
+        "working_tree_modified": true,
+        "identity": {
+          "platform_source_hash": "4e942e9431baedb40dd1e121be5f63d691377f5025986480401732e2e8397b4c",
+          "loaded_code_hash": "7482d4dea850a6daa038c996c036c86287d8e9f7ffc18a672f802a80dfe59ace",
+          "loaded_adapter_hashes": {
+            "app.solvers.base.SolverAdapter.available": "156f673f1135e55bfaaa0ab5cb0fda77d31d390b6b04add8f4b5158ccd24264c",
+            "app.solvers.base.SolverAdapter.solve": "2aa1b3059b329e9c79c63e9864dc0684dbe057644a2173217557c61571823143",
+            "app.solvers.base.SolverAdapter.__subclasshook__": "542db00912bb2c59e0c17d460e55160f65ac5a21c71bfc346d28b5ff82c2fc88",
+            "app.solvers.base.SolverAdapter.__init__": "5b56104861680ddf5ce43d5e6169eb9fdc177f7df345f0f200876c7c0c050c8b",
+            "app.solvers.base.UnavailableSolverAdapter.__init__": "695211cc6f08c5f572928f4d539cb1d21db358f5cba0053db8ba29c262421a19",
+            "app.solvers.base.UnavailableSolverAdapter.available": "b1db9549f25a01fd012fed67764fab16f31f37a395aec103d084870b84d895d4",
+            "app.solvers.base.UnavailableSolverAdapter.solve": "9766ebbb00e0ef234b6c625b99b1fbc92bcfbc297bf0ad92e6e10b14de04e656",
+            "app.solvers.highs_adapter.HiGHSAdapter.available": "7fbd000dcb66fed384224c243a6dde085eb4aa065ee3f5bfd31837fb2cc9ce5d",
+            "app.solvers.highs_adapter.HiGHSAdapter.solve": "b6bfec58ca817384516c93a433f1c550647f2f8180adb2085cb3c3bed86e006d",
+            "app.solvers.highs_adapter.HiGHSAdapter._solve_serial": "9cbe0990d09bff01e62dd515f3293008c47092caa4ec28deb16b98a0c354bb07",
+            "app.solvers.highs_adapter.HiGHSAdapter._configure_progress_callback": "29d39bcb142bbfaeaa717bf988958767d2b1d40b84ec87e1b89d2fe97be5efee",
+            "app.solvers.highs_adapter.HiGHSAdapter._emit_lp_iteration_summary": "f1d8e1cd234ccdd1c2979856d02921c0c0b852ef050c945e118e771d71c3400b",
+            "app.solvers.highs_adapter.HiGHSAdapter._finite_number": "c3f4fa2b13ae7b7af97b89f0428daeb9385ba6e4e248dcd2ff0a19d4b252bd11",
+            "app.solvers.highs_adapter.HiGHSAdapter._finite_integer": "c9522d091f5c15217e249b9fa4f6dc827227d7af2e80f612277cd78255d0e007",
+            "app.solvers.highs_adapter.HiGHSAdapter._extract_variables": "02c08df70a8e8dcd85206b4dee3f38ee77bab1ee9b2a49177716ee89e998c329",
+            "app.solvers.highs_adapter.HiGHSAdapter._label": "a9410a7380d5a154fa8f3801323abd91304f98751c916223af085cf4bb1a0f8b",
+            "app.solvers.nlp_adapter.NLPSolverAdapter.available": "61c93dea7a60111ac15a9406733563f0f44b6e4948afc4e171c2db33fe9e0b08",
+            "app.solvers.nlp_adapter.NLPSolverAdapter.availability_message": "aeecec41efa0518113cc7477d49c2c769ee845ca01b22b09fe1a8039ef67b1cd",
+            "app.solvers.nlp_adapter.NLPSolverAdapter.solve": "0cc06afb237ca7b948ab4ab25fb5a9ed8d3d6d1d137da7a925b8cc76bf5a3c9d",
+            "app.solvers.nlp_adapter.NLPSolverAdapter._cpu_limit_reached": "30abe38daba7038b46b068c52fa0f21a86d9287d358e0bb182771cdd88e1f6ca",
+            "app.solvers.nlp_adapter.NLPSolverAdapter._failed_result": "46b7e7d48018a3aa349891344260c63fecbf16fd5f95834227f1f150491bdd94",
+            "app.solvers.nlp_adapter.NLPSolverAdapter._has_integer_variables": "df327469fa9ef7ddaab08fdcaeadb6af8ca2ab1dfed447d01200b54e8dc965f7",
+            "app.solvers.nlp_adapter.NLPSolverAdapter._initialize_unset_variables": "8e5095de29753edfe9ef7b81fcc2044c4002657c991a0a3f1e5a764805ac24f9",
+            "app.solvers.nlp_adapter.NLPSolverAdapter._objective_value": "db4387109010b32c48c8cdb1e09d5f5885d43665e7824e302b6afbe7ffa98cc6",
+            "app.solvers.nlp_adapter.NLPSolverAdapter.extract_variables": "e1137606a1d7b477e5c7d2ea6f07df64b06b037428f2b90029b0aeb9e821019f",
+            "app.solvers.nlp_adapter.NLPSolverAdapter.constraint_violations": "71c3aa10a0259981b844d8f9a42e6ad8def0cfb7adb0176a8661386c4c6d9b5d",
+            "app.solvers.nlp_adapter.NLPSolverAdapter._status_from_termination": "e022357d45ba914c40deeee3471ce733991887f14ec80348a06522205bd953b5",
+            "app.solvers.nlp_adapter.NLPSolverAdapter._label": "eff8d9d624acba1fc17da1318cdc0501de4dbfdea464752b2e2a538b0ec8a35e",
+            "app.solvers.run_settings.validate_run_settings.validate_run_settings": "7c9905ce86cd63347599ff19ba43ef2e2c245ff98845b3459b7932ce026ff43e",
+            "app.solvers.run_settings.apply_initial_values.apply_initial_values": "8529c65da55cf52a9583b62b5732c37c9ef06abe6dfe7e9afe9052696a5af6f0",
+            "app.solvers.solver_router.SolverRouteError.__init__": "8239e1593da145ff43fffb80c4037ffa79d71c13feb700e65f1c95b66bdfc91f",
+            "app.solvers.solver_router.ScipAdapter.__init__": "f9bc50513c9cf5a219fb3835b79fec61ea0f63ba16d5bb0eab59a9b1011615dd",
+            "app.solvers.solver_router.SolverRouter.__init__": "32b05b8e35836d5898d2fe8ab4be2455d82b9bf0cfac223a15cdafe5c6624c5f",
+            "app.solvers.solver_router.SolverRouter.route": "aa292bb6852612990de8dfb7cd4e4aec9f1bb41690e544aaa6865f255771945a",
+            "app.solvers.solver_router.SolverRouter.solve": "862706f8cabe4faaccfce5bf9465bedad6024f0175486f3ad0e649e01912fac1",
+            "app.solvers.solver_router.SolverRouter.infer_problem_type_from_model": "e15584df123a16108675b3b3188c4cc080ad5bad828a6863536f867443873261",
+            "app.solvers.solver_router.SolverRouter._key": "ec62ad98a144f93789eef008d80b41b1db359fbc0ee6e308713c65721d07c5f4",
+            "app.solvers.solver_router.SolverRouter._message": "0d7a2049374f362bdc0a8c7a5e1fd75b7343774a285e7b61f2c8dce7ce3bef37",
+            "app.solvers.solver_router.SolverRouter._assert_highs_can_accept_model": "29e845dced6d232f6c47c252a9bf4ee3133ced2d35c33e34d0edd90518bb03d1",
+            "app.solvers.solver_router.SolverRouter._model_has_nonlinearity": "40a962711af581685cd03c607a5c094d8cb7eefb9638ea7624977ae47778efca",
+            "app.solvers.status.ipopt_unavailable_explanation.ipopt_unavailable_explanation": "991835cafe391fc166395d14b753e7a274a86d428fa40f693ece9a82c0ccfcf4",
+            "app.solvers.status._package_version._package_version": "ea037bf7820e35b08b59040700ca77ab6492b2a6c418937b0f4a611783a27354",
+            "app.solvers.status._solver_available._solver_available": "ba3af93ae8fc9a4ecd8bf6227f5f01e76098c9f89b290682d905d2c1b02dfb4a",
+            "app.solvers.status._ipopt_version._ipopt_version": "10e97df05ef33272c65833e66f3c2b451edbc05e25a886b95c6ac4345d4a40f9",
+            "app.solvers.status.solver_status.solver_status": "217d8f4f653e3b90532d825d8cfae979eee3cd0ac8d3e3afff9521e65ee25ff6"
+          },
+          "source_hash_scope": "磁盘源码与已加载 Python code object 分别记录；二者不冒充旧镜像证明。",
+          "image_digest": "unknown",
+          "python": "3.12.14",
+          "system": "Darwin",
+          "machine": "arm64",
+          "packages": {
+            "pyomo": "6.10.1",
+            "highspy": "1.15.1",
+            "numpy": "2.5.2",
+            "scipy": "unknown"
+          },
+          "compiler_hashes": {
+            "app/generic_formula_compiler.py": "6f2bf2ca449cdb28b06714f4247bfcc907d3c18772e42497ed7cccaebfe4d156",
+            "app/model_components/formula_components.py": "d528e10ea30d6b6d63f72c55b7cddccd0311ae69a3f499cb06d1c37654f2ed66",
+            "app/builders/component_model_builder.py": "4fc5a34a060316913399e181e7d659b7ff5b76abc781d3e49dbfc99aa012dec2",
+            "app/function_strategy.py": "69a596f275fcc72094f4583cfcb39ab3ebc202d301ffc4cd0193dca945a6fd81"
+          },
+          "builtin_implementations": {
+            "function_mapping_component": {
+              "class": "app.model_components.curve_components.RegisteredFunctionMappingComponent",
+              "source_hash": "92816d40682de0f3be0dd39c40f038a7ebd11a6e24772120babb38283c6c82fe",
+              "module_hash": "b6abb9b86ad4c95e9909dadd18610023623a3cc37d7b1febb1ba3e38c9943edf"
+            }
+          },
+          "solver": {
+            "name": "HiGHS",
+            "version": "1.15.1",
+            "executable_hash": "unknown",
+            "binary_hash": "27633861039f85ade740e5ddf06e7795989ddcf92566e32d94f0980d09e2782f",
+            "adapter_hash": "fd52bcba447227d2daff18ae1ca8ff72279a255d5feb47782d0ef18ddae4ca0a"
+          },
+          "requested_settings": {
+            "time_limit_seconds": 300,
+            "mip_gap": 0.001,
+            "threads": null,
+            "presolve": true
+          },
+          "effective_settings": {
+            "time_limit": 300,
+            "mip_rel_gap": 0.001,
+            "threads": "solver_default",
+            "presolve": "solver_default; adapter does not override"
+          },
+          "initial_values": {},
+          "numeric_environment": {
+            "OMP_NUM_THREADS": "unknown",
+            "OPENBLAS_NUM_THREADS": "unknown",
+            "MKL_NUM_THREADS": "unknown"
+          }
+        },
+        "identity_hash": "63f37f9ca8a2a21a9bdb040982ebd6617d414f74c711f572e8cdb4f534e0e95f",
+        "image_note": "当前进程无法可信取得镜像 digest，未用可随意填写的环境变量冒充镜像证明。",
+        "replay_note": "清单记录实际代码和数值环境；不提供旧环境，也不承诺跨环境逐字节一致。"
+      },
+      "validation_seconds": 0.4556,
+      "model_build_seconds": 0.0044,
+      "problem_type": "MILP",
+      "declared_problem_type": "MILP",
+      "solver_progress": {
+        "schema_version": "1.1",
+        "solver": "HiGHS",
+        "problem_type": "MILP",
+        "search_mode": "MIP_SEARCH",
+        "status": "COMPLETED",
+        "supported": true,
+        "message": "已记录 HiGHS 返回的真实最优解搜索轨迹。",
+        "points": [
+          {
+            "elapsed_seconds": 0.005807792069390416,
+            "incumbent_objective": 55,
+            "best_bound": null,
+            "gap": null,
+            "node_count": 0,
+            "iteration_count": null,
+            "algorithm": null,
+            "kind": "incumbent"
+          },
+          {
+            "elapsed_seconds": 0.012480500037781894,
+            "incumbent_objective": 55,
+            "best_bound": 55,
+            "gap": 0,
+            "node_count": 1,
+            "iteration_count": null,
+            "algorithm": null,
+            "kind": "progress"
+          },
+          {
+            "elapsed_seconds": 0.123,
+            "incumbent_objective": 55,
+            "best_bound": null,
+            "gap": 0,
+            "node_count": null,
+            "iteration_count": null,
+            "algorithm": null,
+            "kind": "final"
+          }
+        ],
+        "events": [
+          {
+            "kind": "search_started",
+            "label": "开始搜索最优解",
+            "elapsed_seconds": 0
+          },
+          {
+            "kind": "first_feasible",
+            "label": "找到首个可行解",
+            "elapsed_seconds": 0.0058,
+            "value": 55
+          },
+          {
+            "kind": "gap_milestone",
+            "label": "Gap 降至 0.1% 以下",
+            "elapsed_seconds": 0.0125,
+            "value": 0
+          },
+          {
+            "kind": "gap_milestone",
+            "label": "Gap 降至 1% 以下",
+            "elapsed_seconds": 0.123,
+            "value": 0
+          },
+          {
+            "kind": "optimality_proven",
+            "label": "求解器已证明当前解最优",
+            "elapsed_seconds": 0.123,
+            "value": 55
+          }
+        ],
+        "latest": {
+          "elapsed_seconds": 0.123,
+          "incumbent_objective": 55,
+          "node_count": 1,
+          "best_bound": 55,
+          "gap": 0
+        },
+        "gap_milestones": [
+          0.001,
+          0.01
+        ],
+        "point_count": 3,
+        "final_status": "optimal"
+      },
+      "solve_seconds": 0.123,
+      "format_seconds": 0.0035
+    },
+    "logs": [
+      "2026-10-21 18:11:56 [INFO] 任务已进入执行队列",
+      "2026-10-21 18:11:57 [INFO] 参数校验开始",
+      "2026-10-21 18:11:57 [INFO] 参数校验完成，耗时=0.4556s",
+      "2026-10-21 18:11:57 [INFO] 开始构建模型 model_code=model_mvhxruag_f609, build_mode=component_based",
+      "2026-10-21 18:11:58 [INFO] 模型构建完成，变量数=14，约束数=16，耗时=0.0044s",
+      "2026-10-21 18:11:58 [INFO] 开始调用路由求解器，time_limit_seconds=300.0",
+      "2026-10-21 18:11:58 [INFO] 求解完成，HiGHS termination_condition=optimal，耗时=0.123s",
+      "2026-10-21 18:11:58 [INFO] 开始格式化业务结果"
+    ],
+    "run_metrics": {
+      "variable_count": 14,
+      "constraint_count": 16,
+      "solver_status": "optimal",
+      "objective_value": 55,
+      "solver_gap": null
+    },
+    "model": "独立验收 教程五 曲线费用",
+    "scene": "经济负荷分配",
+    "submitted_at": "2026-10-21 18:11:56",
+    "started_at": "2026-10-21 18:11:56",
+    "finished_at": "2026-10-21 18:11:58",
+    "series": [],
+    "chart": {},
+    "metrics": {
+      "objective_value": 55,
+      "total_cost": 55,
+      "gap": "0.00%",
+      "risk": "low"
+    },
+    "business_output": {
+      "variable_values": {
+        "p": {
+          "p[0]": 10,
+          "p[1]": 20
+        },
+        "fee": {
+          "fee[0]": 30,
+          "fee[1]": 80
+        },
+        "function_mapping_1792576626547_lambda": {
+          "function_mapping_1792576626547_lambda[0,0]": 0,
+          "function_mapping_1792576626547_lambda[0,1]": 1,
+          "function_mapping_1792576626547_lambda[0,2]": 0,
+          "function_mapping_1792576626547_lambda[1,0]": 0,
+          "function_mapping_1792576626547_lambda[1,1]": 0,
+          "function_mapping_1792576626547_lambda[1,2]": 1
+        },
+        "function_mapping_1792576626547_segment_selected": {
+          "function_mapping_1792576626547_segment_selected[0,0]": 1,
+          "function_mapping_1792576626547_segment_selected[0,1]": 0,
+          "function_mapping_1792576626547_segment_selected[1,0]": 0,
+          "function_mapping_1792576626547_segment_selected[1,1]": 1
+        }
+      },
+      "constraint_check": {},
+      "mccormick_relaxations": []
+    },
+    "business_explanation": {
+      "explanation_schema_version": "2.0",
+      "facts": [
+        "模型已通过统一 Pyomo 建模引擎和 HiGHS 求解链路完成求解。",
+        "求解状态为 success。",
+        "objective的求解值为 55.0。",
+        "平台不会自动下发生产控制指令。所有方案须经人工复核。",
+        "objective为 55.0。",
+        "p · min_value为 10.0MW。",
+        "p · max_value为 20.0MW。",
+        "p · sum_value为 30.0MW。",
+        "p · non_zero_count为 2count。",
+        "fee · min_value为 30.0元/h。",
+        "fee · max_value为 80.0元/h。",
+        "fee · sum_value为 110.0元/h。",
+        "fee · non_zero_count为 2count。",
+        "变量“p”摘要：min=10.0, max=20.0, sum=30.0, non_zero_count=2。",
+        "变量“fee”摘要：min=30.0, max=80.0, sum=110.0, non_zero_count=2。",
+        "变量“function_mapping_1792576626547_lambda”摘要：min=0.0, max=1.0, sum=2.0, non_zero_count=2。",
+        "变量“function_mapping_1792576626547_segment_selected”摘要：min=-0.0, max=1.0, sum=2.0, non_zero_count=2。"
+      ],
+      "fact_items": [
+        {
+          "text": "模型已通过统一 Pyomo 建模引擎和 HiGHS 求解链路完成求解。",
+          "evidence_refs": [
+            "formatter.summary",
+            "formatter.metrics"
+          ]
+        },
+        {
+          "text": "求解状态为 success。",
+          "evidence_refs": [
+            "solver.status",
+            "solver.termination_condition"
+          ]
+        },
+        {
+          "text": "objective的求解值为 55.0。",
+          "evidence_refs": [
+            "solver.objective_value",
+            "model.objective"
+          ]
+        },
+        {
+          "text": "平台不会自动下发生产控制指令。所有方案须经人工复核。",
+          "evidence_refs": [
+            "model.execution_policy",
+            "model.requires_human_review"
+          ]
+        },
+        {
+          "text": "objective为 55.0。",
+          "evidence_refs": [
+            "derived_metrics.objective_value"
+          ]
+        },
+        {
+          "text": "p · min_value为 10.0MW。",
+          "evidence_refs": [
+            "derived_metrics.variable_p_min_value"
+          ]
+        },
+        {
+          "text": "p · max_value为 20.0MW。",
+          "evidence_refs": [
+            "derived_metrics.variable_p_max_value"
+          ]
+        },
+        {
+          "text": "p · sum_value为 30.0MW。",
+          "evidence_refs": [
+            "derived_metrics.variable_p_sum_value"
+          ]
+        },
+        {
+          "text": "p · non_zero_count为 2count。",
+          "evidence_refs": [
+            "derived_metrics.variable_p_non_zero_count"
+          ]
+        },
+        {
+          "text": "fee · min_value为 30.0元/h。",
+          "evidence_refs": [
+            "derived_metrics.variable_fee_min_value"
+          ]
+        },
+        {
+          "text": "fee · max_value为 80.0元/h。",
+          "evidence_refs": [
+            "derived_metrics.variable_fee_max_value"
+          ]
+        },
+        {
+          "text": "fee · sum_value为 110.0元/h。",
+          "evidence_refs": [
+            "derived_metrics.variable_fee_sum_value"
+          ]
+        },
+        {
+          "text": "fee · non_zero_count为 2count。",
+          "evidence_refs": [
+            "derived_metrics.variable_fee_non_zero_count"
+          ]
+        },
+        {
+          "text": "变量“p”摘要：min=10.0, max=20.0, sum=30.0, non_zero_count=2。",
+          "evidence_refs": [
+            "variables_summary.p"
+          ]
+        },
+        {
+          "text": "变量“fee”摘要：min=30.0, max=80.0, sum=110.0, non_zero_count=2。",
+          "evidence_refs": [
+            "variables_summary.fee"
+          ]
+        },
+        {
+          "text": "变量“function_mapping_1792576626547_lambda”摘要：min=0.0, max=1.0, sum=2.0, non_zero_count=2。",
+          "evidence_refs": [
+            "variables_summary.function_mapping_1792576626547_lambda"
+          ]
+        },
+        {
+          "text": "变量“function_mapping_1792576626547_segment_selected”摘要：min=-0.0, max=1.0, sum=2.0, non_zero_count=2。",
+          "evidence_refs": [
+            "variables_summary.function_mapping_1792576626547_segment_selected"
+          ]
+        }
+      ],
+      "inferences": [],
+      "inference_items": [],
+      "recommendations": [
+        "Verify input provenance, freshness, units, and dimensional completeness.",
+        "Confirm the recommendation with an authorized reviewer before operational use."
+      ],
+      "recommendation_items": [
+        {
+          "text": "Verify input provenance, freshness, units, and dimensional completeness.",
+          "evidence_refs": [
+            "manual_review_points"
+          ]
+        },
+        {
+          "text": "Confirm the recommendation with an authorized reviewer before operational use.",
+          "evidence_refs": [
+            "manual_review_points"
+          ]
+        }
+      ],
+      "risk_notes": [],
+      "manual_review_points": [
+        "Verify input provenance, freshness, units, and dimensional completeness.",
+        "Confirm the recommendation with an authorized reviewer before operational use."
+      ],
+      "limitations": [
+        "结果未返回可核验的约束检查明细。",
+        "The explanation describes the returned solver evidence and does not prove real-world causality.",
+        "The platform does not infer undeclared thresholds, business rules, or external actions.",
+        "本结果仅用于辅助分析和决策参考，不构成自动控制指令。实际生产调度、交易申报或安全生产处置需结合现场规程、业务审批和人工复核后执行。"
+      ],
+      "summary": "模型已通过统一 Pyomo 建模引擎和 HiGHS 求解链路完成求解。 求解状态为 success。 objective的求解值为 55.0。 平台不会自动下发生产控制指令。所有方案须经人工复核。",
+      "disclaimer": "本结果仅用于辅助分析和决策参考，不构成自动控制指令。实际生产调度、交易申报或安全生产处置需结合现场规程、业务审批和人工复核后执行。",
+      "grounded_on": "evidence_package"
+    },
+    "execution_environment": {
+      "schema_version": 1,
+      "observed_at": "2026-10-21 18:11:58",
+      "platform_commit": "4d81a3f952af97536918886fd9dc2dfe589e38a5",
+      "working_tree_modified": true,
+      "identity": {
+        "platform_source_hash": "4e942e9431baedb40dd1e121be5f63d691377f5025986480401732e2e8397b4c",
+        "loaded_code_hash": "7482d4dea850a6daa038c996c036c86287d8e9f7ffc18a672f802a80dfe59ace",
+        "loaded_adapter_hashes": {
+          "app.solvers.base.SolverAdapter.available": "156f673f1135e55bfaaa0ab5cb0fda77d31d390b6b04add8f4b5158ccd24264c",
+          "app.solvers.base.SolverAdapter.solve": "2aa1b3059b329e9c79c63e9864dc0684dbe057644a2173217557c61571823143",
+          "app.solvers.base.SolverAdapter.__subclasshook__": "542db00912bb2c59e0c17d460e55160f65ac5a21c71bfc346d28b5ff82c2fc88",
+          "app.solvers.base.SolverAdapter.__init__": "5b56104861680ddf5ce43d5e6169eb9fdc177f7df345f0f200876c7c0c050c8b",
+          "app.solvers.base.UnavailableSolverAdapter.__init__": "695211cc6f08c5f572928f4d539cb1d21db358f5cba0053db8ba29c262421a19",
+          "app.solvers.base.UnavailableSolverAdapter.available": "b1db9549f25a01fd012fed67764fab16f31f37a395aec103d084870b84d895d4",
+          "app.solvers.base.UnavailableSolverAdapter.solve": "9766ebbb00e0ef234b6c625b99b1fbc92bcfbc297bf0ad92e6e10b14de04e656",
+          "app.solvers.highs_adapter.HiGHSAdapter.available": "7fbd000dcb66fed384224c243a6dde085eb4aa065ee3f5bfd31837fb2cc9ce5d",
+          "app.solvers.highs_adapter.HiGHSAdapter.solve": "b6bfec58ca817384516c93a433f1c550647f2f8180adb2085cb3c3bed86e006d",
+          "app.solvers.highs_adapter.HiGHSAdapter._solve_serial": "9cbe0990d09bff01e62dd515f3293008c47092caa4ec28deb16b98a0c354bb07",
+          "app.solvers.highs_adapter.HiGHSAdapter._configure_progress_callback": "29d39bcb142bbfaeaa717bf988958767d2b1d40b84ec87e1b89d2fe97be5efee",
+          "app.solvers.highs_adapter.HiGHSAdapter._emit_lp_iteration_summary": "f1d8e1cd234ccdd1c2979856d02921c0c0b852ef050c945e118e771d71c3400b",
+          "app.solvers.highs_adapter.HiGHSAdapter._finite_number": "c3f4fa2b13ae7b7af97b89f0428daeb9385ba6e4e248dcd2ff0a19d4b252bd11",
+          "app.solvers.highs_adapter.HiGHSAdapter._finite_integer": "c9522d091f5c15217e249b9fa4f6dc827227d7af2e80f612277cd78255d0e007",
+          "app.solvers.highs_adapter.HiGHSAdapter._extract_variables": "02c08df70a8e8dcd85206b4dee3f38ee77bab1ee9b2a49177716ee89e998c329",
+          "app.solvers.highs_adapter.HiGHSAdapter._label": "a9410a7380d5a154fa8f3801323abd91304f98751c916223af085cf4bb1a0f8b",
+          "app.solvers.nlp_adapter.NLPSolverAdapter.available": "61c93dea7a60111ac15a9406733563f0f44b6e4948afc4e171c2db33fe9e0b08",
+          "app.solvers.nlp_adapter.NLPSolverAdapter.availability_message": "aeecec41efa0518113cc7477d49c2c769ee845ca01b22b09fe1a8039ef67b1cd",
+          "app.solvers.nlp_adapter.NLPSolverAdapter.solve": "0cc06afb237ca7b948ab4ab25fb5a9ed8d3d6d1d137da7a925b8cc76bf5a3c9d",
+          "app.solvers.nlp_adapter.NLPSolverAdapter._cpu_limit_reached": "30abe38daba7038b46b068c52fa0f21a86d9287d358e0bb182771cdd88e1f6ca",
+          "app.solvers.nlp_adapter.NLPSolverAdapter._failed_result": "46b7e7d48018a3aa349891344260c63fecbf16fd5f95834227f1f150491bdd94",
+          "app.solvers.nlp_adapter.NLPSolverAdapter._has_integer_variables": "df327469fa9ef7ddaab08fdcaeadb6af8ca2ab1dfed447d01200b54e8dc965f7",
+          "app.solvers.nlp_adapter.NLPSolverAdapter._initialize_unset_variables": "8e5095de29753edfe9ef7b81fcc2044c4002657c991a0a3f1e5a764805ac24f9",
+          "app.solvers.nlp_adapter.NLPSolverAdapter._objective_value": "db4387109010b32c48c8cdb1e09d5f5885d43665e7824e302b6afbe7ffa98cc6",
+          "app.solvers.nlp_adapter.NLPSolverAdapter.extract_variables": "e1137606a1d7b477e5c7d2ea6f07df64b06b037428f2b90029b0aeb9e821019f",
+          "app.solvers.nlp_adapter.NLPSolverAdapter.constraint_violations": "71c3aa10a0259981b844d8f9a42e6ad8def0cfb7adb0176a8661386c4c6d9b5d",
+          "app.solvers.nlp_adapter.NLPSolverAdapter._status_from_termination": "e022357d45ba914c40deeee3471ce733991887f14ec80348a06522205bd953b5",
+          "app.solvers.nlp_adapter.NLPSolverAdapter._label": "eff8d9d624acba1fc17da1318cdc0501de4dbfdea464752b2e2a538b0ec8a35e",
+          "app.solvers.run_settings.validate_run_settings.validate_run_settings": "7c9905ce86cd63347599ff19ba43ef2e2c245ff98845b3459b7932ce026ff43e",
+          "app.solvers.run_settings.apply_initial_values.apply_initial_values": "8529c65da55cf52a9583b62b5732c37c9ef06abe6dfe7e9afe9052696a5af6f0",
+          "app.solvers.solver_router.SolverRouteError.__init__": "8239e1593da145ff43fffb80c4037ffa79d71c13feb700e65f1c95b66bdfc91f",
+          "app.solvers.solver_router.ScipAdapter.__init__": "f9bc50513c9cf5a219fb3835b79fec61ea0f63ba16d5bb0eab59a9b1011615dd",
+          "app.solvers.solver_router.SolverRouter.__init__": "32b05b8e35836d5898d2fe8ab4be2455d82b9bf0cfac223a15cdafe5c6624c5f",
+          "app.solvers.solver_router.SolverRouter.route": "aa292bb6852612990de8dfb7cd4e4aec9f1bb41690e544aaa6865f255771945a",
+          "app.solvers.solver_router.SolverRouter.solve": "862706f8cabe4faaccfce5bf9465bedad6024f0175486f3ad0e649e01912fac1",
+          "app.solvers.solver_router.SolverRouter.infer_problem_type_from_model": "e15584df123a16108675b3b3188c4cc080ad5bad828a6863536f867443873261",
+          "app.solvers.solver_router.SolverRouter._key": "ec62ad98a144f93789eef008d80b41b1db359fbc0ee6e308713c65721d07c5f4",
+          "app.solvers.solver_router.SolverRouter._message": "0d7a2049374f362bdc0a8c7a5e1fd75b7343774a285e7b61f2c8dce7ce3bef37",
+          "app.solvers.solver_router.SolverRouter._assert_highs_can_accept_model": "29e845dced6d232f6c47c252a9bf4ee3133ced2d35c33e34d0edd90518bb03d1",
+          "app.solvers.solver_router.SolverRouter._model_has_nonlinearity": "40a962711af581685cd03c607a5c094d8cb7eefb9638ea7624977ae47778efca",
+          "app.solvers.status.ipopt_unavailable_explanation.ipopt_unavailable_explanation": "991835cafe391fc166395d14b753e7a274a86d428fa40f693ece9a82c0ccfcf4",
+          "app.solvers.status._package_version._package_version": "ea037bf7820e35b08b59040700ca77ab6492b2a6c418937b0f4a611783a27354",
+          "app.solvers.status._solver_available._solver_available": "ba3af93ae8fc9a4ecd8bf6227f5f01e76098c9f89b290682d905d2c1b02dfb4a",
+          "app.solvers.status._ipopt_version._ipopt_version": "10e97df05ef33272c65833e66f3c2b451edbc05e25a886b95c6ac4345d4a40f9",
+          "app.solvers.status.solver_status.solver_status": "217d8f4f653e3b90532d825d8cfae979eee3cd0ac8d3e3afff9521e65ee25ff6"
+        },
+        "source_hash_scope": "磁盘源码与已加载 Python code object 分别记录；二者不冒充旧镜像证明。",
+        "image_digest": "unknown",
+        "python": "3.12.14",
+        "system": "Darwin",
+        "machine": "arm64",
+        "packages": {
+          "pyomo": "6.10.1",
+          "highspy": "1.15.1",
+          "numpy": "2.5.2",
+          "scipy": "unknown"
+        },
+        "compiler_hashes": {
+          "app/generic_formula_compiler.py": "6f2bf2ca449cdb28b06714f4247bfcc907d3c18772e42497ed7cccaebfe4d156",
+          "app/model_components/formula_components.py": "d528e10ea30d6b6d63f72c55b7cddccd0311ae69a3f499cb06d1c37654f2ed66",
+          "app/builders/component_model_builder.py": "4fc5a34a060316913399e181e7d659b7ff5b76abc781d3e49dbfc99aa012dec2",
+          "app/function_strategy.py": "69a596f275fcc72094f4583cfcb39ab3ebc202d301ffc4cd0193dca945a6fd81"
+        },
+        "builtin_implementations": {
+          "function_mapping_component": {
+            "class": "app.model_components.curve_components.RegisteredFunctionMappingComponent",
+            "source_hash": "92816d40682de0f3be0dd39c40f038a7ebd11a6e24772120babb38283c6c82fe",
+            "module_hash": "b6abb9b86ad4c95e9909dadd18610023623a3cc37d7b1febb1ba3e38c9943edf"
+          }
+        },
+        "solver": {
+          "name": "HiGHS",
+          "version": "1.15.1",
+          "executable_hash": "unknown",
+          "binary_hash": "27633861039f85ade740e5ddf06e7795989ddcf92566e32d94f0980d09e2782f",
+          "adapter_hash": "fd52bcba447227d2daff18ae1ca8ff72279a255d5feb47782d0ef18ddae4ca0a"
+        },
+        "requested_settings": {
+          "time_limit_seconds": 300,
+          "mip_gap": 0.001,
+          "threads": null,
+          "presolve": true
+        },
+        "effective_settings": {
+          "time_limit": 300,
+          "mip_rel_gap": 0.001,
+          "threads": "solver_default",
+          "presolve": "solver_default; adapter does not override"
+        },
+        "initial_values": {},
+        "numeric_environment": {
+          "OMP_NUM_THREADS": "unknown",
+          "OPENBLAS_NUM_THREADS": "unknown",
+          "MKL_NUM_THREADS": "unknown"
+        }
+      },
+      "identity_hash": "63f37f9ca8a2a21a9bdb040982ebd6617d414f74c711f572e8cdb4f534e0e95f",
+      "image_note": "当前进程无法可信取得镜像 digest，未用可随意填写的环境变量冒充镜像证明。",
+      "replay_note": "清单记录实际代码和数值环境；不提供旧环境，也不承诺跨环境逐字节一致。"
+    },
+    "solution_evidence": {
+      "schema_version": 1,
+      "business_inputs": {
+        "cost": [
+          2,
+          3
+        ],
+        "delta_t": 0.5,
+        "demand": [
+          10,
+          20
+        ],
+        "horizon": 2,
+        "interval_minutes": 30,
+        "time": [
+          0,
+          1
+        ]
+      },
+      "settings": {
+        "backend": "HiGHS",
+        "problem_type": "MILP",
+        "mip_gap": 0.001,
+        "time_limit_seconds": 300,
+        "thread_num": null,
+        "presolve": true,
+        "nlp_tolerance": null,
+        "max_iter": null,
+        "acceptable_tol": null,
+        "initial_values": {}
+      },
+      "decisions": [
+        {
+          "key": "p[0]",
+          "code": "p",
+          "coordinate": "p[0]",
+          "name": "p",
+          "unit": "MW",
+          "definition": {
+            "dimension": [
+              "time"
+            ],
+            "unit": "MW"
+          },
+          "value": 10
+        },
+        {
+          "key": "p[1]",
+          "code": "p",
+          "coordinate": "p[1]",
+          "name": "p",
+          "unit": "MW",
+          "definition": {
+            "dimension": [
+              "time"
+            ],
+            "unit": "MW"
+          },
+          "value": 20
+        },
+        {
+          "key": "fee[0]",
+          "code": "fee",
+          "coordinate": "fee[0]",
+          "name": "fee",
+          "unit": "元/h",
+          "definition": {
+            "dimension": [
+              "time"
+            ],
+            "unit": "元/h"
+          },
+          "value": 30
+        },
+        {
+          "key": "fee[1]",
+          "code": "fee",
+          "coordinate": "fee[1]",
+          "name": "fee",
+          "unit": "元/h",
+          "definition": {
+            "dimension": [
+              "time"
+            ],
+            "unit": "元/h"
+          },
+          "value": 80
+        },
+        {
+          "key": "function_mapping_1792576626547_lambda[0,0]",
+          "code": "function_mapping_1792576626547_lambda",
+          "coordinate": "function_mapping_1792576626547_lambda[0,0]",
+          "name": "function_mapping_1792576626547_lambda",
+          "unit": "未声明",
+          "definition": {
+            "dimension": [],
+            "unit": "未声明"
+          },
+          "value": 0
+        },
+        {
+          "key": "function_mapping_1792576626547_lambda[0,1]",
+          "code": "function_mapping_1792576626547_lambda",
+          "coordinate": "function_mapping_1792576626547_lambda[0,1]",
+          "name": "function_mapping_1792576626547_lambda",
+          "unit": "未声明",
+          "definition": {
+            "dimension": [],
+            "unit": "未声明"
+          },
+          "value": 1
+        },
+        {
+          "key": "function_mapping_1792576626547_lambda[0,2]",
+          "code": "function_mapping_1792576626547_lambda",
+          "coordinate": "function_mapping_1792576626547_lambda[0,2]",
+          "name": "function_mapping_1792576626547_lambda",
+          "unit": "未声明",
+          "definition": {
+            "dimension": [],
+            "unit": "未声明"
+          },
+          "value": 0
+        },
+        {
+          "key": "function_mapping_1792576626547_lambda[1,0]",
+          "code": "function_mapping_1792576626547_lambda",
+          "coordinate": "function_mapping_1792576626547_lambda[1,0]",
+          "name": "function_mapping_1792576626547_lambda",
+          "unit": "未声明",
+          "definition": {
+            "dimension": [],
+            "unit": "未声明"
+          },
+          "value": 0
+        },
+        {
+          "key": "function_mapping_1792576626547_lambda[1,1]",
+          "code": "function_mapping_1792576626547_lambda",
+          "coordinate": "function_mapping_1792576626547_lambda[1,1]",
+          "name": "function_mapping_1792576626547_lambda",
+          "unit": "未声明",
+          "definition": {
+            "dimension": [],
+            "unit": "未声明"
+          },
+          "value": 0
+        },
+        {
+          "key": "function_mapping_1792576626547_lambda[1,2]",
+          "code": "function_mapping_1792576626547_lambda",
+          "coordinate": "function_mapping_1792576626547_lambda[1,2]",
+          "name": "function_mapping_1792576626547_lambda",
+          "unit": "未声明",
+          "definition": {
+            "dimension": [],
+            "unit": "未声明"
+          },
+          "value": 1
+        },
+        {
+          "key": "function_mapping_1792576626547_segment_selected[0,0]",
+          "code": "function_mapping_1792576626547_segment_selected",
+          "coordinate": "function_mapping_1792576626547_segment_selected[0,0]",
+          "name": "function_mapping_1792576626547_segment_selected",
+          "unit": "未声明",
+          "definition": {
+            "dimension": [],
+            "unit": "未声明"
+          },
+          "value": 1
+        },
+        {
+          "key": "function_mapping_1792576626547_segment_selected[0,1]",
+          "code": "function_mapping_1792576626547_segment_selected",
+          "coordinate": "function_mapping_1792576626547_segment_selected[0,1]",
+          "name": "function_mapping_1792576626547_segment_selected",
+          "unit": "未声明",
+          "definition": {
+            "dimension": [],
+            "unit": "未声明"
+          },
+          "value": 0
+        },
+        {
+          "key": "function_mapping_1792576626547_segment_selected[1,0]",
+          "code": "function_mapping_1792576626547_segment_selected",
+          "coordinate": "function_mapping_1792576626547_segment_selected[1,0]",
+          "name": "function_mapping_1792576626547_segment_selected",
+          "unit": "未声明",
+          "definition": {
+            "dimension": [],
+            "unit": "未声明"
+          },
+          "value": 0
+        },
+        {
+          "key": "function_mapping_1792576626547_segment_selected[1,1]",
+          "code": "function_mapping_1792576626547_segment_selected",
+          "coordinate": "function_mapping_1792576626547_segment_selected[1,1]",
+          "name": "function_mapping_1792576626547_segment_selected",
+          "unit": "未声明",
+          "definition": {
+            "dimension": [],
+            "unit": "未声明"
+          },
+          "value": 1
+        }
+      ],
+      "constraints": [
+        {
+          "key": "function_mapping_1792576626547_lambda_sum[0]",
+          "execution_name": "function_mapping_1792576626547_lambda_sum[0]",
+          "body": 1,
+          "lower": 1,
+          "upper": 1,
+          "violation": 0,
+          "definition": "function_mapping_1792576626547_lambda[0,0] + function_mapping_1792576626547_lambda[0,1] + function_mapping_1792576626547_lambda[0,2]  ==  1",
+          "unit": "按模型约束定义"
+        },
+        {
+          "key": "function_mapping_1792576626547_lambda_sum[1]",
+          "execution_name": "function_mapping_1792576626547_lambda_sum[1]",
+          "body": 1,
+          "lower": 1,
+          "upper": 1,
+          "violation": 0,
+          "definition": "function_mapping_1792576626547_lambda[1,0] + function_mapping_1792576626547_lambda[1,1] + function_mapping_1792576626547_lambda[1,2]  ==  1",
+          "unit": "按模型约束定义"
+        },
+        {
+          "key": "function_mapping_1792576626547_segment_sum[0]",
+          "execution_name": "function_mapping_1792576626547_segment_sum[0]",
+          "body": 1,
+          "lower": 1,
+          "upper": 1,
+          "violation": 0,
+          "definition": "function_mapping_1792576626547_segment_selected[0,0] + function_mapping_1792576626547_segment_selected[0,1]  ==  1",
+          "unit": "按模型约束定义"
+        },
+        {
+          "key": "function_mapping_1792576626547_segment_sum[1]",
+          "execution_name": "function_mapping_1792576626547_segment_sum[1]",
+          "body": 1,
+          "lower": 1,
+          "upper": 1,
+          "violation": 0,
+          "definition": "function_mapping_1792576626547_segment_selected[1,0] + function_mapping_1792576626547_segment_selected[1,1]  ==  1",
+          "unit": "按模型约束定义"
+        },
+        {
+          "key": "function_mapping_1792576626547_adjacency[0,0]",
+          "execution_name": "function_mapping_1792576626547_adjacency[0,0]",
+          "body": -1,
+          "lower": null,
+          "upper": 0,
+          "violation": 0,
+          "definition": "function_mapping_1792576626547_lambda[0,0]  <=  function_mapping_1792576626547_segment_selected[0,0]",
+          "unit": "按模型约束定义"
+        },
+        {
+          "key": "function_mapping_1792576626547_adjacency[0,1]",
+          "execution_name": "function_mapping_1792576626547_adjacency[0,1]",
+          "body": 0,
+          "lower": null,
+          "upper": 0,
+          "violation": 0,
+          "definition": "function_mapping_1792576626547_lambda[0,1]  <=  function_mapping_1792576626547_segment_selected[0,0] + function_mapping_1792576626547_segment_selected[0,1]",
+          "unit": "按模型约束定义"
+        },
+        {
+          "key": "function_mapping_1792576626547_adjacency[0,2]",
+          "execution_name": "function_mapping_1792576626547_adjacency[0,2]",
+          "body": 0,
+          "lower": null,
+          "upper": 0,
+          "violation": 0,
+          "definition": "function_mapping_1792576626547_lambda[0,2]  <=  function_mapping_1792576626547_segment_selected[0,1]",
+          "unit": "按模型约束定义"
+        },
+        {
+          "key": "function_mapping_1792576626547_adjacency[1,0]",
+          "execution_name": "function_mapping_1792576626547_adjacency[1,0]",
+          "body": 0,
+          "lower": null,
+          "upper": 0,
+          "violation": 0,
+          "definition": "function_mapping_1792576626547_lambda[1,0]  <=  function_mapping_1792576626547_segment_selected[1,0]",
+          "unit": "按模型约束定义"
+        },
+        {
+          "key": "function_mapping_1792576626547_adjacency[1,1]",
+          "execution_name": "function_mapping_1792576626547_adjacency[1,1]",
+          "body": -1,
+          "lower": null,
+          "upper": 0,
+          "violation": 0,
+          "definition": "function_mapping_1792576626547_lambda[1,1]  <=  function_mapping_1792576626547_segment_selected[1,0] + function_mapping_1792576626547_segment_selected[1,1]",
+          "unit": "按模型约束定义"
+        },
+        {
+          "key": "function_mapping_1792576626547_adjacency[1,2]",
+          "execution_name": "function_mapping_1792576626547_adjacency[1,2]",
+          "body": 0,
+          "lower": null,
+          "upper": 0,
+          "violation": 0,
+          "definition": "function_mapping_1792576626547_lambda[1,2]  <=  function_mapping_1792576626547_segment_selected[1,1]",
+          "unit": "按模型约束定义"
+        },
+        {
+          "key": "function_mapping_1792576626547_x_link[0]",
+          "execution_name": "function_mapping_1792576626547_x_link[0]",
+          "body": 0,
+          "lower": 0,
+          "upper": 0,
+          "violation": 0,
+          "definition": "p[0]  ==  0.0*function_mapping_1792576626547_lambda[0,0] + 10.0*function_mapping_1792576626547_lambda[0,1] + 20.0*function_mapping_1792576626547_lambda[0,2]",
+          "unit": "按模型约束定义"
+        },
+        {
+          "key": "function_mapping_1792576626547_x_link[1]",
+          "execution_name": "function_mapping_1792576626547_x_link[1]",
+          "body": 0,
+          "lower": 0,
+          "upper": 0,
+          "violation": 0,
+          "definition": "p[1]  ==  0.0*function_mapping_1792576626547_lambda[1,0] + 10.0*function_mapping_1792576626547_lambda[1,1] + 20.0*function_mapping_1792576626547_lambda[1,2]",
+          "unit": "按模型约束定义"
+        },
+        {
+          "key": "function_mapping_1792576626547_y_link[0]",
+          "execution_name": "function_mapping_1792576626547_y_link[0]",
+          "body": 0,
+          "lower": 0,
+          "upper": 0,
+          "violation": 0,
+          "definition": "fee[0]  ==  0.0*function_mapping_1792576626547_lambda[0,0] + 30.0*function_mapping_1792576626547_lambda[0,1] + 80.0*function_mapping_1792576626547_lambda[0,2]",
+          "unit": "按模型约束定义"
+        },
+        {
+          "key": "function_mapping_1792576626547_y_link[1]",
+          "execution_name": "function_mapping_1792576626547_y_link[1]",
+          "body": 0,
+          "lower": 0,
+          "upper": 0,
+          "violation": 0,
+          "definition": "fee[1]  ==  0.0*function_mapping_1792576626547_lambda[1,0] + 30.0*function_mapping_1792576626547_lambda[1,1] + 80.0*function_mapping_1792576626547_lambda[1,2]",
+          "unit": "按模型约束定义"
+        },
+        {
+          "key": "model_formula_2ccb4ba3_293e_405a_a49b_be2ad760a214[0]",
+          "execution_name": "model_formula_2ccb4ba3_293e_405a_a49b_be2ad760a214[0]",
+          "body": 10,
+          "lower": 10,
+          "upper": null,
+          "violation": 0,
+          "definition": "10  <=  p[0]",
+          "unit": "按模型约束定义"
+        },
+        {
+          "key": "model_formula_2ccb4ba3_293e_405a_a49b_be2ad760a214[1]",
+          "execution_name": "model_formula_2ccb4ba3_293e_405a_a49b_be2ad760a214[1]",
+          "body": 20,
+          "lower": 20,
+          "upper": null,
+          "violation": 0,
+          "definition": "20  <=  p[1]",
+          "unit": "按模型约束定义"
+        }
+      ],
+      "metrics": [],
+      "variable_checks": [
+        {
+          "key": "p[0]",
+          "violation": 0,
+          "integrality_violation": 0
+        },
+        {
+          "key": "p[1]",
+          "violation": 0,
+          "integrality_violation": 0
+        },
+        {
+          "key": "fee[0]",
+          "violation": 0,
+          "integrality_violation": 0
+        },
+        {
+          "key": "fee[1]",
+          "violation": 0,
+          "integrality_violation": 0
+        },
+        {
+          "key": "function_mapping_1792576626547_lambda[0,0]",
+          "violation": 0,
+          "integrality_violation": 0
+        },
+        {
+          "key": "function_mapping_1792576626547_lambda[0,1]",
+          "violation": 0,
+          "integrality_violation": 0
+        },
+        {
+          "key": "function_mapping_1792576626547_lambda[0,2]",
+          "violation": 0,
+          "integrality_violation": 0
+        },
+        {
+          "key": "function_mapping_1792576626547_lambda[1,0]",
+          "violation": 0,
+          "integrality_violation": 0
+        },
+        {
+          "key": "function_mapping_1792576626547_lambda[1,1]",
+          "violation": 0,
+          "integrality_violation": 0
+        },
+        {
+          "key": "function_mapping_1792576626547_lambda[1,2]",
+          "violation": 0,
+          "integrality_violation": 0
+        },
+        {
+          "key": "function_mapping_1792576626547_segment_selected[0,0]",
+          "violation": 0,
+          "integrality_violation": 0
+        },
+        {
+          "key": "function_mapping_1792576626547_segment_selected[0,1]",
+          "violation": 0,
+          "integrality_violation": 0
+        },
+        {
+          "key": "function_mapping_1792576626547_segment_selected[1,0]",
+          "violation": 0,
+          "integrality_violation": 0
+        },
+        {
+          "key": "function_mapping_1792576626547_segment_selected[1,1]",
+          "violation": 0,
+          "integrality_violation": 0
+        }
+      ],
+      "max_constraint_violation": 0,
+      "objective": {
+        "value": 55,
+        "definition": "0.5*fee[0] + 0.5*fee[1]",
+        "sense": "minimize",
+        "unit": "模型加权目标"
+      }
+    },
+    "evidence_package": {
+      "evidence_schema_version": "2.0",
+      "solver": {
+        "status": "success",
+        "termination_condition": "optimal",
+        "objective_value": 55,
+        "solver_name": "HiGHS",
+        "error": null,
+        "problem_type": "MILP",
+        "local_optimum_warning": false,
+        "constraint_violation_summary": {}
+      },
+      "model": {
+        "model_id": "MODEL-5F61FE23",
+        "model_version": "v0.2",
+        "skill_name": "run_model_mvhxruag_f609",
+        "schema_version": "unknown",
+        "profile_name": "generic",
+        "skill_definition_revision": 1,
+        "skill_definition_hash": "beb850d2e9ed10fbeab06084d23d72804bec63a14613f0c50fad1f88373ce27d",
+        "explanation_spec_version": "1.0",
+        "objective": {
+          "key": "objective",
+          "name": "objective",
+          "sense": "minimize",
+          "unit": "",
+          "description": "",
+          "expression_declared": true
+        },
+        "execution_policy": "advisory_only",
+        "requires_human_review": true
+      },
+      "inputs_summary": {
+        "parameters": {
+          "demand": [
+            10,
+            20
+          ],
+          "cost": [
+            2,
+            3
+          ],
+          "delta_t": 0.5
+        },
+        "parameter_sources": {
+          "demand": "RUNTIME_VALUE",
+          "cost": "RUNTIME_VALUE",
+          "delta_t": "RUNTIME_VALUE"
+        },
+        "missing_params": []
+      },
+      "variables_summary": [
+        {
+          "name": "p",
+          "business_name": "p",
+          "unit": "MW",
+          "dimension": [
+            "time"
+          ],
+          "min": 10,
+          "max": 20,
+          "sum": 30,
+          "non_zero_count": 2,
+          "max_period": "p[1]",
+          "evidence_ref": "variables_summary.p"
+        },
+        {
+          "name": "fee",
+          "business_name": "fee",
+          "unit": "元/h",
+          "dimension": [
+            "time"
+          ],
+          "min": 30,
+          "max": 80,
+          "sum": 110,
+          "non_zero_count": 2,
+          "max_period": "fee[1]",
+          "evidence_ref": "variables_summary.fee"
+        },
+        {
+          "name": "function_mapping_1792576626547_lambda",
+          "business_name": "function_mapping_1792576626547_lambda",
+          "unit": "",
+          "dimension": [],
+          "min": 0,
+          "max": 1,
+          "sum": 2,
+          "non_zero_count": 2,
+          "max_period": "function_mapping_1792576626547_lambda[0,1]",
+          "evidence_ref": "variables_summary.function_mapping_1792576626547_lambda"
+        },
+        {
+          "name": "function_mapping_1792576626547_segment_selected",
+          "business_name": "function_mapping_1792576626547_segment_selected",
+          "unit": "",
+          "dimension": [],
+          "min": 0,
+          "max": 1,
+          "sum": 2,
+          "non_zero_count": 2,
+          "max_period": "function_mapping_1792576626547_segment_selected[0,0]",
+          "evidence_ref": "variables_summary.function_mapping_1792576626547_segment_selected"
+        }
+      ],
+      "constraint_checks": [],
+      "derived_metrics": {
+        "objective_value": {
+          "label": "objective",
+          "value": 55,
+          "unit": "",
+          "function": "identity",
+          "source": {
+            "kind": "objective",
+            "key": null
+          },
+          "evidence_ref": "derived_metrics.objective_value"
+        },
+        "variable_p_min_value": {
+          "label": "p · min_value",
+          "value": 10,
+          "unit": "MW",
+          "function": "min_value",
+          "source": {
+            "kind": "variable",
+            "key": "p"
+          },
+          "evidence_ref": "derived_metrics.variable_p_min_value"
+        },
+        "variable_p_max_value": {
+          "label": "p · max_value",
+          "value": 20,
+          "unit": "MW",
+          "function": "max_value",
+          "source": {
+            "kind": "variable",
+            "key": "p"
+          },
+          "evidence_ref": "derived_metrics.variable_p_max_value"
+        },
+        "variable_p_sum_value": {
+          "label": "p · sum_value",
+          "value": 30,
+          "unit": "MW",
+          "function": "sum_value",
+          "source": {
+            "kind": "variable",
+            "key": "p"
+          },
+          "evidence_ref": "derived_metrics.variable_p_sum_value"
+        },
+        "variable_p_non_zero_count": {
+          "label": "p · non_zero_count",
+          "value": 2,
+          "unit": "count",
+          "function": "non_zero_count",
+          "source": {
+            "kind": "variable",
+            "key": "p"
+          },
+          "evidence_ref": "derived_metrics.variable_p_non_zero_count"
+        },
+        "variable_fee_min_value": {
+          "label": "fee · min_value",
+          "value": 30,
+          "unit": "元/h",
+          "function": "min_value",
+          "source": {
+            "kind": "variable",
+            "key": "fee"
+          },
+          "evidence_ref": "derived_metrics.variable_fee_min_value"
+        },
+        "variable_fee_max_value": {
+          "label": "fee · max_value",
+          "value": 80,
+          "unit": "元/h",
+          "function": "max_value",
+          "source": {
+            "kind": "variable",
+            "key": "fee"
+          },
+          "evidence_ref": "derived_metrics.variable_fee_max_value"
+        },
+        "variable_fee_sum_value": {
+          "label": "fee · sum_value",
+          "value": 110,
+          "unit": "元/h",
+          "function": "sum_value",
+          "source": {
+            "kind": "variable",
+            "key": "fee"
+          },
+          "evidence_ref": "derived_metrics.variable_fee_sum_value"
+        },
+        "variable_fee_non_zero_count": {
+          "label": "fee · non_zero_count",
+          "value": 2,
+          "unit": "count",
+          "function": "non_zero_count",
+          "source": {
+            "kind": "variable",
+            "key": "fee"
+          },
+          "evidence_ref": "derived_metrics.variable_fee_non_zero_count"
+        }
+      },
+      "formatter": {
+        "source": "SolveResultFormatter",
+        "summary": "模型已通过统一 Pyomo 建模引擎和 HiGHS 求解链路完成求解。",
+        "explanation": {
+          "summary": "模型已通过统一 Pyomo 建模引擎和 HiGHS 求解链路完成求解。",
+          "model_code": "model_mvhxruag_f609",
+          "relaxation_advisory": null
+        },
+        "metrics": {
+          "objective_value": {
+            "value": 55,
+            "unit": "",
+            "label": "objective_value",
+            "source": "result.metrics.objective_value"
+          },
+          "total_cost": {
+            "value": 55,
+            "unit": "",
+            "label": "total_cost",
+            "source": "result.metrics.total_cost"
+          },
+          "gap": {
+            "value": "0.00%",
+            "unit": "",
+            "label": "gap",
+            "source": "result.metrics.gap"
+          },
+          "risk": {
+            "value": "low",
+            "unit": "",
+            "label": "risk",
+            "source": "result.metrics.risk"
+          }
+        }
+      },
+      "business_outcomes": {
+        "facts": []
+      },
+      "risk_notes": [],
+      "manual_review_points": [
+        "Verify input provenance, freshness, units, and dimensional completeness.",
+        "Confirm the recommendation with an authorized reviewer before operational use."
+      ],
+      "data_quality_notes": [],
+      "explanation_limits": [
+        "结果未返回可核验的约束检查明细。",
+        "The explanation describes the returned solver evidence and does not prove real-world causality.",
+        "The platform does not infer undeclared thresholds, business rules, or external actions."
+      ],
+      "evidence_index": {
+        "formatter": [
+          "formatter.summary",
+          "formatter.metrics"
+        ],
+        "solver": [
+          "solver.status",
+          "solver.termination_condition",
+          "solver.objective_value",
+          "solver.local_optimum_warning",
+          "solver.constraint_violation_summary"
+        ],
+        "variables": [
+          "variables_summary.p",
+          "variables_summary.fee",
+          "variables_summary.function_mapping_1792576626547_lambda",
+          "variables_summary.function_mapping_1792576626547_segment_selected"
+        ],
+        "constraints": [],
+        "metrics": [
+          "derived_metrics.objective_value",
+          "derived_metrics.variable_p_min_value",
+          "derived_metrics.variable_p_max_value",
+          "derived_metrics.variable_p_sum_value",
+          "derived_metrics.variable_p_non_zero_count",
+          "derived_metrics.variable_fee_min_value",
+          "derived_metrics.variable_fee_max_value",
+          "derived_metrics.variable_fee_sum_value",
+          "derived_metrics.variable_fee_non_zero_count"
+        ],
+        "business_outcomes": []
+      }
+    },
+    "explanation_structured": {
+      "explanation_schema_version": "2.0",
+      "facts": [
+        "模型已通过统一 Pyomo 建模引擎和 HiGHS 求解链路完成求解。",
+        "求解状态为 success。",
+        "objective的求解值为 55.0。",
+        "平台不会自动下发生产控制指令。所有方案须经人工复核。",
+        "objective为 55.0。",
+        "p · min_value为 10.0MW。",
+        "p · max_value为 20.0MW。",
+        "p · sum_value为 30.0MW。",
+        "p · non_zero_count为 2count。",
+        "fee · min_value为 30.0元/h。",
+        "fee · max_value为 80.0元/h。",
+        "fee · sum_value为 110.0元/h。",
+        "fee · non_zero_count为 2count。",
+        "变量“p”摘要：min=10.0, max=20.0, sum=30.0, non_zero_count=2。",
+        "变量“fee”摘要：min=30.0, max=80.0, sum=110.0, non_zero_count=2。",
+        "变量“function_mapping_1792576626547_lambda”摘要：min=0.0, max=1.0, sum=2.0, non_zero_count=2。",
+        "变量“function_mapping_1792576626547_segment_selected”摘要：min=-0.0, max=1.0, sum=2.0, non_zero_count=2。"
+      ],
+      "fact_items": [
+        {
+          "text": "模型已通过统一 Pyomo 建模引擎和 HiGHS 求解链路完成求解。",
+          "evidence_refs": [
+            "formatter.summary",
+            "formatter.metrics"
+          ]
+        },
+        {
+          "text": "求解状态为 success。",
+          "evidence_refs": [
+            "solver.status",
+            "solver.termination_condition"
+          ]
+        },
+        {
+          "text": "objective的求解值为 55.0。",
+          "evidence_refs": [
+            "solver.objective_value",
+            "model.objective"
+          ]
+        },
+        {
+          "text": "平台不会自动下发生产控制指令。所有方案须经人工复核。",
+          "evidence_refs": [
+            "model.execution_policy",
+            "model.requires_human_review"
+          ]
+        },
+        {
+          "text": "objective为 55.0。",
+          "evidence_refs": [
+            "derived_metrics.objective_value"
+          ]
+        },
+        {
+          "text": "p · min_value为 10.0MW。",
+          "evidence_refs": [
+            "derived_metrics.variable_p_min_value"
+          ]
+        },
+        {
+          "text": "p · max_value为 20.0MW。",
+          "evidence_refs": [
+            "derived_metrics.variable_p_max_value"
+          ]
+        },
+        {
+          "text": "p · sum_value为 30.0MW。",
+          "evidence_refs": [
+            "derived_metrics.variable_p_sum_value"
+          ]
+        },
+        {
+          "text": "p · non_zero_count为 2count。",
+          "evidence_refs": [
+            "derived_metrics.variable_p_non_zero_count"
+          ]
+        },
+        {
+          "text": "fee · min_value为 30.0元/h。",
+          "evidence_refs": [
+            "derived_metrics.variable_fee_min_value"
+          ]
+        },
+        {
+          "text": "fee · max_value为 80.0元/h。",
+          "evidence_refs": [
+            "derived_metrics.variable_fee_max_value"
+          ]
+        },
+        {
+          "text": "fee · sum_value为 110.0元/h。",
+          "evidence_refs": [
+            "derived_metrics.variable_fee_sum_value"
+          ]
+        },
+        {
+          "text": "fee · non_zero_count为 2count。",
+          "evidence_refs": [
+            "derived_metrics.variable_fee_non_zero_count"
+          ]
+        },
+        {
+          "text": "变量“p”摘要：min=10.0, max=20.0, sum=30.0, non_zero_count=2。",
+          "evidence_refs": [
+            "variables_summary.p"
+          ]
+        },
+        {
+          "text": "变量“fee”摘要：min=30.0, max=80.0, sum=110.0, non_zero_count=2。",
+          "evidence_refs": [
+            "variables_summary.fee"
+          ]
+        },
+        {
+          "text": "变量“function_mapping_1792576626547_lambda”摘要：min=0.0, max=1.0, sum=2.0, non_zero_count=2。",
+          "evidence_refs": [
+            "variables_summary.function_mapping_1792576626547_lambda"
+          ]
+        },
+        {
+          "text": "变量“function_mapping_1792576626547_segment_selected”摘要：min=-0.0, max=1.0, sum=2.0, non_zero_count=2。",
+          "evidence_refs": [
+            "variables_summary.function_mapping_1792576626547_segment_selected"
+          ]
+        }
+      ],
+      "inferences": [],
+      "inference_items": [],
+      "recommendations": [
+        "Verify input provenance, freshness, units, and dimensional completeness.",
+        "Confirm the recommendation with an authorized reviewer before operational use."
+      ],
+      "recommendation_items": [
+        {
+          "text": "Verify input provenance, freshness, units, and dimensional completeness.",
+          "evidence_refs": [
+            "manual_review_points"
+          ]
+        },
+        {
+          "text": "Confirm the recommendation with an authorized reviewer before operational use.",
+          "evidence_refs": [
+            "manual_review_points"
+          ]
+        }
+      ],
+      "risk_notes": [],
+      "manual_review_points": [
+        "Verify input provenance, freshness, units, and dimensional completeness.",
+        "Confirm the recommendation with an authorized reviewer before operational use."
+      ],
+      "limitations": [
+        "结果未返回可核验的约束检查明细。",
+        "The explanation describes the returned solver evidence and does not prove real-world causality.",
+        "The platform does not infer undeclared thresholds, business rules, or external actions.",
+        "本结果仅用于辅助分析和决策参考，不构成自动控制指令。实际生产调度、交易申报或安全生产处置需结合现场规程、业务审批和人工复核后执行。"
+      ],
+      "summary": "模型已通过统一 Pyomo 建模引擎和 HiGHS 求解链路完成求解。 求解状态为 success。 objective的求解值为 55.0。 平台不会自动下发生产控制指令。所有方案须经人工复核。",
+      "disclaimer": "本结果仅用于辅助分析和决策参考，不构成自动控制指令。实际生产调度、交易申报或安全生产处置需结合现场规程、业务审批和人工复核后执行。",
+      "grounded_on": "evidence_package"
+    },
+    "explanation_audit": {
+      "processor": "result_post_processor_v2",
+      "definition_source": "ephemeral_contract_compiler",
+      "skill_name": "run_model_mvhxruag_f609",
+      "skill_definition_revision": 1,
+      "skill_definition_hash": "beb850d2e9ed10fbeab06084d23d72804bec63a14613f0c50fad1f88373ce27d",
+      "explanation_spec_version": "1.0",
+      "fallback": {
+        "used": false,
+        "reason": null
+      },
+      "llm": {
+        "enabled": false,
+        "attempted": false,
+        "fallback_used": false,
+        "reason": "LLM_SUMMARY_NOT_REQUESTED"
+      }
+    },
+    "profile_name": "generic",
+    "disclaimer": "本结果仅用于辅助分析和决策参考，不构成自动控制指令。实际生产调度、交易申报或安全生产处置需结合现场规程、业务审批和人工复核后执行。",
+    "execution_policy": "advisory_only",
+    "requires_human_review": true,
+    "explanation": "模型已通过统一 Pyomo 建模引擎和 HiGHS 求解链路完成求解。 求解状态为 success。 objective的求解值为 55.0。 平台不会自动下发生产控制指令。所有方案须经人工复核。",
+    "result_metadata": {
+      "problem_type": "MILP",
+      "explanation_type": null,
+      "capabilities": [
+        "metrics",
+        "timeseries",
+        "business_output",
+        "explanation",
+        "raw"
+      ],
+      "presentation_schema_version": "1.0",
+      "views": [
+        {
+          "key": "overview",
+          "label": "结果概览",
+          "kind": "metrics",
+          "source": "metrics"
+        },
+        {
+          "key": "curves",
+          "label": "变量曲线",
+          "kind": "timeseries",
+          "source": "variable_values"
+        },
+        {
+          "key": "business_output",
+          "label": "业务输出",
+          "kind": "business_output",
+          "source": "business_output"
+        },
+        {
+          "key": "advice",
+          "label": "业务建议",
+          "kind": "explanation",
+          "source": "business_explanation"
+        },
+        {
+          "key": "raw",
+          "label": "原始结果",
+          "kind": "raw",
+          "source": "$"
+        }
+      ]
+    },
+    "result_views": [
+      {
+        "key": "overview",
+        "label": "结果概览",
+        "kind": "metrics",
+        "source": "metrics"
+      },
+      {
+        "key": "curves",
+        "label": "变量曲线",
+        "kind": "timeseries",
+        "source": "variable_values"
+      },
+      {
+        "key": "business_output",
+        "label": "业务输出",
+        "kind": "business_output",
+        "source": "business_output"
+      },
+      {
+        "key": "advice",
+        "label": "业务建议",
+        "kind": "explanation",
+        "source": "business_explanation"
+      },
+      {
+        "key": "raw",
+        "label": "原始结果",
+        "kind": "raw",
+        "source": "$"
+      }
+    ],
+    "result_capabilities": [
+      "metrics",
+      "timeseries",
+      "business_output",
+      "explanation",
+      "raw"
+    ]
+  }
+]

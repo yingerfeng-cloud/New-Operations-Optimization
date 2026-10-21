@@ -1,0 +1,15 @@
+/Users/joiefu/Project/OPTIFORGE/.venv-mac/lib/python3.12/site-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+  from starlette.testclient import TestClient as TestClient  # noqa
+PUBLISH Synthetic acceptance economic MODEL-9F05B073
+PUBLISH Synthetic acceptance pv_storage MODEL-29570B3D
+PUBLISH Synthetic acceptance hydro MODEL-676577CC
+('.model_problem_type', 'LP', 'MILP')
+('.problem_type', 'LP', 'MILP')
+Traceback (most recent call last):
+  File "/tmp/probe_synthetic_manual.py", line 26, in <module>
+    print(run_acceptance(api,json.loads(FIXTURES.read_text())),flush=True)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/joiefu/Project/OPTIFORGE/tests/review_synthetic_poc.py", line 238, in run_acceptance
+    assert published.status_code == 200, published.text
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: {"detail":{"code":"MODEL_TEST_OUTDATED","message":"模型执行定义在规范化后发生变化，请退回草稿保存并重新测试后再发布。"}}

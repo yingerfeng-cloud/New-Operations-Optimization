@@ -133,6 +133,14 @@ export function normalizeComponentForEditor(component?: ComponentDef): Partial<C
   };
 }
 
+export function parseSchemaValue(value: unknown): unknown {
+  if (typeof value !== 'string') return value;
+  if (!value.trim()) return undefined;
+  try { return JSON.parse(value); } catch { return value; }
+}
+
+const schemaValueProps = (value: unknown) => ({ value: value == null ? '' : typeof value === 'string' ? value : JSON.stringify(value) });
+
 function SchemaList({ name, title }: { name: 'required_sets' | 'parameters' | 'variables'; title: string }) {
   return (
     <Form.List name={name}>
@@ -152,8 +160,8 @@ function SchemaList({ name, title }: { name: 'required_sets' | 'parameters' | 'v
                 <Col xs={24} md={12}><Form.Item name={[field.name, 'dimension']} label="维度"><Select mode="tags" /></Form.Item></Col>
                 <Col xs={24} md={12}><Form.Item name={[field.name, 'source_system']} label="数据来源"><Input /></Form.Item></Col>
                 <Col xs={24} md={8}><Form.Item name={[field.name, 'required']} label="必填" valuePropName="checked"><Switch /></Form.Item></Col>
-                <Col xs={24} md={8}><Form.Item name={[field.name, 'default']} label="默认值"><Input /></Form.Item></Col>
-                <Col xs={24} md={8}><Form.Item name={[field.name, 'sample_value']} label="示例值"><Input /></Form.Item></Col>
+                <Col xs={24} md={8}><Form.Item name={[field.name, 'default']} label="默认值" getValueProps={schemaValueProps}><Input placeholder="数值、数组或对象使用 JSON" /></Form.Item></Col>
+                <Col xs={24} md={8}><Form.Item name={[field.name, 'sample_value']} label="示例值" getValueProps={schemaValueProps}><Input placeholder="数值、数组或对象使用 JSON" /></Form.Item></Col>
               </Row>
             </Card>
           ))}
@@ -500,6 +508,11 @@ export function ComponentEditor({ component, availableComponents = [], dictionar
     delete componentContract.status;
     delete componentContract.enabled;
     delete componentContract.implemented;
+    for (const section of ['required_sets', 'parameters', 'variables'] as const) {
+      componentContract[section] = (componentContract[section] || []).map((item: SchemaItem) => ({
+        ...item, default: parseSchemaValue(item.default), sample_value: parseSchemaValue(item.sample_value),
+      }));
+    }
     const deps = getComponentDependencyIds(componentContract as Record<string, unknown>);
     const generatedConstraints = rowsFrom(componentContract.generated_constraints).map(row => ({
       ...normalizeFormulaRowForSave(row),

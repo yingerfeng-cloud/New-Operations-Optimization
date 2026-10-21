@@ -25,6 +25,8 @@ DOMAIN_MAP = {
 
 class ComponentModelBuilder:
     def build(self, model_spec: dict[str, Any], runtime_parameters: dict[str, Any]) -> tuple[Any, dict[str, Any]]:
+        if model_spec.get("model_formula_errors"):
+            raise RuntimeError(f"模型公式未通过后端编译：{model_spec['model_formula_errors']}")
         caller_runtime = runtime_parameters
         runtime_parameters = {**(model_spec.get("runtime_defaults") or {}), **runtime_parameters}
         if model_spec.get("runtime_normalizer") == "cascade_hydro":
@@ -73,11 +75,18 @@ class ComponentModelBuilder:
             else:
                 builder = self._component_builder(component)
             component_context = self._component_context(component, context)
+            context.setdefault("component_runtime_parameters", {})[str(component.get("type") or component.get("component_id"))] = component_context["runtime_parameters"]
             builder.validate(component, component_context)
             prepared_components.append((component, builder, component_context))
         for component, builder, component_context in prepared_components:
             builder.build(model, component, component_context)
 
+        for row in model_spec.get("model_formula_constraints") or []:
+            name = self._safe_component_name(model, f"model_formula_{row['constraint_id']}", 0)
+            local = DynamicFormulaComponent({"component_id": "model_formulas"})
+            constraint = local._build_constraint(model, context, row, row["expression"], row.get("indices") or [])
+            setattr(model, name, constraint)
+            context["constraints"][name] = constraint
         self._build_pv_storage_capacity_guards(model, context)
         self._build_additional_custom_constraints(model, model_spec)
         build_weighted_objective(model, model_spec.get("objective", {}), context)
@@ -375,8 +384,8 @@ class ComponentModelBuilder:
         return raw
 
     def _variable_bounds(self, variable: dict[str, Any], context: dict[str, Any]) -> Any:
-        lower = variable.get("lower_bound", variable.get("lb", None))
-        upper = variable.get("upper_bound", variable.get("ub", None))
+        lower = variable.get("lower_bound", variable.get("lb", variable.get("lowerBound")))
+        upper = variable.get("upper_bound", variable.get("ub", variable.get("upperBound")))
         if lower is None and upper is None:
             return None
         indices = list(variable.get("indices") or variable.get("dimension") or [])

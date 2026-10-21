@@ -47,6 +47,24 @@ describe('task create contract gate', () => {
     expect(validateRuntimeTimeDimension(config, [series], { load_forecast: Array(12).fill(1) }, 24)[0]).toContain('长度应为 24');
   });
 
+  test.each([
+    { S1_U1: [1, 1, 1, 1], S1_U2: [1, 0, 1] },
+    [[1, 1, 1, 1], [1, 0, 1]],
+  ])('matrix time validation identifies a short non-first unit row for %j', availability => {
+    const field: RuntimeField = { code: 'availability', name: '机组可用状态', required: true, dimension: ['unit', 'time'], dimensionValues: { unit: ['S1_U1', 'S1_U2'] } };
+    const config = base({ default_horizon: 4 });
+    const errors = validateRuntimeTimeDimension(config, [field], { availability });
+    expect(errors).toEqual(['机组可用状态（availability）[S1_U2]时间维长度应为 4，当前为 3']);
+    const corrected = Array.isArray(availability) ? [[1, 1, 1, 1], [1, 0, 1, 1]] : { S1_U1: [1, 1, 1, 1], S1_U2: [1, 0, 1, 1] };
+    expect(validateRuntimeTimeDimension(config, [field], { availability: corrected })).toEqual([]);
+  });
+
+  test('state-time validation identifies a short row beyond two axes', () => {
+    const field: RuntimeField = { code: 'energy', name: '能量', required: true, dimension: ['site', 'unit', 'time_volume'] };
+    const errors = validateRuntimeTimeDimension(base({ default_horizon: 2, state_time_set: 'time_volume' }), [field], { energy: { S1: { U1: [0, 1, 2], U2: [0, 1] } } });
+    expect(errors).toEqual(['能量（energy）[S1][U2]时间维长度应为 3，当前为 2']);
+  });
+
   test('data_derived horizon follows the declared field', () => {
     const config = base({ policy: 'data_derived', derive_from: 'load_forecast' });
     expect(deriveHorizon(config, [series], { load_forecast: Array(48).fill(1) })).toBe(48);

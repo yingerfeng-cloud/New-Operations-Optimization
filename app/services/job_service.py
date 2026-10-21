@@ -41,7 +41,7 @@ class JobService:
             self._prepare_request(req, testing_model=testing_model)
             if testing_model is not None:
                 original = model_service.get_model(testing_model.id)
-                req.payload["_model_test"] = {"source_hash": model_service._content_hash(original), "dependencies": deepcopy(testing_model.function_dependencies), "component_dependencies": deepcopy(testing_model.component_dependencies)}
+                req.payload["_model_test"] = {"source_hash": model_service._content_hash(original), "dependencies": deepcopy(testing_model.function_dependencies), "component_dependencies": deepcopy(testing_model.component_dependencies), "prepared_model": testing_model.model_dump(mode="json")}
             task_id = f"OPT-{uuid.uuid4().hex[:10].upper()}"
             record = TaskRecord(id=task_id, request=req, max_retries=max(0, req.max_retries))
             record.trace["request_fingerprint"] = fingerprint

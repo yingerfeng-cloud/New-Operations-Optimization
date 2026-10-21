@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from copy import deepcopy
 from typing import Any
+from app.services.result_diagnostics import result_diagnostics
 
 
 RESULT_PRESENTATION_SCHEMA_VERSION = "1.0"
@@ -26,7 +27,7 @@ def build_result_views(result: dict[str, Any]) -> list[dict[str, str]]:
         views.append({"key": "curves", "label": "变量曲线", "kind": "timeseries", "source": "variable_values"})
     if _meaningful(business_output):
         views.append({"key": "business_output", "label": "业务输出", "kind": "business_output", "source": "business_output"})
-    constraint_data = result.get("constraints") or business_output.get("constraint_check")
+    constraint_data = result.get("constraint_checks") or result.get("constraints") or business_output.get("constraint_check")
     if _meaningful(constraint_data):
         views.append({"key": "constraints", "label": "约束检查", "kind": "constraint_checks", "source": "constraints"})
     if str(result.get("problem_type") or result.get("solver_type") or "").upper() == "NLP" and any(
@@ -43,6 +44,7 @@ def build_result_views(result: dict[str, Any]) -> list[dict[str, str]]:
 
 def apply_result_presentation(result: dict[str, Any]) -> dict[str, Any]:
     normalized = deepcopy(result)
+    normalized.update(result_diagnostics(normalized))
     views = build_result_views(normalized)
     capabilities = [view["kind"] for view in views]
     metadata = dict(normalized.get("result_metadata") or {})

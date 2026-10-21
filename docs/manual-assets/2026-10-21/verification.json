@@ -1,0 +1,414 @@
+{
+  "verified_at": "2026-10-21",
+  "commit": "ac4fda070d1b30431051b1365bba7cb9c1c0910c",
+  "environment": {
+    "os": "macOS arm64",
+    "python": "3.12.14",
+    "pyomo": "6.10.1",
+    "highs": "1.15.1",
+    "frontend_port": 15173,
+    "api_port": 18010,
+    "isolated_runtime": true,
+    "llm_enabled": false
+  },
+  "tasks": [
+    {
+      "id": "OPT-289B6A64F1",
+      "model_id": "MODEL-FF80294E",
+      "status": "SUCCESS",
+      "objective_value": 40.0,
+      "parameters": {
+        "time": [
+          0,
+          1
+        ],
+        "demand": [
+          10,
+          20
+        ],
+        "cost": [
+          2,
+          3
+        ],
+        "delta_t": 0.5,
+        "horizon": 2,
+        "interval_minutes": 30.0
+      },
+      "variable_values": {
+        "p": {
+          "0": 10.0,
+          "1": 20.0
+        }
+      },
+      "solver": "HiGHS",
+      "termination_condition": "optimal",
+      "business_acceptance": "matched tutorial hand calculation"
+    },
+    {
+      "id": "OPT-5237E8DCF7",
+      "model_id": "MODEL-0FAB6AA0",
+      "status": "SUCCESS",
+      "objective_value": 17.0,
+      "parameters": {
+        "unit": [
+          "U1",
+          "U2"
+        ],
+        "time": [
+          0,
+          1
+        ],
+        "demand": [
+          6,
+          8
+        ],
+        "cost": {
+          "U1": 2,
+          "U2": 3
+        },
+        "cap": {
+          "U1": [
+            4,
+            4
+          ],
+          "U2": [
+            4,
+            6
+          ]
+        },
+        "delta_t": 0.5,
+        "horizon": 2,
+        "interval_minutes": 30.0
+      },
+      "variable_values": {
+        "p": {
+          "U1,0": 4.0,
+          "U1,1": 4.0,
+          "U2,0": 2.0,
+          "U2,1": 4.0
+        }
+      },
+      "solver": "HiGHS",
+      "termination_condition": "optimal",
+      "business_acceptance": "matched tutorial hand calculation"
+    },
+    {
+      "id": "OPT-1883BCE22F",
+      "model_id": "MODEL-9985441C",
+      "status": "SUCCESS",
+      "objective_value": 0.0,
+      "parameters": {
+        "time": [
+          0,
+          1
+        ],
+        "demand": [
+          10,
+          20
+        ],
+        "cost": [
+          2,
+          3
+        ],
+        "delta_t": 0.5,
+        "horizon": 2,
+        "interval_minutes": 30.0
+      },
+      "variable_values": {
+        "p": {
+          "p[0]": 10.0,
+          "p[1]": 10.0
+        },
+        "fee": {
+          "fee[0]": 20.0,
+          "fee[1]": 20.0
+        },
+        "function_mapping_1792561936088_lambda": {
+          "function_mapping_1792561936088_lambda[0,0]": 0.0,
+          "function_mapping_1792561936088_lambda[0,1]": 1.0,
+          "function_mapping_1792561936088_lambda[0,2]": 0.0,
+          "function_mapping_1792561936088_lambda[1,0]": 0.0,
+          "function_mapping_1792561936088_lambda[1,1]": 1.0,
+          "function_mapping_1792561936088_lambda[1,2]": 0.0
+        },
+        "function_mapping_1792561936088_segment_selected": {
+          "function_mapping_1792561936088_segment_selected[0,0]": 1.0,
+          "function_mapping_1792561936088_segment_selected[0,1]": 0.0,
+          "function_mapping_1792561936088_segment_selected[1,0]": 1.0,
+          "function_mapping_1792561936088_segment_selected[1,1]": 0.0
+        }
+      },
+      "solver": "HiGHS",
+      "termination_condition": "optimal",
+      "business_acceptance": "failed: p[1]=10 < demand[1]=20 and objective=0"
+    },
+    {
+      "id": "OPT-CC8B17FA70",
+      "model_id": "MODEL-FF80294E",
+      "status": "SUCCESS",
+      "objective_value": 40.0,
+      "parameters": {
+        "time": [
+          0,
+          1
+        ],
+        "demand": [
+          10,
+          20
+        ],
+        "cost": [
+          2,
+          3
+        ],
+        "delta_t": 0.5,
+        "horizon": 2,
+        "interval_minutes": 30.0
+      },
+      "variable_values": {
+        "p": {
+          "0": 10.0,
+          "1": 20.0
+        }
+      },
+      "solver": "HiGHS",
+      "termination_condition": "optimal",
+      "business_acceptance": "matched tutorial hand calculation"
+    },
+    {
+      "id": "OPT-8ADC67A6B8",
+      "model_id": "MODEL-FF80294E",
+      "status": "SUCCESS",
+      "objective_value": 40.0,
+      "parameters": {
+        "time": [
+          0,
+          1
+        ],
+        "demand": [
+          10,
+          20
+        ],
+        "cost": [
+          2,
+          3
+        ],
+        "delta_t": 0.5,
+        "horizon": 2,
+        "interval_minutes": 30.0
+      },
+      "variable_values": {
+        "p": {
+          "0": 10.0,
+          "1": 20.0
+        }
+      },
+      "solver": "HiGHS",
+      "termination_condition": "optimal",
+      "business_acceptance": "matched tutorial hand calculation"
+    }
+  ],
+  "models": [
+    {
+      "id": "MODEL-FF80294E",
+      "name": "手册教程一 时段供电成本",
+      "model_code": null,
+      "version": "v0.1",
+      "status": "published",
+      "content_hash": "3819c26b616fcdb52b6ad072cd5f289aa421e0b7077451347df1ee60bb5bf2e9",
+      "tested_model_id": "MODEL-FF80294E",
+      "tested_content_hash": "3819c26b616fcdb52b6ad072cd5f289aa421e0b7077451347df1ee60bb5bf2e9",
+      "function_dependencies": {},
+      "component_dependencies": {}
+    },
+    {
+      "id": "MODEL-0FAB6AA0",
+      "name": "手册教程二 两机组两时段",
+      "model_code": null,
+      "version": "v0.1",
+      "status": "published",
+      "content_hash": "1a31bfb4280721ac85f3d1c762401d1c2db857e69beec7543cb4c8c77a0d4265",
+      "tested_model_id": "MODEL-0FAB6AA0",
+      "tested_content_hash": "1a31bfb4280721ac85f3d1c762401d1c2db857e69beec7543cb4c8c77a0d4265",
+      "function_dependencies": {},
+      "component_dependencies": {}
+    },
+    {
+      "id": "MODEL-9985441C",
+      "name": "手册教程五 曲线费用",
+      "model_code": null,
+      "version": "v0.1",
+      "status": "trial",
+      "content_hash": "f8f39f7afa2a19f02fea63c36b3aa15370041fe2768cf66cbaf3c42d82c82b5e",
+      "tested_model_id": "MODEL-9985441C",
+      "tested_content_hash": "f8f39f7afa2a19f02fea63c36b3aa15370041fe2768cf66cbaf3c42d82c82b5e",
+      "function_dependencies": {
+        "manual_cost_curve": {
+          "revision": 1,
+          "content_hash": "0de6818c493b3a20b0f38d79b71a21114d5035cd0dd6cb05768ddb09f0b43d7a",
+          "points": [
+            [
+              0.0,
+              0.0
+            ],
+            [
+              10.0,
+              20.0
+            ],
+            [
+              20.0,
+              60.0
+            ]
+          ]
+        }
+      },
+      "component_dependencies": {
+        "manifest_hash": "815d8849e57af3472499b996440c5a031441eaeefff8afc61dea0296433a2ff0",
+        "assets": {
+          "function_mapping_component": {
+            "component_id": "function_mapping_component",
+            "revision": 1,
+            "version": "1.0.0",
+            "content_hash": "6d31fb4ccfa30e8eca40b3809fda79e2fd24d0f8cd7b7f7290a11c9bb7201659"
+          }
+        }
+      }
+    },
+    {
+      "id": "MODEL-A67FA232",
+      "name": "手册教程四 组件装配",
+      "model_code": null,
+      "version": "v0.1",
+      "status": "developing",
+      "content_hash": "983a398db754f01e68ad4f67b79c27bbec05d5ae99113ecf2e9b48d74948be35",
+      "tested_model_id": null,
+      "tested_content_hash": null,
+      "function_dependencies": {},
+      "component_dependencies": {},
+      "test_submit_error": "UI: Request failed with status code 422; no task created; unresolved"
+    }
+  ],
+  "component": {
+    "component_id": "manual_cap_cost",
+    "name": "手册容量与线性费用",
+    "version": "1.0.0",
+    "status": "published",
+    "lifecycle_status": null
+  },
+  "function_revision": {
+    "function_id": "manual_cost_curve",
+    "name": "手册费用曲线",
+    "revision": 2,
+    "points": [
+      [
+        0.0,
+        0.0
+      ],
+      [
+        10.0,
+        30.0
+      ],
+      [
+        20.0,
+        80.0
+      ]
+    ],
+    "content_hash": "be8b9726224d47ce54a1ed9f3d6aaff319d9ca138a7729049c6327381dffa3c9"
+  },
+  "skill_invocations": [
+    {
+      "invocation_id": "INV-618537A06A",
+      "model_id": "MODEL-FF80294E",
+      "model_version": "v0.1",
+      "skill_name": "run_model_mvhofn1l_fqz0",
+      "status": "SUCCESS",
+      "task_id": "OPT-CC8B17FA70"
+    }
+  ],
+  "screenshots": [
+    {
+      "file": "01-formula-index.png",
+      "sha256": "c1aa8ba0635191860e34386831d67d5a49ec7a8495976cc2ab3467ba7a8bf2fe",
+      "bytes": 72577
+    },
+    {
+      "file": "02-one-dimensional-result.png",
+      "sha256": "e412ed0ec780081365afda2bf4f106e9900f9b8b4abc1168a309baeac0d17703",
+      "bytes": 51968
+    },
+    {
+      "file": "03-set-members-error.png",
+      "sha256": "43a680d0b5ff5b164b22f0d26943487f0cd2c1e1a9a77b5e134eaae228065c81",
+      "bytes": 54983
+    },
+    {
+      "file": "04-set-members-filled.png",
+      "sha256": "4cc89f9aa30371440c5086693f1869e8d9e6ef129fbb12b1027c14a4119a8579",
+      "bytes": 55440
+    },
+    {
+      "file": "05-two-dimensional-result.png",
+      "sha256": "69074e835d196dbd0e8df0db2b469110270523563408461f25f6325d492e9ad0",
+      "bytes": 79829
+    },
+    {
+      "file": "06-function-csv.png",
+      "sha256": "cdccf19739acbc76a74a58cc4956f60855fb2d887d86524e62cc5752d95c1300",
+      "bytes": 96998
+    },
+    {
+      "file": "07-function-binding.png",
+      "sha256": "cdc9d5925421b945355951b68436192f0f80b73322450998329684437fe7933f",
+      "bytes": 120405
+    },
+    {
+      "file": "08-function-result-blocker.png",
+      "sha256": "c41a6419851c9d971d12d704ca5692808a795b88f4b0a7a84c3e91cd2747a1ac",
+      "bytes": 98072
+    },
+    {
+      "file": "09-component-validation-blocker.png",
+      "sha256": "c751feb5acc60062bd9db6c398d0ad95ea6b98ed69a173e28ae0cb1406fbc762",
+      "bytes": 73512
+    },
+    {
+      "file": "10-agent-package-enabled.png",
+      "sha256": "cbca53e3b72ca6473e1830f79506d813f7297a90a125ec62d08301c7738c831a",
+      "bytes": 114743
+    },
+    {
+      "file": "11-skill-test-result.png",
+      "sha256": "f460fb0190a2ff47ec58a3f643bff8ef09a8c034238b773bc2b7657e50525c38",
+      "bytes": 98918
+    },
+    {
+      "file": "12-service-async-result.png",
+      "sha256": "424a8444d6e206da1bd00bab41be156e82912d307669e2125563f5819a4649b9",
+      "bytes": 124938
+    },
+    {
+      "file": "13-component-published.png",
+      "sha256": "c07a05e098aca3a28e72a662318300802ccbf5ea9b17587a22d99ce4837b1267",
+      "bytes": 64925
+    },
+    {
+      "file": "14-component-binding.png",
+      "sha256": "f8d2684e440cf83f1972b46ae73dd15024c69d7a7732d8fe80e4069ee5971268",
+      "bytes": 91958
+    },
+    {
+      "file": "15-component-model-blocker.png",
+      "sha256": "db3871144573a8d526008fbc64b3be30f4b3934eef9525162c5cfd82b2bbfc77",
+      "bytes": 97774
+    },
+    {
+      "file": "16-function-revision-two.png",
+      "sha256": "42f07b95d205e7c1fef850c2fa3e203a97ed516ebd6ee5ab67bcedcfe7e0399d",
+      "bytes": 104312
+    },
+    {
+      "file": "17-function-pinned-revision.png",
+      "sha256": "4e35b8c3ece6451cf10af0f0e6b5438ef3ebfc66e13920a0e91962b5de695a79",
+      "bytes": 106563
+    }
+  ]
+}

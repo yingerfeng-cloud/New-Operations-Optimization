@@ -5,6 +5,7 @@ from copy import deepcopy
 from app.services.result_interpreter import result_interpreter
 from app.variable_contract import normalize_variables
 from app.model_dimensions import extract_dimensions
+from app.services.result_diagnostics import result_diagnostics
 
 from app.explainers.constraint_analyzer import constraint_analyzer
 from app.explainers.metric_engine import metric_engine
@@ -25,6 +26,7 @@ class EvidenceBuilder:
         explanation_spec: dict[str, Any] | None = None,
         skill_definition: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
+        result = {**result, **result_diagnostics(result)}
         metadata = dict(skill_metadata or {})
         definition = dict(skill_definition or {})
         declared_explanation = dict(explanation_spec or definition.get("explanation_spec") or {})
@@ -70,6 +72,9 @@ class EvidenceBuilder:
             limitations.append("本次求解未形成可直接采用的有效优化方案。")
         if not checks:
             limitations.append("结果未返回可核验的约束检查明细。")
+        unchecked = (result.get("constraint_violation_summary") or {}).get("unchecked_count")
+        if isinstance(unchecked, int) and unchecked > 0:
+            limitations.append(f"有 {unchecked} 条约束缺少可核验数值，未完成检查。")
         objective = declared_explanation.get("objective") or {}
         business_outcomes = result_interpreter.business_evidence(model_spec, variables) if status in {"success", "optimal", "feasible", "completed"} else {}
         return {

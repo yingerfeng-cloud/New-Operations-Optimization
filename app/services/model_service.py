@@ -159,10 +159,20 @@ class ModelService:
                 raise HTTPException(status_code=409, detail={"code": "FORMAL_VERSION_CHANGED", "message": "正式版本已经切换，请基于当前正式版本准备更新。"})
         current_hash = self._content_hash(ModelPackage.model_validate(model.model_dump()))
         self._validate_publish_code_ownership(model)
-        normalized_model = self._normalize_component_model(ModelPackage(**model.model_dump()))
-        normalized_model = self._normalize_generic_formula_model(normalized_model)
-        normalized_model = self._apply_generalized_top_level_fields(normalized_model)
-        normalized_model = self._normalize_time_dimension_contract(normalized_model)
+        # Re-publishing an offline immutable revision must use the very same
+        # definition that was tested, including its historical compiler data.
+        normalized_model = ModelPackage.model_validate(self._canonical_model_for_test(model).model_dump())
+        comparison_model = normalized_model
+        if model.tested_content_hash == current_hash:
+            # Async tests replace recommendations with the actual solver and
+            # problem class. This alone does not change the executable model;
+            # still run publish's diagnosis against the normalized definition.
+            comparison_model = normalized_model.model_copy(update={
+                "solver": model.solver, "problem_type": model.problem_type,
+                "model_problem_type": model.model_problem_type,
+            })
+        if model.tested_content_hash and self._content_hash(comparison_model) != current_hash:
+            raise HTTPException(status_code=409, detail={"code": "MODEL_TEST_OUTDATED", "message": "模型执行定义在规范化后发生变化，请退回草稿保存并重新测试后再发布。"})
         diagnosis = self._diagnose_problem_type(normalized_model)
         if not diagnosis.get("publish_valid", True):
             problem_errors, _ = validate_problem_type_override(diagnosis)
@@ -845,11 +855,22 @@ class ModelService:
         with STORE.lock:
             return sorted(STORE.assets.values(), key=lambda item: item.created_at, reverse=True)
 
+    def _canonical_model_for_test(self, model):
+        # Test and publish must retain the same server-normalized definition.
+        # Published versions stay immutable during verification runs.
+        if model.published_at:
+            return model
+        normalized = self._normalize_component_model(ModelPackage.model_validate(model.model_dump()))
+        normalized = self._normalize_generic_formula_model(normalized)
+        normalized = self._apply_generalized_top_level_fields(normalized)
+        normalized = self._normalize_time_dimension_contract(normalized)
+        return model.model_copy(update=normalized.model_dump())
+
     def run_model_test_case(self, model_id: str, test_case: dict[str, Any]) -> ModelView:
         model = self.get_model(model_id)
         source_hash = self._content_hash(model)
         from app.services.component_dependencies import prepare_model_dependencies
-        model = prepare_model_dependencies(model)
+        model = prepare_model_dependencies(self._canonical_model_for_test(model))
         from app.solvers.run_settings import validate_run_settings
         settings = validate_run_settings(test_case.get("solver_config") or {})
         params = test_case.get("parameters") if "parameters" in test_case or "solver_config" in test_case else test_case
@@ -880,7 +901,7 @@ class ModelService:
         from app.services.job_service import job_service
         model = self.get_model(model_id)
         from app.services.component_dependencies import prepare_model_dependencies
-        model = prepare_model_dependencies(model)
+        model = prepare_model_dependencies(self._canonical_model_for_test(model))
         parameters = test_case.get("parameters") or self._default_test_parameters(model)
         from app.solvers.run_settings import validate_run_settings
         settings = validate_run_settings(test_case.get("solver_config") or {})
@@ -904,6 +925,8 @@ class ModelService:
         model = self.get_model(task.request.model_id)
         if self._content_hash(model) != context["source_hash"]:
             raise RuntimeError("MODEL_TEST_OUTDATED: 模型在测试期间发生修改，请测试当前版本。")
+        if context.get("prepared_model"):
+            model = model.model_copy(update=ModelPackage.model_validate(context["prepared_model"]).model_dump())
         model = model.model_copy(update={"function_dependencies": context["dependencies"], "component_dependencies": context["component_dependencies"],
             "solver": task.result.get("solver_name") or task.request.solver,
             "problem_type": task.result.get("problem_type") or model.problem_type,
@@ -997,6 +1020,7 @@ class ModelService:
             if is_component_based and not component_spec:
                 errors.append({"field": "component_spec", "error": "component_spec is required before publish"})
             if is_component_based:
+                errors.extend(component_spec.get("model_formula_errors") or [])
                 errors.extend(self._validate_component_sets(model))
                 from app.services.function_dependencies import dependency_snapshots
                 function_errors, function_warnings = self._validate_function_asset_bindings(component_spec, dependency_snapshots(model) if model.function_dependencies else None)

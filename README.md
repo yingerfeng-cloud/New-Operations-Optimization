@@ -2,6 +2,8 @@
 
 > 让复杂约束，生成最优决策。
 
+详细使用方法见 [OptiForge 用户详细使用手册](docs/user-manual.md)，包含日常求解、一维与二维建模、完整输入示例、结果解读、组件与曲线绑定、Skill 与 Agent、备份及故障处理。
+
 策擎是面向安全生产、电力与能源优化场景的模型资产与求解平台。英文名称为 OptiForge，简称“策擎”。后端使用 FastAPI + Pyomo + HiGHS，正式前端使用 Vite + React + TypeScript，前端源码和页面入口统一位于 `frontend/`。
 
 ## 技术栈

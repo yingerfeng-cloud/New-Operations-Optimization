@@ -7,6 +7,7 @@ import app.model_components  # noqa: F401
 from fastapi import APIRouter, HTTPException
 
 from app.model_components.dependency_graph import component_dependency_ids, component_id, component_is_available, selected_dependency_errors
+from app.model_components.formula_contracts import formula_expression
 from app.model_components.formula_components import normalize_component_payload as normalize_formula_component
 from app.model_components.formula_components import validate_component_definition
 from app.model_components.lifecycle import (
@@ -225,6 +226,11 @@ def publish_component(component_id: str) -> dict:
         raise HTTPException(status_code=422, detail={"message": "组件发布校验失败", "errors": errors})
     from app.services.component_dependencies import assert_not_revoked, component_hash
     assert_not_revoked(component_id)
+    # Execution support is a server-validated property, never an editor flag.
+    for section in ("objective_terms", "generated_objective_terms"):
+        for term in normalized.get(section) or []:
+            if formula_expression(term):
+                term["supported_by_backend"] = True
     normalized["status"] = COMPONENT_PUBLISHED_STATUS
     normalized["content_hash"] = component_hash(normalized)
     normalized["published_at"] = now_text()

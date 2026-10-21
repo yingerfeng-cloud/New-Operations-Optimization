@@ -1,0 +1,9 @@
+
+ RUN  v4.1.12 /Users/joiefu/Project/OPTIFORGE/frontend
+
+
+ Test Files  1 passed (1)
+      Tests  18 passed (18)
+   Start at  21:52:35
+   Duration  29.78s (transform 74ms, setup 134ms, import 126ms, tests 29.18s, environment 287ms)
+

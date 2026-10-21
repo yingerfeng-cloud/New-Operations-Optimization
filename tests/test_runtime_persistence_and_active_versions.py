@@ -376,7 +376,7 @@ def test_skill_and_agent_gateway_invoke_active_user_version(monkeypatch) -> None
     assert agent_response["resolved_model_id"] == user.id
 
 
-def test_publish_new_version_switches_skill_and_agent_to_new_asset(monkeypatch) -> None:
+def test_publish_new_version_switches_skill_and_agent_to_new_asset() -> None:
     if not has_pyomo():
         pytest.skip("pyomo is required for publish dry-run")
     pytest.importorskip("highspy")
@@ -389,10 +389,13 @@ def test_publish_new_version_switches_skill_and_agent_to_new_asset(monkeypatch) 
     code = f"active_version_{uuid.uuid4().hex[:8]}"
     payload["semantic_spec"]["model_code"] = code
     first_draft = model_service.create_model(ModelPackage.model_validate(payload))
-    model_service.run_model_test_case(first_draft.id, {"parameters": first_draft.parameters})
+    runtime_inputs = {item["math_param"]: item["sample_value"] for item in payload["semantic_spec"]["parameters"]}
+    first_test = model_service.run_model_test_case(first_draft.id, {"parameters": runtime_inputs})
+    assert first_test.dry_run_result["solver_check"]["status"] == "passed"
     first = model_service.publish_model(first_draft.id)
     second_draft = model_service.create_model_version(first.id, {"name": f"{first.name}-v2"})
-    model_service.run_model_test_case(second_draft.id, {"parameters": second_draft.parameters})
+    second_test = model_service.run_model_test_case(second_draft.id, {"parameters": runtime_inputs})
+    assert second_test.dry_run_result["solver_check"]["status"] == "passed"
     second = model_service.publish_model(second_draft.id)
     skill_name = f"run_{code}"
 
@@ -404,10 +407,11 @@ def test_publish_new_version_switches_skill_and_agent_to_new_asset(monkeypatch) 
     with STORE.lock:
         STORE.skills[skill_name] = {"skill_name": skill_name, "model_id": first.id, "status": "enabled"}
 
-    monkeypatch.setattr(invocation_service, "model_schema", lambda model_id: {"model_id": model_id, "model_code": code, "input_schema": []})
-    monkeypatch.setattr(invocation_service, "invoke_model", lambda model_id, body: {"status": "SUCCESS", "model_id": model_id})
-    skill_response = skill_registry.run_skill(skill_name, {"parameters": {}, "options": {"strict_runtime_parameters": False}})
-    agent_response = InProcessPlatformGateway().run_skill(skill_name, {"parameters": {}, "options": {"strict_runtime_parameters": False}})
+    skill_response = skill_registry.run_skill(skill_name, {"parameters": runtime_inputs, "options": {"mode": "sync"}})
+    agent_response = InProcessPlatformGateway().run_skill(skill_name, {"parameters": runtime_inputs, "options": {"mode": "sync"}})
 
-    assert skill_response["resolved_model_id"] == second.id
-    assert agent_response["resolved_model_id"] == second.id
+    for response in (skill_response, agent_response):
+        assert response["resolved_model_id"] == second.id
+        assert response["status"] == "SUCCESS", response
+        assert response["objective_value"] == pytest.approx(3800)
+        assert response["task_id"] in STORE.tasks

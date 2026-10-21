@@ -84,6 +84,11 @@ class TaskView(BaseModel):
     horizon: int | None = None
     interval_minutes: float | None = None
     attempt_history: list[dict[str, Any]] = Field(default_factory=list)
+    problem_type: str | None = None
+    solver_available: bool | None = None
+    termination_condition: str | None = None
+    constraint_violation_summary: dict[str, Any] = Field(default_factory=dict)
+    local_optimum_warning: bool | None = None
 
 
 @dataclass
@@ -124,6 +129,9 @@ class TaskRecord:
             return None
 
     def view(self) -> TaskView:
+        from app.services.result_diagnostics import result_diagnostics
+
+        diagnostics = result_diagnostics(self.result or {})
         objective_value = self.resolved_objective_value()
         payload = self.request.payload or {}
         semantic = payload.get("semantic_spec") or {}
@@ -160,6 +168,7 @@ class TaskRecord:
             model_version=context.get("version"), model_content_hash=context.get("content_hash"),
             horizon=payload.get("horizon"), interval_minutes=payload.get("interval_minutes"),
             attempt_history=list(self.attempt_history),
+            **diagnostics,
         )
 
 

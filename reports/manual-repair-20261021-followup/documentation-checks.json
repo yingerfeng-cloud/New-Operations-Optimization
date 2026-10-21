@@ -1,0 +1,56 @@
+{
+  "checked_at": "2026-10-21T23:31:23.978419+08:00",
+  "documents": [
+    {
+      "file": "README.md",
+      "local_links": 9,
+      "sha256": "eeb85633c4112005d3f6378c2cf289daa58916628b3fb4c9b1238cc5a178da3e"
+    },
+    {
+      "file": "OPERATION_MANUAL.md",
+      "local_links": 1,
+      "sha256": "57d4786cca2f70959c0859a1dcbcb6ca25f409bdddbcdb884359437a4af3ac63"
+    },
+    {
+      "file": "docs/user-manual.md",
+      "local_links": 74,
+      "sha256": "826dbd3c28909a1b69672b812c18298b8326c05cefeaedf25d3a3183706daa4c"
+    },
+    {
+      "file": "docs/manual-repair-acceptance-2026-10-21.md",
+      "local_links": 58,
+      "sha256": "03af91489559ce3bd585d2f06a67bbe535cff503edec328c269507a03a67e387"
+    },
+    {
+      "file": "docs/user-manual-validation-2026-10-21.md",
+      "local_links": 24,
+      "sha256": "87a6a839a2666a6b62b49906224d9facc1bb064c4a099d54eaa18714defab596"
+    },
+    {
+      "file": "docs/independent-ui-acceptance-2026-10-21.md",
+      "local_links": 53,
+      "sha256": "7a2aa16ccc16beafec758808f93bf77bfff67bc96b4c326ef01aad7abbaabb82"
+    },
+    {
+      "file": "docs/manual-followup-closure-2026-10-21.md",
+      "local_links": 41,
+      "sha256": "0e529842f62df8e90a25ecdb4cadf4d9badffa239c5ce6a56fbf1767e8d90a3b"
+    },
+    {
+      "file": "docs/independent-ui-acceptance-followup-2026-10-21.md",
+      "local_links": 20,
+      "sha256": "d3e6882f1e3d09435bab1fcce0a3d40427e529169bb1446d0908892e45a98464"
+    }
+  ],
+  "missing": [],
+  "manual_json_blocks_checked": 10,
+  "sample_json_valid": true,
+  "evidence_json_files_checked": 23,
+  "evidence_jpeg_files_checked": 27,
+  "source_files_checked": 47,
+  "source_files_changed_since_test": [],
+  "engineering_log_hashes_match": true,
+  "evidence_manifest": "docs/manual-assets/2026-10-21-followup/verification.json",
+  "evidence_manifest_sha256": "5921cfc38055ac3f65c47f40f075282c639fe6ff5f912533839d5d2702a3437f",
+  "git_diff_check": "PASS"
+}

@@ -239,8 +239,14 @@ export function ModelGenericPanel({ model, detail = {} }: { model: ModelAsset; d
   const spec = genericSpecFrom(model, detail);
   const setRows = Object.entries(objectValue(spec.sets)).map(([name, value]) => ({ name, value: Array.isArray(value) ? value.join(', ') : value }));
   const objective = mathObjectiveFrom(model, detail, spec);
-  const termRows = arrayValue(objective.terms);
-  const constraintRows = mathConstraintsFrom(model, detail, spec);
+  const sources = arrayValue(spec.formula_artifacts);
+  const withCompiledSource = (row: Row): Row => {
+    const identifier = row.source_formula_id || row.formula_id;
+    const source = identifier ? sources.find(item => item.formula_id === identifier) : undefined;
+    return { ...row, normalized_expression: row.normalized_expression || (source && source.normalized_expression) };
+  };
+  const termRows = arrayValue(objective.terms).map(withCompiledSource);
+  const constraintRows = mathConstraintsFrom(model, detail, spec).map(withCompiledSource);
   return (
     <Space orientation="vertical" size={14} style={{ width: '100%' }}>
       <Card size="small" title="generic_spec 集合">

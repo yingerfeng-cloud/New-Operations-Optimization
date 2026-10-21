@@ -62,7 +62,7 @@ test('solve_active formula cannot be applied until authoritative compilation suc
   const expression = 'sum(unit_output[u,t] for u in unit) >= load_forecast[t]';
   await setFormula(expression);
   expect(screen.getByRole('button', { name: '应用公式' })).toBeDisabled();
-  analyzeFormulaMock.mockResolvedValueOnce(compiledResult(expression));
+  analyzeFormulaMock.mockResolvedValueOnce({ ...compiledResult(expression), scope: [{ alias: 't', set: 'time' }] });
   fireEvent.click(screen.getByRole('button', { name: '后端编译与展开' }));
   await screen.findByText(/后端权威编译通过/);
   await waitFor(() => expect(screen.getByRole('button', { name: '应用公式' })).toBeEnabled());
@@ -87,6 +87,22 @@ test('inserts variable at cursor and applies', async () => {
   await waitFor(() => expect(screen.getByRole('button', { name: '应用公式' })).toBeEnabled());
   fireEvent.click(screen.getByRole('button', { name: '应用公式' }));
   expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ referenced_variables: expect.arrayContaining(['p_grid']) }));
+});
+
+test('applying an inferred iterator saves the real set code for draft round trips', async () => {
+  const onChange = vi.fn();
+  render(<FormulaEditor onChange={onChange} symbols={symbols} />);
+  const expression = 'p_grid[t] >= load[t]';
+  await setFormula(expression);
+  analyzeFormulaMock.mockResolvedValueOnce({ ...compiledResult(expression), scope: [{ alias: 't', set: 'time' }] });
+  await act(async () => {
+    fireEvent.click(screen.getByRole('button', { name: '后端编译与展开' }));
+  });
+  expect(screen.getByRole('button', { name: '应用公式' })).toBeEnabled();
+  fireEvent.click(screen.getByRole('button', { name: '应用公式' }));
+  expect(onChange).toHaveBeenCalledWith(expect.objectContaining({
+    foreach: ['time'], free_indices: ['t'], scope: [{ alias: 't', set: 'time' }],
+  }));
 });
 
 test('offers click-to-insert tags for symbols, operators and function syntax', () => {

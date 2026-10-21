@@ -301,12 +301,25 @@ class RuntimeParameterValidator:
             except RuntimeError as exc:
                 return [{"field": "runtime_parameters", "error": str(exc)}]
         members = self._semantic_set_members(semantic_spec, runtime_parameters)
+        component_spec = semantic_spec.get("component_spec") or {}
+        runtime_validation = (semantic_spec.get("ui_metadata") or {}).get("runtime_validation") or (component_spec.get("ui_metadata") or {}).get("runtime_validation") or {}
         for param in parameter_definitions:
             code = str(param.get("math_param") or param.get("code") or param.get("key") or "")
             if code and code in runtime_parameters:
                 contract = {"key": code, **parameter_input_contract(param, members)}
                 error = validate_parameter_input(contract, runtime_parameters[code], runtime_parameters)
                 if error:
+                    # Keep structured coordinates while honoring the model's
+                    # declared business vocabulary for shape errors.
+                    if error.get("error") == "length mismatch" and runtime_validation.get("error_prefix"):
+                        dimensions = extract_dimensions(param)
+                        coordinates = re.findall(r"\[([^\]]*)\]", str(error.get("field") or ""))
+                        labels = runtime_validation.get("dimension_labels") or {}
+                        location = "、".join(f"{labels.get(dimensions[i], dimensions[i])} {value}" for i, value in enumerate(coordinates) if i < len(dimensions))
+                        axis = dimensions[len(coordinates)] if len(coordinates) < len(dimensions) else "time"
+                        expected_axis = "horizon" if axis == "time" else str(labels.get(axis) or axis)
+                        message = f"{runtime_validation['error_prefix']}：{location + ' 的 ' if location else ''}{code} 长度为 {error['actual']}，但 {expected_axis} 为 {error['expected']}。"
+                        error = {**error, "error_code": "PARAMETER_LENGTH_MISMATCH", "error": message, "message": message}
                     errors.append(error)
         if errors:
             return errors

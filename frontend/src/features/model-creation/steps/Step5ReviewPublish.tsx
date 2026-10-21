@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import type { ModelAsset } from '../../../types/model';
 import type { ModelDraft } from '../stores/modelCreationStore';
 import type { DraftValidation } from '../utils/validateModelDraft';
+import { requestErrorMessage } from '../../../api/client';
 import { JsonViewer } from '../../../components/JsonViewer';
 import { analyzeDraftNonlinear } from '../utils/nonlinearDiagnostics';
 import { getSolverStatus, type SolverStatusResponse } from '../../../api/solvers';
@@ -149,7 +150,7 @@ export function Step5ReviewPublish({
       setTestResult(result);
       message.success('测试运行完成');
     } catch (exc) {
-      const text = String(exc);
+      const text = requestErrorMessage(exc);
       setError(text);
       message.error(text);
     }
@@ -161,9 +162,9 @@ export function Step5ReviewPublish({
       <Alert
         className="compact-step-note"
         showIcon
-        type={validation.valid ? 'success' : 'error'}
-        title={validation.valid ? '发布前校验全部通过' : '存在阻断项，不能发布'}
-        description="语义、公式、组件依赖、参数绑定、问题类型与求解器兼容性已统一检查。"
+        type={validation.valid && !error ? 'success' : 'error'}
+        title={error ? '后端测试未通过，不能发布' : validation.valid ? '本地检查通过，仍需后端测试确认' : '存在阻断项，不能发布'}
+        description="本地检查用于发现配置问题；保存后需通过后端测试并核对结果，才可发布。"
       />
       {error && <Alert className="section-gap compact-step-note" showIcon type="error" title="发布前检查未通过" description={`请根据检查清单修复模型配置后重试。原始错误：${error}`} />}
       {testRevisionState === 'outdated' && (

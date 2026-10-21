@@ -1,8 +1,8 @@
 import { Collapse, Space, Typography } from 'antd';
 
 export function FormulaDisplay({ row }: { row: Record<string, unknown> }) {
-  const readable = String(row.display_formula || row.readable_formula || row.formula || row.expression || row.dsl_formula || row.math_expression || row.name || '-');
-  const dsl = String(row.dsl_formula || row.formula || row.expression || row.math_expression || '-');
+  const readable = String(row.display_formula || row.readable_formula || row.formula || row.expression || row.dsl_formula || row.normalized_expression || row.math_expression || row.name || '-');
+  const dsl = String(row.dsl_formula || row.formula || row.expression || row.normalized_expression || row.math_expression || '-');
   return (
     <Space orientation="vertical" size={4}>
       <Typography.Text>{readable}</Typography.Text>

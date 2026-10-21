@@ -5,7 +5,7 @@ from typing import Any
 
 import app.model_components  # noqa: F401
 from app.model_components.dependency_graph import merged_component_dependency_ids
-from app.model_components.formula_components import normalize_component_payload
+from app.model_components.formula_components import normalize_component_payload, validate_component_definition
 from app.model_components.formula_contracts import (
     formula_expression,
     participates_in_solve,
@@ -206,6 +206,10 @@ def finalize_model_draft(draft: dict[str, Any]) -> dict[str, Any]:
         component["generated_objective_terms"] = [_normalize_objective_term(item, source_component=component_id) for item in component.get("generated_objective_terms") or []]
     objective = draft.setdefault("objective", {})
     objective["terms"] = [_normalize_objective_term(item, source_component=item.get("source_component")) for item in objective.get("terms") or []]
+    if basic.get("builder_mode") == "component_based":
+        objective.setdefault("type", "weighted_sum")
+        from app.model_formula_bridge import synchronize_model_formulas
+        synchronize_model_formulas(draft)
     draft["objective_strategy"] = generate_objective_strategy(draft.get("objective") or {})
     runtime = draft.setdefault("runtime_parameters", {})
     for item in semantic.get("sets") or []:
@@ -489,6 +493,8 @@ def build_component_spec_from_draft(draft: dict[str, Any]) -> dict[str, Any]:
         "objective": {"type": "weighted_sum", "sense": objective.get("sense", "minimize"), "terms": objective.get("terms", [])},
         "objective_strategy": deepcopy(draft.get("objective_strategy") or generate_objective_strategy(objective)),
         "additional_custom_constraints": deepcopy(draft.get("constraints") or []),
+        "model_formula_constraints": deepcopy(draft.get("model_formula_constraints") or []),
+        "model_formula_errors": deepcopy(draft.get("model_formula_errors") or []),
     }
 
 
@@ -529,8 +535,13 @@ def _component_items(draft: dict[str, Any], key: str) -> list[dict[str, Any]]:
         if component.get("enabled", True) is False:
             continue
         definition = component.get("definition") or _component_definition_or_metadata(str(component.get("type") or component.get("component_id")))
+        bindings = component.get("parameter_bindings") or []
+        mapped = {str(binding.get("component_parameter") or binding.get("parameter") or "")
+                  for binding in bindings if isinstance(binding, dict)
+                  and (binding.get("model_parameter") or binding.get("runtime_key"))
+                  and (binding.get("model_parameter") or binding.get("runtime_key")) != (binding.get("component_parameter") or binding.get("parameter"))}
         for item in definition.get(key, []) or []:
-            if isinstance(item, dict):
+            if isinstance(item, dict) and not (key == "parameters" and str(item.get("code")) in mapped):
                 rows.append(deepcopy(item))
     return rows
 
@@ -665,7 +676,7 @@ def build_constraints_from_draft(draft: dict[str, Any]) -> list[dict[str, Any]]:
                 "editable": True,
             }
         )
-    return rows
+    return rows + deepcopy(draft.get("model_formula_constraints") or [])
 
 
 def build_mathematical_expansion(draft: dict[str, Any]) -> dict[str, Any]:
@@ -938,7 +949,10 @@ def _objective_from_components(components: list[dict[str, Any]], objective_spec:
         existing = terms[existing_index]
         canonical_term_id = existing.get("term_id")
         source_component = existing.get("source_component")
+        validated_support = existing.get("supported_by_backend") is True
         existing.update(item)
+        if validated_support and formula_expression(existing):
+            existing["supported_by_backend"] = True
         if canonical_term_id:
             existing["term_id"] = canonical_term_id
         if source_component and not item.get("source_component"):
@@ -947,8 +961,15 @@ def _objective_from_components(components: list[dict[str, Any]], objective_spec:
             term_indexes[value] = existing_index
 
     for component in components:
+        definition = component.get("definition") or {}
+        validated_dynamic = None
         for term in component.get("generated_objective_terms") or []:
             item = _normalize_objective_term(term, source_component=component.get("component_id") or component.get("type"))
+            if formula_expression(item) and not item.get("supported_by_backend") and definition and not definition.get("backend_builder"):
+                if validated_dynamic is None:
+                    validated_dynamic = validate_component_definition(definition).get("execution_ready", False)
+                if validated_dynamic:
+                    item["supported_by_backend"] = True
             key = item.get("weight_key")
             if key in weights:
                 item["weight"] = weights[key]
@@ -959,7 +980,7 @@ def _objective_from_components(components: list[dict[str, Any]], objective_spec:
         if key in weights and item.get("weight") is None:
             item["weight"] = weights[key]
         merge_explicit_term(item)
-    return {"sense": objective_spec.get("sense", "minimize"), "terms": terms}
+    return {**objective_spec, "sense": objective_spec.get("sense", "minimize"), "terms": terms}
 
 
 def _generic_objective(template: dict[str, Any]) -> dict[str, Any]:

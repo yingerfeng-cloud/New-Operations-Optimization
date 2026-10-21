@@ -1,9 +1,25 @@
 import { render, screen } from '@testing-library/react';
 import { expect, test } from 'vitest';
-import { SolverProgressPanel, TaskExplanationPanel, TaskInputPanel, TaskResultPanel, TaskTimelinePanel } from '../../features/task-center/TaskPanels';
+import { SolverProgressPanel, TaskExplanationPanel, TaskInputPanel, TaskOverviewPanel, TaskResultPanel, TaskTimelinePanel } from '../../features/task-center/TaskPanels';
 import type { SolveTask } from '../../types/task';
 
 const task = (overrides: Partial<SolveTask> = {}): SolveTask => ({ id: 'T1', model_id: 'M1', model: '调度模型', scene: '日前调度', solver: 'HiGHS', status: 'SUCCESS', progress: 100, cost: 10, created_at: '2026-07-12', ...overrides });
+
+test('task overview shows measured solver termination and a readable zero-violation summary', () => {
+  render(<TaskOverviewPanel task={task({
+    termination_condition: 'optimal', solver_available: false,
+    constraint_violation_summary: { checked_count: 4, violated_count: 0, max_violation: 0, variable_checked_count: 2, bound_violated_count: 0, tolerance: 1e-6 },
+  })} />);
+  expect(screen.getByText('optimal')).toBeInTheDocument();
+  expect(screen.getByText('false')).toBeInTheDocument();
+  expect(screen.getByText('已检查 4 条约束；违反 0 条；最大违反量 0；已检查 2 个变量边界；边界违反 0 个；检查容差 0.000001')).toBeInTheDocument();
+});
+
+test('task overview does not turn a missing check into a zero-violation success', () => {
+  render(<TaskOverviewPanel task={task({ constraint_violation_summary: {} })} />);
+  expect(screen.getByText('尚无可核验的约束检查结果')).toBeInTheDocument();
+  expect(screen.queryByText(/违反 0 条/)).not.toBeInTheDocument();
+});
 
 test('task input panel shows submitted business data and contract summary', () => {
   render(<TaskInputPanel task={task({ horizon: 24, interval_minutes: 60, runtime_parameters: { load: [10, 20], reserve: 5 }, data_source: '上传数据' })} />);

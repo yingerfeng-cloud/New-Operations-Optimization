@@ -12,6 +12,7 @@ from app.services.skill_definition_service import skill_definition_service
 from app.storage.memory_store import STORE
 from app.variable_contract import normalize_variables
 from app.model_dimensions import extract_dimensions
+from app.services.result_diagnostics import result_diagnostics
 
 
 class ResultPostProcessor:
@@ -28,6 +29,7 @@ class ResultPostProcessor:
         use_llm: bool = False,
     ) -> dict[str, Any]:
         output = deepcopy(result or {})
+        output.update(result_diagnostics(output))
         definition, source = self._definition(model, skill_name)
         canonical_skill_name = skill_name or definition.get("skill_name")
         processor_fallback: dict[str, Any] | None = None

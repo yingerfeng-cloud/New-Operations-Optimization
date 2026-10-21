@@ -117,6 +117,8 @@ export function FormulaManagementPanel({
         const updated = markFormulaCompiled({
           ...formula,
           scope: result.scope,
+          foreach: result.scope.map(row => row.set),
+          free_indices: result.scope.map(row => row.alias),
           diagnostics: result.diagnostics,
           ast_version: result.ast_version,
           compiler_version: result.compiler_version,

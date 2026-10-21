@@ -133,7 +133,12 @@ def _scan_node(path: str, value: Any, available_sets: set[str], errors: list[dic
                         "message": f"{_subject_name(path, value)} 引用了不存在的集合 {set_code}。",
                     })
         elif key in REFERENCE_FIELDS or is_term_index:
-            for set_code in _reference_codes(child):
+            codes = _reference_codes(child)
+            if key in {"foreach", "for_each"}:
+                aliases = {row["alias"]: row["set"] for row in value.get("scope") or []
+                           if isinstance(row, dict) and row.get("alias") and row.get("set")}
+                codes = [aliases.get(code, code) for code in codes]
+            for set_code in codes:
                 if set_code and set_code not in available_sets:
                     errors.append({
                         "field": child_path,

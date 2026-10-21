@@ -42,6 +42,22 @@ function text(value: unknown) {
   return JSON.stringify(value);
 }
 
+function constraintSummary(value: unknown) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return text(value);
+  const summary = value as Record<string, unknown>;
+  if (summary.max_violation === undefined || summary.max_violation === null) return '尚无可核验的约束检查结果';
+  const parts = [
+    summary.checked_count !== undefined ? `已检查 ${text(summary.checked_count)} 条约束` : undefined,
+    summary.violated_count !== undefined ? `违反 ${text(summary.violated_count)} 条` : undefined,
+    `最大违反量 ${text(summary.max_violation)}`,
+    summary.unchecked_count ? `未能检查 ${text(summary.unchecked_count)} 条` : undefined,
+    summary.variable_checked_count !== undefined ? `已检查 ${text(summary.variable_checked_count)} 个变量边界` : undefined,
+    summary.bound_violated_count !== undefined ? `边界违反 ${text(summary.bound_violated_count)} 个` : undefined,
+    summary.tolerance !== undefined ? `检查容差 ${text(summary.tolerance)}` : undefined,
+  ];
+  return parts.filter(Boolean).join('；');
+}
+
 function rowsFromObject(value: unknown) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return [];
   return Object.entries(value as Record<string, unknown>).map(([key, item], index) => ({ key, value: item, __row_key: `${key}-${index}` }));
@@ -131,7 +147,7 @@ export function TaskOverviewPanel({ task }: { task?: SolveTask }) {
         <Descriptions.Item label="重试次数">{text(task.retry_count || 0)}</Descriptions.Item>
         <Descriptions.Item label="创建时间">{task.created_at}</Descriptions.Item>
         <Descriptions.Item label="耗时">{formatDurationSeconds(task.duration_seconds)}</Descriptions.Item>
-        <Descriptions.Item label="约束违反摘要">{text(task.constraint_violation_summary ?? trace.constraint_violation_summary)}</Descriptions.Item>
+        <Descriptions.Item label="约束违反摘要">{constraintSummary(task.constraint_violation_summary ?? trace.constraint_violation_summary)}</Descriptions.Item>
         <Descriptions.Item label="局部最优提示">{text(task.local_optimum_warning ?? trace.local_optimum_warning)}</Descriptions.Item>
       </Descriptions>
     </>

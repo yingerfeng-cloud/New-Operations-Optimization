@@ -225,10 +225,19 @@ export function ResultConstraintsPanel({ result }: { result?: SolveResult }) {
       size="small"
       pagination={{ pageSize: 8 }}
       rowKey="__row_key"
-      dataSource={rowsFrom(result?.constraints || objectValue(result?.business_output).constraint_check || {}, 'constraint')}
+      dataSource={rowsFrom(result?.constraint_checks || result?.constraints || objectValue(result?.business_output).constraint_check || {}, 'constraint')}
       columns={[
         { title: '约束', dataIndex: 'key', render: (value, row) => text(value || row.name || row.constraint) },
-        { title: '检查结果', dataIndex: 'value', render: (value, row) => text(value ?? row.status ?? row.slack ?? row.binding) },
+        { title: '实际值', dataIndex: 'value', render: text },
+        { title: '下界', dataIndex: 'lower', render: text },
+        { title: '上界', dataIndex: 'upper', render: text },
+        { title: '余量', dataIndex: 'margin', render: text },
+        { title: '违反量', dataIndex: 'violation', render: text },
+        { title: '检查结果', dataIndex: 'status', render: (value, row) => {
+          const status = String(value || '');
+          const label = { binding: '触边', satisfied: '满足', violated: '违反', reported: '已返回' }[status];
+          return label ? <Tag color={status === 'violated' ? 'red' : status === 'reported' ? undefined : 'green'}>{label}</Tag> : text(value ?? row.value ?? row.slack ?? row.binding);
+        } },
       ]}
     />
   );

@@ -1,0 +1,158 @@
+{
+  "checked_at": "2026-10-22T00:03:21.747133+08:00",
+  "edition": "User edition updated 2026-10-22",
+  "documents": [
+    {
+      "file": "docs/user-manual.md",
+      "local_links_checked": 67,
+      "sha256": "deb0c591c818c56f8893d2bd74e6aa98cf52af0046760ebe72b7d37857c3cb69"
+    },
+    {
+      "file": "docs/user-manual-r4-archive-2026-10-21.md",
+      "local_links_checked": 74,
+      "sha256": "826dbd3c28909a1b69672b812c18298b8326c05cefeaedf25d3a3183706daa4c"
+    },
+    {
+      "file": "README.md",
+      "local_links_checked": 9,
+      "sha256": "052d2318772368ef51a67314869c75f7bffb336b86d707f2dbdf2d0397f146d3"
+    },
+    {
+      "file": "OPERATION_MANUAL.md",
+      "local_links_checked": 1,
+      "sha256": "a579af2967da4bf37101cf20af0c113d8ef6b3f4a535f0ddb2abaf2b5401565d"
+    },
+    {
+      "file": "docs/manual-followup-closure-2026-10-21.md",
+      "local_links_checked": 41,
+      "sha256": "d034f76b0a6526b444e8a23b4cefa6a7142afc4d16316899559bfa4fff1ae131"
+    },
+    {
+      "file": "docs/independent-ui-acceptance-followup-2026-10-21.md",
+      "local_links_checked": 21,
+      "sha256": "ebe06e7b6bd9db39895e922deadb544638d4a3f61cd70504f5ad7abe0181c381"
+    },
+    {
+      "file": "docs/manual-repair-acceptance-2026-10-21.md",
+      "local_links_checked": 59,
+      "sha256": "209e28d4d248f0d84e6376939943f004ff82705fe2bc97116affb1ad14ba4f8c"
+    },
+    {
+      "file": "docs/user-manual-validation-2026-10-21.md",
+      "local_links_checked": 25,
+      "sha256": "a1f63c90331ee6aa5aaffb3de2b47d032191c9269b08f5be9e75bc1499546ca5"
+    }
+  ],
+  "missing_links_or_anchors": [],
+  "main_chapters": 22,
+  "tables_checked": 39,
+  "format_errors": [],
+  "json_examples_checked": 10,
+  "json_examples_unchanged": true,
+  "engineering_narrative_removed": true,
+  "concrete_internal_run_ids_removed": true,
+  "retained_product_labels": [
+    "测试运行",
+    "最近测试通过",
+    "更新并测试",
+    "发起测试调用",
+    "运行测试",
+    "测试连接"
+  ],
+  "prior_R4_snapshot_byte_identical": true,
+  "source_fingerprints_checked": 47,
+  "product_sources_changed_this_revision": [],
+  "images": [
+    {
+      "file": "docs/manual-assets/2026-10-21-repair/independent/44-economic-result-160300.jpg",
+      "caption": "经济调度示例的目标值和机组出力",
+      "sha256": "763aa7f4bd2821158e6aa8e42283594330ab9a0e6b2fa08a70a5aee5197da077"
+    },
+    {
+      "file": "docs/manual-assets/2026-10-21-repair/independent/01-1d-constraint-2.jpg",
+      "caption": "图8-1 需求约束编译后展开为两条，索引t对应集合time",
+      "sha256": "59c53a7296af1bd4493d2ef14a611cd5e03a7131d0faf498cd1e5d75aea36637"
+    },
+    {
+      "file": "docs/manual-assets/2026-10-21-repair/independent/04-2d-empty-set-error.jpg",
+      "caption": "图 8-3：① 集合成员栏为空数组；② 保存时的非空成员错误。",
+      "sha256": "86924ef4fd8fd13b3c9a65b7b200307dafe1808ecc28ce484d0ec01f35f14143"
+    },
+    {
+      "file": "docs/manual-assets/2026-10-21-repair/independent/05-2d-members-recovered.jpg",
+      "caption": "图 8-4：同一位置填入 U1、U2；默认规模与实际成员分别填写。",
+      "sha256": "a457d5cf5701471fdd75633660ab66bde2a37677bfc5dc8da24d0898f5a87f56"
+    },
+    {
+      "file": "docs/manual-assets/2026-10-21-repair/independent/10-2d-result-17.jpg",
+      "caption": "图 8-5：目标值 17；U1 两时段各 4，U2 两时段为 2、4。",
+      "sha256": "0b0e7cd7b6a65518ba9fe225b9648e383e0942421463a24f90c991f625e7cbd6"
+    },
+    {
+      "file": "docs/manual-assets/2026-10-21-followup/independent/03-economic-overview.jpg",
+      "caption": "任务概览显示终止条件、约束摘要和变量边界检查",
+      "sha256": "62f3f6ed1dd63f0eef8669d56b802beb02a1f5bec292e38ed8c27186d13c46ad"
+    },
+    {
+      "file": "docs/manual-assets/2026-10-21-followup/independent/04-economic-constraints-p1.jpg",
+      "caption": "约束检查表展示实际值、边界、余量和违反量",
+      "sha256": "55dbfb6965229c7e4490f2492b31664f6a5769f1a605fb513e54a12ce8265eee"
+    },
+    {
+      "file": "docs/manual-assets/2026-10-21-repair/independent/08-component-published.jpg",
+      "caption": "图 12-1：组件发布后显示 published、可用于新模型；后续修改需复制为新草稿。",
+      "sha256": "7916294fefb8ab936bfe004bc95f82b83a14519cfc0c04051359550e05025b59"
+    },
+    {
+      "file": "docs/manual-assets/2026-10-21-repair/independent/12-component-binding-different-code.jpg",
+      "caption": "图 12-2：① 当前上下文 max_output；② 映射到模型参数 capacity_limit；③ time 索引；④ 保存并校验。",
+      "sha256": "ba3fbcbb41ab567280bdb5e81211130bbc75b37eb831b52ed059ef0b3a77f071"
+    },
+    {
+      "file": "docs/manual-assets/2026-10-21-repair/independent/17-component-result-20.jpg",
+      "caption": "图12-3 装配模型的出力为10、10，目标值为20",
+      "sha256": "e79fd8f71fd2dc4df0446c2bdf2cfa97b82d5a91813b311f82bd158f68fc104d"
+    },
+    {
+      "file": "docs/manual-assets/2026-10-21-repair/independent/16-curve-r1-import.jpg",
+      "caption": "图 12-4：CSV 内容、字段映射与三行预览均需核对后导入。",
+      "sha256": "c7342b202dd89b1689b8849f2a06a62de6df3f7d211059bb9e6b6bf78cd9aa7e"
+    },
+    {
+      "file": "docs/manual-assets/2026-10-21-repair/independent/24-curve-r1-result-40.jpg",
+      "caption": "图12-6 曲线r1模型的出力、费用率与目标值",
+      "sha256": "b69d3b8e384d9ed89bb6bc0918a81ad139bec8e002a61a9e7de240519c9461ee"
+    },
+    {
+      "file": "docs/manual-assets/2026-10-21-repair/independent/27-curve-r1-pinned-latest-r2.jpg",
+      "caption": "图 12-7：资产最新为 r2，模型仍固定使用 r1；未选择时“更新并测试”不可用。",
+      "sha256": "63309161a144305acd7a3163242fbdf56f1505bfd61fd6bce03d0e7c05fda23a"
+    },
+    {
+      "file": "docs/manual-assets/2026-10-21-repair/independent/29-curve-r2-comparison-55.jpg",
+      "caption": "图 12-8：r2候选对比，p不变、fee变为30/80、费用40→55，约束违反0→0。",
+      "sha256": "02e4cff41726015fde71d8ef19d6107e2db8e3a7b79c63772a72481efb81dff3"
+    },
+    {
+      "file": "docs/manual-assets/2026-10-21/12-service-async-result.jpg",
+      "caption": "图13-1 在线调试完成后显示任务编号、状态和模型ID",
+      "sha256": "424a8444d6e206da1bd00bab41be156e82912d307669e2125563f5819a4649b9"
+    },
+    {
+      "file": "docs/manual-assets/2026-10-21-repair/independent/37-agent-package-enabled.jpg",
+      "caption": "图14-1 Agent包的生成、校验与启用区域",
+      "sha256": "773d32749e617f03f5280e5145f5b41fa4feabec912dfe7afdb8e039a2bdb571"
+    },
+    {
+      "file": "docs/manual-assets/2026-10-21-followup/independent/11-skill-real-test-40.jpg",
+      "caption": "图14-2 Skill计算返回目标值和变量摘要",
+      "sha256": "8ea83e34660561914b8a415de64a2b85c06dbde50805149c05087f301b741ed8"
+    },
+    {
+      "file": "docs/manual-assets/2026-10-21-followup/independent/23-hydro-row-error-after-fix.jpg",
+      "caption": "参数问题明确显示availability的机组行、期望点数和实际点数",
+      "sha256": "5a672e7c485a6df884330db14f8c631af0674cd7fd8f10e2662d5de0ec7246ec"
+    }
+  ],
+  "git_diff_check": "PASS"
+}

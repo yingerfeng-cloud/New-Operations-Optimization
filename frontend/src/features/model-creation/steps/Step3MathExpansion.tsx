@@ -42,6 +42,11 @@ function schemaCode(row: Record<string, unknown>) {
   return String(row.code || row.key || row.name || '').trim();
 }
 
+function preferredComponentRows(component: Record<string, unknown>, canonical: string, legacy: string) {
+  const rows = componentRows(component, canonical);
+  return rows.length ? rows : componentRows(component, legacy);
+}
+
 function schemaDimension(row: Record<string, unknown>) {
   const value = row.indices || row.dimension || row.dimensions || row.index_sets;
   return Array.isArray(value) ? value.map(item => String(item)) : [];
@@ -342,6 +347,8 @@ export function Step3MathExpansion({ draft, onChange }: { draft: ModelDraft; onC
         const updated = markFormulaCompiled({
           ...source,
           scope: result.scope,
+          foreach: result.scope.map(row => row.set),
+          free_indices: result.scope.map(row => row.alias),
           diagnostics: result.diagnostics,
           ast_version: result.ast_version,
           compiler_version: result.compiler_version,
@@ -611,8 +618,8 @@ export function Step3MathExpansion({ draft, onChange }: { draft: ModelDraft; onC
   const renderComponentDetail = (component?: Record<string, unknown>) => {
     if (!component) return <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="请选择左侧构件查看配置" />;
     const status = componentStatus(component);
-    const generatedConstraints = [...componentRows(component, 'generated_constraints'), ...componentRows(component, 'constraints')];
-    const generatedObjectives = [...componentRows(component, 'generated_objective_terms'), ...componentRows(component, 'objective_terms')];
+    const generatedConstraints = preferredComponentRows(component, 'generated_constraints', 'constraints');
+    const generatedObjectives = preferredComponentRows(component, 'generated_objective_terms', 'objective_terms');
     const parameterBindings = componentRows(component, 'parameter_bindings');
     return (
       <Card title={String(component.display_name || component.name || component.component_id || '构件配置')} extra={<Tag color={status.color}>{status.text}</Tag>}>
@@ -680,8 +687,8 @@ export function Step3MathExpansion({ draft, onChange }: { draft: ModelDraft; onC
       {draft.components.length ? draft.components.map((component, index) => {
         const name = String(component.display_name || component.name || component.component_id || `组件 ${index + 1}`);
         const dependencies = [...new Set([...(Array.isArray(component.dependencies) ? component.dependencies : []), ...(Array.isArray(component.depends_on) ? component.depends_on : [])])];
-        const generatedConstraints = [...componentRows(component, 'generated_constraints'), ...componentRows(component, 'constraints')];
-        const generatedObjectives = [...componentRows(component, 'generated_objective_terms'), ...componentRows(component, 'objective_terms')];
+        const generatedConstraints = preferredComponentRows(component, 'generated_constraints', 'constraints');
+        const generatedObjectives = preferredComponentRows(component, 'generated_objective_terms', 'objective_terms');
         const parameterBindings = componentRows(component, 'parameter_bindings');
         return (
           <Card

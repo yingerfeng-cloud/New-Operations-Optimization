@@ -227,6 +227,22 @@ function axisLength(value: unknown, axis: number) {
   return length > 0 ? length : undefined;
 }
 
+function timeAxisMismatch(value: unknown, axis: number, expected: number, members: string[][], depth = 0, coordinates: string[] = []): { actual: number | undefined; coordinates: string[] } | undefined {
+  if (depth === axis) {
+    const actual = Array.isArray(value) ? value.length : value && typeof value === 'object' ? Object.keys(value).length : undefined;
+    return actual === expected ? undefined : { actual, coordinates };
+  }
+  const entries: [string, unknown][] = Array.isArray(value)
+    ? value.map((item, index) => [String(members[depth]?.[index] ?? index), item])
+    : Object.entries(objectValue(value));
+  if (!entries.length) return { actual: undefined, coordinates };
+  for (const [key, item] of entries) {
+    const mismatch = timeAxisMismatch(item, axis, expected, members, depth + 1, [...coordinates, key]);
+    if (mismatch) return mismatch;
+  }
+  return undefined;
+}
+
 function truncateAlongAxis(value: unknown, axis: number, length: number): unknown {
   if (axis === 0) {
     if (Array.isArray(value)) return value.slice(0, length);
@@ -324,8 +340,12 @@ export function validateRuntimeTimeDimension(config: TimeDimensionConfig, fields
     const timeAxis = field.dimension.findIndex(item => item === config.time_set || item === config.state_time_set);
     if (timeAxis < 0 || parameters[field.code] === undefined) continue;
     const expected = field.dimension[timeAxis] === config.state_time_set ? value + 1 : value;
-    const actual = axisLength(parameters[field.code], timeAxis);
-    if (actual !== expected) errors.push(`${field.name}（${field.code}）时间维长度应为 ${expected}，当前为 ${actual ?? '无法识别'}`);
+    const dimensionValues = runtimeDimensionValues(field, fields, parameters);
+    const mismatch = timeAxisMismatch(parameters[field.code], timeAxis, expected, field.dimension.map(axis => dimensionValues[axis] || []));
+    if (mismatch) {
+      const location = mismatch.coordinates.map(key => `[${key}]`).join('');
+      errors.push(`${field.name}（${field.code}）${location}时间维长度应为 ${expected}，当前为 ${mismatch.actual ?? '无法识别'}`);
+    }
   }
   return errors;
 }

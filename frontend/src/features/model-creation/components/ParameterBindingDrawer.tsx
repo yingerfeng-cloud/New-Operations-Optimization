@@ -100,7 +100,6 @@ export function ParameterBindingDrawer({
   const selectedSet = Form.useWatch('index_set', form);
   const mappingComplete = isBindingComplete(draftBinding);
   const validationRows = [
-    { label: '数据类型匹配', ok: true },
     { label: '索引集合匹配', ok: Boolean(!selectedSet || draft.semantic.sets.some(item => item.code === selectedSet)) },
     { label: sourceType === 'static' ? '静态默认值' : sourceType === 'function_asset' ? '函数资产映射' : '运行参数映射', ok: mappingComplete },
   ];
@@ -230,6 +229,9 @@ export function ParameterBindingDrawer({
           <Typography.Text type={mappingComplete ? 'success' : 'warning'}>
             {mappingComplete ? `已完成映射${selectedModelParameter ? `：${selectedModelParameter}` : selectedRuntimeKey ? `：${selectedRuntimeKey}` : hasBindingValue(selectedDefaultValue) ? '：静态默认值' : ''}` : `仍缺少 ${code || '组件参数'} 的必填映射`}
           </Typography.Text>
+          <Typography.Paragraph type="secondary">
+            此处检查映射完整性和集合是否存在。数据类型、维度和单位仍需通过模型整体测试确认；修改单位文字不会自动换算数值。
+          </Typography.Paragraph>
         </section>
       </Space>
     </Drawer>

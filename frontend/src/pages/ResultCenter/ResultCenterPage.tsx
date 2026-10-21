@@ -29,7 +29,7 @@ export function resultViewDefinitions(result?: SolveResult): ResultViewDefinitio
   const views: ResultViewDefinition[] = [{ key: 'overview', label: '结果概览', kind: 'metrics', source: 'metrics' }];
   if (meaningful(result.variables) || meaningful(result.variable_values) || meaningful(result.business_variables)) views.push({ key: 'curves', label: '变量曲线', kind: 'timeseries', source: 'variable_values' });
   if (meaningful(result.business_output)) views.push({ key: 'business_output', label: '业务输出', kind: 'business_output', source: 'business_output' });
-  if (meaningful(result.constraints) || meaningful(record(result.business_output).constraint_check)) views.push({ key: 'constraints', label: '约束检查', kind: 'constraint_checks', source: 'constraints' });
+  if (meaningful(result.constraint_checks) || meaningful(result.constraints) || meaningful(record(result.business_output).constraint_check)) views.push({ key: 'constraints', label: '约束检查', kind: 'constraint_checks', source: 'constraints' });
   if (String(result.problem_type || result.solver_type || '').toUpperCase() === 'NLP') views.push({ key: 'diagnostics', label: '求解诊断', kind: 'solver_diagnostics', source: 'solver' });
   if (meaningful(result.business_explanation) || meaningful(result.explanation) || meaningful(result.suggestion)) views.push({ key: 'advice', label: '业务建议', kind: 'explanation', source: 'business_explanation' });
   views.push({ key: 'raw', label: '原始结果', kind: 'raw', source: '$' });

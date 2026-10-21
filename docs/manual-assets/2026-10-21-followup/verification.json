@@ -1,0 +1,298 @@
+{
+  "checked_at": "2026-10-21T23:31:23.978419+08:00",
+  "baseline_commit": "4d81a3f952af97536918886fd9dc2dfe589e38a5",
+  "source_manifest": "reports/manual-repair-20261021-followup/source-manifest.json",
+  "source_files_checked": 47,
+  "source_fingerprints_match": true,
+  "independent_report": "docs/independent-ui-acceptance-followup-2026-10-21.md",
+  "acceptance_type": "independent test agent; normal native Chrome UI; LLM disabled",
+  "economic_task": {
+    "id": "OPT-552BE5B50F",
+    "objective": 160300,
+    "constraints_checked": 40,
+    "violations": 0
+  },
+  "skill_invocation": {
+    "id": "INV-9E08239D47",
+    "task_id": "OPT-42E6251653",
+    "objective": 40,
+    "constraints_checked": 2
+  },
+  "hydro_scope": "same invalid input rechecked after fix: S1_U1 expected 4 / actual 3; restored to ready-to-submit; no hydro solve submitted",
+  "version_scope": "existing formal/history and pinned binding inspected; no model version republished in this UI followup",
+  "engineering": {
+    "backend_default": {
+      "passed": 725,
+      "skipped": 5,
+      "failed": 0
+    },
+    "extended_integration": {
+      "passed": 57,
+      "failed": 0,
+      "groups": [
+        42,
+        14,
+        1
+      ]
+    },
+    "frontend_default": {
+      "files_passed": 90,
+      "passed": 502,
+      "failed": 0
+    },
+    "typecheck": "PASS",
+    "production_build": "PASS_WITH_EXISTING_CHUNK_WARNING"
+  },
+  "files": [
+    {
+      "path": "independent/00-start-ui.json",
+      "bytes": 320,
+      "sha256": "4ab4d76c74c5df5e374cc04e051ddabcc64e9ddd42d6d0d9bf7e17c54c2e9193"
+    },
+    {
+      "path": "independent/00-start.jpg",
+      "bytes": 658329,
+      "sha256": "cd7df08b2dc9a17085736906c81bd9134ac0c02599f52ef14266e1b5e60a26cd"
+    },
+    {
+      "path": "independent/01-economic-submit-ui.json",
+      "bytes": 350,
+      "sha256": "9431ac50cd6b2ed5de744030064d9bb197d7e7204be4de3bcef83786baf7a409"
+    },
+    {
+      "path": "independent/02-economic-result-160300.jpg",
+      "bytes": 703453,
+      "sha256": "2a40089da0f363941b73d8b2bc708fc7257225a02a0e3e9aec984ccf2cffa131"
+    },
+    {
+      "path": "independent/02-economic-result-ui.json",
+      "bytes": 210,
+      "sha256": "eca85aaafa74cb399b61fb623b30e0a311aada9664b137291d520be8d897427f"
+    },
+    {
+      "path": "independent/03-economic-overview-ui.json",
+      "bytes": 237,
+      "sha256": "a937642dcbb156b086a3a07f3ac3e3e3a03eb3eb33e8b07a2c32cae09f29914f"
+    },
+    {
+      "path": "independent/03-economic-overview.jpg",
+      "bytes": 726491,
+      "sha256": "62f3f6ed1dd63f0eef8669d56b802beb02a1f5bec292e38ed8c27186d13c46ad"
+    },
+    {
+      "path": "independent/04-economic-constraints-p1-ui.json",
+      "bytes": 10494,
+      "sha256": "8527a3df1806a81f4d893e3710f18e2ca038ff1876002b36f70918186b879cfc"
+    },
+    {
+      "path": "independent/04-economic-constraints-p1.jpg",
+      "bytes": 691826,
+      "sha256": "55dbfb6965229c7e4490f2492b31664f6a5769f1a605fb513e54a12ce8265eee"
+    },
+    {
+      "path": "independent/05-economic-constraints-p2-ui.json",
+      "bytes": 10445,
+      "sha256": "5d96cc01babe6280ed8493d025603f1f1b197306f045ce3f35b1d9ce46d9ac11"
+    },
+    {
+      "path": "independent/05-economic-constraints-p2.jpg",
+      "bytes": 704783,
+      "sha256": "713d76a57e0f9a9d840a5dce428b226529c26aeab22b65bb7ab42d365c8c34bc"
+    },
+    {
+      "path": "independent/06-economic-constraints-p3-ui.json",
+      "bytes": 10445,
+      "sha256": "353441f68c46c80560a45b90bb0247ccce1e2afa4cc637e8bb84b191deb10440"
+    },
+    {
+      "path": "independent/06-economic-constraints-p3.jpg",
+      "bytes": 701814,
+      "sha256": "b64129d1eb211e47c2bbe6ad96c385921cf9cbf6c5d88739a96266e66d488c85"
+    },
+    {
+      "path": "independent/07-economic-constraints-p4-ui.json",
+      "bytes": 10450,
+      "sha256": "4626c3cf84295ab0a0e4b037a267937b8eca9dc36d3e8f4f45353f3dd45cff30"
+    },
+    {
+      "path": "independent/07-economic-constraints-p4.jpg",
+      "bytes": 702094,
+      "sha256": "e363438ab389e74fbe83a0abe8eeb79b341f13e6b9378d97d290a5922f1866ac"
+    },
+    {
+      "path": "independent/08-economic-constraints-p5-ui.json",
+      "bytes": 10549,
+      "sha256": "01de1b4e57a2ae158aad45a786891ec8d9f7992ab261549142aaf6ba4f616089"
+    },
+    {
+      "path": "independent/08-economic-constraints-p5.jpg",
+      "bytes": 706671,
+      "sha256": "c7e0c4d3279e0969986cead34a9685ed2dcab4a6ca82481387c225e8b104795e"
+    },
+    {
+      "path": "independent/09-skill-fixed-definition-r1-ui.json",
+      "bytes": 17923,
+      "sha256": "696b7feabcefa60116cf19ddaadd99f6c523cde735bd5df08956be079e03717a"
+    },
+    {
+      "path": "independent/09-skill-fixed-definition-r1.jpg",
+      "bytes": 789966,
+      "sha256": "ada7a9f4feea3baec303d798fcda64d8d44920c9d3065ac6119cd80bc6a3f936"
+    },
+    {
+      "path": "independent/10-skill-agent-existing-enabled-ui.json",
+      "bytes": 6181,
+      "sha256": "6466f1886c11d87b4708b5f2430dc00b089b736faf0a8944019d3df04ad6e2b6"
+    },
+    {
+      "path": "independent/10-skill-agent-existing-enabled.jpg",
+      "bytes": 674255,
+      "sha256": "37faa539c1199ffac4acb0665726fb4c42d159f2f3611ec1efb6116f167983f5"
+    },
+    {
+      "path": "independent/11-skill-real-test-40-ui.json",
+      "bytes": 6108,
+      "sha256": "5bf399778c0fcd42108547f8dfa09752c262f3434e3598dba95cf48a5450af2f"
+    },
+    {
+      "path": "independent/11-skill-real-test-40.jpg",
+      "bytes": 650545,
+      "sha256": "8ea83e34660561914b8a415de64a2b85c06dbde50805149c05087f301b741ed8"
+    },
+    {
+      "path": "independent/12-skill-evidence-constraint-start.jpg",
+      "bytes": 657020,
+      "sha256": "63a3ca4b8ef469bb2ba4ceac6ae6c8c06e6cb9fc297b5d8ba2ac9db7bb932e0b"
+    },
+    {
+      "path": "independent/13-skill-evidence-constraints-middle.jpg",
+      "bytes": 681726,
+      "sha256": "cee27cda963994f97ebf5da159e923858c77ea4dcdce0bb677737eda13fdd861"
+    },
+    {
+      "path": "independent/14-skill-visible-selection-ui.json",
+      "bytes": 6145,
+      "sha256": "5c78c36bf75f732919f29a30f375f93dea5b176dc5b950313eedca86750ccae8"
+    },
+    {
+      "path": "independent/15-skill-evidence-constraint-tail.jpg",
+      "bytes": 680983,
+      "sha256": "9ce0373154be7218814aeadd16e3de0fe8fec75e9abcb20eeff91eff341184a1"
+    },
+    {
+      "path": "independent/16-skill-raw-constraints-middle.jpg",
+      "bytes": 609934,
+      "sha256": "04ab29426971df65e72fe9084c1a3ef8ac2d59b567923a8d0c117a9353e23668"
+    },
+    {
+      "path": "independent/17-skill-raw-constraints-tail.jpg",
+      "bytes": 610148,
+      "sha256": "41f30c6a74285a1ae96736db97434006ba8f814ec684476fc8159c87f78f7492"
+    },
+    {
+      "path": "independent/18-skill-definition-audit-r1.jpg",
+      "bytes": 629086,
+      "sha256": "588939d5e2d0617d260de6bece9c7ebddbcdec6643c2e2ce9ca0999ae8c7fc79"
+    },
+    {
+      "path": "independent/19-skill-invocation-record-ui.json",
+      "bytes": 5538,
+      "sha256": "4d5c26e1d3882c2e94eafaa05ef0b0f6d5a5e4da41c51277b85feed15ebd5382"
+    },
+    {
+      "path": "independent/19-skill-invocation-record.jpg",
+      "bytes": 553989,
+      "sha256": "d91a7277d9980744e43072c54f42fab9bd0066912c589fdcc0ddf49cde6fcd9a"
+    },
+    {
+      "path": "independent/20-hydro-missing-period-error-ui.json",
+      "bytes": 32089,
+      "sha256": "1043fa1c1fb43f34585d68cee4032f700021cbb078566f0d6edef2f56727667a"
+    },
+    {
+      "path": "independent/20-hydro-missing-period-error.jpg",
+      "bytes": 593423,
+      "sha256": "b7c920ea1ff773cb7ad46ce7b31148eaa8f791230b1594e95206da0c4033e5eb"
+    },
+    {
+      "path": "independent/21-hydro-restored-valid-ui.json",
+      "bytes": 17978,
+      "sha256": "9373ba632d82e7ab709ce4a2a4518abfaa86dd94559dc2952426ba0c46e6e68d"
+    },
+    {
+      "path": "independent/21-hydro-restored-valid.jpg",
+      "bytes": 754000,
+      "sha256": "7f0f0088bbbaeb00d1ea666f1f40d92caff3510cc41eb3b128129e2247459f67"
+    },
+    {
+      "path": "independent/22-hydro-restored-submit-check-ui.json",
+      "bytes": 5667,
+      "sha256": "7b98eb6f3abde12f4b5574c45dce488827338a29574ab7218a003d2d38c0c043"
+    },
+    {
+      "path": "independent/22-hydro-restored-submit-check.jpg",
+      "bytes": 668000,
+      "sha256": "8d5903cba54ee1bab83a2514935d39994801f1c8ac9c3030bd45fd051de8e4a3"
+    },
+    {
+      "path": "independent/23-hydro-row-error-after-fix-ui.json",
+      "bytes": 32119,
+      "sha256": "120d9991bec3e124d26588e6098cd61fd277811cfd85e19aac93420252bd6c48"
+    },
+    {
+      "path": "independent/23-hydro-row-error-after-fix.jpg",
+      "bytes": 613169,
+      "sha256": "5a672e7c485a6df884330db14f8c631af0674cd7fd8f10e2662d5de0ec7246ec"
+    },
+    {
+      "path": "independent/24-hydro-row-restored-after-fix-ui.json",
+      "bytes": 18001,
+      "sha256": "7f32dc7034b28bf5c795046a02d9b5a0c9aad3c63918cfa6a93f0cac37f3261b"
+    },
+    {
+      "path": "independent/24-hydro-row-restored-after-fix.jpg",
+      "bytes": 754024,
+      "sha256": "f5b65281afb57f2938c7b07bf2d2951bb64bccfb335d9f8f2637efef394ba370"
+    },
+    {
+      "path": "independent/25-hydro-valid-submit-after-fix-ui.json",
+      "bytes": 5634,
+      "sha256": "e4fa4b942264989750ea5eb4a51e6be2039f5e30626efc24c182c912e1e89adb"
+    },
+    {
+      "path": "independent/25-hydro-valid-submit-after-fix.jpg",
+      "bytes": 685518,
+      "sha256": "04a7aa91ded76de60308e6f7530faa8e625c8e80e30d0c7ce6c6272755a5e93b"
+    },
+    {
+      "path": "independent/26-existing-curve-family-versions-ui.json",
+      "bytes": 9512,
+      "sha256": "2ecc5165c1bd919f8a606c8486f049dbf5f556daa64d661d5bbbc4c1990a635c"
+    },
+    {
+      "path": "independent/26-existing-curve-family-versions.jpg",
+      "bytes": 690448,
+      "sha256": "3126d9ead1c00526aef596d6ce750f428bf33e5d1f7995fd7ac0e0b54a6a74fa"
+    },
+    {
+      "path": "independent/27-existing-formal-v02-ui.json",
+      "bytes": 17355,
+      "sha256": "95c16325ed5607ee4aca39bc76fd1b40b0c1a8358f54610dbdaef53716399e97"
+    },
+    {
+      "path": "independent/27-existing-formal-v02.jpg",
+      "bytes": 731778,
+      "sha256": "2cf35f19253589ff584c5efc3c8bf680c3916a1e83632f1e36bc1e7df436cf5e"
+    },
+    {
+      "path": "independent/28-existing-historical-v01-ui.json",
+      "bytes": 15684,
+      "sha256": "2a99932d0f0a26e4429f314bc467a28b3db3b4626b8582d3c57efa3cb57bd9d2"
+    },
+    {
+      "path": "independent/28-existing-historical-v01.jpg",
+      "bytes": 700186,
+      "sha256": "6ce78a98f67d715d567ffeea8b3f4d1d33121045e0eb4ccecd6c23c6ff836c77"
+    }
+  ]
+}

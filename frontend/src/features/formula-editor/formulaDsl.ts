@@ -24,6 +24,11 @@ export function tokenToDisplay(token: FormulaToken): string {
 export const tokensToDsl = (tokens: FormulaToken[]) => tokens.map(tokenToDsl).join(' ').replace(/\s+([\],)])/g, '$1');
 export const tokensToDisplay = (tokens: FormulaToken[]) => tokens.map(tokenToDisplay).join(' ');
 
+export function indexAliasNames(expression: string): string[] {
+  // Literal coordinates are not iterators; offsets such as t-1 use alias t.
+  return expression.replace(/'(?:\\.|[^'\\])*'|"(?:\\.|[^"\\])*"/g, '').match(/[A-Za-z_]\w*/g) || [];
+}
+
 export function collectReferences(tokens: FormulaToken[]) {
   const sets = new Set<string>();
   const parameters = new Set<string>();
@@ -49,12 +54,12 @@ export function collectReferences(tokens: FormulaToken[]) {
     }
     if (token.type === 'parameter') {
       parameters.add(token.code);
-      (token.indices || token.indexAliases || []).forEach(index => indices.add(index));
+      (token.indexAliases || token.indices || []).flatMap(indexAliasNames).forEach(index => indices.add(index));
       return;
     }
     if (token.type === 'variable') {
       variables.add(token.code);
-      (token.indices || token.indexAliases || []).forEach(index => indices.add(index));
+      (token.indexAliases || token.indices || []).flatMap(indexAliasNames).forEach(index => indices.add(index));
     }
   });
 
