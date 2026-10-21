@@ -38,10 +38,14 @@ def test_explicit_composite_coordinates_and_unindexed_curve_remain_valid():
 
 def test_real_api_rejects_extra_axis_before_solver_and_accepts_business_mapping(client):
     c = component(client); a = model(client, c); test_publish(client, a)
+    previous_count = len(client.get('/api/tasks').json())
     for value in ([[10], [20]], {"0": [10], "1": [20]}):
         response = client.post("/api/tasks", json={"model_id": a, "parameters": {"horizon": 2, "demand": value}, "async_run": False})
         assert response.status_code == 422, response.text
         assert "rank mismatch" in response.text
+        synchronous = client.post(f'/api/models/{a}/test', json={'parameters': {'horizon': 2, 'demand': value}})
+        assert synchronous.status_code == 422 and 'rank mismatch' in synchronous.text
+    assert len(client.get('/api/tasks').json()) == previous_count
     response = client.post("/api/tasks", json={"model_id": a, "parameters": {"horizon": 2, "demand": {"0": 10, "1": 20}}, "async_run": False})
     assert response.status_code == 200, response.text
     assert response.json()["status"] == "SUCCESS" and response.json()["objective_value"] == pytest.approx(90)

@@ -1,0 +1,1148 @@
+{
+  "data_class": "synthetic only",
+  "runtime": "isolated uvicorn + Vite; real HiGHS; LLM disabled",
+  "models": [
+    {
+      "id": "MODEL-9E77873F",
+      "name": "iter_a_1792554788551",
+      "version": "v0.1",
+      "status": "offline",
+      "content_hash": "22071e33531dc3de614e3c422874b543b3b45796dff4251b4f4203e4a05de886",
+      "tested_content_hash": "22071e33531dc3de614e3c422874b543b3b45796dff4251b4f4203e4a05de886",
+      "component_manifest_hash": "b0a338a80a1227b4efc1c06b2e6d1af8f3432d02e4bc0f0ec0c5ad8c49bf7728",
+      "components": {
+        "iter_browser_1792554788551": {
+          "family_id": "iter_browser_1792554788551",
+          "revision": 1,
+          "version": "1.0.0",
+          "content_hash": "2943499aad0a0691dc84bcf24d2e961865221438816a9846a65eb0f03cdc1c25"
+        }
+      },
+      "functions": {}
+    },
+    {
+      "id": "MODEL-B14DE655",
+      "name": "iter_b_1792554788551",
+      "version": "v0.1",
+      "status": "published",
+      "content_hash": "c577caa8235e81a957b61a4237adf302b2cb69e5eda6a69255c1971d4e6642e8",
+      "tested_content_hash": "c577caa8235e81a957b61a4237adf302b2cb69e5eda6a69255c1971d4e6642e8",
+      "component_manifest_hash": "b0a338a80a1227b4efc1c06b2e6d1af8f3432d02e4bc0f0ec0c5ad8c49bf7728",
+      "components": {
+        "iter_browser_1792554788551": {
+          "family_id": "iter_browser_1792554788551",
+          "revision": 1,
+          "version": "1.0.0",
+          "content_hash": "2943499aad0a0691dc84bcf24d2e961865221438816a9846a65eb0f03cdc1c25"
+        }
+      },
+      "functions": {}
+    },
+    {
+      "id": "MODEL-6CC1BE03",
+      "name": "iter_a_1792554788551",
+      "version": "v0.2",
+      "status": "published",
+      "content_hash": "e6797b08bd7f71c58bf23d893fd46ead6af82fdb1eb7b4c207a72ae7fc6ddb57",
+      "tested_content_hash": "e6797b08bd7f71c58bf23d893fd46ead6af82fdb1eb7b4c207a72ae7fc6ddb57",
+      "component_manifest_hash": "6ab2f58d2e840c554269421a5a33ce86a9e7601854595d5d7731b48cf36dd286",
+      "components": {
+        "iter_browser_1792554788551_r2": {
+          "family_id": "iter_browser_1792554788551",
+          "revision": 2,
+          "version": "v1.2",
+          "content_hash": "92ce747c3dd431b0a16fd2c870160d3b858b84ed4fae1df5292061b1377a5038"
+        }
+      },
+      "functions": {}
+    },
+    {
+      "id": "MODEL-DDC82CCD",
+      "name": "iter_curve_1792554804565",
+      "version": "v0.1",
+      "status": "published",
+      "content_hash": "c0806b0afb9502b07969b4525b59db77498b829536ee79137c7e6cab693eb592",
+      "tested_content_hash": "c0806b0afb9502b07969b4525b59db77498b829536ee79137c7e6cab693eb592",
+      "component_manifest_hash": "3b08512364ec168e41e928d45a985bf31df3eafdd2cdd764118bf18e793fee2f",
+      "components": {
+        "function_mapping_component": {
+          "family_id": "function_mapping_component",
+          "revision": 1,
+          "version": "1.0.0",
+          "content_hash": "6d31fb4ccfa30e8eca40b3809fda79e2fd24d0f8cd7b7f7290a11c9bb7201659"
+        }
+      },
+      "functions": {
+        "iter_browser_f_1792554804565": {
+          "revision": 1,
+          "content_hash": "9d6ffe794a2e2894f17046e8cd9fce2baa85fbd3c20ee06e9abcaa520e935f2b"
+        }
+      }
+    },
+    {
+      "id": "MODEL-F9B9602F",
+      "name": "iter_curve_1792554804565",
+      "version": "v0.2",
+      "status": "trial",
+      "content_hash": "7bcadd78aca2fea54433b406c3e3fabce9a97281990acd9c7e7bced1db18e874",
+      "tested_content_hash": "7bcadd78aca2fea54433b406c3e3fabce9a97281990acd9c7e7bced1db18e874",
+      "component_manifest_hash": "3b08512364ec168e41e928d45a985bf31df3eafdd2cdd764118bf18e793fee2f",
+      "components": {
+        "function_mapping_component": {
+          "family_id": "function_mapping_component",
+          "revision": 1,
+          "version": "1.0.0",
+          "content_hash": "6d31fb4ccfa30e8eca40b3809fda79e2fd24d0f8cd7b7f7290a11c9bb7201659"
+        }
+      },
+      "functions": {
+        "iter_browser_f_1792554804565": {
+          "revision": 2,
+          "content_hash": "5a5bf8051d1534e0c7e3269a1d5fd3b2ec8ea683e9c9cc733abe9709966ec040"
+        }
+      }
+    }
+  ],
+  "tasks": [
+    {
+      "id": "OPT-90A0AE25D0",
+      "model_id": "MODEL-9E77873F",
+      "status": "SUCCESS",
+      "parameters": {
+        "horizon": 2,
+        "demand": [
+          10,
+          10
+        ]
+      },
+      "objective_value": 60.0,
+      "duration_seconds": 1.0,
+      "decisions": [
+        {
+          "key": "output[0]",
+          "code": "output",
+          "coordinate": "output[0]",
+          "name": "output",
+          "unit": "MW",
+          "definition": {
+            "dimension": [
+              "time"
+            ],
+            "unit": "MW"
+          },
+          "value": 10.0
+        },
+        {
+          "key": "output[1]",
+          "code": "output",
+          "coordinate": "output[1]",
+          "name": "output",
+          "unit": "MW",
+          "definition": {
+            "dimension": [
+              "time"
+            ],
+            "unit": "MW"
+          },
+          "value": 10.0
+        }
+      ],
+      "max_constraint_violation": 0.0,
+      "execution_environment": {
+        "schema_version": 1,
+        "observed_at": "2026-10-21 11:53:09",
+        "platform_commit": "ec4264ae6cdb9cd509a45d4f86e3a3763029b914",
+        "working_tree_modified": true,
+        "identity": {
+          "platform_source_hash": "b3a5dba6b18b1afa8d6fe373e5b88823da6529255296296afef5f125b9c2b6a3",
+          "loaded_code_hash": "2fa7f01a4713ab5ab03090620c1601aeb8e8bcf39f12697c5f6a8bc6c6cc1a34",
+          "loaded_adapter_hashes": {
+            "app.solvers.base.SolverAdapter.available": "156f673f1135e55bfaaa0ab5cb0fda77d31d390b6b04add8f4b5158ccd24264c",
+            "app.solvers.base.SolverAdapter.solve": "2aa1b3059b329e9c79c63e9864dc0684dbe057644a2173217557c61571823143",
+            "app.solvers.base.SolverAdapter.__subclasshook__": "542db00912bb2c59e0c17d460e55160f65ac5a21c71bfc346d28b5ff82c2fc88",
+            "app.solvers.base.SolverAdapter.__init__": "5b56104861680ddf5ce43d5e6169eb9fdc177f7df345f0f200876c7c0c050c8b",
+            "app.solvers.base.UnavailableSolverAdapter.__init__": "695211cc6f08c5f572928f4d539cb1d21db358f5cba0053db8ba29c262421a19",
+            "app.solvers.base.UnavailableSolverAdapter.available": "b1db9549f25a01fd012fed67764fab16f31f37a395aec103d084870b84d895d4",
+            "app.solvers.base.UnavailableSolverAdapter.solve": "9766ebbb00e0ef234b6c625b99b1fbc92bcfbc297bf0ad92e6e10b14de04e656",
+            "app.solvers.highs_adapter.HiGHSAdapter.available": "7fbd000dcb66fed384224c243a6dde085eb4aa065ee3f5bfd31837fb2cc9ce5d",
+            "app.solvers.highs_adapter.HiGHSAdapter.solve": "b6bfec58ca817384516c93a433f1c550647f2f8180adb2085cb3c3bed86e006d",
+            "app.solvers.highs_adapter.HiGHSAdapter._solve_serial": "9cbe0990d09bff01e62dd515f3293008c47092caa4ec28deb16b98a0c354bb07",
+            "app.solvers.highs_adapter.HiGHSAdapter._configure_progress_callback": "29d39bcb142bbfaeaa717bf988958767d2b1d40b84ec87e1b89d2fe97be5efee",
+            "app.solvers.highs_adapter.HiGHSAdapter._emit_lp_iteration_summary": "c6e9fae1e05504caba8b6205d62d5778a1d2482ffcef7d57901480c8ef153ca9",
+            "app.solvers.highs_adapter.HiGHSAdapter._finite_number": "c3f4fa2b13ae7b7af97b89f0428daeb9385ba6e4e248dcd2ff0a19d4b252bd11",
+            "app.solvers.highs_adapter.HiGHSAdapter._finite_integer": "c9522d091f5c15217e249b9fa4f6dc827227d7af2e80f612277cd78255d0e007",
+            "app.solvers.highs_adapter.HiGHSAdapter._extract_variables": "02c08df70a8e8dcd85206b4dee3f38ee77bab1ee9b2a49177716ee89e998c329",
+            "app.solvers.highs_adapter.HiGHSAdapter._label": "a9410a7380d5a154fa8f3801323abd91304f98751c916223af085cf4bb1a0f8b",
+            "app.solvers.nlp_adapter.NLPSolverAdapter.available": "61c93dea7a60111ac15a9406733563f0f44b6e4948afc4e171c2db33fe9e0b08",
+            "app.solvers.nlp_adapter.NLPSolverAdapter.availability_message": "aeecec41efa0518113cc7477d49c2c769ee845ca01b22b09fe1a8039ef67b1cd",
+            "app.solvers.nlp_adapter.NLPSolverAdapter.solve": "0cc06afb237ca7b948ab4ab25fb5a9ed8d3d6d1d137da7a925b8cc76bf5a3c9d",
+            "app.solvers.nlp_adapter.NLPSolverAdapter._cpu_limit_reached": "30abe38daba7038b46b068c52fa0f21a86d9287d358e0bb182771cdd88e1f6ca",
+            "app.solvers.nlp_adapter.NLPSolverAdapter._failed_result": "46b7e7d48018a3aa349891344260c63fecbf16fd5f95834227f1f150491bdd94",
+            "app.solvers.nlp_adapter.NLPSolverAdapter._has_integer_variables": "df327469fa9ef7ddaab08fdcaeadb6af8ca2ab1dfed447d01200b54e8dc965f7",
+            "app.solvers.nlp_adapter.NLPSolverAdapter._initialize_unset_variables": "8e5095de29753edfe9ef7b81fcc2044c4002657c991a0a3f1e5a764805ac24f9",
+            "app.solvers.nlp_adapter.NLPSolverAdapter._objective_value": "db4387109010b32c48c8cdb1e09d5f5885d43665e7824e302b6afbe7ffa98cc6",
+            "app.solvers.nlp_adapter.NLPSolverAdapter.extract_variables": "e1137606a1d7b477e5c7d2ea6f07df64b06b037428f2b90029b0aeb9e821019f",
+            "app.solvers.nlp_adapter.NLPSolverAdapter.constraint_violations": "71c3aa10a0259981b844d8f9a42e6ad8def0cfb7adb0176a8661386c4c6d9b5d",
+            "app.solvers.nlp_adapter.NLPSolverAdapter._status_from_termination": "e022357d45ba914c40deeee3471ce733991887f14ec80348a06522205bd953b5",
+            "app.solvers.nlp_adapter.NLPSolverAdapter._label": "eff8d9d624acba1fc17da1318cdc0501de4dbfdea464752b2e2a538b0ec8a35e",
+            "app.solvers.run_settings.validate_run_settings.validate_run_settings": "7c9905ce86cd63347599ff19ba43ef2e2c245ff98845b3459b7932ce026ff43e",
+            "app.solvers.run_settings.apply_initial_values.apply_initial_values": "8529c65da55cf52a9583b62b5732c37c9ef06abe6dfe7e9afe9052696a5af6f0",
+            "app.solvers.solver_router.SolverRouteError.__init__": "8239e1593da145ff43fffb80c4037ffa79d71c13feb700e65f1c95b66bdfc91f",
+            "app.solvers.solver_router.ScipAdapter.__init__": "f9bc50513c9cf5a219fb3835b79fec61ea0f63ba16d5bb0eab59a9b1011615dd",
+            "app.solvers.solver_router.SolverRouter.__init__": "32b05b8e35836d5898d2fe8ab4be2455d82b9bf0cfac223a15cdafe5c6624c5f",
+            "app.solvers.solver_router.SolverRouter.route": "aa292bb6852612990de8dfb7cd4e4aec9f1bb41690e544aaa6865f255771945a",
+            "app.solvers.solver_router.SolverRouter.solve": "862706f8cabe4faaccfce5bf9465bedad6024f0175486f3ad0e649e01912fac1",
+            "app.solvers.solver_router.SolverRouter.infer_problem_type_from_model": "e15584df123a16108675b3b3188c4cc080ad5bad828a6863536f867443873261",
+            "app.solvers.solver_router.SolverRouter._key": "ec62ad98a144f93789eef008d80b41b1db359fbc0ee6e308713c65721d07c5f4",
+            "app.solvers.solver_router.SolverRouter._message": "0d7a2049374f362bdc0a8c7a5e1fd75b7343774a285e7b61f2c8dce7ce3bef37",
+            "app.solvers.solver_router.SolverRouter._assert_highs_can_accept_model": "29e845dced6d232f6c47c252a9bf4ee3133ced2d35c33e34d0edd90518bb03d1",
+            "app.solvers.solver_router.SolverRouter._model_has_nonlinearity": "40a962711af581685cd03c607a5c094d8cb7eefb9638ea7624977ae47778efca",
+            "app.solvers.status.ipopt_unavailable_explanation.ipopt_unavailable_explanation": "991835cafe391fc166395d14b753e7a274a86d428fa40f693ece9a82c0ccfcf4",
+            "app.solvers.status._package_version._package_version": "ea037bf7820e35b08b59040700ca77ab6492b2a6c418937b0f4a611783a27354",
+            "app.solvers.status._solver_available._solver_available": "ba3af93ae8fc9a4ecd8bf6227f5f01e76098c9f89b290682d905d2c1b02dfb4a",
+            "app.solvers.status._ipopt_version._ipopt_version": "10e97df05ef33272c65833e66f3c2b451edbc05e25a886b95c6ac4345d4a40f9",
+            "app.solvers.status.solver_status.solver_status": "217d8f4f653e3b90532d825d8cfae979eee3cd0ac8d3e3afff9521e65ee25ff6"
+          },
+          "source_hash_scope": "磁盘源码与已加载 Python code object 分别记录；二者不冒充旧镜像证明。",
+          "image_digest": "unknown",
+          "python": "3.12.14",
+          "system": "Darwin",
+          "machine": "arm64",
+          "packages": {
+            "pyomo": "6.10.1",
+            "highspy": "1.15.1",
+            "numpy": "2.5.2",
+            "scipy": "unknown"
+          },
+          "compiler_hashes": {
+            "app/generic_formula_compiler.py": "6f2bf2ca449cdb28b06714f4247bfcc907d3c18772e42497ed7cccaebfe4d156",
+            "app/model_components/formula_components.py": "d528e10ea30d6b6d63f72c55b7cddccd0311ae69a3f499cb06d1c37654f2ed66",
+            "app/builders/component_model_builder.py": "0eab1b55ab2ffc02c75fedbc7d40ef2696ac1ac05f5f995d1e9072ef7a8bd93d",
+            "app/function_strategy.py": "69a596f275fcc72094f4583cfcb39ab3ebc202d301ffc4cd0193dca945a6fd81"
+          },
+          "builtin_implementations": {},
+          "solver": {
+            "name": "HiGHS",
+            "version": "1.15.1",
+            "executable_hash": "unknown",
+            "binary_hash": "27633861039f85ade740e5ddf06e7795989ddcf92566e32d94f0980d09e2782f",
+            "adapter_hash": "fd52bcba447227d2daff18ae1ca8ff72279a255d5feb47782d0ef18ddae4ca0a"
+          },
+          "requested_settings": {
+            "time_limit_seconds": 300.0,
+            "mip_gap": 0.001,
+            "threads": null,
+            "presolve": true
+          },
+          "effective_settings": {
+            "time_limit": 300.0,
+            "mip_rel_gap": 0.001,
+            "threads": "solver_default",
+            "presolve": "solver_default; adapter does not override"
+          },
+          "initial_values": {},
+          "numeric_environment": {
+            "OMP_NUM_THREADS": "unknown",
+            "OPENBLAS_NUM_THREADS": "unknown",
+            "MKL_NUM_THREADS": "unknown"
+          }
+        },
+        "identity_hash": "d4b84ae2e1f3379e5d42cec0747f0d2c0dc012650c9a964ef32fe0a7d962f209",
+        "image_note": "当前进程无法可信取得镜像 digest，未用可随意填写的环境变量冒充镜像证明。",
+        "replay_note": "清单记录实际代码和数值环境；不提供旧环境，也不承诺跨环境逐字节一致。"
+      }
+    },
+    {
+      "id": "OPT-6CA26FC4E7",
+      "model_id": "MODEL-B14DE655",
+      "status": "SUCCESS",
+      "parameters": {
+        "horizon": 2,
+        "demand": [
+          10,
+          10
+        ]
+      },
+      "objective_value": 60.0,
+      "duration_seconds": 1.0,
+      "decisions": [
+        {
+          "key": "output[0]",
+          "code": "output",
+          "coordinate": "output[0]",
+          "name": "output",
+          "unit": "MW",
+          "definition": {
+            "dimension": [
+              "time"
+            ],
+            "unit": "MW"
+          },
+          "value": 10.0
+        },
+        {
+          "key": "output[1]",
+          "code": "output",
+          "coordinate": "output[1]",
+          "name": "output",
+          "unit": "MW",
+          "definition": {
+            "dimension": [
+              "time"
+            ],
+            "unit": "MW"
+          },
+          "value": 10.0
+        }
+      ],
+      "max_constraint_violation": 0.0,
+      "execution_environment": {
+        "schema_version": 1,
+        "observed_at": "2026-10-21 11:53:11",
+        "platform_commit": "ec4264ae6cdb9cd509a45d4f86e3a3763029b914",
+        "working_tree_modified": true,
+        "identity": {
+          "platform_source_hash": "b3a5dba6b18b1afa8d6fe373e5b88823da6529255296296afef5f125b9c2b6a3",
+          "loaded_code_hash": "56ed74c4b8536b0d5919766bec7c664323199ef9683d72054e434f7b51548880",
+          "loaded_adapter_hashes": {
+            "app.solvers.base.SolverAdapter.available": "156f673f1135e55bfaaa0ab5cb0fda77d31d390b6b04add8f4b5158ccd24264c",
+            "app.solvers.base.SolverAdapter.solve": "2aa1b3059b329e9c79c63e9864dc0684dbe057644a2173217557c61571823143",
+            "app.solvers.base.SolverAdapter.__subclasshook__": "542db00912bb2c59e0c17d460e55160f65ac5a21c71bfc346d28b5ff82c2fc88",
+            "app.solvers.base.SolverAdapter.__init__": "5b56104861680ddf5ce43d5e6169eb9fdc177f7df345f0f200876c7c0c050c8b",
+            "app.solvers.base.UnavailableSolverAdapter.__init__": "695211cc6f08c5f572928f4d539cb1d21db358f5cba0053db8ba29c262421a19",
+            "app.solvers.base.UnavailableSolverAdapter.available": "b1db9549f25a01fd012fed67764fab16f31f37a395aec103d084870b84d895d4",
+            "app.solvers.base.UnavailableSolverAdapter.solve": "9766ebbb00e0ef234b6c625b99b1fbc92bcfbc297bf0ad92e6e10b14de04e656",
+            "app.solvers.highs_adapter.HiGHSAdapter.available": "7fbd000dcb66fed384224c243a6dde085eb4aa065ee3f5bfd31837fb2cc9ce5d",
+            "app.solvers.highs_adapter.HiGHSAdapter.solve": "b6bfec58ca817384516c93a433f1c550647f2f8180adb2085cb3c3bed86e006d",
+            "app.solvers.highs_adapter.HiGHSAdapter._solve_serial": "9cbe0990d09bff01e62dd515f3293008c47092caa4ec28deb16b98a0c354bb07",
+            "app.solvers.highs_adapter.HiGHSAdapter._configure_progress_callback": "29d39bcb142bbfaeaa717bf988958767d2b1d40b84ec87e1b89d2fe97be5efee",
+            "app.solvers.highs_adapter.HiGHSAdapter._emit_lp_iteration_summary": "f1d8e1cd234ccdd1c2979856d02921c0c0b852ef050c945e118e771d71c3400b",
+            "app.solvers.highs_adapter.HiGHSAdapter._finite_number": "c3f4fa2b13ae7b7af97b89f0428daeb9385ba6e4e248dcd2ff0a19d4b252bd11",
+            "app.solvers.highs_adapter.HiGHSAdapter._finite_integer": "c9522d091f5c15217e249b9fa4f6dc827227d7af2e80f612277cd78255d0e007",
+            "app.solvers.highs_adapter.HiGHSAdapter._extract_variables": "02c08df70a8e8dcd85206b4dee3f38ee77bab1ee9b2a49177716ee89e998c329",
+            "app.solvers.highs_adapter.HiGHSAdapter._label": "a9410a7380d5a154fa8f3801323abd91304f98751c916223af085cf4bb1a0f8b",
+            "app.solvers.nlp_adapter.NLPSolverAdapter.available": "61c93dea7a60111ac15a9406733563f0f44b6e4948afc4e171c2db33fe9e0b08",
+            "app.solvers.nlp_adapter.NLPSolverAdapter.availability_message": "aeecec41efa0518113cc7477d49c2c769ee845ca01b22b09fe1a8039ef67b1cd",
+            "app.solvers.nlp_adapter.NLPSolverAdapter.solve": "0cc06afb237ca7b948ab4ab25fb5a9ed8d3d6d1d137da7a925b8cc76bf5a3c9d",
+            "app.solvers.nlp_adapter.NLPSolverAdapter._cpu_limit_reached": "30abe38daba7038b46b068c52fa0f21a86d9287d358e0bb182771cdd88e1f6ca",
+            "app.solvers.nlp_adapter.NLPSolverAdapter._failed_result": "46b7e7d48018a3aa349891344260c63fecbf16fd5f95834227f1f150491bdd94",
+            "app.solvers.nlp_adapter.NLPSolverAdapter._has_integer_variables": "df327469fa9ef7ddaab08fdcaeadb6af8ca2ab1dfed447d01200b54e8dc965f7",
+            "app.solvers.nlp_adapter.NLPSolverAdapter._initialize_unset_variables": "8e5095de29753edfe9ef7b81fcc2044c4002657c991a0a3f1e5a764805ac24f9",
+            "app.solvers.nlp_adapter.NLPSolverAdapter._objective_value": "db4387109010b32c48c8cdb1e09d5f5885d43665e7824e302b6afbe7ffa98cc6",
+            "app.solvers.nlp_adapter.NLPSolverAdapter.extract_variables": "e1137606a1d7b477e5c7d2ea6f07df64b06b037428f2b90029b0aeb9e821019f",
+            "app.solvers.nlp_adapter.NLPSolverAdapter.constraint_violations": "71c3aa10a0259981b844d8f9a42e6ad8def0cfb7adb0176a8661386c4c6d9b5d",
+            "app.solvers.nlp_adapter.NLPSolverAdapter._status_from_termination": "e022357d45ba914c40deeee3471ce733991887f14ec80348a06522205bd953b5",
+            "app.solvers.nlp_adapter.NLPSolverAdapter._label": "eff8d9d624acba1fc17da1318cdc0501de4dbfdea464752b2e2a538b0ec8a35e",
+            "app.solvers.run_settings.validate_run_settings.validate_run_settings": "7c9905ce86cd63347599ff19ba43ef2e2c245ff98845b3459b7932ce026ff43e",
+            "app.solvers.run_settings.apply_initial_values.apply_initial_values": "8529c65da55cf52a9583b62b5732c37c9ef06abe6dfe7e9afe9052696a5af6f0",
+            "app.solvers.solver_router.SolverRouteError.__init__": "8239e1593da145ff43fffb80c4037ffa79d71c13feb700e65f1c95b66bdfc91f",
+            "app.solvers.solver_router.ScipAdapter.__init__": "f9bc50513c9cf5a219fb3835b79fec61ea0f63ba16d5bb0eab59a9b1011615dd",
+            "app.solvers.solver_router.SolverRouter.__init__": "32b05b8e35836d5898d2fe8ab4be2455d82b9bf0cfac223a15cdafe5c6624c5f",
+            "app.solvers.solver_router.SolverRouter.route": "aa292bb6852612990de8dfb7cd4e4aec9f1bb41690e544aaa6865f255771945a",
+            "app.solvers.solver_router.SolverRouter.solve": "862706f8cabe4faaccfce5bf9465bedad6024f0175486f3ad0e649e01912fac1",
+            "app.solvers.solver_router.SolverRouter.infer_problem_type_from_model": "e15584df123a16108675b3b3188c4cc080ad5bad828a6863536f867443873261",
+            "app.solvers.solver_router.SolverRouter._key": "ec62ad98a144f93789eef008d80b41b1db359fbc0ee6e308713c65721d07c5f4",
+            "app.solvers.solver_router.SolverRouter._message": "0d7a2049374f362bdc0a8c7a5e1fd75b7343774a285e7b61f2c8dce7ce3bef37",
+            "app.solvers.solver_router.SolverRouter._assert_highs_can_accept_model": "29e845dced6d232f6c47c252a9bf4ee3133ced2d35c33e34d0edd90518bb03d1",
+            "app.solvers.solver_router.SolverRouter._model_has_nonlinearity": "40a962711af581685cd03c607a5c094d8cb7eefb9638ea7624977ae47778efca",
+            "app.solvers.status.ipopt_unavailable_explanation.ipopt_unavailable_explanation": "991835cafe391fc166395d14b753e7a274a86d428fa40f693ece9a82c0ccfcf4",
+            "app.solvers.status._package_version._package_version": "ea037bf7820e35b08b59040700ca77ab6492b2a6c418937b0f4a611783a27354",
+            "app.solvers.status._solver_available._solver_available": "ba3af93ae8fc9a4ecd8bf6227f5f01e76098c9f89b290682d905d2c1b02dfb4a",
+            "app.solvers.status._ipopt_version._ipopt_version": "10e97df05ef33272c65833e66f3c2b451edbc05e25a886b95c6ac4345d4a40f9",
+            "app.solvers.status.solver_status.solver_status": "217d8f4f653e3b90532d825d8cfae979eee3cd0ac8d3e3afff9521e65ee25ff6"
+          },
+          "source_hash_scope": "磁盘源码与已加载 Python code object 分别记录；二者不冒充旧镜像证明。",
+          "image_digest": "unknown",
+          "python": "3.12.14",
+          "system": "Darwin",
+          "machine": "arm64",
+          "packages": {
+            "pyomo": "6.10.1",
+            "highspy": "1.15.1",
+            "numpy": "2.5.2",
+            "scipy": "unknown"
+          },
+          "compiler_hashes": {
+            "app/generic_formula_compiler.py": "6f2bf2ca449cdb28b06714f4247bfcc907d3c18772e42497ed7cccaebfe4d156",
+            "app/model_components/formula_components.py": "d528e10ea30d6b6d63f72c55b7cddccd0311ae69a3f499cb06d1c37654f2ed66",
+            "app/builders/component_model_builder.py": "0eab1b55ab2ffc02c75fedbc7d40ef2696ac1ac05f5f995d1e9072ef7a8bd93d",
+            "app/function_strategy.py": "69a596f275fcc72094f4583cfcb39ab3ebc202d301ffc4cd0193dca945a6fd81"
+          },
+          "builtin_implementations": {},
+          "solver": {
+            "name": "HiGHS",
+            "version": "1.15.1",
+            "executable_hash": "unknown",
+            "binary_hash": "27633861039f85ade740e5ddf06e7795989ddcf92566e32d94f0980d09e2782f",
+            "adapter_hash": "fd52bcba447227d2daff18ae1ca8ff72279a255d5feb47782d0ef18ddae4ca0a"
+          },
+          "requested_settings": {
+            "time_limit_seconds": 300.0,
+            "mip_gap": 0.001,
+            "threads": null,
+            "presolve": true
+          },
+          "effective_settings": {
+            "time_limit": 300.0,
+            "mip_rel_gap": 0.001,
+            "threads": "solver_default",
+            "presolve": "solver_default; adapter does not override"
+          },
+          "initial_values": {},
+          "numeric_environment": {
+            "OMP_NUM_THREADS": "unknown",
+            "OPENBLAS_NUM_THREADS": "unknown",
+            "MKL_NUM_THREADS": "unknown"
+          }
+        },
+        "identity_hash": "19c4f6cfb92e92488d09d48a4fbbf0c4aa9a1190de26c46eb4a4ab617e4345f4",
+        "image_note": "当前进程无法可信取得镜像 digest，未用可随意填写的环境变量冒充镜像证明。",
+        "replay_note": "清单记录实际代码和数值环境；不提供旧环境，也不承诺跨环境逐字节一致。"
+      }
+    },
+    {
+      "id": "OPT-B009EB6559",
+      "model_id": "MODEL-6CC1BE03",
+      "status": "SUCCESS",
+      "parameters": {
+        "horizon": 2,
+        "demand": [
+          10,
+          10
+        ]
+      },
+      "objective_value": 72.0,
+      "duration_seconds": 1.0,
+      "decisions": [
+        {
+          "key": "output[0]",
+          "code": "output",
+          "coordinate": "output[0]",
+          "name": "output",
+          "unit": "MW",
+          "definition": {
+            "dimension": [
+              "time"
+            ],
+            "unit": "MW"
+          },
+          "value": 12.0
+        },
+        {
+          "key": "output[1]",
+          "code": "output",
+          "coordinate": "output[1]",
+          "name": "output",
+          "unit": "MW",
+          "definition": {
+            "dimension": [
+              "time"
+            ],
+            "unit": "MW"
+          },
+          "value": 12.0
+        }
+      ],
+      "max_constraint_violation": 0.0,
+      "execution_environment": {
+        "schema_version": 1,
+        "observed_at": "2026-10-21 11:53:15",
+        "platform_commit": "ec4264ae6cdb9cd509a45d4f86e3a3763029b914",
+        "working_tree_modified": true,
+        "identity": {
+          "platform_source_hash": "b3a5dba6b18b1afa8d6fe373e5b88823da6529255296296afef5f125b9c2b6a3",
+          "loaded_code_hash": "f87aacc102fee2201bca375027acdcd695433bbb5cf44035829486b1ddc817f9",
+          "loaded_adapter_hashes": {
+            "app.solvers.base.SolverAdapter.available": "156f673f1135e55bfaaa0ab5cb0fda77d31d390b6b04add8f4b5158ccd24264c",
+            "app.solvers.base.SolverAdapter.solve": "2aa1b3059b329e9c79c63e9864dc0684dbe057644a2173217557c61571823143",
+            "app.solvers.base.SolverAdapter.__subclasshook__": "542db00912bb2c59e0c17d460e55160f65ac5a21c71bfc346d28b5ff82c2fc88",
+            "app.solvers.base.SolverAdapter.__init__": "5b56104861680ddf5ce43d5e6169eb9fdc177f7df345f0f200876c7c0c050c8b",
+            "app.solvers.base.UnavailableSolverAdapter.__init__": "695211cc6f08c5f572928f4d539cb1d21db358f5cba0053db8ba29c262421a19",
+            "app.solvers.base.UnavailableSolverAdapter.available": "b1db9549f25a01fd012fed67764fab16f31f37a395aec103d084870b84d895d4",
+            "app.solvers.base.UnavailableSolverAdapter.solve": "9766ebbb00e0ef234b6c625b99b1fbc92bcfbc297bf0ad92e6e10b14de04e656",
+            "app.solvers.highs_adapter.HiGHSAdapter.available": "7fbd000dcb66fed384224c243a6dde085eb4aa065ee3f5bfd31837fb2cc9ce5d",
+            "app.solvers.highs_adapter.HiGHSAdapter.solve": "b6bfec58ca817384516c93a433f1c550647f2f8180adb2085cb3c3bed86e006d",
+            "app.solvers.highs_adapter.HiGHSAdapter._solve_serial": "9cbe0990d09bff01e62dd515f3293008c47092caa4ec28deb16b98a0c354bb07",
+            "app.solvers.highs_adapter.HiGHSAdapter._configure_progress_callback": "29d39bcb142bbfaeaa717bf988958767d2b1d40b84ec87e1b89d2fe97be5efee",
+            "app.solvers.highs_adapter.HiGHSAdapter._emit_lp_iteration_summary": "f1d8e1cd234ccdd1c2979856d02921c0c0b852ef050c945e118e771d71c3400b",
+            "app.solvers.highs_adapter.HiGHSAdapter._finite_number": "c3f4fa2b13ae7b7af97b89f0428daeb9385ba6e4e248dcd2ff0a19d4b252bd11",
+            "app.solvers.highs_adapter.HiGHSAdapter._finite_integer": "c9522d091f5c15217e249b9fa4f6dc827227d7af2e80f612277cd78255d0e007",
+            "app.solvers.highs_adapter.HiGHSAdapter._extract_variables": "02c08df70a8e8dcd85206b4dee3f38ee77bab1ee9b2a49177716ee89e998c329",
+            "app.solvers.highs_adapter.HiGHSAdapter._label": "a9410a7380d5a154fa8f3801323abd91304f98751c916223af085cf4bb1a0f8b",
+            "app.solvers.nlp_adapter.NLPSolverAdapter.available": "61c93dea7a60111ac15a9406733563f0f44b6e4948afc4e171c2db33fe9e0b08",
+            "app.solvers.nlp_adapter.NLPSolverAdapter.availability_message": "aeecec41efa0518113cc7477d49c2c769ee845ca01b22b09fe1a8039ef67b1cd",
+            "app.solvers.nlp_adapter.NLPSolverAdapter.solve": "0cc06afb237ca7b948ab4ab25fb5a9ed8d3d6d1d137da7a925b8cc76bf5a3c9d",
+            "app.solvers.nlp_adapter.NLPSolverAdapter._cpu_limit_reached": "30abe38daba7038b46b068c52fa0f21a86d9287d358e0bb182771cdd88e1f6ca",
+            "app.solvers.nlp_adapter.NLPSolverAdapter._failed_result": "46b7e7d48018a3aa349891344260c63fecbf16fd5f95834227f1f150491bdd94",
+            "app.solvers.nlp_adapter.NLPSolverAdapter._has_integer_variables": "df327469fa9ef7ddaab08fdcaeadb6af8ca2ab1dfed447d01200b54e8dc965f7",
+            "app.solvers.nlp_adapter.NLPSolverAdapter._initialize_unset_variables": "8e5095de29753edfe9ef7b81fcc2044c4002657c991a0a3f1e5a764805ac24f9",
+            "app.solvers.nlp_adapter.NLPSolverAdapter._objective_value": "db4387109010b32c48c8cdb1e09d5f5885d43665e7824e302b6afbe7ffa98cc6",
+            "app.solvers.nlp_adapter.NLPSolverAdapter.extract_variables": "e1137606a1d7b477e5c7d2ea6f07df64b06b037428f2b90029b0aeb9e821019f",
+            "app.solvers.nlp_adapter.NLPSolverAdapter.constraint_violations": "71c3aa10a0259981b844d8f9a42e6ad8def0cfb7adb0176a8661386c4c6d9b5d",
+            "app.solvers.nlp_adapter.NLPSolverAdapter._status_from_termination": "e022357d45ba914c40deeee3471ce733991887f14ec80348a06522205bd953b5",
+            "app.solvers.nlp_adapter.NLPSolverAdapter._label": "eff8d9d624acba1fc17da1318cdc0501de4dbfdea464752b2e2a538b0ec8a35e",
+            "app.solvers.run_settings.validate_run_settings.validate_run_settings": "7c9905ce86cd63347599ff19ba43ef2e2c245ff98845b3459b7932ce026ff43e",
+            "app.solvers.run_settings.apply_initial_values.apply_initial_values": "8529c65da55cf52a9583b62b5732c37c9ef06abe6dfe7e9afe9052696a5af6f0",
+            "app.solvers.solver_router.SolverRouteError.__init__": "8239e1593da145ff43fffb80c4037ffa79d71c13feb700e65f1c95b66bdfc91f",
+            "app.solvers.solver_router.ScipAdapter.__init__": "f9bc50513c9cf5a219fb3835b79fec61ea0f63ba16d5bb0eab59a9b1011615dd",
+            "app.solvers.solver_router.SolverRouter.__init__": "32b05b8e35836d5898d2fe8ab4be2455d82b9bf0cfac223a15cdafe5c6624c5f",
+            "app.solvers.solver_router.SolverRouter.route": "aa292bb6852612990de8dfb7cd4e4aec9f1bb41690e544aaa6865f255771945a",
+            "app.solvers.solver_router.SolverRouter.solve": "862706f8cabe4faaccfce5bf9465bedad6024f0175486f3ad0e649e01912fac1",
+            "app.solvers.solver_router.SolverRouter.infer_problem_type_from_model": "e15584df123a16108675b3b3188c4cc080ad5bad828a6863536f867443873261",
+            "app.solvers.solver_router.SolverRouter._key": "ec62ad98a144f93789eef008d80b41b1db359fbc0ee6e308713c65721d07c5f4",
+            "app.solvers.solver_router.SolverRouter._message": "0d7a2049374f362bdc0a8c7a5e1fd75b7343774a285e7b61f2c8dce7ce3bef37",
+            "app.solvers.solver_router.SolverRouter._assert_highs_can_accept_model": "29e845dced6d232f6c47c252a9bf4ee3133ced2d35c33e34d0edd90518bb03d1",
+            "app.solvers.solver_router.SolverRouter._model_has_nonlinearity": "40a962711af581685cd03c607a5c094d8cb7eefb9638ea7624977ae47778efca",
+            "app.solvers.status.ipopt_unavailable_explanation.ipopt_unavailable_explanation": "991835cafe391fc166395d14b753e7a274a86d428fa40f693ece9a82c0ccfcf4",
+            "app.solvers.status._package_version._package_version": "ea037bf7820e35b08b59040700ca77ab6492b2a6c418937b0f4a611783a27354",
+            "app.solvers.status._solver_available._solver_available": "ba3af93ae8fc9a4ecd8bf6227f5f01e76098c9f89b290682d905d2c1b02dfb4a",
+            "app.solvers.status._ipopt_version._ipopt_version": "10e97df05ef33272c65833e66f3c2b451edbc05e25a886b95c6ac4345d4a40f9",
+            "app.solvers.status.solver_status.solver_status": "217d8f4f653e3b90532d825d8cfae979eee3cd0ac8d3e3afff9521e65ee25ff6"
+          },
+          "source_hash_scope": "磁盘源码与已加载 Python code object 分别记录；二者不冒充旧镜像证明。",
+          "image_digest": "unknown",
+          "python": "3.12.14",
+          "system": "Darwin",
+          "machine": "arm64",
+          "packages": {
+            "pyomo": "6.10.1",
+            "highspy": "1.15.1",
+            "numpy": "2.5.2",
+            "scipy": "unknown"
+          },
+          "compiler_hashes": {
+            "app/generic_formula_compiler.py": "6f2bf2ca449cdb28b06714f4247bfcc907d3c18772e42497ed7cccaebfe4d156",
+            "app/model_components/formula_components.py": "d528e10ea30d6b6d63f72c55b7cddccd0311ae69a3f499cb06d1c37654f2ed66",
+            "app/builders/component_model_builder.py": "0eab1b55ab2ffc02c75fedbc7d40ef2696ac1ac05f5f995d1e9072ef7a8bd93d",
+            "app/function_strategy.py": "69a596f275fcc72094f4583cfcb39ab3ebc202d301ffc4cd0193dca945a6fd81"
+          },
+          "builtin_implementations": {},
+          "solver": {
+            "name": "HiGHS",
+            "version": "1.15.1",
+            "executable_hash": "unknown",
+            "binary_hash": "27633861039f85ade740e5ddf06e7795989ddcf92566e32d94f0980d09e2782f",
+            "adapter_hash": "fd52bcba447227d2daff18ae1ca8ff72279a255d5feb47782d0ef18ddae4ca0a"
+          },
+          "requested_settings": {
+            "time_limit_seconds": 300.0,
+            "mip_gap": 0.001,
+            "threads": null,
+            "presolve": true
+          },
+          "effective_settings": {
+            "time_limit": 300.0,
+            "mip_rel_gap": 0.001,
+            "threads": "solver_default",
+            "presolve": "solver_default; adapter does not override"
+          },
+          "initial_values": {},
+          "numeric_environment": {
+            "OMP_NUM_THREADS": "unknown",
+            "OPENBLAS_NUM_THREADS": "unknown",
+            "MKL_NUM_THREADS": "unknown"
+          }
+        },
+        "identity_hash": "b8007eb5d6a49f859d4fea6c35f1ece6afd9a3bde4f63ed2c2f82491bcf67d45",
+        "image_note": "当前进程无法可信取得镜像 digest，未用可随意填写的环境变量冒充镜像证明。",
+        "replay_note": "清单记录实际代码和数值环境；不提供旧环境，也不承诺跨环境逐字节一致。"
+      }
+    },
+    {
+      "id": "OPT-F286E82EB1",
+      "model_id": "MODEL-6CC1BE03",
+      "status": "SUCCESS",
+      "parameters": {
+        "horizon": 2,
+        "demand": [
+          10,
+          10
+        ]
+      },
+      "objective_value": 72.0,
+      "duration_seconds": 1.0,
+      "decisions": [
+        {
+          "key": "output[0]",
+          "code": "output",
+          "coordinate": "output[0]",
+          "name": "output",
+          "unit": "MW",
+          "definition": {
+            "dimension": [
+              "time"
+            ],
+            "unit": "MW"
+          },
+          "value": 12.0
+        },
+        {
+          "key": "output[1]",
+          "code": "output",
+          "coordinate": "output[1]",
+          "name": "output",
+          "unit": "MW",
+          "definition": {
+            "dimension": [
+              "time"
+            ],
+            "unit": "MW"
+          },
+          "value": 12.0
+        }
+      ],
+      "max_constraint_violation": 0.0,
+      "execution_environment": {
+        "schema_version": 1,
+        "observed_at": "2026-10-21 11:53:19",
+        "platform_commit": "ec4264ae6cdb9cd509a45d4f86e3a3763029b914",
+        "working_tree_modified": true,
+        "identity": {
+          "platform_source_hash": "b3a5dba6b18b1afa8d6fe373e5b88823da6529255296296afef5f125b9c2b6a3",
+          "loaded_code_hash": "f6d20892ea319ff5e785646458c6b4183bf3b75242f26dc794a690b17559028a",
+          "loaded_adapter_hashes": {
+            "app.solvers.base.SolverAdapter.available": "156f673f1135e55bfaaa0ab5cb0fda77d31d390b6b04add8f4b5158ccd24264c",
+            "app.solvers.base.SolverAdapter.solve": "2aa1b3059b329e9c79c63e9864dc0684dbe057644a2173217557c61571823143",
+            "app.solvers.base.SolverAdapter.__subclasshook__": "542db00912bb2c59e0c17d460e55160f65ac5a21c71bfc346d28b5ff82c2fc88",
+            "app.solvers.base.SolverAdapter.__init__": "5b56104861680ddf5ce43d5e6169eb9fdc177f7df345f0f200876c7c0c050c8b",
+            "app.solvers.base.UnavailableSolverAdapter.__init__": "695211cc6f08c5f572928f4d539cb1d21db358f5cba0053db8ba29c262421a19",
+            "app.solvers.base.UnavailableSolverAdapter.available": "b1db9549f25a01fd012fed67764fab16f31f37a395aec103d084870b84d895d4",
+            "app.solvers.base.UnavailableSolverAdapter.solve": "9766ebbb00e0ef234b6c625b99b1fbc92bcfbc297bf0ad92e6e10b14de04e656",
+            "app.solvers.highs_adapter.HiGHSAdapter.available": "7fbd000dcb66fed384224c243a6dde085eb4aa065ee3f5bfd31837fb2cc9ce5d",
+            "app.solvers.highs_adapter.HiGHSAdapter.solve": "b6bfec58ca817384516c93a433f1c550647f2f8180adb2085cb3c3bed86e006d",
+            "app.solvers.highs_adapter.HiGHSAdapter._solve_serial": "9cbe0990d09bff01e62dd515f3293008c47092caa4ec28deb16b98a0c354bb07",
+            "app.solvers.highs_adapter.HiGHSAdapter._configure_progress_callback": "29d39bcb142bbfaeaa717bf988958767d2b1d40b84ec87e1b89d2fe97be5efee",
+            "app.solvers.highs_adapter.HiGHSAdapter._emit_lp_iteration_summary": "f1d8e1cd234ccdd1c2979856d02921c0c0b852ef050c945e118e771d71c3400b",
+            "app.solvers.highs_adapter.HiGHSAdapter._finite_number": "c3f4fa2b13ae7b7af97b89f0428daeb9385ba6e4e248dcd2ff0a19d4b252bd11",
+            "app.solvers.highs_adapter.HiGHSAdapter._finite_integer": "c9522d091f5c15217e249b9fa4f6dc827227d7af2e80f612277cd78255d0e007",
+            "app.solvers.highs_adapter.HiGHSAdapter._extract_variables": "02c08df70a8e8dcd85206b4dee3f38ee77bab1ee9b2a49177716ee89e998c329",
+            "app.solvers.highs_adapter.HiGHSAdapter._label": "a9410a7380d5a154fa8f3801323abd91304f98751c916223af085cf4bb1a0f8b",
+            "app.solvers.nlp_adapter.NLPSolverAdapter.available": "61c93dea7a60111ac15a9406733563f0f44b6e4948afc4e171c2db33fe9e0b08",
+            "app.solvers.nlp_adapter.NLPSolverAdapter.availability_message": "aeecec41efa0518113cc7477d49c2c769ee845ca01b22b09fe1a8039ef67b1cd",
+            "app.solvers.nlp_adapter.NLPSolverAdapter.solve": "0cc06afb237ca7b948ab4ab25fb5a9ed8d3d6d1d137da7a925b8cc76bf5a3c9d",
+            "app.solvers.nlp_adapter.NLPSolverAdapter._cpu_limit_reached": "30abe38daba7038b46b068c52fa0f21a86d9287d358e0bb182771cdd88e1f6ca",
+            "app.solvers.nlp_adapter.NLPSolverAdapter._failed_result": "46b7e7d48018a3aa349891344260c63fecbf16fd5f95834227f1f150491bdd94",
+            "app.solvers.nlp_adapter.NLPSolverAdapter._has_integer_variables": "df327469fa9ef7ddaab08fdcaeadb6af8ca2ab1dfed447d01200b54e8dc965f7",
+            "app.solvers.nlp_adapter.NLPSolverAdapter._initialize_unset_variables": "8e5095de29753edfe9ef7b81fcc2044c4002657c991a0a3f1e5a764805ac24f9",
+            "app.solvers.nlp_adapter.NLPSolverAdapter._objective_value": "db4387109010b32c48c8cdb1e09d5f5885d43665e7824e302b6afbe7ffa98cc6",
+            "app.solvers.nlp_adapter.NLPSolverAdapter.extract_variables": "e1137606a1d7b477e5c7d2ea6f07df64b06b037428f2b90029b0aeb9e821019f",
+            "app.solvers.nlp_adapter.NLPSolverAdapter.constraint_violations": "71c3aa10a0259981b844d8f9a42e6ad8def0cfb7adb0176a8661386c4c6d9b5d",
+            "app.solvers.nlp_adapter.NLPSolverAdapter._status_from_termination": "e022357d45ba914c40deeee3471ce733991887f14ec80348a06522205bd953b5",
+            "app.solvers.nlp_adapter.NLPSolverAdapter._label": "eff8d9d624acba1fc17da1318cdc0501de4dbfdea464752b2e2a538b0ec8a35e",
+            "app.solvers.run_settings.validate_run_settings.validate_run_settings": "7c9905ce86cd63347599ff19ba43ef2e2c245ff98845b3459b7932ce026ff43e",
+            "app.solvers.run_settings.apply_initial_values.apply_initial_values": "8529c65da55cf52a9583b62b5732c37c9ef06abe6dfe7e9afe9052696a5af6f0",
+            "app.solvers.solver_router.SolverRouteError.__init__": "8239e1593da145ff43fffb80c4037ffa79d71c13feb700e65f1c95b66bdfc91f",
+            "app.solvers.solver_router.ScipAdapter.__init__": "f9bc50513c9cf5a219fb3835b79fec61ea0f63ba16d5bb0eab59a9b1011615dd",
+            "app.solvers.solver_router.SolverRouter.__init__": "32b05b8e35836d5898d2fe8ab4be2455d82b9bf0cfac223a15cdafe5c6624c5f",
+            "app.solvers.solver_router.SolverRouter.route": "aa292bb6852612990de8dfb7cd4e4aec9f1bb41690e544aaa6865f255771945a",
+            "app.solvers.solver_router.SolverRouter.solve": "862706f8cabe4faaccfce5bf9465bedad6024f0175486f3ad0e649e01912fac1",
+            "app.solvers.solver_router.SolverRouter.infer_problem_type_from_model": "e15584df123a16108675b3b3188c4cc080ad5bad828a6863536f867443873261",
+            "app.solvers.solver_router.SolverRouter._key": "ec62ad98a144f93789eef008d80b41b1db359fbc0ee6e308713c65721d07c5f4",
+            "app.solvers.solver_router.SolverRouter._message": "0d7a2049374f362bdc0a8c7a5e1fd75b7343774a285e7b61f2c8dce7ce3bef37",
+            "app.solvers.solver_router.SolverRouter._assert_highs_can_accept_model": "29e845dced6d232f6c47c252a9bf4ee3133ced2d35c33e34d0edd90518bb03d1",
+            "app.solvers.solver_router.SolverRouter._model_has_nonlinearity": "40a962711af581685cd03c607a5c094d8cb7eefb9638ea7624977ae47778efca",
+            "app.solvers.status.ipopt_unavailable_explanation.ipopt_unavailable_explanation": "991835cafe391fc166395d14b753e7a274a86d428fa40f693ece9a82c0ccfcf4",
+            "app.solvers.status._package_version._package_version": "ea037bf7820e35b08b59040700ca77ab6492b2a6c418937b0f4a611783a27354",
+            "app.solvers.status._solver_available._solver_available": "ba3af93ae8fc9a4ecd8bf6227f5f01e76098c9f89b290682d905d2c1b02dfb4a",
+            "app.solvers.status._ipopt_version._ipopt_version": "10e97df05ef33272c65833e66f3c2b451edbc05e25a886b95c6ac4345d4a40f9",
+            "app.solvers.status.solver_status.solver_status": "217d8f4f653e3b90532d825d8cfae979eee3cd0ac8d3e3afff9521e65ee25ff6"
+          },
+          "source_hash_scope": "磁盘源码与已加载 Python code object 分别记录；二者不冒充旧镜像证明。",
+          "image_digest": "unknown",
+          "python": "3.12.14",
+          "system": "Darwin",
+          "machine": "arm64",
+          "packages": {
+            "pyomo": "6.10.1",
+            "highspy": "1.15.1",
+            "numpy": "2.5.2",
+            "scipy": "unknown"
+          },
+          "compiler_hashes": {
+            "app/generic_formula_compiler.py": "6f2bf2ca449cdb28b06714f4247bfcc907d3c18772e42497ed7cccaebfe4d156",
+            "app/model_components/formula_components.py": "d528e10ea30d6b6d63f72c55b7cddccd0311ae69a3f499cb06d1c37654f2ed66",
+            "app/builders/component_model_builder.py": "0eab1b55ab2ffc02c75fedbc7d40ef2696ac1ac05f5f995d1e9072ef7a8bd93d",
+            "app/function_strategy.py": "69a596f275fcc72094f4583cfcb39ab3ebc202d301ffc4cd0193dca945a6fd81"
+          },
+          "builtin_implementations": {},
+          "solver": {
+            "name": "HiGHS",
+            "version": "1.15.1",
+            "executable_hash": "unknown",
+            "binary_hash": "27633861039f85ade740e5ddf06e7795989ddcf92566e32d94f0980d09e2782f",
+            "adapter_hash": "fd52bcba447227d2daff18ae1ca8ff72279a255d5feb47782d0ef18ddae4ca0a"
+          },
+          "requested_settings": {
+            "time_limit_seconds": 300.0,
+            "mip_gap": 0.001,
+            "threads": null,
+            "presolve": true
+          },
+          "effective_settings": {
+            "time_limit": 300.0,
+            "mip_rel_gap": 0.001,
+            "threads": "solver_default",
+            "presolve": "solver_default; adapter does not override"
+          },
+          "initial_values": {},
+          "numeric_environment": {
+            "OMP_NUM_THREADS": "unknown",
+            "OPENBLAS_NUM_THREADS": "unknown",
+            "MKL_NUM_THREADS": "unknown"
+          }
+        },
+        "identity_hash": "7c23e9c5da318f6ed51d3abdf4b56023f2dce0d696243fda6c044ca272c76264",
+        "image_note": "当前进程无法可信取得镜像 digest，未用可随意填写的环境变量冒充镜像证明。",
+        "replay_note": "清单记录实际代码和数值环境；不提供旧环境，也不承诺跨环境逐字节一致。"
+      }
+    },
+    {
+      "id": "OPT-F3F54508FE",
+      "model_id": "MODEL-B14DE655",
+      "status": "SUCCESS",
+      "parameters": {
+        "horizon": 2,
+        "demand": [
+          10,
+          10
+        ]
+      },
+      "objective_value": 60.0,
+      "duration_seconds": 1.0,
+      "decisions": [
+        {
+          "key": "output[0]",
+          "code": "output",
+          "coordinate": "output[0]",
+          "name": "output",
+          "unit": "MW",
+          "definition": {
+            "dimension": [
+              "time"
+            ],
+            "unit": "MW"
+          },
+          "value": 10.0
+        },
+        {
+          "key": "output[1]",
+          "code": "output",
+          "coordinate": "output[1]",
+          "name": "output",
+          "unit": "MW",
+          "definition": {
+            "dimension": [
+              "time"
+            ],
+            "unit": "MW"
+          },
+          "value": 10.0
+        }
+      ],
+      "max_constraint_violation": 0.0,
+      "execution_environment": {
+        "schema_version": 1,
+        "observed_at": "2026-10-21 11:53:21",
+        "platform_commit": "ec4264ae6cdb9cd509a45d4f86e3a3763029b914",
+        "working_tree_modified": true,
+        "identity": {
+          "platform_source_hash": "b3a5dba6b18b1afa8d6fe373e5b88823da6529255296296afef5f125b9c2b6a3",
+          "loaded_code_hash": "f6d20892ea319ff5e785646458c6b4183bf3b75242f26dc794a690b17559028a",
+          "loaded_adapter_hashes": {
+            "app.solvers.base.SolverAdapter.available": "156f673f1135e55bfaaa0ab5cb0fda77d31d390b6b04add8f4b5158ccd24264c",
+            "app.solvers.base.SolverAdapter.solve": "2aa1b3059b329e9c79c63e9864dc0684dbe057644a2173217557c61571823143",
+            "app.solvers.base.SolverAdapter.__subclasshook__": "542db00912bb2c59e0c17d460e55160f65ac5a21c71bfc346d28b5ff82c2fc88",
+            "app.solvers.base.SolverAdapter.__init__": "5b56104861680ddf5ce43d5e6169eb9fdc177f7df345f0f200876c7c0c050c8b",
+            "app.solvers.base.UnavailableSolverAdapter.__init__": "695211cc6f08c5f572928f4d539cb1d21db358f5cba0053db8ba29c262421a19",
+            "app.solvers.base.UnavailableSolverAdapter.available": "b1db9549f25a01fd012fed67764fab16f31f37a395aec103d084870b84d895d4",
+            "app.solvers.base.UnavailableSolverAdapter.solve": "9766ebbb00e0ef234b6c625b99b1fbc92bcfbc297bf0ad92e6e10b14de04e656",
+            "app.solvers.highs_adapter.HiGHSAdapter.available": "7fbd000dcb66fed384224c243a6dde085eb4aa065ee3f5bfd31837fb2cc9ce5d",
+            "app.solvers.highs_adapter.HiGHSAdapter.solve": "b6bfec58ca817384516c93a433f1c550647f2f8180adb2085cb3c3bed86e006d",
+            "app.solvers.highs_adapter.HiGHSAdapter._solve_serial": "9cbe0990d09bff01e62dd515f3293008c47092caa4ec28deb16b98a0c354bb07",
+            "app.solvers.highs_adapter.HiGHSAdapter._configure_progress_callback": "29d39bcb142bbfaeaa717bf988958767d2b1d40b84ec87e1b89d2fe97be5efee",
+            "app.solvers.highs_adapter.HiGHSAdapter._emit_lp_iteration_summary": "f1d8e1cd234ccdd1c2979856d02921c0c0b852ef050c945e118e771d71c3400b",
+            "app.solvers.highs_adapter.HiGHSAdapter._finite_number": "c3f4fa2b13ae7b7af97b89f0428daeb9385ba6e4e248dcd2ff0a19d4b252bd11",
+            "app.solvers.highs_adapter.HiGHSAdapter._finite_integer": "c9522d091f5c15217e249b9fa4f6dc827227d7af2e80f612277cd78255d0e007",
+            "app.solvers.highs_adapter.HiGHSAdapter._extract_variables": "02c08df70a8e8dcd85206b4dee3f38ee77bab1ee9b2a49177716ee89e998c329",
+            "app.solvers.highs_adapter.HiGHSAdapter._label": "a9410a7380d5a154fa8f3801323abd91304f98751c916223af085cf4bb1a0f8b",
+            "app.solvers.nlp_adapter.NLPSolverAdapter.available": "61c93dea7a60111ac15a9406733563f0f44b6e4948afc4e171c2db33fe9e0b08",
+            "app.solvers.nlp_adapter.NLPSolverAdapter.availability_message": "aeecec41efa0518113cc7477d49c2c769ee845ca01b22b09fe1a8039ef67b1cd",
+            "app.solvers.nlp_adapter.NLPSolverAdapter.solve": "0cc06afb237ca7b948ab4ab25fb5a9ed8d3d6d1d137da7a925b8cc76bf5a3c9d",
+            "app.solvers.nlp_adapter.NLPSolverAdapter._cpu_limit_reached": "30abe38daba7038b46b068c52fa0f21a86d9287d358e0bb182771cdd88e1f6ca",
+            "app.solvers.nlp_adapter.NLPSolverAdapter._failed_result": "46b7e7d48018a3aa349891344260c63fecbf16fd5f95834227f1f150491bdd94",
+            "app.solvers.nlp_adapter.NLPSolverAdapter._has_integer_variables": "df327469fa9ef7ddaab08fdcaeadb6af8ca2ab1dfed447d01200b54e8dc965f7",
+            "app.solvers.nlp_adapter.NLPSolverAdapter._initialize_unset_variables": "8e5095de29753edfe9ef7b81fcc2044c4002657c991a0a3f1e5a764805ac24f9",
+            "app.solvers.nlp_adapter.NLPSolverAdapter._objective_value": "db4387109010b32c48c8cdb1e09d5f5885d43665e7824e302b6afbe7ffa98cc6",
+            "app.solvers.nlp_adapter.NLPSolverAdapter.extract_variables": "e1137606a1d7b477e5c7d2ea6f07df64b06b037428f2b90029b0aeb9e821019f",
+            "app.solvers.nlp_adapter.NLPSolverAdapter.constraint_violations": "71c3aa10a0259981b844d8f9a42e6ad8def0cfb7adb0176a8661386c4c6d9b5d",
+            "app.solvers.nlp_adapter.NLPSolverAdapter._status_from_termination": "e022357d45ba914c40deeee3471ce733991887f14ec80348a06522205bd953b5",
+            "app.solvers.nlp_adapter.NLPSolverAdapter._label": "eff8d9d624acba1fc17da1318cdc0501de4dbfdea464752b2e2a538b0ec8a35e",
+            "app.solvers.run_settings.validate_run_settings.validate_run_settings": "7c9905ce86cd63347599ff19ba43ef2e2c245ff98845b3459b7932ce026ff43e",
+            "app.solvers.run_settings.apply_initial_values.apply_initial_values": "8529c65da55cf52a9583b62b5732c37c9ef06abe6dfe7e9afe9052696a5af6f0",
+            "app.solvers.solver_router.SolverRouteError.__init__": "8239e1593da145ff43fffb80c4037ffa79d71c13feb700e65f1c95b66bdfc91f",
+            "app.solvers.solver_router.ScipAdapter.__init__": "f9bc50513c9cf5a219fb3835b79fec61ea0f63ba16d5bb0eab59a9b1011615dd",
+            "app.solvers.solver_router.SolverRouter.__init__": "32b05b8e35836d5898d2fe8ab4be2455d82b9bf0cfac223a15cdafe5c6624c5f",
+            "app.solvers.solver_router.SolverRouter.route": "aa292bb6852612990de8dfb7cd4e4aec9f1bb41690e544aaa6865f255771945a",
+            "app.solvers.solver_router.SolverRouter.solve": "862706f8cabe4faaccfce5bf9465bedad6024f0175486f3ad0e649e01912fac1",
+            "app.solvers.solver_router.SolverRouter.infer_problem_type_from_model": "e15584df123a16108675b3b3188c4cc080ad5bad828a6863536f867443873261",
+            "app.solvers.solver_router.SolverRouter._key": "ec62ad98a144f93789eef008d80b41b1db359fbc0ee6e308713c65721d07c5f4",
+            "app.solvers.solver_router.SolverRouter._message": "0d7a2049374f362bdc0a8c7a5e1fd75b7343774a285e7b61f2c8dce7ce3bef37",
+            "app.solvers.solver_router.SolverRouter._assert_highs_can_accept_model": "29e845dced6d232f6c47c252a9bf4ee3133ced2d35c33e34d0edd90518bb03d1",
+            "app.solvers.solver_router.SolverRouter._model_has_nonlinearity": "40a962711af581685cd03c607a5c094d8cb7eefb9638ea7624977ae47778efca",
+            "app.solvers.status.ipopt_unavailable_explanation.ipopt_unavailable_explanation": "991835cafe391fc166395d14b753e7a274a86d428fa40f693ece9a82c0ccfcf4",
+            "app.solvers.status._package_version._package_version": "ea037bf7820e35b08b59040700ca77ab6492b2a6c418937b0f4a611783a27354",
+            "app.solvers.status._solver_available._solver_available": "ba3af93ae8fc9a4ecd8bf6227f5f01e76098c9f89b290682d905d2c1b02dfb4a",
+            "app.solvers.status._ipopt_version._ipopt_version": "10e97df05ef33272c65833e66f3c2b451edbc05e25a886b95c6ac4345d4a40f9",
+            "app.solvers.status.solver_status.solver_status": "217d8f4f653e3b90532d825d8cfae979eee3cd0ac8d3e3afff9521e65ee25ff6"
+          },
+          "source_hash_scope": "磁盘源码与已加载 Python code object 分别记录；二者不冒充旧镜像证明。",
+          "image_digest": "unknown",
+          "python": "3.12.14",
+          "system": "Darwin",
+          "machine": "arm64",
+          "packages": {
+            "pyomo": "6.10.1",
+            "highspy": "1.15.1",
+            "numpy": "2.5.2",
+            "scipy": "unknown"
+          },
+          "compiler_hashes": {
+            "app/generic_formula_compiler.py": "6f2bf2ca449cdb28b06714f4247bfcc907d3c18772e42497ed7cccaebfe4d156",
+            "app/model_components/formula_components.py": "d528e10ea30d6b6d63f72c55b7cddccd0311ae69a3f499cb06d1c37654f2ed66",
+            "app/builders/component_model_builder.py": "0eab1b55ab2ffc02c75fedbc7d40ef2696ac1ac05f5f995d1e9072ef7a8bd93d",
+            "app/function_strategy.py": "69a596f275fcc72094f4583cfcb39ab3ebc202d301ffc4cd0193dca945a6fd81"
+          },
+          "builtin_implementations": {},
+          "solver": {
+            "name": "HiGHS",
+            "version": "1.15.1",
+            "executable_hash": "unknown",
+            "binary_hash": "27633861039f85ade740e5ddf06e7795989ddcf92566e32d94f0980d09e2782f",
+            "adapter_hash": "fd52bcba447227d2daff18ae1ca8ff72279a255d5feb47782d0ef18ddae4ca0a"
+          },
+          "requested_settings": {
+            "time_limit_seconds": 300.0,
+            "mip_gap": 0.001,
+            "threads": null,
+            "presolve": true
+          },
+          "effective_settings": {
+            "time_limit": 300.0,
+            "mip_rel_gap": 0.001,
+            "threads": "solver_default",
+            "presolve": "solver_default; adapter does not override"
+          },
+          "initial_values": {},
+          "numeric_environment": {
+            "OMP_NUM_THREADS": "unknown",
+            "OPENBLAS_NUM_THREADS": "unknown",
+            "MKL_NUM_THREADS": "unknown"
+          }
+        },
+        "identity_hash": "7c23e9c5da318f6ed51d3abdf4b56023f2dce0d696243fda6c044ca272c76264",
+        "image_note": "当前进程无法可信取得镜像 digest，未用可随意填写的环境变量冒充镜像证明。",
+        "replay_note": "清单记录实际代码和数值环境；不提供旧环境，也不承诺跨环境逐字节一致。"
+      }
+    },
+    {
+      "id": "OPT-F794A53665",
+      "model_id": "MODEL-DDC82CCD",
+      "status": "SUCCESS",
+      "parameters": {
+        "horizon": 1
+      },
+      "objective_value": 10.0,
+      "duration_seconds": 2.0,
+      "decisions": [
+        {
+          "key": "volume[0]",
+          "code": "volume",
+          "coordinate": "volume[0]",
+          "name": "volume",
+          "unit": "MWh",
+          "definition": {
+            "dimension": [
+              "time"
+            ],
+            "unit": "MWh"
+          },
+          "value": 10.0
+        },
+        {
+          "key": "level[0]",
+          "code": "level",
+          "coordinate": "level[0]",
+          "name": "level",
+          "unit": "MW",
+          "definition": {
+            "dimension": [
+              "time"
+            ],
+            "unit": "MW"
+          },
+          "value": 10.0
+        }
+      ],
+      "max_constraint_violation": 0.0,
+      "execution_environment": {
+        "schema_version": 1,
+        "observed_at": "2026-10-21 11:53:26",
+        "platform_commit": "ec4264ae6cdb9cd509a45d4f86e3a3763029b914",
+        "working_tree_modified": true,
+        "identity": {
+          "platform_source_hash": "b3a5dba6b18b1afa8d6fe373e5b88823da6529255296296afef5f125b9c2b6a3",
+          "loaded_code_hash": "869c3285b091b46e61e90ba5855b477670bf655f00e19795c938cdaf703ec063",
+          "loaded_adapter_hashes": {
+            "app.solvers.base.SolverAdapter.available": "156f673f1135e55bfaaa0ab5cb0fda77d31d390b6b04add8f4b5158ccd24264c",
+            "app.solvers.base.SolverAdapter.solve": "2aa1b3059b329e9c79c63e9864dc0684dbe057644a2173217557c61571823143",
+            "app.solvers.base.SolverAdapter.__subclasshook__": "542db00912bb2c59e0c17d460e55160f65ac5a21c71bfc346d28b5ff82c2fc88",
+            "app.solvers.base.SolverAdapter.__init__": "5b56104861680ddf5ce43d5e6169eb9fdc177f7df345f0f200876c7c0c050c8b",
+            "app.solvers.base.UnavailableSolverAdapter.__init__": "695211cc6f08c5f572928f4d539cb1d21db358f5cba0053db8ba29c262421a19",
+            "app.solvers.base.UnavailableSolverAdapter.available": "b1db9549f25a01fd012fed67764fab16f31f37a395aec103d084870b84d895d4",
+            "app.solvers.base.UnavailableSolverAdapter.solve": "9766ebbb00e0ef234b6c625b99b1fbc92bcfbc297bf0ad92e6e10b14de04e656",
+            "app.solvers.highs_adapter.HiGHSAdapter.available": "7fbd000dcb66fed384224c243a6dde085eb4aa065ee3f5bfd31837fb2cc9ce5d",
+            "app.solvers.highs_adapter.HiGHSAdapter.solve": "b6bfec58ca817384516c93a433f1c550647f2f8180adb2085cb3c3bed86e006d",
+            "app.solvers.highs_adapter.HiGHSAdapter._solve_serial": "9cbe0990d09bff01e62dd515f3293008c47092caa4ec28deb16b98a0c354bb07",
+            "app.solvers.highs_adapter.HiGHSAdapter._configure_progress_callback": "29d39bcb142bbfaeaa717bf988958767d2b1d40b84ec87e1b89d2fe97be5efee",
+            "app.solvers.highs_adapter.HiGHSAdapter._emit_lp_iteration_summary": "f1d8e1cd234ccdd1c2979856d02921c0c0b852ef050c945e118e771d71c3400b",
+            "app.solvers.highs_adapter.HiGHSAdapter._finite_number": "c3f4fa2b13ae7b7af97b89f0428daeb9385ba6e4e248dcd2ff0a19d4b252bd11",
+            "app.solvers.highs_adapter.HiGHSAdapter._finite_integer": "c9522d091f5c15217e249b9fa4f6dc827227d7af2e80f612277cd78255d0e007",
+            "app.solvers.highs_adapter.HiGHSAdapter._extract_variables": "02c08df70a8e8dcd85206b4dee3f38ee77bab1ee9b2a49177716ee89e998c329",
+            "app.solvers.highs_adapter.HiGHSAdapter._label": "a9410a7380d5a154fa8f3801323abd91304f98751c916223af085cf4bb1a0f8b",
+            "app.solvers.nlp_adapter.NLPSolverAdapter.available": "61c93dea7a60111ac15a9406733563f0f44b6e4948afc4e171c2db33fe9e0b08",
+            "app.solvers.nlp_adapter.NLPSolverAdapter.availability_message": "aeecec41efa0518113cc7477d49c2c769ee845ca01b22b09fe1a8039ef67b1cd",
+            "app.solvers.nlp_adapter.NLPSolverAdapter.solve": "0cc06afb237ca7b948ab4ab25fb5a9ed8d3d6d1d137da7a925b8cc76bf5a3c9d",
+            "app.solvers.nlp_adapter.NLPSolverAdapter._cpu_limit_reached": "30abe38daba7038b46b068c52fa0f21a86d9287d358e0bb182771cdd88e1f6ca",
+            "app.solvers.nlp_adapter.NLPSolverAdapter._failed_result": "46b7e7d48018a3aa349891344260c63fecbf16fd5f95834227f1f150491bdd94",
+            "app.solvers.nlp_adapter.NLPSolverAdapter._has_integer_variables": "df327469fa9ef7ddaab08fdcaeadb6af8ca2ab1dfed447d01200b54e8dc965f7",
+            "app.solvers.nlp_adapter.NLPSolverAdapter._initialize_unset_variables": "8e5095de29753edfe9ef7b81fcc2044c4002657c991a0a3f1e5a764805ac24f9",
+            "app.solvers.nlp_adapter.NLPSolverAdapter._objective_value": "db4387109010b32c48c8cdb1e09d5f5885d43665e7824e302b6afbe7ffa98cc6",
+            "app.solvers.nlp_adapter.NLPSolverAdapter.extract_variables": "e1137606a1d7b477e5c7d2ea6f07df64b06b037428f2b90029b0aeb9e821019f",
+            "app.solvers.nlp_adapter.NLPSolverAdapter.constraint_violations": "71c3aa10a0259981b844d8f9a42e6ad8def0cfb7adb0176a8661386c4c6d9b5d",
+            "app.solvers.nlp_adapter.NLPSolverAdapter._status_from_termination": "e022357d45ba914c40deeee3471ce733991887f14ec80348a06522205bd953b5",
+            "app.solvers.nlp_adapter.NLPSolverAdapter._label": "eff8d9d624acba1fc17da1318cdc0501de4dbfdea464752b2e2a538b0ec8a35e",
+            "app.solvers.run_settings.validate_run_settings.validate_run_settings": "7c9905ce86cd63347599ff19ba43ef2e2c245ff98845b3459b7932ce026ff43e",
+            "app.solvers.run_settings.apply_initial_values.apply_initial_values": "8529c65da55cf52a9583b62b5732c37c9ef06abe6dfe7e9afe9052696a5af6f0",
+            "app.solvers.solver_router.SolverRouteError.__init__": "8239e1593da145ff43fffb80c4037ffa79d71c13feb700e65f1c95b66bdfc91f",
+            "app.solvers.solver_router.ScipAdapter.__init__": "f9bc50513c9cf5a219fb3835b79fec61ea0f63ba16d5bb0eab59a9b1011615dd",
+            "app.solvers.solver_router.SolverRouter.__init__": "32b05b8e35836d5898d2fe8ab4be2455d82b9bf0cfac223a15cdafe5c6624c5f",
+            "app.solvers.solver_router.SolverRouter.route": "aa292bb6852612990de8dfb7cd4e4aec9f1bb41690e544aaa6865f255771945a",
+            "app.solvers.solver_router.SolverRouter.solve": "862706f8cabe4faaccfce5bf9465bedad6024f0175486f3ad0e649e01912fac1",
+            "app.solvers.solver_router.SolverRouter.infer_problem_type_from_model": "e15584df123a16108675b3b3188c4cc080ad5bad828a6863536f867443873261",
+            "app.solvers.solver_router.SolverRouter._key": "ec62ad98a144f93789eef008d80b41b1db359fbc0ee6e308713c65721d07c5f4",
+            "app.solvers.solver_router.SolverRouter._message": "0d7a2049374f362bdc0a8c7a5e1fd75b7343774a285e7b61f2c8dce7ce3bef37",
+            "app.solvers.solver_router.SolverRouter._assert_highs_can_accept_model": "29e845dced6d232f6c47c252a9bf4ee3133ced2d35c33e34d0edd90518bb03d1",
+            "app.solvers.solver_router.SolverRouter._model_has_nonlinearity": "40a962711af581685cd03c607a5c094d8cb7eefb9638ea7624977ae47778efca",
+            "app.solvers.status.ipopt_unavailable_explanation.ipopt_unavailable_explanation": "991835cafe391fc166395d14b753e7a274a86d428fa40f693ece9a82c0ccfcf4",
+            "app.solvers.status._package_version._package_version": "ea037bf7820e35b08b59040700ca77ab6492b2a6c418937b0f4a611783a27354",
+            "app.solvers.status._solver_available._solver_available": "ba3af93ae8fc9a4ecd8bf6227f5f01e76098c9f89b290682d905d2c1b02dfb4a",
+            "app.solvers.status._ipopt_version._ipopt_version": "10e97df05ef33272c65833e66f3c2b451edbc05e25a886b95c6ac4345d4a40f9",
+            "app.solvers.status.solver_status.solver_status": "217d8f4f653e3b90532d825d8cfae979eee3cd0ac8d3e3afff9521e65ee25ff6"
+          },
+          "source_hash_scope": "磁盘源码与已加载 Python code object 分别记录；二者不冒充旧镜像证明。",
+          "image_digest": "unknown",
+          "python": "3.12.14",
+          "system": "Darwin",
+          "machine": "arm64",
+          "packages": {
+            "pyomo": "6.10.1",
+            "highspy": "1.15.1",
+            "numpy": "2.5.2",
+            "scipy": "unknown"
+          },
+          "compiler_hashes": {
+            "app/generic_formula_compiler.py": "6f2bf2ca449cdb28b06714f4247bfcc907d3c18772e42497ed7cccaebfe4d156",
+            "app/model_components/formula_components.py": "d528e10ea30d6b6d63f72c55b7cddccd0311ae69a3f499cb06d1c37654f2ed66",
+            "app/builders/component_model_builder.py": "0eab1b55ab2ffc02c75fedbc7d40ef2696ac1ac05f5f995d1e9072ef7a8bd93d",
+            "app/function_strategy.py": "69a596f275fcc72094f4583cfcb39ab3ebc202d301ffc4cd0193dca945a6fd81"
+          },
+          "builtin_implementations": {
+            "function_mapping_component": {
+              "class": "app.model_components.curve_components.RegisteredFunctionMappingComponent",
+              "source_hash": "92816d40682de0f3be0dd39c40f038a7ebd11a6e24772120babb38283c6c82fe",
+              "module_hash": "b6abb9b86ad4c95e9909dadd18610023623a3cc37d7b1febb1ba3e38c9943edf"
+            }
+          },
+          "solver": {
+            "name": "HiGHS",
+            "version": "1.15.1",
+            "executable_hash": "unknown",
+            "binary_hash": "27633861039f85ade740e5ddf06e7795989ddcf92566e32d94f0980d09e2782f",
+            "adapter_hash": "fd52bcba447227d2daff18ae1ca8ff72279a255d5feb47782d0ef18ddae4ca0a"
+          },
+          "requested_settings": {
+            "time_limit_seconds": 300.0,
+            "mip_gap": 0.001,
+            "threads": null,
+            "presolve": true
+          },
+          "effective_settings": {
+            "time_limit": 300.0,
+            "mip_rel_gap": 0.001,
+            "threads": "solver_default",
+            "presolve": "solver_default; adapter does not override"
+          },
+          "initial_values": {},
+          "numeric_environment": {
+            "OMP_NUM_THREADS": "unknown",
+            "OPENBLAS_NUM_THREADS": "unknown",
+            "MKL_NUM_THREADS": "unknown"
+          }
+        },
+        "identity_hash": "2f9cad3d62e06b1aea8a4d7a76cb9d7cbd006e388e6d7742457f67206de34fcc",
+        "image_note": "当前进程无法可信取得镜像 digest，未用可随意填写的环境变量冒充镜像证明。",
+        "replay_note": "清单记录实际代码和数值环境；不提供旧环境，也不承诺跨环境逐字节一致。"
+      }
+    },
+    {
+      "id": "OPT-B8769B2771",
+      "model_id": "MODEL-F9B9602F",
+      "status": "SUCCESS",
+      "parameters": {
+        "horizon": 1
+      },
+      "objective_value": 20.0,
+      "duration_seconds": 2.0,
+      "decisions": [
+        {
+          "key": "volume[0]",
+          "code": "volume",
+          "coordinate": "volume[0]",
+          "name": "volume",
+          "unit": "MWh",
+          "definition": {
+            "dimension": [
+              "time"
+            ],
+            "unit": "MWh"
+          },
+          "value": 10.0
+        },
+        {
+          "key": "level[0]",
+          "code": "level",
+          "coordinate": "level[0]",
+          "name": "level",
+          "unit": "MW",
+          "definition": {
+            "dimension": [
+              "time"
+            ],
+            "unit": "MW"
+          },
+          "value": 20.0
+        }
+      ],
+      "max_constraint_violation": 0.0,
+      "execution_environment": {
+        "schema_version": 1,
+        "observed_at": "2026-10-21 11:53:33",
+        "platform_commit": "ec4264ae6cdb9cd509a45d4f86e3a3763029b914",
+        "working_tree_modified": true,
+        "identity": {
+          "platform_source_hash": "b3a5dba6b18b1afa8d6fe373e5b88823da6529255296296afef5f125b9c2b6a3",
+          "loaded_code_hash": "64daf4da98f150be86b36fe9cab339fc36ecf0d74c7e6c59502015f058292e2d",
+          "loaded_adapter_hashes": {
+            "app.solvers.base.SolverAdapter.available": "156f673f1135e55bfaaa0ab5cb0fda77d31d390b6b04add8f4b5158ccd24264c",
+            "app.solvers.base.SolverAdapter.solve": "2aa1b3059b329e9c79c63e9864dc0684dbe057644a2173217557c61571823143",
+            "app.solvers.base.SolverAdapter.__subclasshook__": "542db00912bb2c59e0c17d460e55160f65ac5a21c71bfc346d28b5ff82c2fc88",
+            "app.solvers.base.SolverAdapter.__init__": "5b56104861680ddf5ce43d5e6169eb9fdc177f7df345f0f200876c7c0c050c8b",
+            "app.solvers.base.UnavailableSolverAdapter.__init__": "695211cc6f08c5f572928f4d539cb1d21db358f5cba0053db8ba29c262421a19",
+            "app.solvers.base.UnavailableSolverAdapter.available": "b1db9549f25a01fd012fed67764fab16f31f37a395aec103d084870b84d895d4",
+            "app.solvers.base.UnavailableSolverAdapter.solve": "9766ebbb00e0ef234b6c625b99b1fbc92bcfbc297bf0ad92e6e10b14de04e656",
+            "app.solvers.highs_adapter.HiGHSAdapter.available": "7fbd000dcb66fed384224c243a6dde085eb4aa065ee3f5bfd31837fb2cc9ce5d",
+            "app.solvers.highs_adapter.HiGHSAdapter.solve": "b6bfec58ca817384516c93a433f1c550647f2f8180adb2085cb3c3bed86e006d",
+            "app.solvers.highs_adapter.HiGHSAdapter._solve_serial": "9cbe0990d09bff01e62dd515f3293008c47092caa4ec28deb16b98a0c354bb07",
+            "app.solvers.highs_adapter.HiGHSAdapter._configure_progress_callback": "29d39bcb142bbfaeaa717bf988958767d2b1d40b84ec87e1b89d2fe97be5efee",
+            "app.solvers.highs_adapter.HiGHSAdapter._emit_lp_iteration_summary": "f1d8e1cd234ccdd1c2979856d02921c0c0b852ef050c945e118e771d71c3400b",
+            "app.solvers.highs_adapter.HiGHSAdapter._finite_number": "c3f4fa2b13ae7b7af97b89f0428daeb9385ba6e4e248dcd2ff0a19d4b252bd11",
+            "app.solvers.highs_adapter.HiGHSAdapter._finite_integer": "c9522d091f5c15217e249b9fa4f6dc827227d7af2e80f612277cd78255d0e007",
+            "app.solvers.highs_adapter.HiGHSAdapter._extract_variables": "02c08df70a8e8dcd85206b4dee3f38ee77bab1ee9b2a49177716ee89e998c329",
+            "app.solvers.highs_adapter.HiGHSAdapter._label": "a9410a7380d5a154fa8f3801323abd91304f98751c916223af085cf4bb1a0f8b",
+            "app.solvers.nlp_adapter.NLPSolverAdapter.available": "61c93dea7a60111ac15a9406733563f0f44b6e4948afc4e171c2db33fe9e0b08",
+            "app.solvers.nlp_adapter.NLPSolverAdapter.availability_message": "aeecec41efa0518113cc7477d49c2c769ee845ca01b22b09fe1a8039ef67b1cd",
+            "app.solvers.nlp_adapter.NLPSolverAdapter.solve": "0cc06afb237ca7b948ab4ab25fb5a9ed8d3d6d1d137da7a925b8cc76bf5a3c9d",
+            "app.solvers.nlp_adapter.NLPSolverAdapter._cpu_limit_reached": "30abe38daba7038b46b068c52fa0f21a86d9287d358e0bb182771cdd88e1f6ca",
+            "app.solvers.nlp_adapter.NLPSolverAdapter._failed_result": "46b7e7d48018a3aa349891344260c63fecbf16fd5f95834227f1f150491bdd94",
+            "app.solvers.nlp_adapter.NLPSolverAdapter._has_integer_variables": "df327469fa9ef7ddaab08fdcaeadb6af8ca2ab1dfed447d01200b54e8dc965f7",
+            "app.solvers.nlp_adapter.NLPSolverAdapter._initialize_unset_variables": "8e5095de29753edfe9ef7b81fcc2044c4002657c991a0a3f1e5a764805ac24f9",
+            "app.solvers.nlp_adapter.NLPSolverAdapter._objective_value": "db4387109010b32c48c8cdb1e09d5f5885d43665e7824e302b6afbe7ffa98cc6",
+            "app.solvers.nlp_adapter.NLPSolverAdapter.extract_variables": "e1137606a1d7b477e5c7d2ea6f07df64b06b037428f2b90029b0aeb9e821019f",
+            "app.solvers.nlp_adapter.NLPSolverAdapter.constraint_violations": "71c3aa10a0259981b844d8f9a42e6ad8def0cfb7adb0176a8661386c4c6d9b5d",
+            "app.solvers.nlp_adapter.NLPSolverAdapter._status_from_termination": "e022357d45ba914c40deeee3471ce733991887f14ec80348a06522205bd953b5",
+            "app.solvers.nlp_adapter.NLPSolverAdapter._label": "eff8d9d624acba1fc17da1318cdc0501de4dbfdea464752b2e2a538b0ec8a35e",
+            "app.solvers.run_settings.validate_run_settings.validate_run_settings": "7c9905ce86cd63347599ff19ba43ef2e2c245ff98845b3459b7932ce026ff43e",
+            "app.solvers.run_settings.apply_initial_values.apply_initial_values": "8529c65da55cf52a9583b62b5732c37c9ef06abe6dfe7e9afe9052696a5af6f0",
+            "app.solvers.solver_router.SolverRouteError.__init__": "8239e1593da145ff43fffb80c4037ffa79d71c13feb700e65f1c95b66bdfc91f",
+            "app.solvers.solver_router.ScipAdapter.__init__": "f9bc50513c9cf5a219fb3835b79fec61ea0f63ba16d5bb0eab59a9b1011615dd",
+            "app.solvers.solver_router.SolverRouter.__init__": "32b05b8e35836d5898d2fe8ab4be2455d82b9bf0cfac223a15cdafe5c6624c5f",
+            "app.solvers.solver_router.SolverRouter.route": "aa292bb6852612990de8dfb7cd4e4aec9f1bb41690e544aaa6865f255771945a",
+            "app.solvers.solver_router.SolverRouter.solve": "862706f8cabe4faaccfce5bf9465bedad6024f0175486f3ad0e649e01912fac1",
+            "app.solvers.solver_router.SolverRouter.infer_problem_type_from_model": "e15584df123a16108675b3b3188c4cc080ad5bad828a6863536f867443873261",
+            "app.solvers.solver_router.SolverRouter._key": "ec62ad98a144f93789eef008d80b41b1db359fbc0ee6e308713c65721d07c5f4",
+            "app.solvers.solver_router.SolverRouter._message": "0d7a2049374f362bdc0a8c7a5e1fd75b7343774a285e7b61f2c8dce7ce3bef37",
+            "app.solvers.solver_router.SolverRouter._assert_highs_can_accept_model": "29e845dced6d232f6c47c252a9bf4ee3133ced2d35c33e34d0edd90518bb03d1",
+            "app.solvers.solver_router.SolverRouter._model_has_nonlinearity": "40a962711af581685cd03c607a5c094d8cb7eefb9638ea7624977ae47778efca",
+            "app.solvers.status.ipopt_unavailable_explanation.ipopt_unavailable_explanation": "991835cafe391fc166395d14b753e7a274a86d428fa40f693ece9a82c0ccfcf4",
+            "app.solvers.status._package_version._package_version": "ea037bf7820e35b08b59040700ca77ab6492b2a6c418937b0f4a611783a27354",
+            "app.solvers.status._solver_available._solver_available": "ba3af93ae8fc9a4ecd8bf6227f5f01e76098c9f89b290682d905d2c1b02dfb4a",
+            "app.solvers.status._ipopt_version._ipopt_version": "10e97df05ef33272c65833e66f3c2b451edbc05e25a886b95c6ac4345d4a40f9",
+            "app.solvers.status.solver_status.solver_status": "217d8f4f653e3b90532d825d8cfae979eee3cd0ac8d3e3afff9521e65ee25ff6"
+          },
+          "source_hash_scope": "磁盘源码与已加载 Python code object 分别记录；二者不冒充旧镜像证明。",
+          "image_digest": "unknown",
+          "python": "3.12.14",
+          "system": "Darwin",
+          "machine": "arm64",
+          "packages": {
+            "pyomo": "6.10.1",
+            "highspy": "1.15.1",
+            "numpy": "2.5.2",
+            "scipy": "unknown"
+          },
+          "compiler_hashes": {
+            "app/generic_formula_compiler.py": "6f2bf2ca449cdb28b06714f4247bfcc907d3c18772e42497ed7cccaebfe4d156",
+            "app/model_components/formula_components.py": "d528e10ea30d6b6d63f72c55b7cddccd0311ae69a3f499cb06d1c37654f2ed66",
+            "app/builders/component_model_builder.py": "0eab1b55ab2ffc02c75fedbc7d40ef2696ac1ac05f5f995d1e9072ef7a8bd93d",
+            "app/function_strategy.py": "69a596f275fcc72094f4583cfcb39ab3ebc202d301ffc4cd0193dca945a6fd81"
+          },
+          "builtin_implementations": {
+            "function_mapping_component": {
+              "class": "app.model_components.curve_components.RegisteredFunctionMappingComponent",
+              "source_hash": "92816d40682de0f3be0dd39c40f038a7ebd11a6e24772120babb38283c6c82fe",
+              "module_hash": "b6abb9b86ad4c95e9909dadd18610023623a3cc37d7b1febb1ba3e38c9943edf"
+            }
+          },
+          "solver": {
+            "name": "HiGHS",
+            "version": "1.15.1",
+            "executable_hash": "unknown",
+            "binary_hash": "27633861039f85ade740e5ddf06e7795989ddcf92566e32d94f0980d09e2782f",
+            "adapter_hash": "fd52bcba447227d2daff18ae1ca8ff72279a255d5feb47782d0ef18ddae4ca0a"
+          },
+          "requested_settings": {
+            "time_limit_seconds": 300.0,
+            "mip_gap": 0.001,
+            "threads": null,
+            "presolve": true
+          },
+          "effective_settings": {
+            "time_limit": 300.0,
+            "mip_rel_gap": 0.001,
+            "threads": "solver_default",
+            "presolve": "solver_default; adapter does not override"
+          },
+          "initial_values": {},
+          "numeric_environment": {
+            "OMP_NUM_THREADS": "unknown",
+            "OPENBLAS_NUM_THREADS": "unknown",
+            "MKL_NUM_THREADS": "unknown"
+          }
+        },
+        "identity_hash": "af0e7fcfd505a76c1513c72dbb53ff086cc5d047a2a9718ea9c1f1d0120eb919",
+        "image_note": "当前进程无法可信取得镜像 digest，未用可随意填写的环境变量冒充镜像证明。",
+        "replay_note": "清单记录实际代码和数值环境；不提供旧环境，也不承诺跨环境逐字节一致。"
+      }
+    }
+  ]
+}

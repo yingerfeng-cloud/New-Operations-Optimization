@@ -1,0 +1,8 @@
+{
+  "observed_at": "2026-10-21T03:23:45.194Z",
+  "node": "v22.23.2",
+  "npm": "10.9.8",
+  "lock_sha256": "2d6c7bc49394675ab6e82bd6429bdb089fe2e51865d2f04d6397a96e3a0fa07c",
+  "exit_status": 1,
+  "stderr": "npm notice\nnpm notice New major version of npm available! 10.9.8 -> 12.2.0\nnpm notice Changelog: https://github.com/npm/cli/releases/tag/v12.2.0\nnpm notice To update run: npm install -g npm@12.2.0\nnpm notice\n"
+}

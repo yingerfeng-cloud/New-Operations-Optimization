@@ -70,6 +70,7 @@ def solver_status() -> dict[str, Any]:
         "highs": {
             "available": highspy_available and _solver_available("appsi_highs"),
             "version": _package_version("highspy"),
+            "supported_problem_types": ["LP", "MILP"],
         },
         "ipopt": {
             "available": ipopt_available,
@@ -77,7 +78,10 @@ def solver_status() -> dict[str, Any]:
             "version": _ipopt_version(ipopt_path),
             "pyomo_available": pyomo_ipopt_available,
             "message": ipopt_message,
+            "supported_problem_types": ["NLP"],
         },
+        "unsupported_problem_types": ["QP", "MIQP", "MINLP_RESERVED"],
+        "capability_note": "平台适配能力与底层软件能力分开；原生 QP/MIQP 尚未开放，PWL 为转换后的模型。",
         "status": "OK" if ipopt_available else "FAILED",
         "message": ipopt_message,
     }

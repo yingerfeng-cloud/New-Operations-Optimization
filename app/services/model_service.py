@@ -127,7 +127,7 @@ class ModelService:
         if existing.status in IMMUTABLE_MODEL_STATUSES or existing.published_at:
             raise HTTPException(status_code=409, detail="Online and historical model versions are immutable; create a new version before editing")
         from app.services.function_dependencies import dependency_ids
-        model = model.model_copy(update={"function_dependencies": {key: deepcopy(value) for key, value in existing.function_dependencies.items() if key in dependency_ids(model)}, "component_dependencies": deepcopy(existing.component_dependencies), "last_test_parameters": deepcopy(existing.last_test_parameters), "test_task_id": existing.test_task_id})
+        model = model.model_copy(update={"function_dependencies": {key: deepcopy(value) for key, value in existing.function_dependencies.items() if key in dependency_ids(model)}, "component_dependencies": deepcopy(existing.component_dependencies), "last_test_parameters": deepcopy(existing.last_test_parameters), "last_test_solver_config": deepcopy(existing.last_test_solver_config), "test_task_id": existing.test_task_id})
         model = self._normalize_component_model(model)
         model = self._normalize_generic_formula_model(model)
         model = self._apply_generalized_top_level_fields(model)
@@ -848,17 +848,22 @@ class ModelService:
         source_hash = self._content_hash(model)
         from app.services.component_dependencies import prepare_model_dependencies
         model = prepare_model_dependencies(model)
-        params = test_case.get("parameters") if "parameters" in test_case else test_case
+        from app.solvers.run_settings import validate_run_settings
+        settings = validate_run_settings(test_case.get("solver_config") or {})
+        params = test_case.get("parameters") if "parameters" in test_case or "solver_config" in test_case else test_case
         if not isinstance(params, dict) or not params:
             params = self._default_test_parameters(model)
         if not isinstance(params, dict) or not params:
             raise HTTPException(status_code=422, detail={"message": "test_case.parameters is required", "errors": [{"field": "test_case.parameters", "error": "missing"}]})
-        dry_run_result = self._dry_run_model(model, test_parameters=params, run_solver=True)
+        from app.schemas.solve import SolveRequest
+        from app.services.job_service import job_service
+        job_service._prepare_request(SolveRequest(model_id=model_id, parameters=params, solver_config=settings), testing_model=model)
+        dry_run_result = self._dry_run_model(model, test_parameters=params, run_solver=True, solver_config=settings)
         if dry_run_result["structure_check"]["status"] != "passed" or dry_run_result["solver_check"]["status"] != "passed":
             raise HTTPException(status_code=422, detail={"message": "模型测试用例执行失败", **dry_run_result})
         content_hash = self._content_hash(ModelPackage.model_validate(model.model_dump()))
         next_status = model.status if model.status == "published" else "trial"
-        updated = model.model_copy(update={"status": next_status, "content_hash": content_hash, "tested_content_hash": content_hash, "tested_model_id": model.id, "updated_at": now_text(), "tested_at": now_text(), "last_test_parameters": deepcopy(params), "dry_run_result": dry_run_result, "validation_warnings": dry_run_result["solver_check"].get("warnings", [])})
+        updated = model.model_copy(update={"status": next_status, "content_hash": content_hash, "tested_content_hash": content_hash, "tested_model_id": model.id, "updated_at": now_text(), "tested_at": now_text(), "last_test_parameters": deepcopy(params), "last_test_solver_config": deepcopy(settings), "test_task_id": None, "dry_run_result": dry_run_result, "validation_warnings": dry_run_result["solver_check"].get("warnings", [])})
         with STORE.lock:
             if self._content_hash(self.get_model(model_id)) != source_hash:
                 raise HTTPException(status_code=409, detail={"code": "MODEL_TEST_OUTDATED", "message": "Model changed during test; test the current content."})
@@ -914,6 +919,7 @@ class ModelService:
             "dry_run_result": {"structure_check": {"status": "passed", "errors": []}, "solver_check": {
                 "status": "passed", "warnings": [], "objective_value": task.objective_value,
                 "problem_type": task.result.get("problem_type"), "solver_status": task.result.get("termination_condition"),
+                "evidence": deepcopy(task.result.get("solution_evidence")), "execution_environment": deepcopy(task.trace.get("execution_environment")),
                 "solver": task.result.get("solver_name") or task.request.solver,
             }},
         })
@@ -1369,7 +1375,7 @@ class ModelService:
             "dry_run_status": (dry_run_result or {}).get("structure_check", {}).get("status"),
         }
 
-    def _dry_run_model(self, model: ModelPackage | ModelView, *, test_parameters: dict[str, Any] | None = None, run_solver: bool = False) -> dict[str, Any]:
+    def _dry_run_model(self, model: ModelPackage | ModelView, *, test_parameters: dict[str, Any] | None = None, run_solver: bool = False, solver_config: dict[str, Any] | None = None) -> dict[str, Any]:
         result: dict[str, Any] = {
             "structure_check": {"status": "passed", "errors": []},
             "solver_check": {"status": "skipped", "warnings": []},
@@ -1440,10 +1446,28 @@ class ModelService:
                 pyomo_model, _ = GenericLinearBuilder().build(dry_spec)
             if run_solver:
                 problem_type = solver_router.infer_problem_type_from_model(pyomo_model)
-                solver_result = solver_router.solve(pyomo_model, problem_type=problem_type, requested_solver=None)
+                from app.solvers.run_settings import apply_initial_values
+                options = solver_config or {}
+                from app.schemas.solve import SolveRequest
+                observed = SolveRequest(parameters=test_parameters or {}, payload=dry_parameters, solver_config=options,
+                    time_limit_seconds=options.get("time_limit", 300), mip_gap=options.get("mip_gap", .001), thread_num=options.get("thread_num"))
+                apply_initial_values(pyomo_model, options)
+                solver_result = solver_router.solve(pyomo_model, problem_type=problem_type, requested_solver=None,
+                    time_limit_seconds=observed.time_limit_seconds, mip_gap=observed.mip_gap, threads=observed.thread_num,
+                    nlp_tolerance=options.get("nlp_tolerance", options.get("tol")), max_iter=options.get("max_iter"), acceptable_tol=options.get("acceptable_tol"))
                 if solver_result.status not in {"optimal", "local_optimal", "feasible"}:
                     raise RuntimeError(solver_result.message or f"solver returned {solver_result.status}")
                 result["solver_check"] = {"status": "passed", "warnings": [], "objective_value": solver_result.objective_value, "solver_status": solver_result.status, "problem_type": problem_type}
+                from app.schemas.solve import SolveRequest
+                from app.services.execution_environment import execution_environment
+                from app.services.solution_evidence import solution_evidence
+                observed.solver = solver_result.solver_name or "HiGHS"
+                evidence_semantic = {**deepcopy(model.semantic_spec or {}), "component_spec": deepcopy(component_spec)}
+                settings = {"backend": observed.solver, "problem_type": problem_type, "mip_gap": observed.mip_gap,
+                    "time_limit_seconds": observed.time_limit_seconds, "thread_num": observed.thread_num, "presolve": observed.presolve,
+                    "nlp_tolerance": options.get("nlp_tolerance", options.get("tol")), "max_iter": options.get("max_iter"), "acceptable_tol": options.get("acceptable_tol"), "initial_values": deepcopy(options.get("initial_values") or {})}
+                result["solver_check"]["evidence"] = solution_evidence(pyomo_model, solver_result, evidence_semantic, dry_parameters, settings)
+                result["solver_check"]["execution_environment"] = execution_environment(observed, observed.solver)
         except Exception as exc:
             function_component_index = self._first_function_mapping_component_index(component_spec) if is_component_based else None
             field = (

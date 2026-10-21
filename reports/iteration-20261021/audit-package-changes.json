@@ -1,0 +1,17 @@
+[
+  {
+    "package": "",
+    "before": "1.0.0",
+    "after": "1.0.0"
+  },
+  {
+    "package": "node_modules/follow-redirects",
+    "before": "1.16.0",
+    "after": "1.16.1"
+  },
+  {
+    "package": "node_modules/vite",
+    "before": "7.3.5",
+    "after": "7.3.7"
+  }
+]

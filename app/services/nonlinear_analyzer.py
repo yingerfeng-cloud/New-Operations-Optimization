@@ -177,7 +177,7 @@ def _visit(
                         supported=not has_integer_variables and _solver_supports_qp(solver_name),
                         strategies=["qp", "piecewise_1d"],
                         risk="medium",
-                        message="检测到二次项 x^2，可选择 QP 或一维 PWL 线性化。",
+                        message="检测到二次项 x^2；平台尚未开放原生 QP/MIQP，可明确选择一维 PWL 转换，转换结果不等同原问题。",
                     )
                 )
             else:

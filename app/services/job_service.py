@@ -88,6 +88,8 @@ class JobService:
             self._validate_historical_dependencies(task)
             from app.jobs.attempt_history import archive_attempt
             archive_attempt(task)
+            task.trace["retry_boundary"] = {"mode": "current_kernel", "source_identity_hash": (task.trace.get("execution_environment") or {}).get("identity_hash", "unknown"),
+                "message": "失败重试复用冻结依赖和请求，由当前执行内核计算；各次实际环境单独留存。"}
             task.attempt_id = uuid.uuid4().hex
             task.error = None
             task.result = None
@@ -140,15 +142,17 @@ class JobService:
         if expected.keys() != actual.keys() or any(function_asset_hash(actual[key]) != function_asset_hash(value) for key, value in expected.items()):
             raise HTTPException(status_code=409, detail={"code": "TASK_HISTORY_UNREPLAYABLE", "message": "任务缺少完整且一致的历史函数快照，保留原结果；请明确选择函数修订后重新计算。"})
 
-    def replay_task(self, task_id: str) -> TaskView:
+    def replay_task(self, task_id: str, mode: str = "current_kernel") -> TaskView:
         """A new task from server-held prepared inputs, without re-resolving a model."""
         with STORE.lock:
             original = self.get_task(task_id)
             self._validate_historical_dependencies(original)
             request = original.request.model_copy(deep=True, update={"idempotency_key": None})
             request.payload.pop("_model_test", None)
+            from app.services.execution_environment import replay_boundary
+            boundary = replay_boundary(original.trace.get("execution_environment"), request, mode)
             record = TaskRecord(id=f"OPT-{uuid.uuid4().hex[:10].upper()}", request=request, max_retries=original.max_retries)
-            record.trace.update(history_action="replay", source_task_id=task_id, source_attempt_id=original.attempt_id)
+            record.trace.update(history_action="replay", source_task_id=task_id, source_attempt_id=original.attempt_id, replay_boundary=boundary)
             STORE.tasks[record.id] = record
             STORE.save_runtime()
         if os.getenv("OPTIFORGE_SYNC_JOBS") == "true" or request.async_run is False:

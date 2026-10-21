@@ -94,7 +94,8 @@ def prepare_candidate(model_id, selections, idempotency_key):
         package = model_version_service.new_version_package(source, family_models=STORE.models.values())
         package = package.model_copy(update={key: deepcopy(getattr(selected, key)) for key in ("component_spec", "semantic_spec", "model_draft")})
         metadata = deepcopy(package.ui_metadata)
-        metadata["component_update"] = {"source_model_id": source.id, "selections": selections,
+        from app.services.update_comparison import baseline_evidence
+        metadata["component_update"] = {"source_model_id": source.id, "comparison_baseline": baseline_evidence(source), "selections": selections,
                                         "idempotency_key": idempotency_key, "signature": signature}
         package = package.model_copy(update={"ui_metadata": metadata})
         return model_service.create_model(package, inherited_dependencies=selected.function_dependencies, inherited_components=selected.component_dependencies)
@@ -104,8 +105,9 @@ def test_candidate(model_id, selections, idempotency_key):
     candidate = prepare_candidate(model_id, selections, idempotency_key)
     source = model_service.get_model(candidate.ui_metadata["component_update"]["source_model_id"])
     original = STORE.tasks.get(source.test_task_id)
-    parameters = source.last_test_parameters or model_service._default_test_parameters(source)
-    settings = deepcopy(original.request.solver_config) if original else deepcopy(source.last_test_solver_config)
+    baseline = candidate.ui_metadata["component_update"].get("comparison_baseline") or {}
+    parameters = baseline.get("parameters") or source.last_test_parameters or model_service._default_test_parameters(source)
+    settings = deepcopy(baseline.get("solver_config", source.last_test_solver_config))
     task = model_service.start_model_test(candidate.id, {"parameters": parameters, "solver_config": settings,
         "idempotency_key": f"component-update:{candidate.id}:{candidate.content_hash}"})
     return {"model": model_service.get_model(candidate.id), "task": task.view()}

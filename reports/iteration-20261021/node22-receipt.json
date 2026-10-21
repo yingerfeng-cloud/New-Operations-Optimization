@@ -1,0 +1,21 @@
+{
+  "node": "v22.17.0",
+  "lock_sha256": "027e4be6fa4971c94b4a3898c5fa733dacc11bb6c78c2666871bf8e67894cbcd",
+  "steps": [
+    {
+      "command": "npm ci",
+      "observed_at": "2026-10-21T03:39:01.623Z",
+      "exit_status": 0
+    },
+    {
+      "command": "npm run build",
+      "observed_at": "2026-10-21T03:39:12.734Z",
+      "exit_status": 0
+    },
+    {
+      "command": "npm run test:unit",
+      "observed_at": "2026-10-21T03:43:52.079Z",
+      "exit_status": 0
+    }
+  ]
+}

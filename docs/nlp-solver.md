@@ -1,7 +1,7 @@
 # NLP Solver Support
 
 The platform supports continuous-variable NLP models through Pyomo + Ipopt.
-LP, MILP, QP, and MIQP models continue to use HiGHS.
+LP and MILP models use the platform's HiGHS adapter. Native QP and MIQP solving are **not supported** by the platform: public routes return `SOLVER_UNSUPPORTED_PROBLEM_TYPE`, including explicit Ipopt requests for a QP type. Recognizing a quadratic expression or solving a PWL reformulation does not open native QP/MIQP support. See [the capability matrix and separate proposal](solver-capabilities.md).
 
 ## Requirements
 

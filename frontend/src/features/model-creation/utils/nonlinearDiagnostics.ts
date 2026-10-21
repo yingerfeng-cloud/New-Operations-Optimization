@@ -168,7 +168,7 @@ export function analyzeFormulaText(expression: string, variableCodes: string[], 
         recommended_strategy: exponent === 2 ? ['qp', 'piecewise_1d'] : ['piecewise_1d', 'nlp_reserved'],
         supported_by_current_solver: exponent === 2,
         risk_level: exponent === 2 ? 'medium' : 'high',
-        message: exponent === 2 ? '检测到二次项 x^2，可选择 QP 或 PWL。' : '检测到高次幂项，建议 PWL 或 NLP 预留。',
+        message: exponent === 2 ? '检测到二次项 x^2；原生 QP/MIQP 未开放，可明确选择 PWL 转换。' : '检测到高次幂项，建议 PWL 或 NLP 预留。',
         blocking: exponent !== 2,
         source,
       });

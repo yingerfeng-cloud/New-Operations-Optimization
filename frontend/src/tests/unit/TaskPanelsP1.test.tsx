@@ -106,6 +106,6 @@ test('LP task renders actual HiGHS iteration activity instead of MIP gap placeho
   })} />);
   expect(screen.getByText('累计迭代次数')).toBeInTheDocument();
   expect(screen.getByText('单纯形')).toBeInTheDocument();
-  expect(screen.getByText('LP / QP')).toBeInTheDocument();
+  expect(screen.getByText('LP')).toBeInTheDocument();
   expect(screen.getByRole('img', { name: 'HiGHS 真实算法累计迭代次数曲线' })).toBeInTheDocument();
 });

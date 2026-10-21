@@ -1031,7 +1031,7 @@ def _capability(expression_class: str) -> dict[str, Any]:
     elif expression_class == "piecewise_linear":
         recommendation = {"type": "pwl_component"}
     elif expression_class in {"quadratic", "general_nonlinear"}:
-        recommendation = {"type": "qp_or_nlp_solver" if expression_class == "quadratic" else "nlp_solver"}
+        recommendation = {"type": "explicit_pwl_reformulation" if expression_class == "quadratic" else "nlp_solver", "message": "原生 QP/MIQP 未开放；PWL 转换不是原问题的原生求解。" if expression_class == "quadratic" else "连续 NLP 需要可用的 Ipopt。"}
     return {"direct_builder": "LP Builder" if direct else None, "requires": recommendation, "supported": direct, "recommended_transformation": recommendation}
 
 

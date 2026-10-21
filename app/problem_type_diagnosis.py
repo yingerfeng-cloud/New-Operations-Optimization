@@ -26,8 +26,8 @@ SOLVER_CAPABILITIES = {
 RECOMMENDED_SOLVERS = {
     "LP": "HiGHS",
     "MILP": "HiGHS",
-    "QP": "HiGHS",
-    "MIQP": "HiGHS",
+    "QP": None,
+    "MIQP": None,
     "NLP": "Ipopt",
     "MINLP_RESERVED": None,
 }
@@ -601,5 +601,5 @@ def _risk_lines(inferred: str, requested: str, solver_name: str | None, supporte
     elif inferred != requested:
         warnings.append(f"手动指定 {requested} 与系统诊断 {inferred} 不一致，发布前会强校验。")
     if not supported:
-        warnings.append(f"求解器 {solver_name or 'HiGHS'} 不支持 {requested}。")
+        warnings.append(f"平台当前未开放原生 {requested} 求解；类型识别不代表求解支持。" if requested in {"QP", "MIQP"} else f"平台求解适配器 {solver_name or 'HiGHS'} 不支持 {requested}。")
     return warnings

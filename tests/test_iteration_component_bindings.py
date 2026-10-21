@@ -193,3 +193,61 @@ def test_upstream_dependency_missing_and_offline_rules(client):
     fresh = model(client, parent, [upstream])
     unavailable = client.post(f'/api/models/{fresh}/test-jobs', json={})
     assert unavailable.status_code == 409 and unavailable.json()['detail']['code'] == 'COMPONENT_NOT_SELECTABLE'
+
+
+def test_new_revision_during_real_queued_candidate_cannot_change_selection(client, monkeypatch):
+    import time
+    c1 = component(client); a = model(client, c1); test_publish(client, a)
+    c2 = component(client, 1.2, c1)
+    monkeypatch.setenv('OPTIFORGE_SYNC_JOBS', 'false')
+    for _ in range(4): STORE.scheduler.acquire()
+    try:
+        accepted = client.post(f'/api/models/{a}/component-updates/test', json={'selections': {c1: c2}, 'idempotency_key': uuid4().hex})
+        assert accepted.status_code == 200, accepted.text
+        body = accepted.json()
+        c3 = component(client, 1.5, c1)
+        assert client.post(f'/api/components/{c2}/offline').status_code == 200
+    finally:
+        for _ in range(4): STORE.scheduler.release()
+    for _ in range(100):
+        task = client.get(f"/api/tasks/{body['task']['id']}").json()
+        if task['status'] in {'SUCCESS', 'FAILED'}: break
+        time.sleep(.05)
+    assert task['status'] == 'SUCCESS', task
+    assert task['objective_value'] == pytest.approx(72)
+    published = client.post(f"/api/models/{body['model']['id']}/component-updates/apply")
+    assert published.status_code == 200, published.text
+    assets = published.json()['component_dependencies']['assets']
+    assert c2 in assets and c3 not in assets
+
+
+def test_untrusted_inline_and_same_family_conflict_are_rejected(client):
+    c1 = component(client)
+    a = model(client, c1)
+    package = client.get(f'/api/models/{a}').json()
+    for section in ('constraints', 'generated_constraints'):
+        for row in package['component_spec']['components'][0]['definition'][section]:
+            row.update(expression='output[t] >= 0', formula='output[t] >= 0', dsl_formula='output[t] >= 0')
+    package['model_draft'] = {}
+    assert client.put(f'/api/models/{a}', json=package).status_code == 200
+    blocked = client.post(f'/api/models/{a}/test-jobs', json={})
+    assert blocked.status_code == 409 and blocked.json()['detail']['code'] == 'COMPONENT_DEFINITION_UNTRUSTED'
+    c2 = component(client, 1.2, c1)
+    conflict = model(client, c1, [c2])
+    blocked = client.post(f'/api/models/{conflict}/test-jobs', json={})
+    assert blocked.status_code == 409 and blocked.json()['detail']['code'] == 'COMPONENT_VERSION_CONFLICT'
+
+
+def test_frozen_dependency_cycle_is_detected_even_if_hashes_are_recomputed(client):
+    from app.services.component_dependencies import component_hash, digest, validate_manifest
+    from fastapi import HTTPException
+    first = component(client, .5)
+    second = component(client, 1, depends_on=[first])
+    a = model(client, second, [first]); asset = test_publish(client, a)
+    manifest = deepcopy(asset['component_dependencies'])
+    definition = manifest['assets'][first]['definition']
+    definition.update(depends_on=[second], dependencies=[second])
+    manifest['assets'][first]['content_hash'] = component_hash(definition)
+    manifest['manifest_hash'] = digest({key: value for key, value in manifest.items() if key != 'manifest_hash'})
+    with pytest.raises(HTTPException) as error: validate_manifest(manifest)
+    assert error.value.detail['code'] == 'COMPONENT_DEPENDENCY_CYCLE'

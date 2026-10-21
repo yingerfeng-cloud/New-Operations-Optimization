@@ -1,0 +1,38 @@
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.12 [39m[90m/work/frontend[39m
+
+ [32m✓[39m src/tests/unit/ReviewFunctionUpdates.test.tsx [2m([22m[2m3 tests[22m[2m)[22m[33m 2145[2mms[22m[39m
+   [33m[2m✓[22m[39m only selected F is updated and applied after the exact candidate test [33m 1192[2mms[22m[39m
+   [33m[2m✓[22m[39m refresh and an uncertain submission reuse the same candidate identity [33m 624[2mms[22m[39m
+   [33m[2m✓[22m[39m a stale model content hash cannot enable apply from restored task success [33m 327[2mms[22m[39m
+ [32m✓[39m src/tests/unit/TaskPanelsP1.test.tsx [2m([22m[2m7 tests[22m[2m)[22m[33m 868[2mms[22m[39m
+ [32m✓[39m src/tests/unit/IterationComparison.test.tsx [2m([22m[2m2 tests[22m[2m)[22m[33m 812[2mms[22m[39m
+   [33m[2m✓[22m[39m unit mismatch displays observed values without manufacturing a delta [33m 607[2mms[22m[39m
+ [32m✓[39m src/tests/unit/IterationComponentUpdates.test.tsx [2m([22m[2m1 test[22m[2m)[22m[33m 505[2mms[22m[39m
+   [33m[2m✓[22m[39m restored component update cannot apply stale success evidence [33m 504[2mms[22m[39m
+ [32m✓[39m src/tests/unit/ComponentLibraryPage.test.tsx [2m([22m[2m12 tests[22m[2m)[22m[33m 23510[2mms[22m[39m
+   [33m[2m✓[22m[39m renders component library list and structured detail drawer [33m 1081[2mms[22m[39m
+   [33m[2m✓[22m[39m direct edit waits for detail and hydrates every formula section [33m 6012[2mms[22m[39m
+   [33m[2m✓[22m[39m published components offer copy-edit instead of a disabled edit action [33m 1501[2mms[22m[39m
+   [33m[2m✓[22m[39m draft component copies can be deleted from more actions [33m 3070[2mms[22m[39m
+   [33m[2m✓[22m[39m legacy formula fields are normalized for editing and synchronized on save [33m 1968[2mms[22m[39m
+   [33m[2m✓[22m[39m confirming deletion removes the selected formula from the component draft [33m 5917[2mms[22m[39m
+   [33m[2m✓[22m[39m renders component schema, math, parameter interface and dependency panels [33m 1408[2mms[22m[39m
+   [33m[2m✓[22m[39m new component opens a system-owned draft lifecycle editor [33m 1823[2mms[22m[39m
+   [33m[2m✓[22m[39m keeps model-specific parameter binding out of the component editor [33m 720[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m5 passed[39m[22m[90m (5)[39m
+[2m      Tests [22m [1m[32m25 passed[39m[22m[90m (25)[39m
+[2m   Start at [22m 03:47:17
+[2m   Duration [22m 25.46s[2m (transform 468ms, setup 1.23s, import 2.20s, tests 27.84s, environment 3.90s)[22m
+
+[90mstderr[2m | src/tests/unit/ComponentLibraryPage.test.tsx[2m > [22m[2mrenders component library list and structured detail drawer
+[22m[39mWarning: [antd: Descriptions] Sum of column `span` in a line not match `column` of Descriptions.
+Warning: [antd: Descriptions] Sum of column `span` in a line not match `column` of Descriptions.
+
+[90mstderr[2m | src/tests/unit/ComponentLibraryPage.test.tsx[2m > [22m[2mdraft component copies can be deleted from more actions
+[22m[39mWarning: [antd: Modal] Static function can not consume context like dynamic theme. Please use 'App' component instead.
+
+[90mstderr[2m | src/tests/unit/ComponentLibraryPage.test.tsx[2m > [22m[2mlegacy formula fields are normalized for editing and synchronized on save
+[22m[39m`NaN` is an invalid value for the `height` css style property.
+

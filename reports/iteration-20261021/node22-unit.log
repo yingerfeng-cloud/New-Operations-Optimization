@@ -1,0 +1,313 @@
+
+> optiforge-platform-frontend@1.0.0 test:unit
+> vitest run src/tests/unit
+
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.12 [39m[90m/work/frontend[39m
+
+ [32m✓[39m src/tests/unit/AgentWorkbenchPage.test.tsx [2m([22m[2m18 tests[22m[2m)[22m[33m 28091[2mms[22m[39m
+   [33m[2m✓[22m[39m loads agent status, skills and sends a V3 Agent turn [33m 1764[2mms[22m[39m
+   [33m[2m✓[22m[39m shows the auto-selected optimization model inline and submits a safe switch turn [33m 481[2mms[22m[39m
+   [33m[2m✓[22m[39m offers guided or batch parameter entry without sending before review [33m 1547[2mms[22m[39m
+   [33m[2m✓[22m[39m writes only completed fields when batch filling part of a long parameter list [33m 945[2mms[22m[39m
+   [33m[2m✓[22m[39m shows Agent thinking in the conversation instead of a sending spinner on the button [33m 460[2mms[22m[39m
+   [33m[2m✓[22m[39m keeps a server-recorded failed turn out of the composer without adding another toast [33m 442[2mms[22m[39m
+   [33m[2m✓[22m[39m resolves the V3 approval chain without calling legacy confirmation APIs [33m 1323[2mms[22m[39m
+   [33m[2m✓[22m[39m clears expert Skill before returning to business mode [33m 4549[2mms[22m[39m
+   [33m[2m✓[22m[39m replaces duplicated expert panels with compact task diagnostics [33m 2119[2mms[22m[39m
+   [33m[2m✓[22m[39m switching history restores the selected conversation run [33m 2178[2mms[22m[39m
+   [33m[2m✓[22m[39m uses the durable task lifecycle instead of a stale run snapshot [33m 1903[2mms[22m[39m
+   [33m[2m✓[22m[39m toggling the inspector keeps the conversation controls available [33m 3078[2mms[22m[39m
+   [33m[2m✓[22m[39m activity inspector behaves as a keyboard-accessible dialog [33m 1428[2mms[22m[39m
+   [33m[2m✓[22m[39m mobile session drawer exposes create, switch, and manage actions [33m 2183[2mms[22m[39m
+   [33m[2m✓[22m[39m deleting a history conversation requires confirmation and calls the delete API [33m 3174[2mms[22m[39m
+ [32m✓[39m src/tests/unit/ModelCreationPage.test.tsx [2m([22m[2m22 tests[22m[2m)[22m[33m 58462[2mms[22m[39m
+   [33m[2m✓[22m[39m renders five-step model creation [33m 442[2mms[22m[39m
+   [33m[2m✓[22m[39m save test and publish use one asset without creating a second model [33m 2809[2mms[22m[39m
+   [33m[2m✓[22m[39m editing while a test is running keeps the returned snapshot outdated [33m 2679[2mms[22m[39m
+   [33m[2m✓[22m[39m repeated clicks share an active test and a changed draft requires a subsequent test [33m 5075[2mms[22m[39m
+   [33m[2m✓[22m[39m editing after a successful test invalidates publish without creating another asset [33m 4926[2mms[22m[39m
+   [33m[2m✓[22m[39m retesting a changed draft updates and publishes the same asset [33m 4982[2mms[22m[39m
+   [33m[2m✓[22m[39m version mode creates its first saved asset through the version endpoint [33m 4271[2mms[22m[39m
+   [33m[2m✓[22m[39m refresh and network recovery show the same model test and verify current evidence [33m 17183[2mms[22m[39m
+   [33m[2m✓[22m[39m a restored SUCCESS cannot publish a different current model hash [33m 2957[2mms[22m[39m
+   [33m[2m✓[22m[39m autosave accepts partial semantics and updates the same located draft [33m 8273[2mms[22m[39m
+   [33m[2m✓[22m[39m a failed save retains the local unsubmitted copy across a fresh workspace [33m 3060[2mms[22m[39m
+ [32m✓[39m src/tests/unit/modelCreationStore.test.ts [2m([22m[2m15 tests[22m[2m)[22m[32m 13[2mms[22m[39m
+ [32m✓[39m src/tests/unit/FunctionAssetsPage.test.tsx [2m([22m[2m8 tests[22m[2m)[22m[33m 9728[2mms[22m[39m
+   [33m[2m✓[22m[39m uses one create entry and opens a blank new function asset drawer [33m 384[2mms[22m[39m
+   [33m[2m✓[22m[39m CSV import starts empty and fills examples only on explicit button click [33m 894[2mms[22m[39m
+   [33m[2m✓[22m[39m creating a 2D surface posts to createFunctionAsset, closes drawer and refreshes list [33m 1117[2mms[22m[39m
+   [33m[2m✓[22m[39m blocks save before POST when current backend does not expose the latest function asset API [33m 1406[2mms[22m[39m
+   [33m[2m✓[22m[39m editing existing 2D surface shows original xyz points and preserves points_2d [33m 1096[2mms[22m[39m
+   [33m[2m✓[22m[39m create rejection with 422 preserves edits and shows the validation reason without refreshing [33m 2412[2mms[22m[39m
+   [33m[2m✓[22m[39m update rejection with 422 preserves edits and shows the validation reason without refreshing [33m 2414[2mms[22m[39m
+ [32m✓[39m src/tests/unit/SkillCenterPage.test.tsx [2m([22m[2m6 tests[22m[2m)[22m[33m 681[2mms[22m[39m
+ [32m✓[39m src/tests/unit/ModelCenterPage.test.tsx [2m([22m[2m10 tests[22m[2m)[22m[33m 15817[2mms[22m[39m
+   [33m[2m✓[22m[39m renders model center metrics and basic asset detail [33m 1833[2mms[22m[39m
+   [33m[2m✓[22m[39m renders semantic and generic model panels [33m 1256[2mms[22m[39m
+   [33m[2m✓[22m[39m renders template-based unit commitment math from asset detail fallbacks [33m 736[2mms[22m[39m
+   [33m[2m✓[22m[39m renders component and runtime model panels [33m 731[2mms[22m[39m
+   [33m[2m✓[22m[39m derives a readable runtime schema when a legacy asset only stores defaults [33m 367[2mms[22m[39m
+   [33m[2m✓[22m[39m renders governance and history model panels [33m 729[2mms[22m[39m
+   [33m[2m✓[22m[39m runs model asset operations from list [33m 4913[2mms[22m[39m
+   [33m[2m✓[22m[39m promotes an unchanged trial baseline without repeating the solver test [33m 2475[2mms[22m[39m
+   [33m[2m✓[22m[39m returns an unpublished trial to draft before opening the editor [33m 2410[2mms[22m[39m
+   [33m[2m✓[22m[39m model detail follows route id changes and close returns to models [33m 365[2mms[22m[39m
+ [32m✓[39m src/tests/unit/Step3MathExpansion.test.tsx [2m([22m[2m19 tests[22m[2m)[22m[33m 82658[2mms[22m[39m
+   [33m[2m✓[22m[39m Step3 generic builder composes only backend authoritative fragments into generic_spec [33m 683[2mms[22m[39m
+   [33m[2m✓[22m[39m treats coefficient-times-variable expressions as linear while flagging variable products [33m 460[2mms[22m[39m
+   [33m[2m✓[22m[39m Step3 component builder renders generated constraints and dependencies [33m 1484[2mms[22m[39m
+   [33m[2m✓[22m[39m Step3 explains empty component outputs and binding states [33m 1243[2mms[22m[39m
+   [33m[2m✓[22m[39m Step3 template builder opens formula editor for generated formulas [33m 2525[2mms[22m[39m
+   [33m[2m✓[22m[39m Step3 opens Add Function Mapping modal and saves complete component config [33m 2924[2mms[22m[39m
+   [33m[2m✓[22m[39m Step3 disables display-only assets in the function mapping picker [33m 1782[2mms[22m[39m
+   [33m[2m✓[22m[39m Step3 saves 2D function mapping component with triangulated MILP strategy [33m 3420[2mms[22m[39m
+   [33m[2m✓[22m[39m Step3 binds a 2D asset to the selected catalog component without adding a duplicate [33m 3259[2mms[22m[39m
+   [33m[2m✓[22m[39m Step3 rejects 2D mapping when z variable is missing [33m 3196[2mms[22m[39m
+   [33m[2m✓[22m[39m Step3 excludes display_only strategy and warns for convex hull approximation [33m 2384[2mms[22m[39m
+   [33m[2m✓[22m[39m Step3 compiles, saves and closes editors then adds again with strict [33m 12880[2mms[22m[39m
+   [33m[2m✓[22m[39m Step3 compiles, saves and closes editors then adds again with skip_first [33m 13426[2mms[22m[39m
+   [33m[2m✓[22m[39m time and symbol changes while the editor is open require compilation again [33m 9620[2mms[22m[39m
+   [33m[2m✓[22m[39m ignores a late compile response after changing expression [33m 5064[2mms[22m[39m
+   [33m[2m✓[22m[39m ignores a late compile response after changing symbol [33m 6845[2mms[22m[39m
+   [33m[2m✓[22m[39m ignores a late compile response after changing time [33m 6531[2mms[22m[39m
+   [33m[2m✓[22m[39m ignores a late compile response after changing boundary [33m 4686[2mms[22m[39m
+ [32m✓[39m src/tests/unit/FormulaEditor.test.tsx [2m([22m[2m17 tests[22m[2m)[22m[33m 27698[2mms[22m[39m
+   [33m[2m✓[22m[39m solve_active formula cannot be applied until authoritative compilation succeeds [33m 2635[2mms[22m[39m
+   [33m[2m✓[22m[39m inserts variable at cursor and applies [33m 3582[2mms[22m[39m
+   [33m[2m✓[22m[39m offers click-to-insert tags for symbols, operators and function syntax [33m 4837[2mms[22m[39m
+   [33m[2m✓[22m[39m search filters function templates and shows a clear empty state [33m 1272[2mms[22m[39m
+   [33m[2m✓[22m[39m asks for confirmation before deleting an existing formula [33m 1167[2mms[22m[39m
+   [33m[2m✓[22m[39m empty formula cannot be applied [33m 889[2mms[22m[39m
+   [33m[2m✓[22m[39m uses the professional code editor and supports focus mode [33m 1640[2mms[22m[39m
+   [33m[2m✓[22m[39m exits focus mode without discarding or prompting for unsaved edits [33m 1684[2mms[22m[39m
+   [33m[2m✓[22m[39m protects unsaved edits with three explicit exit choices [33m 2083[2mms[22m[39m
+   [33m[2m✓[22m[39m undefined variable has clear error [33m 430[2mms[22m[39m
+   [33m[2m✓[22m[39m objective cannot contain relation operator [33m 937[2mms[22m[39m
+   [33m[2m✓[22m[39m constraint requires relation operator [33m 506[2mms[22m[39m
+   [33m[2m✓[22m[39m shows four-stage authoritative backend compile result [33m 2491[2mms[22m[39m
+   [33m[2m✓[22m[39m editing a compiled formula immediately invalidates the authoritative artifact [33m 3180[2mms[22m[39m
+ [32m✓[39m src/tests/unit/Step2SemanticModel.test.tsx [2m([22m[2m12 tests[22m[2m)[22m[33m 20534[2mms[22m[39m
+   [33m[2m✓[22m[39m shows non-time default and time-dimension configuration entry [33m 400[2mms[22m[39m
+   [33m[2m✓[22m[39m can add structured sets, parameters, and variables into semantic draft [33m 2438[2mms[22m[39m
+   [33m[2m✓[22m[39m opens semantic item editor from overview card [33m 933[2mms[22m[39m
+   [33m[2m✓[22m[39m separates set-member contract fields from ordinary parameters in the overview [33m 465[2mms[22m[39m
+   [33m[2m✓[22m[39m renders component builder writeback without raw JSON block [33m 793[2mms[22m[39m
+   [33m[2m✓[22m[39m opens parameter binding drawer from missing component dependency [33m 1851[2mms[22m[39m
+   [33m[2m✓[22m[39m selects components from catalog and automatically includes dependencies [33m 4889[2mms[22m[39m
+   [33m[2m✓[22m[39m cascade removes components that depend on the selected base component [33m 4148[2mms[22m[39m
+   [33m[2m✓[22m[39m blocks applying a component selection that contains a dependency cycle [33m 4417[2mms[22m[39m
+ [32m✓[39m src/tests/unit/ComponentLibraryPage.test.tsx [2m([22m[2m12 tests[22m[2m)[22m[33m 28596[2mms[22m[39m
+   [33m[2m✓[22m[39m renders component library list and structured detail drawer [33m 890[2mms[22m[39m
+   [33m[2m✓[22m[39m direct edit waits for detail and hydrates every formula section [33m 5207[2mms[22m[39m
+   [33m[2m✓[22m[39m published components offer copy-edit instead of a disabled edit action [33m 2112[2mms[22m[39m
+   [33m[2m✓[22m[39m draft component copies can be deleted from more actions [33m 4631[2mms[22m[39m
+   [33m[2m✓[22m[39m legacy formula fields are normalized for editing and synchronized on save [33m 2745[2mms[22m[39m
+   [33m[2m✓[22m[39m confirming deletion removes the selected formula from the component draft [33m 7867[2mms[22m[39m
+   [33m[2m✓[22m[39m renders component schema, math, parameter interface and dependency panels [33m 1937[2mms[22m[39m
+   [33m[2m✓[22m[39m new component opens a system-owned draft lifecycle editor [33m 2288[2mms[22m[39m
+   [33m[2m✓[22m[39m keeps model-specific parameter binding out of the component editor [33m 908[2mms[22m[39m
+ [32m✓[39m src/tests/unit/AgentRunPanels.test.tsx [2m([22m[2m5 tests[22m[2m)[22m[33m 780[2mms[22m[39m
+   [33m[2m✓[22m[39m groups workflow turns, puts the latest invocation first and folds older calls [33m 472[2mms[22m[39m
+ [32m✓[39m src/tests/unit/CascadeHydroTemplate.test.tsx [2m([22m[2m7 tests[22m[2m)[22m[33m 5079[2mms[22m[39m
+   [33m[2m✓[22m[39m Step3 展示梯级水电核心组件 [33m 1916[2mms[22m[39m
+   [33m[2m✓[22m[39m Step4 展示水电模式控件和兼容提示 [33m 963[2mms[22m[39m
+   [33m[2m✓[22m[39m Step5 展示函数资产和 MILP 风险诊断 [33m 531[2mms[22m[39m
+   [33m[2m✓[22m[39m 结果中心通过统一业务输出视图展示水电结果 [33m 1654[2mms[22m[39m
+ [32m✓[39m src/tests/unit/TaskCreateContracts.test.ts [2m([22m[2m33 tests[22m[2m)[22m[32m 13[2mms[22m[39m
+ [32m✓[39m src/tests/unit/ParameterEditorP1.test.tsx [2m([22m[2m13 tests[22m[2m)[22m[33m 1802[2mms[22m[39m
+   [33m[2m✓[22m[39m time sequence uses semantic labels and editable cells [33m 424[2mms[22m[39m
+ [32m✓[39m src/tests/unit/modelCreationTimeDimension.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 9[2mms[22m[39m
+ [32m✓[39m src/tests/unit/componentDependencies.test.ts [2m([22m[2m10 tests[22m[2m)[22m[32m 14[2mms[22m[39m
+ [32m✓[39m src/tests/unit/TaskPanelsP1.test.tsx [2m([22m[2m7 tests[22m[2m)[22m[33m 1061[2mms[22m[39m
+   [33m[2m✓[22m[39m task input panel shows submitted business data and contract summary [33m 357[2mms[22m[39m
+ [32m✓[39m src/tests/unit/TaskCreateWizardP0.test.tsx [2m([22m[2m8 tests[22m[2m)[22m[33m 17410[2mms[22m[39m
+   [33m[2m✓[22m[39m blocks when both contract interfaces fail and exposes retry [33m 709[2mms[22m[39m
+   [33m[2m✓[22m[39m array input schema renders object parameters as editable key-value rows [33m 2092[2mms[22m[39m
+   [33m[2m✓[22m[39m renders string and nested-map defaults, then blocks a partially cleared required matrix [33m 5913[2mms[22m[39m
+   [33m[2m✓[22m[39m closing resets model, step, and edited parameters [33m 2363[2mms[22m[39m
+   [33m[2m✓[22m[39m edited model switch asks for confirmation and cancel preserves current model [33m 3458[2mms[22m[39m
+   [33m[2m✓[22m[39m submit lock permits only one request while pending [33m 2585[2mms[22m[39m
+ [32m✓[39m src/tests/unit/RuntimeParameterGroups.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 10[2mms[22m[39m
+ [32m✓[39m src/tests/unit/Step4RuntimeParams.test.tsx [2m([22m[2m6 tests[22m[2m)[22m[33m 1804[2mms[22m[39m
+   [33m[2m✓[22m[39m renders parameter categories and missing prompts [33m 695[2mms[22m[39m
+   [33m[2m✓[22m[39m imports JSON runtime parameters and updates preview [33m 325[2mms[22m[39m
+   [33m[2m✓[22m[39m controlled runtime input follows parent draft updates [33m 387[2mms[22m[39m
+   [33m[2m✓[22m[39m edits table value into runtime schema [33m 387[2mms[22m[39m
+ [32m✓[39m src/tests/unit/NonlinearDiagnostics.test.tsx [2m([22m[2m7 tests[22m[2m)[22m[33m 2785[2mms[22m[39m
+   [33m[2m✓[22m[39m Formula Builder 输入双线性公式时给出提示 [33m 1175[2mms[22m[39m
+   [33m[2m✓[22m[39m Step5 展示非线性诊断并阻断未转换双线性 [33m 592[2mms[22m[39m
+   [33m[2m✓[22m[39m 缺少上下界时阻断发布 [33m 529[2mms[22m[39m
+   [33m[2m✓[22m[39m 已转换 McCormick 后允许发布 [33m 484[2mms[22m[39m
+ [32m✓[39m src/tests/unit/validateModelDraft.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 9[2mms[22m[39m
+ [32m✓[39m src/tests/unit/ScenarioLibraryPage.test.tsx [2m([22m[2m4 tests[22m[2m)[22m[33m 784[2mms[22m[39m
+   [33m[2m✓[22m[39m renders configured scenarios and opens the actual model asset [33m 426[2mms[22m[39m
+ [32m✓[39m src/tests/unit/AuthoritativeObjectiveAndVersion.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 13[2mms[22m[39m
+ [32m✓[39m src/tests/unit/FormulaManagementPanel.test.tsx [2m([22m[2m3 tests[22m[2m)[22m[33m 3783[2mms[22m[39m
+   [33m[2m✓[22m[39m management panel filters, copies, toggles and batch compiles formulas [33m 1870[2mms[22m[39m
+   [33m[2m✓[22m[39m keeps successful dependency analysis in the card header instead of a large alert [33m 553[2mms[22m[39m
+   [33m[2m✓[22m[39m marks preview formulas with semantic errors as compile failures [33m 1359[2mms[22m[39m
+ [32m✓[39m src/tests/unit/ModelServicesPage.test.tsx [2m([22m[2m3 tests[22m[2m)[22m[33m 4211[2mms[22m[39m
+   [33m[2m✓[22m[39m renders model services page and service list [33m 1148[2mms[22m[39m
+   [33m[2m✓[22m[39m runs online debug call with JSON payload [33m 1524[2mms[22m[39m
+   [33m[2m✓[22m[39m shows clear error for invalid debug JSON [33m 1437[2mms[22m[39m
+ [32m✓[39m src/tests/unit/TimeDimensionConfigCard.test.tsx [2m([22m[2m5 tests[22m[2m)[22m[33m 4638[2mms[22m[39m
+   [33m[2m✓[22m[39m configures fixed, free, choice and optional state/labels [33m 2100[2mms[22m[39m
+   [33m[2m✓[22m[39m offers only time-dimensional runtime parameters for data_derived [33m 602[2mms[22m[39m
+   [33m[2m✓[22m[39m offers dimensions alias parameters for data_derived and stores scalar granularity [33m 621[2mms[22m[39m
+   [33m[2m✓[22m[39m blocks disabling while time dimensions are referenced [33m 642[2mms[22m[39m
+   [33m[2m✓[22m[39m blocks disabling the state set while it is referenced [33m 669[2mms[22m[39m
+ [32m✓[39m src/tests/unit/ModelWorkspaceMode.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 14[2mms[22m[39m
+ [32m✓[39m src/tests/unit/componentFormulaContract.test.ts [2m([22m[2m13 tests[22m[2m)[22m[32m 10[2mms[22m[39m
+ [32m✓[39m src/tests/unit/compileFormulaToGenericSpec.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 9[2mms[22m[39m
+ [32m✓[39m src/tests/unit/CommandSearchP0.test.tsx [2m([22m[2m4 tests[22m[2m)[22m[33m 1112[2mms[22m[39m
+   [33m[2m✓[22m[39m visual and keyboard order share the same displayed array [33m 435[2mms[22m[39m
+   [33m[2m✓[22m[39m closing and reopening clears query, results state, and active index [33m 338[2mms[22m[39m
+ [32m✓[39m src/tests/unit/Step5ReviewPublish.test.tsx [2m([22m[2m3 tests[22m[2m)[22m[33m 783[2mms[22m[39m
+   [33m[2m✓[22m[39m disables publish and test actions when validation has blockers [33m 435[2mms[22m[39m
+ [32m✓[39m src/tests/unit/NlpDiagnostics.test.tsx [2m([22m[2m3 tests[22m[2m)[22m[33m 716[2mms[22m[39m
+   [33m[2m✓[22m[39m Ipopt 可用时 NLP 可发布但必须确认风险 [33m 499[2mms[22m[39m
+ [32m✓[39m src/tests/unit/ParameterEditorP0.test.tsx [2m([22m[2m18 tests[22m[2m)[22m[33m 304[2mms[22m[39m
+ [32m✓[39m src/tests/unit/ReviewFunctionUpdates.test.tsx [2m([22m[2m3 tests[22m[2m)[22m[33m 2731[2mms[22m[39m
+   [33m[2m✓[22m[39m only selected F is updated and applied after the exact candidate test [33m 1512[2mms[22m[39m
+   [33m[2m✓[22m[39m refresh and an uncertain submission reuse the same candidate identity [33m 757[2mms[22m[39m
+   [33m[2m✓[22m[39m a stale model content hash cannot enable apply from restored task success [33m 460[2mms[22m[39m
+ [32m✓[39m src/tests/unit/CloudReviewEditing.test.tsx [2m([22m[2m4 tests[22m[2m)[22m[33m 937[2mms[22m[39m
+   [33m[2m✓[22m[39m renaming a component preserves unvisited formula, variable and parameter sections [33m 933[2mms[22m[39m
+ [32m✓[39m src/tests/unit/ReviewResultContracts.test.tsx [2m([22m[2m5 tests[22m[2m)[22m[33m 1762[2mms[22m[39m
+   [33m[2m✓[22m[39m first read failure shows retry and only successful empty reads show empty state [33m 551[2mms[22m[39m
+   [33m[2m✓[22m[39m cached read failure retains old rows and shows last update and recovery [33m 876[2mms[22m[39m
+   [33m[2m✓[22m[39m missing result detail has an actionable failure state [33m 322[2mms[22m[39m
+ [32m✓[39m src/tests/unit/ModelNavigationCommand.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 25[2mms[22m[39m
+ [32m✓[39m src/tests/unit/ReviewDraftLeave.test.tsx [2m([22m[2m3 tests[22m[2m)[22m[33m 698[2mms[22m[39m
+   [33m[2m✓[22m[39m continue editing preserves draft and only explicit discard clears it [33m 433[2mms[22m[39m
+ [32m✓[39m src/tests/unit/FormulaManagement.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 10[2mms[22m[39m
+ [32m✓[39m src/tests/unit/ReviewModelTestTracking.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+ [32m✓[39m src/tests/unit/ResultCenterPage.test.tsx [2m([22m[2m2 tests[22m[2m)[22m[33m 1209[2mms[22m[39m
+   [33m[2m✓[22m[39m renders result center and structured report detail [33m 1202[2mms[22m[39m
+ [32m✓[39m src/tests/unit/ReviewAsyncServices.test.tsx [2m([22m[2m2 tests[22m[2m)[22m[33m 10490[2mms[22m[39m
+   [33m[2m✓[22m[39m async call survives page remount, blocks duplicate clicks and recovers after a read failure [33m 7204[2mms[22m[39m
+   [33m[2m✓[22m[39m uncertain submission retries with the same idempotency key [33m 3284[2mms[22m[39m
+ [32m✓[39m src/tests/unit/ReviewWorkspaceRecovery.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 9[2mms[22m[39m
+ [32m✓[39m src/tests/unit/ComponentParameterBindings.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 11[2mms[22m[39m
+ [32m✓[39m src/tests/unit/FocusEditor.test.tsx [2m([22m[2m5 tests[22m[2m)[22m[33m 1252[2mms[22m[39m
+     [33m[2m✓[22m[39m clean close exits directly [33m 306[2mms[22m[39m
+     [33m[2m✓[22m[39m dirty close offers continue and discard [33m 349[2mms[22m[39m
+ [32m✓[39m src/tests/unit/formulaValidator.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 11[2mms[22m[39m
+ [32m✓[39m src/tests/unit/modelLifecycle.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 8[2mms[22m[39m
+ [32m✓[39m src/tests/unit/ModelInteractionEnhancements.test.tsx [2m([22m[2m2 tests[22m[2m)[22m[33m 420[2mms[22m[39m
+ [32m✓[39m src/tests/unit/TaskCenterPage.test.tsx [2m([22m[2m24 tests[22m[2m)[22m[32m 10[2mms[22m[39m
+ [32m✓[39m src/tests/unit/RuntimeParameterHistory.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+ [32m✓[39m src/tests/unit/ModelServicesDemoInvoke.test.tsx [2m([22m[2m1 test[22m[2m)[22m[33m 2081[2mms[22m[39m
+   [33m[2m✓[22m[39m model services shows NLP sample and enriched debug response [33m 2029[2mms[22m[39m
+ [32m✓[39m src/tests/unit/DashboardPage.test.tsx [2m([22m[2m1 test[22m[2m)[22m[33m 825[2mms[22m[39m
+   [33m[2m✓[22m[39m dashboard renders React platform entries [33m 824[2mms[22m[39m
+ [32m✓[39m src/tests/unit/Sidebar.test.tsx [2m([22m[2m5 tests[22m[2m)[22m[32m 227[2mms[22m[39m
+ [32m✓[39m src/tests/unit/authoritativeCompilation.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 13[2mms[22m[39m
+ [32m✓[39m src/tests/unit/ModelCreationProgress.test.tsx [2m([22m[2m3 tests[22m[2m)[22m[33m 331[2mms[22m[39m
+ [32m✓[39m src/tests/unit/ModelFocusLifecycle.test.tsx [2m([22m[2m1 test[22m[2m)[22m[32m 35[2mms[22m[39m
+ [32m✓[39m src/tests/unit/HeaderTaskInbox.test.tsx [2m([22m[2m1 test[22m[2m)[22m[33m 1442[2mms[22m[39m
+   [33m[2m✓[22m[39m failed task messages can be handled without deleting task history [33m 1441[2mms[22m[39m
+ [32m✓[39m src/tests/unit/TimeSeriesPreview.test.tsx [2m([22m[2m4 tests[22m[2m)[22m[32m 212[2mms[22m[39m
+ [32m✓[39m src/tests/unit/ModelBuildSummaryBar.test.tsx [2m([22m[2m3 tests[22m[2m)[22m[32m 237[2mms[22m[39m
+ [32m✓[39m src/tests/unit/resultLabels.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 4[2mms[22m[39m
+ [32m✓[39m src/tests/unit/ModelDocumentationSource.test.tsx [2m([22m[2m2 tests[22m[2m)[22m[32m 284[2mms[22m[39m
+ [32m✓[39m src/tests/unit/SolverStatus.test.tsx [2m([22m[2m2 tests[22m[2m)[22m[32m 271[2mms[22m[39m
+ [32m✓[39m src/tests/unit/OfficialFrontendOnly.test.tsx [2m([22m[2m3 tests[22m[2m)[22m[33m 744[2mms[22m[39m
+   [33m[2m✓[22m[39m header exposes only the React model creation entry [33m 330[2mms[22m[39m
+   [33m[2m✓[22m[39m settings page documents frontend as React-only [33m 413[2mms[22m[39m
+ [32m✓[39m src/tests/unit/RuntimeWorkspaceComponents.test.tsx [2m([22m[2m3 tests[22m[2m)[22m[33m 664[2mms[22m[39m
+   [33m[2m✓[22m[39m fullscreen matrix saves edits and cancel does not save [33m 308[2mms[22m[39m
+ [32m✓[39m src/tests/unit/builderModeTransition.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 9[2mms[22m[39m
+ [32m✓[39m src/tests/unit/ParameterBindingDrawer.test.tsx [2m([22m[2m1 test[22m[2m)[22m[33m 762[2mms[22m[39m
+   [33m[2m✓[22m[39m renders binding context and saves validation status [33m 761[2mms[22m[39m
+ [32m✓[39m src/tests/unit/ReviewLlmConfigImport.test.tsx [2m([22m[2m1 test[22m[2m)[22m[33m 1938[2mms[22m[39m
+   [33m[2m✓[22m[39m settings imports the server local file and refreshes safe configuration without echoing a key [33m 1937[2mms[22m[39m
+ [32m✓[39m src/tests/unit/IterationComparison.test.tsx [2m([22m[2m2 tests[22m[2m)[22m[33m 552[2mms[22m[39m
+   [33m[2m✓[22m[39m unit mismatch displays observed values without manufacturing a delta [33m 384[2mms[22m[39m
+ [32m✓[39m src/tests/unit/formulaDsl.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 4[2mms[22m[39m
+ [32m✓[39m src/tests/unit/formulaDictionary.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 3[2mms[22m[39m
+ [32m✓[39m src/tests/unit/DemoDashboard.test.tsx [2m([22m[2m1 test[22m[2m)[22m[33m 522[2mms[22m[39m
+   [33m[2m✓[22m[39m dashboard keeps solver capabilities concise and routes details to runtime [33m 521[2mms[22m[39m
+ [32m✓[39m src/tests/unit/IterationComponentUpdates.test.tsx [2m([22m[2m1 test[22m[2m)[22m[33m 440[2mms[22m[39m
+   [33m[2m✓[22m[39m restored component update cannot apply stale success evidence [33m 439[2mms[22m[39m
+ [32m✓[39m src/tests/unit/CascadeHydroResultExplanation.test.tsx [2m([22m[2m1 test[22m[2m)[22m[33m 336[2mms[22m[39m
+   [33m[2m✓[22m[39m hydro output uses the same model-neutral business output renderer [33m 335[2mms[22m[39m
+ [32m✓[39m src/tests/unit/AgentExplanationPanel.test.tsx [2m([22m[2m1 test[22m[2m)[22m[32m 187[2mms[22m[39m
+ [32m✓[39m src/tests/unit/PageStates.test.tsx [2m([22m[2m2 tests[22m[2m)[22m[33m 765[2mms[22m[39m
+   [33m[2m✓[22m[39m exposes accessible loading and processing states [33m 544[2mms[22m[39m
+ [32m✓[39m src/tests/unit/formulaParser.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 15[2mms[22m[39m
+ [32m✓[39m src/tests/unit/CloudReviewFormula.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 11[2mms[22m[39m
+ [32m✓[39m src/tests/unit/AgentWorkbenchIntentCard.test.tsx [2m([22m[2m1 test[22m[2m)[22m[33m 729[2mms[22m[39m
+   [33m[2m✓[22m[39m shows ranked candidates, confidence, reason and clarification [33m 727[2mms[22m[39m
+ [32m✓[39m src/tests/unit/componentDependencyPanel.test.tsx [2m([22m[2m2 tests[22m[2m)[22m[33m 381[2mms[22m[39m
+   [33m[2m✓[22m[39m missing dependency blocks publish visibly [33m 342[2mms[22m[39m
+ [32m✓[39m src/tests/unit/ModelAssetTimeDimension.test.tsx [2m([22m[2m1 test[22m[2m)[22m[32m 236[2mms[22m[39m
+ [32m✓[39m src/tests/unit/RuntimeParameterImport.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 4[2mms[22m[39m
+ [32m✓[39m src/tests/unit/AudienceMode.test.tsx [2m([22m[2m1 test[22m[2m)[22m[32m 99[2mms[22m[39m
+ [32m✓[39m src/tests/unit/NlpResultExplanation.test.tsx [2m([22m[2m1 test[22m[2m)[22m[33m 323[2mms[22m[39m
+   [33m[2m✓[22m[39m NLP result panel explains Ipopt local optimum boundary [33m 322[2mms[22m[39m
+ [32m✓[39m src/tests/unit/SkillCenterAgentSkillV2.test.tsx [2m([22m[2m1 test[22m[2m)[22m[33m 336[2mms[22m[39m
+   [33m[2m✓[22m[39m shows Agent Skill v2 validation state without enabling drafts [33m 333[2mms[22m[39m
+ [32m✓[39m src/tests/unit/AgentCascadeHydroDemo.test.tsx [2m([22m[2m1 test[22m[2m)[22m[32m 217[2mms[22m[39m
+ [32m✓[39m src/tests/unit/AgentNlpQuestions.test.tsx [2m([22m[2m1 test[22m[2m)[22m[32m 189[2mms[22m[39m
+ [32m✓[39m src/tests/unit/smoke.test.tsx [2m([22m[2m1 test[22m[2m)[22m[32m 107[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m88 passed[39m[22m[90m (88)[39m
+[2m      Tests [22m [1m[32m485 passed[39m[22m[90m (485)[39m
+[2m   Start at [22m 03:39:13
+[2m   Duration [22m 278.42s[2m (transform 1.97s, setup 28.29s, import 35.22s, tests 354.56s, environment 119.92s)[22m
+
+[90mstderr[2m | src/tests/unit/AgentWorkbenchPage.test.tsx[2m > [22m[2mloads agent status, skills and sends a V3 Agent turn
+[22m[39m`NaN` is an invalid value for the `height` css style property.
+
+[90mstderr[2m | src/tests/unit/ComponentLibraryPage.test.tsx[2m > [22m[2mrenders component library list and structured detail drawer
+[22m[39mWarning: [antd: Descriptions] Sum of column `span` in a line not match `column` of Descriptions.
+Warning: [antd: Descriptions] Sum of column `span` in a line not match `column` of Descriptions.
+
+[90mstderr[2m | src/tests/unit/ComponentLibraryPage.test.tsx[2m > [22m[2mdraft component copies can be deleted from more actions
+[22m[39mWarning: [antd: Modal] Static function can not consume context like dynamic theme. Please use 'App' component instead.
+
+[90mstderr[2m | src/tests/unit/ComponentLibraryPage.test.tsx[2m > [22m[2mlegacy formula fields are normalized for editing and synchronized on save
+[22m[39m`NaN` is an invalid value for the `height` css style property.
+
+[90mstderr[2m | src/tests/unit/CloudReviewEditing.test.tsx[2m > [22m[2mrenaming a component preserves unvisited formula, variable and parameter sections
+[22m[39m`NaN` is an invalid value for the `height` css style property.
+
+[90mstderr[2m | src/tests/unit/ReviewDraftLeave.test.tsx[2m > [22m[2mcontinue editing preserves draft and only explicit discard clears it
+[22m[39mWarning: [antd: Modal] `maskClosable` is deprecated. Please use `mask.closable` instead.
+
+[90mstderr[2m | src/tests/unit/ReviewDraftLeave.test.tsx[2m > [22m[2mcontinue editing preserves draft and only explicit discard clears it
+[22m[39mWarning: [antd: Modal] `maskClosable` is deprecated. Please use `mask.closable` instead.
+
+[90mstderr[2m | src/tests/unit/ReviewDraftLeave.test.tsx[2m > [22m[2mfailed save prevents navigation and successful retry leaves
+[22m[39mWarning: [antd: Modal] `maskClosable` is deprecated. Please use `mask.closable` instead.
+
+[90mstderr[2m | src/tests/unit/ReviewDraftLeave.test.tsx[2m > [22m[2mfailed save prevents navigation and successful retry leaves
+[22m[39mWarning: [antd: Modal] `maskClosable` is deprecated. Please use `mask.closable` instead.
+
+[90mstderr[2m | src/tests/unit/ReviewDraftLeave.test.tsx[2m > [22m[2mfailed save prevents navigation and successful retry leaves
+[22m[39mWarning: [antd: Modal] `maskClosable` is deprecated. Please use `mask.closable` instead.
+
+[90mstderr[2m | src/tests/unit/ReviewDraftLeave.test.tsx[2m > [22m[2mfailed save prevents navigation and successful retry leaves
+[22m[39mWarning: [antd: Modal] `maskClosable` is deprecated. Please use `mask.closable` instead.
+
+[90mstderr[2m | src/tests/unit/ReviewDraftLeave.test.tsx[2m > [22m[2mfailed save prevents navigation and successful retry leaves
+[22m[39mWarning: [antd: Modal] `maskClosable` is deprecated. Please use `mask.closable` instead.
+
+[90mstderr[2m | src/tests/unit/ReviewDraftLeave.test.tsx[2m > [22m[2mbrowser history navigation is guarded and clean drafts leave normally
+[22m[39mWarning: [antd: Modal] `maskClosable` is deprecated. Please use `mask.closable` instead.
+
+[90mstderr[2m | src/tests/unit/RuntimeWorkspaceComponents.test.tsx[2m > [22m[2mfullscreen matrix saves edits and cancel does not save
+[22m[39mAn update to ForwardRef(StickyScrollBar) inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+

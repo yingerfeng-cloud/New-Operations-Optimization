@@ -9,6 +9,7 @@ import { getTask } from '../../api/tasks';
 import { terminalTask } from '../../api/taskTracking';
 import { QueryState } from '../../components/QueryState';
 import type { ModelAsset } from '../../types/model';
+import { UpdateComparisonPanel } from './UpdateComparisonPanel';
 
 interface Pending { key: string; selections: Record<string, string>; candidateId?: string; taskId?: string }
 const storageKey = (id: string) => `optiforge-component-update:${id}`;
@@ -68,6 +69,7 @@ export function ComponentUpdatesPanel({ model, onApplied }: { model: ModelAsset;
     {pending?.taskId && <QueryState query={task} title="组件候选测试"><Card size="small" title={`组件测试任务 ${pending.taskId}`}>
       <Typography.Paragraph>状态：{task.data?.status} · 候选版本：{pending.candidateId}</Typography.Paragraph>
       {task.data?.error && <Alert type="error" title={task.data.error} />}
+      {task.data?.status === 'SUCCESS' && pending.candidateId && <UpdateComparisonPanel candidateId={pending.candidateId} contentHash={tested?.content_hash} />}
       <Button type="primary" disabled={!canApply} loading={apply.isPending} onClick={() => apply.mutate()}>应用组件更新</Button>
       <Button onClick={() => void candidate.refetch()}>刷新组件测试证据</Button>
       <Button onClick={() => nav(`/models/${encodeURIComponent(pending.candidateId!)}/edit`)}>在工作台查看组件候选</Button>

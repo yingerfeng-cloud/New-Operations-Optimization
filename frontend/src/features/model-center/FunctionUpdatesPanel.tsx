@@ -10,6 +10,7 @@ import { getResult } from '../../api/results';
 import { terminalTask } from '../../api/taskTracking';
 import { QueryState } from '../../components/QueryState';
 import type { ModelAsset } from '../../types/model';
+import { UpdateComparisonPanel } from './UpdateComparisonPanel';
 import { assetToWorkspaceDraft } from '../model-creation/utils/workspaceMode';
 import { normalizeModelDraft } from '../model-creation/utils/normalizeModelDraft';
 import { editWorkspaceKey, writeWorkspaceRecovery } from '../model-creation/utils/workspaceRecovery';
@@ -51,8 +52,6 @@ export function FunctionUpdatesPanel({ model, onApplied }: { model: ModelAsset; 
   } });
   const tested = candidate.data;
   const canApply = task.data?.status === 'SUCCESS' && tested?.tested_model_id === tested?.id && tested?.tested_content_hash === tested?.content_hash && tested?.status === 'trial';
-  const oldObjective = ((model.dry_run_result?.solver_check || {}) as Record<string, unknown>).objective_value;
-  const newObjective = task.data?.objective_value;
   return <Space orientation="vertical" style={{ width: '100%' }}>
     <Alert type="info" showIcon title="按模型版本绑定函数修订" description="只替换选中的依赖；未选择的函数保留原修订。测试通过后应用更新，平台发布新模型版本并切换正式入口。固定模型 ID 和既有固定 Skill 保留原绑定。" />
     <QueryState query={updates} title="函数依赖">
@@ -83,7 +82,7 @@ export function FunctionUpdatesPanel({ model, onApplied }: { model: ModelAsset; 
     {pending?.taskId && <QueryState query={task} title="候选版本测试"><Card size="small" title={`测试任务 ${pending.taskId}`}>
       <Typography.Paragraph>状态：{task.data?.status} · 进度：{task.data?.progress || 0}% · 候选版本：{pending.candidateId}</Typography.Paragraph>
       {task.data?.error && <Alert type="error" title={task.data.error} />}
-      <Typography.Paragraph>测试目标：{String(oldObjective ?? '未记录')} → {String(newObjective ?? '待完成')}。综合加权目标按模型定义解释。</Typography.Paragraph>
+      {task.data?.status === 'SUCCESS' && pending.candidateId && <UpdateComparisonPanel candidateId={pending.candidateId} contentHash={tested?.content_hash} />}
       {result.data && <details><summary>物理量、变量及目标分项</summary><pre style={{ whiteSpace: 'pre-wrap' }}>{JSON.stringify(result.data, null, 2)}</pre></details>}
       <Button type="primary" disabled={!canApply} loading={apply.isPending} onClick={() => apply.mutate()}>应用更新</Button>
       {pending.candidateId && <Button onClick={() => nav(`/models/${encodeURIComponent(pending.candidateId!)}/edit`)}>在工作台查看候选</Button>}

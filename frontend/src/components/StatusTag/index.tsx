@@ -18,6 +18,7 @@ const statusMap: Record<string, { color: string; label: string }> = {
   trial: { color: 'blue', label: '试运行' },
   developing: { color: 'gold', label: '草稿' },
   offline: { color: 'default', label: '已下线' },
+  revoked: { color: 'red', label: '安全撤销' },
   valid: { color: 'green', label: '有效' },
   invalid: { color: 'red', label: '无效' },
 };

@@ -181,3 +181,9 @@ def select_component_revisions(model_id: str, body: ComponentSelectionRequest):
 def apply_component_updates(model_id: str):
     from app.services.function_update_service import apply_candidate
     return apply_candidate(model_id)
+
+
+@router.get("/models/{model_id}/update-comparison")
+def update_comparison(model_id: str):
+    from app.services.update_comparison import model_update_comparison
+    return model_update_comparison(model_id)

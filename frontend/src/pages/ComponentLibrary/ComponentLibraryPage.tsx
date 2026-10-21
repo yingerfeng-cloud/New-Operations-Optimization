@@ -169,7 +169,7 @@ export function ComponentLibraryPage() {
                     menu={{
                       items: [
                         { key: 'validate', label: '校验组件' },
-                        { key: 'publish', label: String(row.status).toLowerCase() === 'offline' ? '重新发布' : '发布组件', disabled: String(row.status).toLowerCase() === 'published' },
+                        { key: 'publish', label: String(row.status).toLowerCase() === 'offline' ? '重新发布' : '发布组件', disabled: ['published', 'revoked'].includes(String(row.status).toLowerCase()) },
                         { key: 'copy', label: '复制版本' },
                         { key: 'offline', label: '停用组件', danger: true, disabled: String(row.status).toLowerCase() !== 'published' },
                         { type: 'divider' },
@@ -208,7 +208,7 @@ export function ComponentLibraryPage() {
           <Space style={{ width: '100%', justifyContent: 'flex-end' }}>
             <Button onClick={() => { setViewId(undefined); setEditing(false); setValidation(undefined); }}>关闭</Button>
             {c && <Button onClick={() => validate.mutate(c.component_id)}>校验</Button>}
-            {c && String(c.status).toLowerCase() !== 'published' && <Button type="primary" onClick={() => publish.mutate(c.component_id)}>{String(c.status).toLowerCase() === 'offline' ? '重新发布' : '发布组件'}</Button>}
+            {c && !['published', 'revoked'].includes(String(c.status).toLowerCase()) && <Button type="primary" onClick={() => publish.mutate(c.component_id)}>{String(c.status).toLowerCase() === 'offline' ? '重新发布' : '发布组件'}</Button>}
             {c && String(c.status).toLowerCase() !== 'draft' && <Button onClick={() => copy.mutate(c.component_id)}>复制为新草稿</Button>}
           </Space>
         )}
@@ -239,6 +239,8 @@ export function ComponentLibraryPage() {
                     <Descriptions.Item label="领域">{c.domain || '-'}</Descriptions.Item>
                     <Descriptions.Item label="生命周期状态"><StatusTag status={c.status} /></Descriptions.Item>
                     <Descriptions.Item label="版本">{c.version || '-'}</Descriptions.Item>
+                    {c.status === 'revoked' && <Descriptions.Item label="安全撤销原因" span={2}>{String((c.revocation as Record<string, unknown> | undefined)?.reason || '请联系资产管理员核对撤销记录')}</Descriptions.Item>}
+                    {c.status === 'offline' && <Descriptions.Item label="旧绑定" span={2}>普通停用阻止新增选用；可信旧绑定按固定清单执行，仍受模型下线与安全撤销约束。</Descriptions.Item>}
                     <Descriptions.Item label="建模可用性">
                       <Tag color={String(c.status).toLowerCase() === 'published' ? 'green' : 'default'}>
                         {String(c.status).toLowerCase() === 'published' ? '可用于新模型' : '不可用于新模型'}
