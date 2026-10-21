@@ -1,0 +1,1521 @@
+bringing up nodes...
+bringing up nodes...
+
+........................................................................ [ 10%]
+........................................................................ [ 20%]
+........................................................................ [ 30%]
+........................................................................ [ 40%]
+........................................................FFFF.F.F..F.s..F [ 50%]
+.s..s..ss............................................................... [ 60%]
+........................................................................ [ 70%]
+........................................................................ [ 80%]
+........................................................................ [ 90%]
+..................................................................       [100%]
+=================================== FAILURES ===================================
+_____ test_publish_requires_current_trial_revision_and_trial_is_immutable ______
+[gw2] darwin -- Python 3.12.14 /Users/joiefu/Project/OPTIFORGE/.venv-mac/bin/python
+
+    def test_publish_requires_current_trial_revision_and_trial_is_immutable() -> None:
+        model = _create_model()
+    
+        with pytest.raises(HTTPException) as not_tested:
+            model_service.publish_model(model.id)
+        assert not_tested.value.detail["code"] == "MODEL_NOT_TESTED"
+    
+>       tested = model_service.run_model_test_case(model.id, {"parameters": model.parameters})
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_model_publish_revision_consistency.py:48: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+app/services/model_service.py:860: in run_model_test_case
+    job_service._prepare_request(SolveRequest(model_id=model_id, parameters=params, solver_config=settings), testing_model=model)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <app.services.job_service.JobService object at 0x10ad29ca0>
+req = SolveRequest(scene='经济调度', model='最小经济调度模型', model_code=None, model_id='MODEL-SKILL-2AACB3F6', horizon=None, interval_...3}, payload={'resolved_model_id': 'MODEL-SKILL-2AACB3F6', 'resolved_model_code': 'custom_optimization_model_2364253f'})
+
+    def _prepare_request(self, req: SolveRequest, *, testing_model=None) -> None:
+        user_parameter_keys = set(req.parameters or {})
+        user_runtime_keys = set(req.runtime_parameters or {})
+        user_payload_keys = set(req.payload or {})
+        explicit_keys = user_parameter_keys | user_runtime_keys | user_payload_keys
+        if req.interval_minutes is not None:
+            explicit_keys.add("interval_minutes")
+        explicit_horizon = self._explicit_horizon(req, explicit_keys)
+        if req.solver_config:
+            from app.solvers.run_settings import validate_run_settings
+            req.solver_config = validate_run_settings(req.solver_config)
+            if req.solver_config.get("time_limit") is not None:
+                req.time_limit_seconds = float(req.solver_config["time_limit"])
+            if req.solver_config.get("mip_gap") is not None:
+                req.mip_gap = float(req.solver_config["mip_gap"])
+            if req.solver_config.get("thread_num") is not None:
+                req.thread_num = int(req.solver_config["thread_num"])
+        if req.runtime_parameters:
+            req.parameters = {**req.parameters, **req.runtime_parameters}
+        if req.model_code and not req.model_id:
+            try:
+                resolved = model_service.resolve_model(model_code=req.model_code)
+                req.model_id = resolved.id
+                req.payload = {
+                    **req.payload,
+                    "resolved_model_id": resolved.id,
+                    "resolved_model_code": req.model_code,
+                }
+                warning = model_service.model_code_resolution_warning(req.model_code, resolved)
+                if warning:
+                    req.payload["resolution_warning"] = warning
+            except HTTPException as exc:
+                if exc.status_code != 404:
+                    raise
+                if model_service.find_models_by_code(req.model_code):
+                    raise HTTPException(
+                        status_code=409,
+                        detail={
+                            "code": "MODEL_NOT_PUBLISHED",
+                            "message": "该 model_code 当前没有已发布版本；试运行仅允许显式传入 model_id 调试。",
+                            "model_code": req.model_code,
+                        },
+                    )
+                template = deepcopy(template_library.get_template(req.model_code))
+                component_spec = deepcopy(template.get("component_spec") or {})
+                generic_spec = deepcopy(template.get("generic_spec") or {})
+                runtime_parameters = {**template.get("sample_runtime_parameters", {}), **req.parameters, **req.payload}
+                self._validate_set_references(template, component_spec, generic_spec)
+                if explicit_horizon is not None:
+                    runtime_parameters["horizon"] = explicit_horizon
+                time_dimension = resolve_time_dimension_config(
+                    model=None,
+                    semantic_spec=template,
+                    component_spec=component_spec,
+                    generic_spec=generic_spec,
+                    runtime_parameters=runtime_parameters,
+                )
+                runtime_parameters, component_spec, generic_spec, normalized_time_dimension = normalize_runtime_time_dimension(
+                    semantic_spec=template,
+                    component_spec=component_spec,
+                    generic_spec=generic_spec,
+                    runtime_parameters=runtime_parameters,
+                    explicit_horizon=explicit_horizon,
+                    explicitly_provided_keys=explicit_keys,
+                    time_dimension=time_dimension,
+                )
+                template.setdefault("ui_metadata", {})["time_dimension"] = normalized_time_dimension
+                if component_spec:
+                    template["component_spec"] = component_spec
+                    runtime_parameters["component_spec"] = component_spec
+                if generic_spec:
+                    runtime_parameters["generic_spec"] = self._instantiate_generic_spec(generic_spec, runtime_parameters)
+                runtime_parameters["semantic_spec"] = template
+                errors = RuntimeParameterValidator().validate(template, runtime_parameters)
+                if errors:
+                    raise HTTPException(status_code=422, detail=errors)
+                req.scene = template.get("scenario", req.scene)
+                req.model = template.get("name", req.model)
+                req.payload = {
+                    **runtime_parameters,
+                    "resolved_model_code": req.model_code,
+                }
+                return
+        if not req.model_id:
+            if req.model_code:
+                req.payload = {**req.parameters, **req.payload, "model_code": req.model_code}
+                return
+            raise HTTPException(status_code=422, detail="model_id or model_code is required for semantic optimization")
+    
+        model = testing_model or model_service.get_model(req.model_id)
+        if testing_model is None and model.status not in DIRECT_CALLABLE_STATUSES:
+            raise HTTPException(status_code=409, detail=f"Model is not callable in status: {model.status}")
+        req.scene = model.scene
+        req.model = model.name
+        model_code = (model.semantic_spec or {}).get("model_code") or model.template_id or req.model_code
+        req.payload = {
+            **req.payload,
+            "resolved_model_id": model.id,
+            "resolved_model_code": model_code,
+        }
+        semantic_spec = deepcopy(model.semantic_spec or {})
+        semantic_spec["build_mode"] = model.build_mode
+        if model.build_mode in {"template_based", "domain_builder"}:
+            template_code = model_service._template_code(model)
+            if template_code:
+                semantic_spec["template_code"] = template_code
+        component_spec = deepcopy(model.component_spec or semantic_spec.get("component_spec") or {})
+        generic_spec = deepcopy(model.generic_spec or semantic_spec.get("generic_spec") or {})
+        self._validate_set_references(semantic_spec, component_spec, generic_spec)
+        runtime_parameters = map_business_parameters(semantic_spec, req.parameters)
+        merged = {**self._default_parameters_from_model(model), **deepcopy(runtime_parameters), **deepcopy(req.payload)}
+        from app.services.function_dependencies import dependency_snapshots
+        merged["_function_asset_snapshots"] = dependency_snapshots(model, require_pinned=bool(model.published_at))
+        from app.services.component_dependencies import validate_manifest, component_refs
+        refs = component_refs(model)
+        if refs:
+            validate_manifest(model.component_dependencies, refs)
+            merged["_component_dependencies"] = deepcopy(model.component_dependencies)
+        else:
+            merged.pop("_component_dependencies", None)
+        if explicit_horizon is not None:
+            merged["horizon"] = explicit_horizon
+        if req.interval_minutes is not None:
+            merged["interval_minutes"] = req.interval_minutes
+        if req.objective_config:
+            merged["objective_config"] = req.objective_config
+        if req.constraint_config:
+            merged["constraint_config"] = req.constraint_config
+        time_dimension = resolve_time_dimension_config(
+            model=model,
+            semantic_spec=semantic_spec,
+            component_spec=component_spec,
+            generic_spec=generic_spec,
+            runtime_parameters=merged,
+        )
+        merged, component_spec, generic_spec, normalized_time_dimension = normalize_runtime_time_dimension(
+            semantic_spec=semantic_spec,
+            component_spec=component_spec,
+            generic_spec=generic_spec,
+            runtime_parameters=merged,
+            explicit_horizon=explicit_horizon,
+            explicitly_provided_keys=explicit_keys,
+            time_dimension=time_dimension,
+        )
+        semantic_spec.setdefault("ui_metadata", {})["time_dimension"] = normalized_time_dimension
+        if component_spec:
+            component_spec.setdefault("ui_metadata", {})["time_dimension"] = normalized_time_dimension
+            semantic_spec["component_spec"] = component_spec
+            merged["component_spec"] = component_spec
+        if generic_spec:
+            generic_spec.setdefault("ui_metadata", {})["time_dimension"] = normalized_time_dimension
+            semantic_spec["generic_spec"] = generic_spec
+        if generic_spec:
+            consistency_errors = RuntimeParameterValidator().validate_semantic_and_generic(semantic_spec, generic_spec)
+            if consistency_errors:
+                raise HTTPException(status_code=422, detail=consistency_errors)
+            merged["generic_spec"] = self._instantiate_generic_spec(generic_spec, merged)
+        if semantic_spec:
+            merged["semantic_spec"] = semantic_spec
+        errors = RuntimeParameterValidator().validate(semantic_spec, merged)
+        if errors:
+>           raise HTTPException(status_code=422, detail=errors)
+E           fastapi.exceptions.HTTPException: 422: [{'field': 'load_forecast', 'error': 'missing required parameter', 'expected': 'present', 'actual': None}, {'field': 'fuel_cost', 'error': 'missing required parameter', 'expected': 'present', 'actual': None}, {'field': 'unit_max_output', 'error': 'missing required parameter', 'expected': 'present', 'actual': None}]
+
+app/services/job_service.py:348: HTTPException
+____________ test_publish_rejects_test_record_from_different_asset _____________
+[gw2] darwin -- Python 3.12.14 /Users/joiefu/Project/OPTIFORGE/.venv-mac/bin/python
+
+    def test_publish_rejects_test_record_from_different_asset() -> None:
+        model = _create_model()
+>       tested = model_service.run_model_test_case(model.id, {"parameters": model.parameters})
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_model_publish_revision_consistency.py:66: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+app/services/model_service.py:860: in run_model_test_case
+    job_service._prepare_request(SolveRequest(model_id=model_id, parameters=params, solver_config=settings), testing_model=model)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <app.services.job_service.JobService object at 0x10ad29ca0>
+req = SolveRequest(scene='经济调度', model='最小经济调度模型', model_code=None, model_id='MODEL-SKILL-AB60A009', horizon=None, interval_...3}, payload={'resolved_model_id': 'MODEL-SKILL-AB60A009', 'resolved_model_code': 'custom_optimization_model_20b50e2a'})
+
+    def _prepare_request(self, req: SolveRequest, *, testing_model=None) -> None:
+        user_parameter_keys = set(req.parameters or {})
+        user_runtime_keys = set(req.runtime_parameters or {})
+        user_payload_keys = set(req.payload or {})
+        explicit_keys = user_parameter_keys | user_runtime_keys | user_payload_keys
+        if req.interval_minutes is not None:
+            explicit_keys.add("interval_minutes")
+        explicit_horizon = self._explicit_horizon(req, explicit_keys)
+        if req.solver_config:
+            from app.solvers.run_settings import validate_run_settings
+            req.solver_config = validate_run_settings(req.solver_config)
+            if req.solver_config.get("time_limit") is not None:
+                req.time_limit_seconds = float(req.solver_config["time_limit"])
+            if req.solver_config.get("mip_gap") is not None:
+                req.mip_gap = float(req.solver_config["mip_gap"])
+            if req.solver_config.get("thread_num") is not None:
+                req.thread_num = int(req.solver_config["thread_num"])
+        if req.runtime_parameters:
+            req.parameters = {**req.parameters, **req.runtime_parameters}
+        if req.model_code and not req.model_id:
+            try:
+                resolved = model_service.resolve_model(model_code=req.model_code)
+                req.model_id = resolved.id
+                req.payload = {
+                    **req.payload,
+                    "resolved_model_id": resolved.id,
+                    "resolved_model_code": req.model_code,
+                }
+                warning = model_service.model_code_resolution_warning(req.model_code, resolved)
+                if warning:
+                    req.payload["resolution_warning"] = warning
+            except HTTPException as exc:
+                if exc.status_code != 404:
+                    raise
+                if model_service.find_models_by_code(req.model_code):
+                    raise HTTPException(
+                        status_code=409,
+                        detail={
+                            "code": "MODEL_NOT_PUBLISHED",
+                            "message": "该 model_code 当前没有已发布版本；试运行仅允许显式传入 model_id 调试。",
+                            "model_code": req.model_code,
+                        },
+                    )
+                template = deepcopy(template_library.get_template(req.model_code))
+                component_spec = deepcopy(template.get("component_spec") or {})
+                generic_spec = deepcopy(template.get("generic_spec") or {})
+                runtime_parameters = {**template.get("sample_runtime_parameters", {}), **req.parameters, **req.payload}
+                self._validate_set_references(template, component_spec, generic_spec)
+                if explicit_horizon is not None:
+                    runtime_parameters["horizon"] = explicit_horizon
+                time_dimension = resolve_time_dimension_config(
+                    model=None,
+                    semantic_spec=template,
+                    component_spec=component_spec,
+                    generic_spec=generic_spec,
+                    runtime_parameters=runtime_parameters,
+                )
+                runtime_parameters, component_spec, generic_spec, normalized_time_dimension = normalize_runtime_time_dimension(
+                    semantic_spec=template,
+                    component_spec=component_spec,
+                    generic_spec=generic_spec,
+                    runtime_parameters=runtime_parameters,
+                    explicit_horizon=explicit_horizon,
+                    explicitly_provided_keys=explicit_keys,
+                    time_dimension=time_dimension,
+                )
+                template.setdefault("ui_metadata", {})["time_dimension"] = normalized_time_dimension
+                if component_spec:
+                    template["component_spec"] = component_spec
+                    runtime_parameters["component_spec"] = component_spec
+                if generic_spec:
+                    runtime_parameters["generic_spec"] = self._instantiate_generic_spec(generic_spec, runtime_parameters)
+                runtime_parameters["semantic_spec"] = template
+                errors = RuntimeParameterValidator().validate(template, runtime_parameters)
+                if errors:
+                    raise HTTPException(status_code=422, detail=errors)
+                req.scene = template.get("scenario", req.scene)
+                req.model = template.get("name", req.model)
+                req.payload = {
+                    **runtime_parameters,
+                    "resolved_model_code": req.model_code,
+                }
+                return
+        if not req.model_id:
+            if req.model_code:
+                req.payload = {**req.parameters, **req.payload, "model_code": req.model_code}
+                return
+            raise HTTPException(status_code=422, detail="model_id or model_code is required for semantic optimization")
+    
+        model = testing_model or model_service.get_model(req.model_id)
+        if testing_model is None and model.status not in DIRECT_CALLABLE_STATUSES:
+            raise HTTPException(status_code=409, detail=f"Model is not callable in status: {model.status}")
+        req.scene = model.scene
+        req.model = model.name
+        model_code = (model.semantic_spec or {}).get("model_code") or model.template_id or req.model_code
+        req.payload = {
+            **req.payload,
+            "resolved_model_id": model.id,
+            "resolved_model_code": model_code,
+        }
+        semantic_spec = deepcopy(model.semantic_spec or {})
+        semantic_spec["build_mode"] = model.build_mode
+        if model.build_mode in {"template_based", "domain_builder"}:
+            template_code = model_service._template_code(model)
+            if template_code:
+                semantic_spec["template_code"] = template_code
+        component_spec = deepcopy(model.component_spec or semantic_spec.get("component_spec") or {})
+        generic_spec = deepcopy(model.generic_spec or semantic_spec.get("generic_spec") or {})
+        self._validate_set_references(semantic_spec, component_spec, generic_spec)
+        runtime_parameters = map_business_parameters(semantic_spec, req.parameters)
+        merged = {**self._default_parameters_from_model(model), **deepcopy(runtime_parameters), **deepcopy(req.payload)}
+        from app.services.function_dependencies import dependency_snapshots
+        merged["_function_asset_snapshots"] = dependency_snapshots(model, require_pinned=bool(model.published_at))
+        from app.services.component_dependencies import validate_manifest, component_refs
+        refs = component_refs(model)
+        if refs:
+            validate_manifest(model.component_dependencies, refs)
+            merged["_component_dependencies"] = deepcopy(model.component_dependencies)
+        else:
+            merged.pop("_component_dependencies", None)
+        if explicit_horizon is not None:
+            merged["horizon"] = explicit_horizon
+        if req.interval_minutes is not None:
+            merged["interval_minutes"] = req.interval_minutes
+        if req.objective_config:
+            merged["objective_config"] = req.objective_config
+        if req.constraint_config:
+            merged["constraint_config"] = req.constraint_config
+        time_dimension = resolve_time_dimension_config(
+            model=model,
+            semantic_spec=semantic_spec,
+            component_spec=component_spec,
+            generic_spec=generic_spec,
+            runtime_parameters=merged,
+        )
+        merged, component_spec, generic_spec, normalized_time_dimension = normalize_runtime_time_dimension(
+            semantic_spec=semantic_spec,
+            component_spec=component_spec,
+            generic_spec=generic_spec,
+            runtime_parameters=merged,
+            explicit_horizon=explicit_horizon,
+            explicitly_provided_keys=explicit_keys,
+            time_dimension=time_dimension,
+        )
+        semantic_spec.setdefault("ui_metadata", {})["time_dimension"] = normalized_time_dimension
+        if component_spec:
+            component_spec.setdefault("ui_metadata", {})["time_dimension"] = normalized_time_dimension
+            semantic_spec["component_spec"] = component_spec
+            merged["component_spec"] = component_spec
+        if generic_spec:
+            generic_spec.setdefault("ui_metadata", {})["time_dimension"] = normalized_time_dimension
+            semantic_spec["generic_spec"] = generic_spec
+        if generic_spec:
+            consistency_errors = RuntimeParameterValidator().validate_semantic_and_generic(semantic_spec, generic_spec)
+            if consistency_errors:
+                raise HTTPException(status_code=422, detail=consistency_errors)
+            merged["generic_spec"] = self._instantiate_generic_spec(generic_spec, merged)
+        if semantic_spec:
+            merged["semantic_spec"] = semantic_spec
+        errors = RuntimeParameterValidator().validate(semantic_spec, merged)
+        if errors:
+>           raise HTTPException(status_code=422, detail=errors)
+E           fastapi.exceptions.HTTPException: 422: [{'field': 'load_forecast', 'error': 'missing required parameter', 'expected': 'present', 'actual': None}, {'field': 'fuel_cost', 'error': 'missing required parameter', 'expected': 'present', 'actual': None}, {'field': 'unit_max_output', 'error': 'missing required parameter', 'expected': 'present', 'actual': None}]
+
+app/services/job_service.py:348: HTTPException
+_ test_published_validation_preserves_status_and_offline_version_can_be_republished _
+[gw2] darwin -- Python 3.12.14 /Users/joiefu/Project/OPTIFORGE/.venv-mac/bin/python
+
+    def test_published_validation_preserves_status_and_offline_version_can_be_republished() -> None:
+        model = _create_model()
+>       tested = model_service.run_model_test_case(model.id, {"parameters": model.parameters})
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_model_publish_revision_consistency.py:78: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+app/services/model_service.py:860: in run_model_test_case
+    job_service._prepare_request(SolveRequest(model_id=model_id, parameters=params, solver_config=settings), testing_model=model)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <app.services.job_service.JobService object at 0x10ad29ca0>
+req = SolveRequest(scene='经济调度', model='最小经济调度模型', model_code=None, model_id='MODEL-SKILL-9E9D7176', horizon=None, interval_...3}, payload={'resolved_model_id': 'MODEL-SKILL-9E9D7176', 'resolved_model_code': 'custom_optimization_model_866c42c8'})
+
+    def _prepare_request(self, req: SolveRequest, *, testing_model=None) -> None:
+        user_parameter_keys = set(req.parameters or {})
+        user_runtime_keys = set(req.runtime_parameters or {})
+        user_payload_keys = set(req.payload or {})
+        explicit_keys = user_parameter_keys | user_runtime_keys | user_payload_keys
+        if req.interval_minutes is not None:
+            explicit_keys.add("interval_minutes")
+        explicit_horizon = self._explicit_horizon(req, explicit_keys)
+        if req.solver_config:
+            from app.solvers.run_settings import validate_run_settings
+            req.solver_config = validate_run_settings(req.solver_config)
+            if req.solver_config.get("time_limit") is not None:
+                req.time_limit_seconds = float(req.solver_config["time_limit"])
+            if req.solver_config.get("mip_gap") is not None:
+                req.mip_gap = float(req.solver_config["mip_gap"])
+            if req.solver_config.get("thread_num") is not None:
+                req.thread_num = int(req.solver_config["thread_num"])
+        if req.runtime_parameters:
+            req.parameters = {**req.parameters, **req.runtime_parameters}
+        if req.model_code and not req.model_id:
+            try:
+                resolved = model_service.resolve_model(model_code=req.model_code)
+                req.model_id = resolved.id
+                req.payload = {
+                    **req.payload,
+                    "resolved_model_id": resolved.id,
+                    "resolved_model_code": req.model_code,
+                }
+                warning = model_service.model_code_resolution_warning(req.model_code, resolved)
+                if warning:
+                    req.payload["resolution_warning"] = warning
+            except HTTPException as exc:
+                if exc.status_code != 404:
+                    raise
+                if model_service.find_models_by_code(req.model_code):
+                    raise HTTPException(
+                        status_code=409,
+                        detail={
+                            "code": "MODEL_NOT_PUBLISHED",
+                            "message": "该 model_code 当前没有已发布版本；试运行仅允许显式传入 model_id 调试。",
+                            "model_code": req.model_code,
+                        },
+                    )
+                template = deepcopy(template_library.get_template(req.model_code))
+                component_spec = deepcopy(template.get("component_spec") or {})
+                generic_spec = deepcopy(template.get("generic_spec") or {})
+                runtime_parameters = {**template.get("sample_runtime_parameters", {}), **req.parameters, **req.payload}
+                self._validate_set_references(template, component_spec, generic_spec)
+                if explicit_horizon is not None:
+                    runtime_parameters["horizon"] = explicit_horizon
+                time_dimension = resolve_time_dimension_config(
+                    model=None,
+                    semantic_spec=template,
+                    component_spec=component_spec,
+                    generic_spec=generic_spec,
+                    runtime_parameters=runtime_parameters,
+                )
+                runtime_parameters, component_spec, generic_spec, normalized_time_dimension = normalize_runtime_time_dimension(
+                    semantic_spec=template,
+                    component_spec=component_spec,
+                    generic_spec=generic_spec,
+                    runtime_parameters=runtime_parameters,
+                    explicit_horizon=explicit_horizon,
+                    explicitly_provided_keys=explicit_keys,
+                    time_dimension=time_dimension,
+                )
+                template.setdefault("ui_metadata", {})["time_dimension"] = normalized_time_dimension
+                if component_spec:
+                    template["component_spec"] = component_spec
+                    runtime_parameters["component_spec"] = component_spec
+                if generic_spec:
+                    runtime_parameters["generic_spec"] = self._instantiate_generic_spec(generic_spec, runtime_parameters)
+                runtime_parameters["semantic_spec"] = template
+                errors = RuntimeParameterValidator().validate(template, runtime_parameters)
+                if errors:
+                    raise HTTPException(status_code=422, detail=errors)
+                req.scene = template.get("scenario", req.scene)
+                req.model = template.get("name", req.model)
+                req.payload = {
+                    **runtime_parameters,
+                    "resolved_model_code": req.model_code,
+                }
+                return
+        if not req.model_id:
+            if req.model_code:
+                req.payload = {**req.parameters, **req.payload, "model_code": req.model_code}
+                return
+            raise HTTPException(status_code=422, detail="model_id or model_code is required for semantic optimization")
+    
+        model = testing_model or model_service.get_model(req.model_id)
+        if testing_model is None and model.status not in DIRECT_CALLABLE_STATUSES:
+            raise HTTPException(status_code=409, detail=f"Model is not callable in status: {model.status}")
+        req.scene = model.scene
+        req.model = model.name
+        model_code = (model.semantic_spec or {}).get("model_code") or model.template_id or req.model_code
+        req.payload = {
+            **req.payload,
+            "resolved_model_id": model.id,
+            "resolved_model_code": model_code,
+        }
+        semantic_spec = deepcopy(model.semantic_spec or {})
+        semantic_spec["build_mode"] = model.build_mode
+        if model.build_mode in {"template_based", "domain_builder"}:
+            template_code = model_service._template_code(model)
+            if template_code:
+                semantic_spec["template_code"] = template_code
+        component_spec = deepcopy(model.component_spec or semantic_spec.get("component_spec") or {})
+        generic_spec = deepcopy(model.generic_spec or semantic_spec.get("generic_spec") or {})
+        self._validate_set_references(semantic_spec, component_spec, generic_spec)
+        runtime_parameters = map_business_parameters(semantic_spec, req.parameters)
+        merged = {**self._default_parameters_from_model(model), **deepcopy(runtime_parameters), **deepcopy(req.payload)}
+        from app.services.function_dependencies import dependency_snapshots
+        merged["_function_asset_snapshots"] = dependency_snapshots(model, require_pinned=bool(model.published_at))
+        from app.services.component_dependencies import validate_manifest, component_refs
+        refs = component_refs(model)
+        if refs:
+            validate_manifest(model.component_dependencies, refs)
+            merged["_component_dependencies"] = deepcopy(model.component_dependencies)
+        else:
+            merged.pop("_component_dependencies", None)
+        if explicit_horizon is not None:
+            merged["horizon"] = explicit_horizon
+        if req.interval_minutes is not None:
+            merged["interval_minutes"] = req.interval_minutes
+        if req.objective_config:
+            merged["objective_config"] = req.objective_config
+        if req.constraint_config:
+            merged["constraint_config"] = req.constraint_config
+        time_dimension = resolve_time_dimension_config(
+            model=model,
+            semantic_spec=semantic_spec,
+            component_spec=component_spec,
+            generic_spec=generic_spec,
+            runtime_parameters=merged,
+        )
+        merged, component_spec, generic_spec, normalized_time_dimension = normalize_runtime_time_dimension(
+            semantic_spec=semantic_spec,
+            component_spec=component_spec,
+            generic_spec=generic_spec,
+            runtime_parameters=merged,
+            explicit_horizon=explicit_horizon,
+            explicitly_provided_keys=explicit_keys,
+            time_dimension=time_dimension,
+        )
+        semantic_spec.setdefault("ui_metadata", {})["time_dimension"] = normalized_time_dimension
+        if component_spec:
+            component_spec.setdefault("ui_metadata", {})["time_dimension"] = normalized_time_dimension
+            semantic_spec["component_spec"] = component_spec
+            merged["component_spec"] = component_spec
+        if generic_spec:
+            generic_spec.setdefault("ui_metadata", {})["time_dimension"] = normalized_time_dimension
+            semantic_spec["generic_spec"] = generic_spec
+        if generic_spec:
+            consistency_errors = RuntimeParameterValidator().validate_semantic_and_generic(semantic_spec, generic_spec)
+            if consistency_errors:
+                raise HTTPException(status_code=422, detail=consistency_errors)
+            merged["generic_spec"] = self._instantiate_generic_spec(generic_spec, merged)
+        if semantic_spec:
+            merged["semantic_spec"] = semantic_spec
+        errors = RuntimeParameterValidator().validate(semantic_spec, merged)
+        if errors:
+>           raise HTTPException(status_code=422, detail=errors)
+E           fastapi.exceptions.HTTPException: 422: [{'field': 'load_forecast', 'error': 'missing required parameter', 'expected': 'present', 'actual': None}, {'field': 'fuel_cost', 'error': 'missing required parameter', 'expected': 'present', 'actual': None}, {'field': 'unit_max_output', 'error': 'missing required parameter', 'expected': 'present', 'actual': None}]
+
+app/services/job_service.py:348: HTTPException
+______ test_trial_model_can_be_tested_and_promoted_to_formal_publication _______
+[gw2] darwin -- Python 3.12.14 /Users/joiefu/Project/OPTIFORGE/.venv-mac/bin/python
+
+    def test_trial_model_can_be_tested_and_promoted_to_formal_publication() -> None:
+        model = _create_model()
+        with STORE.lock:
+            STORE.models[model.id] = model.model_copy(update={"status": "trial"})
+    
+>       tested = model_service.run_model_test_case(model.id, {"parameters": model.parameters})
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_model_publish_revision_consistency.py:97: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+app/services/model_service.py:860: in run_model_test_case
+    job_service._prepare_request(SolveRequest(model_id=model_id, parameters=params, solver_config=settings), testing_model=model)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <app.services.job_service.JobService object at 0x10ad29ca0>
+req = SolveRequest(scene='经济调度', model='最小经济调度模型', model_code=None, model_id='MODEL-SKILL-084B2655', horizon=None, interval_...3}, payload={'resolved_model_id': 'MODEL-SKILL-084B2655', 'resolved_model_code': 'custom_optimization_model_d6d305a7'})
+
+    def _prepare_request(self, req: SolveRequest, *, testing_model=None) -> None:
+        user_parameter_keys = set(req.parameters or {})
+        user_runtime_keys = set(req.runtime_parameters or {})
+        user_payload_keys = set(req.payload or {})
+        explicit_keys = user_parameter_keys | user_runtime_keys | user_payload_keys
+        if req.interval_minutes is not None:
+            explicit_keys.add("interval_minutes")
+        explicit_horizon = self._explicit_horizon(req, explicit_keys)
+        if req.solver_config:
+            from app.solvers.run_settings import validate_run_settings
+            req.solver_config = validate_run_settings(req.solver_config)
+            if req.solver_config.get("time_limit") is not None:
+                req.time_limit_seconds = float(req.solver_config["time_limit"])
+            if req.solver_config.get("mip_gap") is not None:
+                req.mip_gap = float(req.solver_config["mip_gap"])
+            if req.solver_config.get("thread_num") is not None:
+                req.thread_num = int(req.solver_config["thread_num"])
+        if req.runtime_parameters:
+            req.parameters = {**req.parameters, **req.runtime_parameters}
+        if req.model_code and not req.model_id:
+            try:
+                resolved = model_service.resolve_model(model_code=req.model_code)
+                req.model_id = resolved.id
+                req.payload = {
+                    **req.payload,
+                    "resolved_model_id": resolved.id,
+                    "resolved_model_code": req.model_code,
+                }
+                warning = model_service.model_code_resolution_warning(req.model_code, resolved)
+                if warning:
+                    req.payload["resolution_warning"] = warning
+            except HTTPException as exc:
+                if exc.status_code != 404:
+                    raise
+                if model_service.find_models_by_code(req.model_code):
+                    raise HTTPException(
+                        status_code=409,
+                        detail={
+                            "code": "MODEL_NOT_PUBLISHED",
+                            "message": "该 model_code 当前没有已发布版本；试运行仅允许显式传入 model_id 调试。",
+                            "model_code": req.model_code,
+                        },
+                    )
+                template = deepcopy(template_library.get_template(req.model_code))
+                component_spec = deepcopy(template.get("component_spec") or {})
+                generic_spec = deepcopy(template.get("generic_spec") or {})
+                runtime_parameters = {**template.get("sample_runtime_parameters", {}), **req.parameters, **req.payload}
+                self._validate_set_references(template, component_spec, generic_spec)
+                if explicit_horizon is not None:
+                    runtime_parameters["horizon"] = explicit_horizon
+                time_dimension = resolve_time_dimension_config(
+                    model=None,
+                    semantic_spec=template,
+                    component_spec=component_spec,
+                    generic_spec=generic_spec,
+                    runtime_parameters=runtime_parameters,
+                )
+                runtime_parameters, component_spec, generic_spec, normalized_time_dimension = normalize_runtime_time_dimension(
+                    semantic_spec=template,
+                    component_spec=component_spec,
+                    generic_spec=generic_spec,
+                    runtime_parameters=runtime_parameters,
+                    explicit_horizon=explicit_horizon,
+                    explicitly_provided_keys=explicit_keys,
+                    time_dimension=time_dimension,
+                )
+                template.setdefault("ui_metadata", {})["time_dimension"] = normalized_time_dimension
+                if component_spec:
+                    template["component_spec"] = component_spec
+                    runtime_parameters["component_spec"] = component_spec
+                if generic_spec:
+                    runtime_parameters["generic_spec"] = self._instantiate_generic_spec(generic_spec, runtime_parameters)
+                runtime_parameters["semantic_spec"] = template
+                errors = RuntimeParameterValidator().validate(template, runtime_parameters)
+                if errors:
+                    raise HTTPException(status_code=422, detail=errors)
+                req.scene = template.get("scenario", req.scene)
+                req.model = template.get("name", req.model)
+                req.payload = {
+                    **runtime_parameters,
+                    "resolved_model_code": req.model_code,
+                }
+                return
+        if not req.model_id:
+            if req.model_code:
+                req.payload = {**req.parameters, **req.payload, "model_code": req.model_code}
+                return
+            raise HTTPException(status_code=422, detail="model_id or model_code is required for semantic optimization")
+    
+        model = testing_model or model_service.get_model(req.model_id)
+        if testing_model is None and model.status not in DIRECT_CALLABLE_STATUSES:
+            raise HTTPException(status_code=409, detail=f"Model is not callable in status: {model.status}")
+        req.scene = model.scene
+        req.model = model.name
+        model_code = (model.semantic_spec or {}).get("model_code") or model.template_id or req.model_code
+        req.payload = {
+            **req.payload,
+            "resolved_model_id": model.id,
+            "resolved_model_code": model_code,
+        }
+        semantic_spec = deepcopy(model.semantic_spec or {})
+        semantic_spec["build_mode"] = model.build_mode
+        if model.build_mode in {"template_based", "domain_builder"}:
+            template_code = model_service._template_code(model)
+            if template_code:
+                semantic_spec["template_code"] = template_code
+        component_spec = deepcopy(model.component_spec or semantic_spec.get("component_spec") or {})
+        generic_spec = deepcopy(model.generic_spec or semantic_spec.get("generic_spec") or {})
+        self._validate_set_references(semantic_spec, component_spec, generic_spec)
+        runtime_parameters = map_business_parameters(semantic_spec, req.parameters)
+        merged = {**self._default_parameters_from_model(model), **deepcopy(runtime_parameters), **deepcopy(req.payload)}
+        from app.services.function_dependencies import dependency_snapshots
+        merged["_function_asset_snapshots"] = dependency_snapshots(model, require_pinned=bool(model.published_at))
+        from app.services.component_dependencies import validate_manifest, component_refs
+        refs = component_refs(model)
+        if refs:
+            validate_manifest(model.component_dependencies, refs)
+            merged["_component_dependencies"] = deepcopy(model.component_dependencies)
+        else:
+            merged.pop("_component_dependencies", None)
+        if explicit_horizon is not None:
+            merged["horizon"] = explicit_horizon
+        if req.interval_minutes is not None:
+            merged["interval_minutes"] = req.interval_minutes
+        if req.objective_config:
+            merged["objective_config"] = req.objective_config
+        if req.constraint_config:
+            merged["constraint_config"] = req.constraint_config
+        time_dimension = resolve_time_dimension_config(
+            model=model,
+            semantic_spec=semantic_spec,
+            component_spec=component_spec,
+            generic_spec=generic_spec,
+            runtime_parameters=merged,
+        )
+        merged, component_spec, generic_spec, normalized_time_dimension = normalize_runtime_time_dimension(
+            semantic_spec=semantic_spec,
+            component_spec=component_spec,
+            generic_spec=generic_spec,
+            runtime_parameters=merged,
+            explicit_horizon=explicit_horizon,
+            explicitly_provided_keys=explicit_keys,
+            time_dimension=time_dimension,
+        )
+        semantic_spec.setdefault("ui_metadata", {})["time_dimension"] = normalized_time_dimension
+        if component_spec:
+            component_spec.setdefault("ui_metadata", {})["time_dimension"] = normalized_time_dimension
+            semantic_spec["component_spec"] = component_spec
+            merged["component_spec"] = component_spec
+        if generic_spec:
+            generic_spec.setdefault("ui_metadata", {})["time_dimension"] = normalized_time_dimension
+            semantic_spec["generic_spec"] = generic_spec
+        if generic_spec:
+            consistency_errors = RuntimeParameterValidator().validate_semantic_and_generic(semantic_spec, generic_spec)
+            if consistency_errors:
+                raise HTTPException(status_code=422, detail=consistency_errors)
+            merged["generic_spec"] = self._instantiate_generic_spec(generic_spec, merged)
+        if semantic_spec:
+            merged["semantic_spec"] = semantic_spec
+        errors = RuntimeParameterValidator().validate(semantic_spec, merged)
+        if errors:
+>           raise HTTPException(status_code=422, detail=errors)
+E           fastapi.exceptions.HTTPException: 422: [{'field': 'load_forecast', 'error': 'missing required parameter', 'expected': 'present', 'actual': None}, {'field': 'fuel_cost', 'error': 'missing required parameter', 'expected': 'present', 'actual': None}, {'field': 'unit_max_output', 'error': 'missing required parameter', 'expected': 'present', 'actual': None}]
+
+app/services/job_service.py:348: HTTPException
+_____ test_unpublished_trial_can_return_to_draft_and_clears_test_evidence ______
+[gw2] darwin -- Python 3.12.14 /Users/joiefu/Project/OPTIFORGE/.venv-mac/bin/python
+
+    def test_unpublished_trial_can_return_to_draft_and_clears_test_evidence() -> None:
+        model = _create_model()
+>       tested = model_service.run_model_test_case(model.id, {"parameters": model.parameters})
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_model_publish_revision_consistency.py:106: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+app/services/model_service.py:860: in run_model_test_case
+    job_service._prepare_request(SolveRequest(model_id=model_id, parameters=params, solver_config=settings), testing_model=model)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <app.services.job_service.JobService object at 0x10ad29ca0>
+req = SolveRequest(scene='经济调度', model='最小经济调度模型', model_code=None, model_id='MODEL-SKILL-59908336', horizon=None, interval_...3}, payload={'resolved_model_id': 'MODEL-SKILL-59908336', 'resolved_model_code': 'custom_optimization_model_ba7389da'})
+
+    def _prepare_request(self, req: SolveRequest, *, testing_model=None) -> None:
+        user_parameter_keys = set(req.parameters or {})
+        user_runtime_keys = set(req.runtime_parameters or {})
+        user_payload_keys = set(req.payload or {})
+        explicit_keys = user_parameter_keys | user_runtime_keys | user_payload_keys
+        if req.interval_minutes is not None:
+            explicit_keys.add("interval_minutes")
+        explicit_horizon = self._explicit_horizon(req, explicit_keys)
+        if req.solver_config:
+            from app.solvers.run_settings import validate_run_settings
+            req.solver_config = validate_run_settings(req.solver_config)
+            if req.solver_config.get("time_limit") is not None:
+                req.time_limit_seconds = float(req.solver_config["time_limit"])
+            if req.solver_config.get("mip_gap") is not None:
+                req.mip_gap = float(req.solver_config["mip_gap"])
+            if req.solver_config.get("thread_num") is not None:
+                req.thread_num = int(req.solver_config["thread_num"])
+        if req.runtime_parameters:
+            req.parameters = {**req.parameters, **req.runtime_parameters}
+        if req.model_code and not req.model_id:
+            try:
+                resolved = model_service.resolve_model(model_code=req.model_code)
+                req.model_id = resolved.id
+                req.payload = {
+                    **req.payload,
+                    "resolved_model_id": resolved.id,
+                    "resolved_model_code": req.model_code,
+                }
+                warning = model_service.model_code_resolution_warning(req.model_code, resolved)
+                if warning:
+                    req.payload["resolution_warning"] = warning
+            except HTTPException as exc:
+                if exc.status_code != 404:
+                    raise
+                if model_service.find_models_by_code(req.model_code):
+                    raise HTTPException(
+                        status_code=409,
+                        detail={
+                            "code": "MODEL_NOT_PUBLISHED",
+                            "message": "该 model_code 当前没有已发布版本；试运行仅允许显式传入 model_id 调试。",
+                            "model_code": req.model_code,
+                        },
+                    )
+                template = deepcopy(template_library.get_template(req.model_code))
+                component_spec = deepcopy(template.get("component_spec") or {})
+                generic_spec = deepcopy(template.get("generic_spec") or {})
+                runtime_parameters = {**template.get("sample_runtime_parameters", {}), **req.parameters, **req.payload}
+                self._validate_set_references(template, component_spec, generic_spec)
+                if explicit_horizon is not None:
+                    runtime_parameters["horizon"] = explicit_horizon
+                time_dimension = resolve_time_dimension_config(
+                    model=None,
+                    semantic_spec=template,
+                    component_spec=component_spec,
+                    generic_spec=generic_spec,
+                    runtime_parameters=runtime_parameters,
+                )
+                runtime_parameters, component_spec, generic_spec, normalized_time_dimension = normalize_runtime_time_dimension(
+                    semantic_spec=template,
+                    component_spec=component_spec,
+                    generic_spec=generic_spec,
+                    runtime_parameters=runtime_parameters,
+                    explicit_horizon=explicit_horizon,
+                    explicitly_provided_keys=explicit_keys,
+                    time_dimension=time_dimension,
+                )
+                template.setdefault("ui_metadata", {})["time_dimension"] = normalized_time_dimension
+                if component_spec:
+                    template["component_spec"] = component_spec
+                    runtime_parameters["component_spec"] = component_spec
+                if generic_spec:
+                    runtime_parameters["generic_spec"] = self._instantiate_generic_spec(generic_spec, runtime_parameters)
+                runtime_parameters["semantic_spec"] = template
+                errors = RuntimeParameterValidator().validate(template, runtime_parameters)
+                if errors:
+                    raise HTTPException(status_code=422, detail=errors)
+                req.scene = template.get("scenario", req.scene)
+                req.model = template.get("name", req.model)
+                req.payload = {
+                    **runtime_parameters,
+                    "resolved_model_code": req.model_code,
+                }
+                return
+        if not req.model_id:
+            if req.model_code:
+                req.payload = {**req.parameters, **req.payload, "model_code": req.model_code}
+                return
+            raise HTTPException(status_code=422, detail="model_id or model_code is required for semantic optimization")
+    
+        model = testing_model or model_service.get_model(req.model_id)
+        if testing_model is None and model.status not in DIRECT_CALLABLE_STATUSES:
+            raise HTTPException(status_code=409, detail=f"Model is not callable in status: {model.status}")
+        req.scene = model.scene
+        req.model = model.name
+        model_code = (model.semantic_spec or {}).get("model_code") or model.template_id or req.model_code
+        req.payload = {
+            **req.payload,
+            "resolved_model_id": model.id,
+            "resolved_model_code": model_code,
+        }
+        semantic_spec = deepcopy(model.semantic_spec or {})
+        semantic_spec["build_mode"] = model.build_mode
+        if model.build_mode in {"template_based", "domain_builder"}:
+            template_code = model_service._template_code(model)
+            if template_code:
+                semantic_spec["template_code"] = template_code
+        component_spec = deepcopy(model.component_spec or semantic_spec.get("component_spec") or {})
+        generic_spec = deepcopy(model.generic_spec or semantic_spec.get("generic_spec") or {})
+        self._validate_set_references(semantic_spec, component_spec, generic_spec)
+        runtime_parameters = map_business_parameters(semantic_spec, req.parameters)
+        merged = {**self._default_parameters_from_model(model), **deepcopy(runtime_parameters), **deepcopy(req.payload)}
+        from app.services.function_dependencies import dependency_snapshots
+        merged["_function_asset_snapshots"] = dependency_snapshots(model, require_pinned=bool(model.published_at))
+        from app.services.component_dependencies import validate_manifest, component_refs
+        refs = component_refs(model)
+        if refs:
+            validate_manifest(model.component_dependencies, refs)
+            merged["_component_dependencies"] = deepcopy(model.component_dependencies)
+        else:
+            merged.pop("_component_dependencies", None)
+        if explicit_horizon is not None:
+            merged["horizon"] = explicit_horizon
+        if req.interval_minutes is not None:
+            merged["interval_minutes"] = req.interval_minutes
+        if req.objective_config:
+            merged["objective_config"] = req.objective_config
+        if req.constraint_config:
+            merged["constraint_config"] = req.constraint_config
+        time_dimension = resolve_time_dimension_config(
+            model=model,
+            semantic_spec=semantic_spec,
+            component_spec=component_spec,
+            generic_spec=generic_spec,
+            runtime_parameters=merged,
+        )
+        merged, component_spec, generic_spec, normalized_time_dimension = normalize_runtime_time_dimension(
+            semantic_spec=semantic_spec,
+            component_spec=component_spec,
+            generic_spec=generic_spec,
+            runtime_parameters=merged,
+            explicit_horizon=explicit_horizon,
+            explicitly_provided_keys=explicit_keys,
+            time_dimension=time_dimension,
+        )
+        semantic_spec.setdefault("ui_metadata", {})["time_dimension"] = normalized_time_dimension
+        if component_spec:
+            component_spec.setdefault("ui_metadata", {})["time_dimension"] = normalized_time_dimension
+            semantic_spec["component_spec"] = component_spec
+            merged["component_spec"] = component_spec
+        if generic_spec:
+            generic_spec.setdefault("ui_metadata", {})["time_dimension"] = normalized_time_dimension
+            semantic_spec["generic_spec"] = generic_spec
+        if generic_spec:
+            consistency_errors = RuntimeParameterValidator().validate_semantic_and_generic(semantic_spec, generic_spec)
+            if consistency_errors:
+                raise HTTPException(status_code=422, detail=consistency_errors)
+            merged["generic_spec"] = self._instantiate_generic_spec(generic_spec, merged)
+        if semantic_spec:
+            merged["semantic_spec"] = semantic_spec
+        errors = RuntimeParameterValidator().validate(semantic_spec, merged)
+        if errors:
+>           raise HTTPException(status_code=422, detail=errors)
+E           fastapi.exceptions.HTTPException: 422: [{'field': 'load_forecast', 'error': 'missing required parameter', 'expected': 'present', 'actual': None}, {'field': 'fuel_cost', 'error': 'missing required parameter', 'expected': 'present', 'actual': None}, {'field': 'unit_max_output', 'error': 'missing required parameter', 'expected': 'present', 'actual': None}]
+
+app/services/job_service.py:348: HTTPException
+____________ test_previously_published_trial_cannot_return_to_draft ____________
+[gw2] darwin -- Python 3.12.14 /Users/joiefu/Project/OPTIFORGE/.venv-mac/bin/python
+
+    def test_previously_published_trial_cannot_return_to_draft() -> None:
+        model = _create_model()
+>       tested = model_service.run_model_test_case(model.id, {"parameters": model.parameters})
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_model_publish_revision_consistency.py:124: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+app/services/model_service.py:860: in run_model_test_case
+    job_service._prepare_request(SolveRequest(model_id=model_id, parameters=params, solver_config=settings), testing_model=model)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <app.services.job_service.JobService object at 0x10ad29ca0>
+req = SolveRequest(scene='经济调度', model='最小经济调度模型', model_code=None, model_id='MODEL-SKILL-78661FD0', horizon=None, interval_...3}, payload={'resolved_model_id': 'MODEL-SKILL-78661FD0', 'resolved_model_code': 'custom_optimization_model_62fa03f0'})
+
+    def _prepare_request(self, req: SolveRequest, *, testing_model=None) -> None:
+        user_parameter_keys = set(req.parameters or {})
+        user_runtime_keys = set(req.runtime_parameters or {})
+        user_payload_keys = set(req.payload or {})
+        explicit_keys = user_parameter_keys | user_runtime_keys | user_payload_keys
+        if req.interval_minutes is not None:
+            explicit_keys.add("interval_minutes")
+        explicit_horizon = self._explicit_horizon(req, explicit_keys)
+        if req.solver_config:
+            from app.solvers.run_settings import validate_run_settings
+            req.solver_config = validate_run_settings(req.solver_config)
+            if req.solver_config.get("time_limit") is not None:
+                req.time_limit_seconds = float(req.solver_config["time_limit"])
+            if req.solver_config.get("mip_gap") is not None:
+                req.mip_gap = float(req.solver_config["mip_gap"])
+            if req.solver_config.get("thread_num") is not None:
+                req.thread_num = int(req.solver_config["thread_num"])
+        if req.runtime_parameters:
+            req.parameters = {**req.parameters, **req.runtime_parameters}
+        if req.model_code and not req.model_id:
+            try:
+                resolved = model_service.resolve_model(model_code=req.model_code)
+                req.model_id = resolved.id
+                req.payload = {
+                    **req.payload,
+                    "resolved_model_id": resolved.id,
+                    "resolved_model_code": req.model_code,
+                }
+                warning = model_service.model_code_resolution_warning(req.model_code, resolved)
+                if warning:
+                    req.payload["resolution_warning"] = warning
+            except HTTPException as exc:
+                if exc.status_code != 404:
+                    raise
+                if model_service.find_models_by_code(req.model_code):
+                    raise HTTPException(
+                        status_code=409,
+                        detail={
+                            "code": "MODEL_NOT_PUBLISHED",
+                            "message": "该 model_code 当前没有已发布版本；试运行仅允许显式传入 model_id 调试。",
+                            "model_code": req.model_code,
+                        },
+                    )
+                template = deepcopy(template_library.get_template(req.model_code))
+                component_spec = deepcopy(template.get("component_spec") or {})
+                generic_spec = deepcopy(template.get("generic_spec") or {})
+                runtime_parameters = {**template.get("sample_runtime_parameters", {}), **req.parameters, **req.payload}
+                self._validate_set_references(template, component_spec, generic_spec)
+                if explicit_horizon is not None:
+                    runtime_parameters["horizon"] = explicit_horizon
+                time_dimension = resolve_time_dimension_config(
+                    model=None,
+                    semantic_spec=template,
+                    component_spec=component_spec,
+                    generic_spec=generic_spec,
+                    runtime_parameters=runtime_parameters,
+                )
+                runtime_parameters, component_spec, generic_spec, normalized_time_dimension = normalize_runtime_time_dimension(
+                    semantic_spec=template,
+                    component_spec=component_spec,
+                    generic_spec=generic_spec,
+                    runtime_parameters=runtime_parameters,
+                    explicit_horizon=explicit_horizon,
+                    explicitly_provided_keys=explicit_keys,
+                    time_dimension=time_dimension,
+                )
+                template.setdefault("ui_metadata", {})["time_dimension"] = normalized_time_dimension
+                if component_spec:
+                    template["component_spec"] = component_spec
+                    runtime_parameters["component_spec"] = component_spec
+                if generic_spec:
+                    runtime_parameters["generic_spec"] = self._instantiate_generic_spec(generic_spec, runtime_parameters)
+                runtime_parameters["semantic_spec"] = template
+                errors = RuntimeParameterValidator().validate(template, runtime_parameters)
+                if errors:
+                    raise HTTPException(status_code=422, detail=errors)
+                req.scene = template.get("scenario", req.scene)
+                req.model = template.get("name", req.model)
+                req.payload = {
+                    **runtime_parameters,
+                    "resolved_model_code": req.model_code,
+                }
+                return
+        if not req.model_id:
+            if req.model_code:
+                req.payload = {**req.parameters, **req.payload, "model_code": req.model_code}
+                return
+            raise HTTPException(status_code=422, detail="model_id or model_code is required for semantic optimization")
+    
+        model = testing_model or model_service.get_model(req.model_id)
+        if testing_model is None and model.status not in DIRECT_CALLABLE_STATUSES:
+            raise HTTPException(status_code=409, detail=f"Model is not callable in status: {model.status}")
+        req.scene = model.scene
+        req.model = model.name
+        model_code = (model.semantic_spec or {}).get("model_code") or model.template_id or req.model_code
+        req.payload = {
+            **req.payload,
+            "resolved_model_id": model.id,
+            "resolved_model_code": model_code,
+        }
+        semantic_spec = deepcopy(model.semantic_spec or {})
+        semantic_spec["build_mode"] = model.build_mode
+        if model.build_mode in {"template_based", "domain_builder"}:
+            template_code = model_service._template_code(model)
+            if template_code:
+                semantic_spec["template_code"] = template_code
+        component_spec = deepcopy(model.component_spec or semantic_spec.get("component_spec") or {})
+        generic_spec = deepcopy(model.generic_spec or semantic_spec.get("generic_spec") or {})
+        self._validate_set_references(semantic_spec, component_spec, generic_spec)
+        runtime_parameters = map_business_parameters(semantic_spec, req.parameters)
+        merged = {**self._default_parameters_from_model(model), **deepcopy(runtime_parameters), **deepcopy(req.payload)}
+        from app.services.function_dependencies import dependency_snapshots
+        merged["_function_asset_snapshots"] = dependency_snapshots(model, require_pinned=bool(model.published_at))
+        from app.services.component_dependencies import validate_manifest, component_refs
+        refs = component_refs(model)
+        if refs:
+            validate_manifest(model.component_dependencies, refs)
+            merged["_component_dependencies"] = deepcopy(model.component_dependencies)
+        else:
+            merged.pop("_component_dependencies", None)
+        if explicit_horizon is not None:
+            merged["horizon"] = explicit_horizon
+        if req.interval_minutes is not None:
+            merged["interval_minutes"] = req.interval_minutes
+        if req.objective_config:
+            merged["objective_config"] = req.objective_config
+        if req.constraint_config:
+            merged["constraint_config"] = req.constraint_config
+        time_dimension = resolve_time_dimension_config(
+            model=model,
+            semantic_spec=semantic_spec,
+            component_spec=component_spec,
+            generic_spec=generic_spec,
+            runtime_parameters=merged,
+        )
+        merged, component_spec, generic_spec, normalized_time_dimension = normalize_runtime_time_dimension(
+            semantic_spec=semantic_spec,
+            component_spec=component_spec,
+            generic_spec=generic_spec,
+            runtime_parameters=merged,
+            explicit_horizon=explicit_horizon,
+            explicitly_provided_keys=explicit_keys,
+            time_dimension=time_dimension,
+        )
+        semantic_spec.setdefault("ui_metadata", {})["time_dimension"] = normalized_time_dimension
+        if component_spec:
+            component_spec.setdefault("ui_metadata", {})["time_dimension"] = normalized_time_dimension
+            semantic_spec["component_spec"] = component_spec
+            merged["component_spec"] = component_spec
+        if generic_spec:
+            generic_spec.setdefault("ui_metadata", {})["time_dimension"] = normalized_time_dimension
+            semantic_spec["generic_spec"] = generic_spec
+        if generic_spec:
+            consistency_errors = RuntimeParameterValidator().validate_semantic_and_generic(semantic_spec, generic_spec)
+            if consistency_errors:
+                raise HTTPException(status_code=422, detail=consistency_errors)
+            merged["generic_spec"] = self._instantiate_generic_spec(generic_spec, merged)
+        if semantic_spec:
+            merged["semantic_spec"] = semantic_spec
+        errors = RuntimeParameterValidator().validate(semantic_spec, merged)
+        if errors:
+>           raise HTTPException(status_code=422, detail=errors)
+E           fastapi.exceptions.HTTPException: 422: [{'field': 'load_forecast', 'error': 'missing required parameter', 'expected': 'present', 'actual': None}, {'field': 'fuel_cost', 'error': 'missing required parameter', 'expected': 'present', 'actual': None}, {'field': 'unit_max_output', 'error': 'missing required parameter', 'expected': 'present', 'actual': None}]
+
+app/services/job_service.py:348: HTTPException
+_ test_offline_is_restricted_to_online_models_and_published_history_is_immutable _
+[gw2] darwin -- Python 3.12.14 /Users/joiefu/Project/OPTIFORGE/.venv-mac/bin/python
+
+    def test_offline_is_restricted_to_online_models_and_published_history_is_immutable() -> None:
+        developing = _create_model()
+        with pytest.raises(HTTPException) as invalid_transition:
+            model_service.offline_model(developing.id)
+        assert invalid_transition.value.detail["code"] == "INVALID_MODEL_STATUS_TRANSITION"
+    
+>       tested = model_service.run_model_test_case(developing.id, {"parameters": developing.parameters})
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_model_publish_revision_consistency.py:141: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+app/services/model_service.py:860: in run_model_test_case
+    job_service._prepare_request(SolveRequest(model_id=model_id, parameters=params, solver_config=settings), testing_model=model)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <app.services.job_service.JobService object at 0x10ad29ca0>
+req = SolveRequest(scene='经济调度', model='最小经济调度模型', model_code=None, model_id='MODEL-SKILL-C6636A89', horizon=None, interval_...3}, payload={'resolved_model_id': 'MODEL-SKILL-C6636A89', 'resolved_model_code': 'custom_optimization_model_a546fc6e'})
+
+    def _prepare_request(self, req: SolveRequest, *, testing_model=None) -> None:
+        user_parameter_keys = set(req.parameters or {})
+        user_runtime_keys = set(req.runtime_parameters or {})
+        user_payload_keys = set(req.payload or {})
+        explicit_keys = user_parameter_keys | user_runtime_keys | user_payload_keys
+        if req.interval_minutes is not None:
+            explicit_keys.add("interval_minutes")
+        explicit_horizon = self._explicit_horizon(req, explicit_keys)
+        if req.solver_config:
+            from app.solvers.run_settings import validate_run_settings
+            req.solver_config = validate_run_settings(req.solver_config)
+            if req.solver_config.get("time_limit") is not None:
+                req.time_limit_seconds = float(req.solver_config["time_limit"])
+            if req.solver_config.get("mip_gap") is not None:
+                req.mip_gap = float(req.solver_config["mip_gap"])
+            if req.solver_config.get("thread_num") is not None:
+                req.thread_num = int(req.solver_config["thread_num"])
+        if req.runtime_parameters:
+            req.parameters = {**req.parameters, **req.runtime_parameters}
+        if req.model_code and not req.model_id:
+            try:
+                resolved = model_service.resolve_model(model_code=req.model_code)
+                req.model_id = resolved.id
+                req.payload = {
+                    **req.payload,
+                    "resolved_model_id": resolved.id,
+                    "resolved_model_code": req.model_code,
+                }
+                warning = model_service.model_code_resolution_warning(req.model_code, resolved)
+                if warning:
+                    req.payload["resolution_warning"] = warning
+            except HTTPException as exc:
+                if exc.status_code != 404:
+                    raise
+                if model_service.find_models_by_code(req.model_code):
+                    raise HTTPException(
+                        status_code=409,
+                        detail={
+                            "code": "MODEL_NOT_PUBLISHED",
+                            "message": "该 model_code 当前没有已发布版本；试运行仅允许显式传入 model_id 调试。",
+                            "model_code": req.model_code,
+                        },
+                    )
+                template = deepcopy(template_library.get_template(req.model_code))
+                component_spec = deepcopy(template.get("component_spec") or {})
+                generic_spec = deepcopy(template.get("generic_spec") or {})
+                runtime_parameters = {**template.get("sample_runtime_parameters", {}), **req.parameters, **req.payload}
+                self._validate_set_references(template, component_spec, generic_spec)
+                if explicit_horizon is not None:
+                    runtime_parameters["horizon"] = explicit_horizon
+                time_dimension = resolve_time_dimension_config(
+                    model=None,
+                    semantic_spec=template,
+                    component_spec=component_spec,
+                    generic_spec=generic_spec,
+                    runtime_parameters=runtime_parameters,
+                )
+                runtime_parameters, component_spec, generic_spec, normalized_time_dimension = normalize_runtime_time_dimension(
+                    semantic_spec=template,
+                    component_spec=component_spec,
+                    generic_spec=generic_spec,
+                    runtime_parameters=runtime_parameters,
+                    explicit_horizon=explicit_horizon,
+                    explicitly_provided_keys=explicit_keys,
+                    time_dimension=time_dimension,
+                )
+                template.setdefault("ui_metadata", {})["time_dimension"] = normalized_time_dimension
+                if component_spec:
+                    template["component_spec"] = component_spec
+                    runtime_parameters["component_spec"] = component_spec
+                if generic_spec:
+                    runtime_parameters["generic_spec"] = self._instantiate_generic_spec(generic_spec, runtime_parameters)
+                runtime_parameters["semantic_spec"] = template
+                errors = RuntimeParameterValidator().validate(template, runtime_parameters)
+                if errors:
+                    raise HTTPException(status_code=422, detail=errors)
+                req.scene = template.get("scenario", req.scene)
+                req.model = template.get("name", req.model)
+                req.payload = {
+                    **runtime_parameters,
+                    "resolved_model_code": req.model_code,
+                }
+                return
+        if not req.model_id:
+            if req.model_code:
+                req.payload = {**req.parameters, **req.payload, "model_code": req.model_code}
+                return
+            raise HTTPException(status_code=422, detail="model_id or model_code is required for semantic optimization")
+    
+        model = testing_model or model_service.get_model(req.model_id)
+        if testing_model is None and model.status not in DIRECT_CALLABLE_STATUSES:
+            raise HTTPException(status_code=409, detail=f"Model is not callable in status: {model.status}")
+        req.scene = model.scene
+        req.model = model.name
+        model_code = (model.semantic_spec or {}).get("model_code") or model.template_id or req.model_code
+        req.payload = {
+            **req.payload,
+            "resolved_model_id": model.id,
+            "resolved_model_code": model_code,
+        }
+        semantic_spec = deepcopy(model.semantic_spec or {})
+        semantic_spec["build_mode"] = model.build_mode
+        if model.build_mode in {"template_based", "domain_builder"}:
+            template_code = model_service._template_code(model)
+            if template_code:
+                semantic_spec["template_code"] = template_code
+        component_spec = deepcopy(model.component_spec or semantic_spec.get("component_spec") or {})
+        generic_spec = deepcopy(model.generic_spec or semantic_spec.get("generic_spec") or {})
+        self._validate_set_references(semantic_spec, component_spec, generic_spec)
+        runtime_parameters = map_business_parameters(semantic_spec, req.parameters)
+        merged = {**self._default_parameters_from_model(model), **deepcopy(runtime_parameters), **deepcopy(req.payload)}
+        from app.services.function_dependencies import dependency_snapshots
+        merged["_function_asset_snapshots"] = dependency_snapshots(model, require_pinned=bool(model.published_at))
+        from app.services.component_dependencies import validate_manifest, component_refs
+        refs = component_refs(model)
+        if refs:
+            validate_manifest(model.component_dependencies, refs)
+            merged["_component_dependencies"] = deepcopy(model.component_dependencies)
+        else:
+            merged.pop("_component_dependencies", None)
+        if explicit_horizon is not None:
+            merged["horizon"] = explicit_horizon
+        if req.interval_minutes is not None:
+            merged["interval_minutes"] = req.interval_minutes
+        if req.objective_config:
+            merged["objective_config"] = req.objective_config
+        if req.constraint_config:
+            merged["constraint_config"] = req.constraint_config
+        time_dimension = resolve_time_dimension_config(
+            model=model,
+            semantic_spec=semantic_spec,
+            component_spec=component_spec,
+            generic_spec=generic_spec,
+            runtime_parameters=merged,
+        )
+        merged, component_spec, generic_spec, normalized_time_dimension = normalize_runtime_time_dimension(
+            semantic_spec=semantic_spec,
+            component_spec=component_spec,
+            generic_spec=generic_spec,
+            runtime_parameters=merged,
+            explicit_horizon=explicit_horizon,
+            explicitly_provided_keys=explicit_keys,
+            time_dimension=time_dimension,
+        )
+        semantic_spec.setdefault("ui_metadata", {})["time_dimension"] = normalized_time_dimension
+        if component_spec:
+            component_spec.setdefault("ui_metadata", {})["time_dimension"] = normalized_time_dimension
+            semantic_spec["component_spec"] = component_spec
+            merged["component_spec"] = component_spec
+        if generic_spec:
+            generic_spec.setdefault("ui_metadata", {})["time_dimension"] = normalized_time_dimension
+            semantic_spec["generic_spec"] = generic_spec
+        if generic_spec:
+            consistency_errors = RuntimeParameterValidator().validate_semantic_and_generic(semantic_spec, generic_spec)
+            if consistency_errors:
+                raise HTTPException(status_code=422, detail=consistency_errors)
+            merged["generic_spec"] = self._instantiate_generic_spec(generic_spec, merged)
+        if semantic_spec:
+            merged["semantic_spec"] = semantic_spec
+        errors = RuntimeParameterValidator().validate(semantic_spec, merged)
+        if errors:
+>           raise HTTPException(status_code=422, detail=errors)
+E           fastapi.exceptions.HTTPException: 422: [{'field': 'load_forecast', 'error': 'missing required parameter', 'expected': 'present', 'actual': None}, {'field': 'fuel_cost', 'error': 'missing required parameter', 'expected': 'present', 'actual': None}, {'field': 'unit_max_output', 'error': 'missing required parameter', 'expected': 'present', 'actual': None}]
+
+app/services/job_service.py:348: HTTPException
+_ test_publish_persists_formula_published_revision_without_losing_applied_baseline _
+[gw2] darwin -- Python 3.12.14 /Users/joiefu/Project/OPTIFORGE/.venv-mac/bin/python
+
+    def test_publish_persists_formula_published_revision_without_losing_applied_baseline() -> None:
+        payload = minimal_dispatch_payload()
+        payload["model_draft"] = {
+            "formulas": [{
+                "formula_id": "versioned-objective",
+                "name": "versioned-objective",
+                "kind": "objective",
+                "dsl_formula": "dispatch",
+                "version_state": {
+                    "current_revision": 2,
+                    "last_saved_revision": 2,
+                    "last_compiled_revision": 2,
+                    "applied_revision": 2,
+                    "expression_hash": "fnv1a-current",
+                    "compiled_expression_hash": "fnv1a-current",
+                    "compiler_version": "2.0.0",
+                },
+                "applied_version": {"revision": 2, "expression_hash": "fnv1a-current", "expression": "dispatch"},
+            }]
+        }
+        model = model_service.create_model(ModelPackage.model_validate(payload))
+>       tested = model_service.run_model_test_case(model.id, {"parameters": model.parameters})
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_model_publish_revision_consistency.py:193: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+app/services/model_service.py:860: in run_model_test_case
+    job_service._prepare_request(SolveRequest(model_id=model_id, parameters=params, solver_config=settings), testing_model=model)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <app.services.job_service.JobService object at 0x10ad29ca0>
+req = SolveRequest(scene='经济调度', model='最小经济调度模型', model_code=None, model_id='MODEL-SKILL-D6C99295', horizon=None, interval_...3}, payload={'resolved_model_id': 'MODEL-SKILL-D6C99295', 'resolved_model_code': 'custom_optimization_model_89736c97'})
+
+    def _prepare_request(self, req: SolveRequest, *, testing_model=None) -> None:
+        user_parameter_keys = set(req.parameters or {})
+        user_runtime_keys = set(req.runtime_parameters or {})
+        user_payload_keys = set(req.payload or {})
+        explicit_keys = user_parameter_keys | user_runtime_keys | user_payload_keys
+        if req.interval_minutes is not None:
+            explicit_keys.add("interval_minutes")
+        explicit_horizon = self._explicit_horizon(req, explicit_keys)
+        if req.solver_config:
+            from app.solvers.run_settings import validate_run_settings
+            req.solver_config = validate_run_settings(req.solver_config)
+            if req.solver_config.get("time_limit") is not None:
+                req.time_limit_seconds = float(req.solver_config["time_limit"])
+            if req.solver_config.get("mip_gap") is not None:
+                req.mip_gap = float(req.solver_config["mip_gap"])
+            if req.solver_config.get("thread_num") is not None:
+                req.thread_num = int(req.solver_config["thread_num"])
+        if req.runtime_parameters:
+            req.parameters = {**req.parameters, **req.runtime_parameters}
+        if req.model_code and not req.model_id:
+            try:
+                resolved = model_service.resolve_model(model_code=req.model_code)
+                req.model_id = resolved.id
+                req.payload = {
+                    **req.payload,
+                    "resolved_model_id": resolved.id,
+                    "resolved_model_code": req.model_code,
+                }
+                warning = model_service.model_code_resolution_warning(req.model_code, resolved)
+                if warning:
+                    req.payload["resolution_warning"] = warning
+            except HTTPException as exc:
+                if exc.status_code != 404:
+                    raise
+                if model_service.find_models_by_code(req.model_code):
+                    raise HTTPException(
+                        status_code=409,
+                        detail={
+                            "code": "MODEL_NOT_PUBLISHED",
+                            "message": "该 model_code 当前没有已发布版本；试运行仅允许显式传入 model_id 调试。",
+                            "model_code": req.model_code,
+                        },
+                    )
+                template = deepcopy(template_library.get_template(req.model_code))
+                component_spec = deepcopy(template.get("component_spec") or {})
+                generic_spec = deepcopy(template.get("generic_spec") or {})
+                runtime_parameters = {**template.get("sample_runtime_parameters", {}), **req.parameters, **req.payload}
+                self._validate_set_references(template, component_spec, generic_spec)
+                if explicit_horizon is not None:
+                    runtime_parameters["horizon"] = explicit_horizon
+                time_dimension = resolve_time_dimension_config(
+                    model=None,
+                    semantic_spec=template,
+                    component_spec=component_spec,
+                    generic_spec=generic_spec,
+                    runtime_parameters=runtime_parameters,
+                )
+                runtime_parameters, component_spec, generic_spec, normalized_time_dimension = normalize_runtime_time_dimension(
+                    semantic_spec=template,
+                    component_spec=component_spec,
+                    generic_spec=generic_spec,
+                    runtime_parameters=runtime_parameters,
+                    explicit_horizon=explicit_horizon,
+                    explicitly_provided_keys=explicit_keys,
+                    time_dimension=time_dimension,
+                )
+                template.setdefault("ui_metadata", {})["time_dimension"] = normalized_time_dimension
+                if component_spec:
+                    template["component_spec"] = component_spec
+                    runtime_parameters["component_spec"] = component_spec
+                if generic_spec:
+                    runtime_parameters["generic_spec"] = self._instantiate_generic_spec(generic_spec, runtime_parameters)
+                runtime_parameters["semantic_spec"] = template
+                errors = RuntimeParameterValidator().validate(template, runtime_parameters)
+                if errors:
+                    raise HTTPException(status_code=422, detail=errors)
+                req.scene = template.get("scenario", req.scene)
+                req.model = template.get("name", req.model)
+                req.payload = {
+                    **runtime_parameters,
+                    "resolved_model_code": req.model_code,
+                }
+                return
+        if not req.model_id:
+            if req.model_code:
+                req.payload = {**req.parameters, **req.payload, "model_code": req.model_code}
+                return
+            raise HTTPException(status_code=422, detail="model_id or model_code is required for semantic optimization")
+    
+        model = testing_model or model_service.get_model(req.model_id)
+        if testing_model is None and model.status not in DIRECT_CALLABLE_STATUSES:
+            raise HTTPException(status_code=409, detail=f"Model is not callable in status: {model.status}")
+        req.scene = model.scene
+        req.model = model.name
+        model_code = (model.semantic_spec or {}).get("model_code") or model.template_id or req.model_code
+        req.payload = {
+            **req.payload,
+            "resolved_model_id": model.id,
+            "resolved_model_code": model_code,
+        }
+        semantic_spec = deepcopy(model.semantic_spec or {})
+        semantic_spec["build_mode"] = model.build_mode
+        if model.build_mode in {"template_based", "domain_builder"}:
+            template_code = model_service._template_code(model)
+            if template_code:
+                semantic_spec["template_code"] = template_code
+        component_spec = deepcopy(model.component_spec or semantic_spec.get("component_spec") or {})
+        generic_spec = deepcopy(model.generic_spec or semantic_spec.get("generic_spec") or {})
+        self._validate_set_references(semantic_spec, component_spec, generic_spec)
+        runtime_parameters = map_business_parameters(semantic_spec, req.parameters)
+        merged = {**self._default_parameters_from_model(model), **deepcopy(runtime_parameters), **deepcopy(req.payload)}
+        from app.services.function_dependencies import dependency_snapshots
+        merged["_function_asset_snapshots"] = dependency_snapshots(model, require_pinned=bool(model.published_at))
+        from app.services.component_dependencies import validate_manifest, component_refs
+        refs = component_refs(model)
+        if refs:
+            validate_manifest(model.component_dependencies, refs)
+            merged["_component_dependencies"] = deepcopy(model.component_dependencies)
+        else:
+            merged.pop("_component_dependencies", None)
+        if explicit_horizon is not None:
+            merged["horizon"] = explicit_horizon
+        if req.interval_minutes is not None:
+            merged["interval_minutes"] = req.interval_minutes
+        if req.objective_config:
+            merged["objective_config"] = req.objective_config
+        if req.constraint_config:
+            merged["constraint_config"] = req.constraint_config
+        time_dimension = resolve_time_dimension_config(
+            model=model,
+            semantic_spec=semantic_spec,
+            component_spec=component_spec,
+            generic_spec=generic_spec,
+            runtime_parameters=merged,
+        )
+        merged, component_spec, generic_spec, normalized_time_dimension = normalize_runtime_time_dimension(
+            semantic_spec=semantic_spec,
+            component_spec=component_spec,
+            generic_spec=generic_spec,
+            runtime_parameters=merged,
+            explicit_horizon=explicit_horizon,
+            explicitly_provided_keys=explicit_keys,
+            time_dimension=time_dimension,
+        )
+        semantic_spec.setdefault("ui_metadata", {})["time_dimension"] = normalized_time_dimension
+        if component_spec:
+            component_spec.setdefault("ui_metadata", {})["time_dimension"] = normalized_time_dimension
+            semantic_spec["component_spec"] = component_spec
+            merged["component_spec"] = component_spec
+        if generic_spec:
+            generic_spec.setdefault("ui_metadata", {})["time_dimension"] = normalized_time_dimension
+            semantic_spec["generic_spec"] = generic_spec
+        if generic_spec:
+            consistency_errors = RuntimeParameterValidator().validate_semantic_and_generic(semantic_spec, generic_spec)
+            if consistency_errors:
+                raise HTTPException(status_code=422, detail=consistency_errors)
+            merged["generic_spec"] = self._instantiate_generic_spec(generic_spec, merged)
+        if semantic_spec:
+            merged["semantic_spec"] = semantic_spec
+        errors = RuntimeParameterValidator().validate(semantic_spec, merged)
+        if errors:
+>           raise HTTPException(status_code=422, detail=errors)
+E           fastapi.exceptions.HTTPException: 422: [{'field': 'load_forecast', 'error': 'missing required parameter', 'expected': 'present', 'actual': None}, {'field': 'fuel_cost', 'error': 'missing required parameter', 'expected': 'present', 'actual': None}, {'field': 'unit_max_output', 'error': 'missing required parameter', 'expected': 'present', 'actual': None}]
+
+app/services/job_service.py:348: HTTPException
+=============================== warnings summary ===============================
+.venv-mac/lib/python3.12/site-packages/fastapi/testclient.py:1
+.venv-mac/lib/python3.12/site-packages/fastapi/testclient.py:1
+.venv-mac/lib/python3.12/site-packages/fastapi/testclient.py:1
+.venv-mac/lib/python3.12/site-packages/fastapi/testclient.py:1
+.venv-mac/lib/python3.12/site-packages/fastapi/testclient.py:1
+  /Users/joiefu/Project/OPTIFORGE/.venv-mac/lib/python3.12/site-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+    from starlette.testclient import TestClient as TestClient  # noqa
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/test_model_publish_revision_consistency.py::test_publish_requires_current_trial_revision_and_trial_is_immutable
+FAILED tests/test_model_publish_revision_consistency.py::test_publish_rejects_test_record_from_different_asset
+FAILED tests/test_model_publish_revision_consistency.py::test_published_validation_preserves_status_and_offline_version_can_be_republished
+FAILED tests/test_model_publish_revision_consistency.py::test_trial_model_can_be_tested_and_promoted_to_formal_publication
+FAILED tests/test_model_publish_revision_consistency.py::test_unpublished_trial_can_return_to_draft_and_clears_test_evidence
+FAILED tests/test_model_publish_revision_consistency.py::test_previously_published_trial_cannot_return_to_draft
+FAILED tests/test_model_publish_revision_consistency.py::test_offline_is_restricted_to_online_models_and_published_history_is_immutable
+FAILED tests/test_model_publish_revision_consistency.py::test_publish_persists_formula_published_revision_without_losing_applied_baseline
+8 failed, 701 passed, 5 skipped, 5 warnings in 122.95s (0:02:02)

@@ -1,0 +1,8 @@
+
+Running 1 test using 1 worker
+
+(node:42518) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  1 src/tests/e2e/cloud_review_iteration.spec.ts:9:1 › iteration: selective component update survives lost response, refresh and newer revision (13.0s)
+
+  1 passed (13.9s)

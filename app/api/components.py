@@ -41,12 +41,16 @@ def get_component_catalog() -> list[dict]:
     rows = {item["component_id"]: item for item in list_component_catalog()}
     for item in custom:
         rows[item["component_id"]] = item
+    for identifier, revocation in (STORE.system_config.get("component_revocations") or {}).items():
+        if identifier in rows:
+            rows[identifier] = {**rows[identifier], "status": "revoked", "revocation": deepcopy(revocation)}
     return sorted(rows.values(), key=lambda item: item["component_id"])
 
 
 @router.post("/catalog")
 def create_component(payload: dict) -> dict:
     component = _normalize_component_payload(payload, creating=True, lifecycle_status=COMPONENT_DRAFT_STATUS)
+    component.update(component_family_id=component["component_id"], revision=1)
     _assert_component_identity_available(component["component_id"])
     with STORE.lock:
         STORE.custom_components[component["component_id"]] = component
@@ -106,7 +110,11 @@ def get_component(component_id: str) -> dict:
                 STORE.save_runtime()
         return {**normalize_formula_component(normalized_asset), "referenced_by": _component_references(component_id)}
     try:
-        return {**component_definition(component_id), "referenced_by": _component_references(component_id)}
+        definition = {**component_definition(component_id), "referenced_by": _component_references(component_id)}
+        revocation = (STORE.system_config.get("component_revocations") or {}).get(component_id)
+        if revocation:
+            definition.update(status="revoked", revocation=deepcopy(revocation))
+        return definition
     except RuntimeError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
@@ -117,7 +125,7 @@ def update_component(component_id: str, payload: dict) -> dict:
     if component_lifecycle_status(existing_detail) != COMPONENT_DRAFT_STATUS:
         raise HTTPException(status_code=409, detail="已发布或已停用组件不可直接修改，请复制为新的草稿版本。")
     component = _normalize_component_payload(
-        {**existing_detail, **payload, "component_id": component_id},
+        {**existing_detail, **payload, "component_id": component_id, "revision": existing_detail.get("revision", 1), "component_family_id": existing_detail.get("component_family_id", component_id)},
         creating=False,
         lifecycle_status=COMPONENT_DRAFT_STATUS,
     )
@@ -170,6 +178,9 @@ def copy_component_version(component_id: str, payload: dict | None = None) -> di
     component = _normalize_component_payload(copied, creating=True, lifecycle_status=COMPONENT_DRAFT_STATUS)
     _assert_component_identity_available(new_component_id)
     with STORE.lock:
+        family = source.get("component_family_id") or component_id
+        revision = max([int(row.get("revision") or 1) for row in STORE.custom_components.values() if (row.get("component_family_id") or row.get("component_id")) == family] or [1]) + 1
+        component.update(component_family_id=family, revision=revision, source_component_id=component_id)
         STORE.custom_components[new_component_id] = component
         STORE.save_runtime()
     return component
@@ -212,7 +223,10 @@ def publish_component(component_id: str) -> dict:
             }
         ]
         raise HTTPException(status_code=422, detail={"message": "组件发布校验失败", "errors": errors})
+    from app.services.component_dependencies import assert_not_revoked, component_hash
+    assert_not_revoked(component_id)
     normalized["status"] = COMPONENT_PUBLISHED_STATUS
+    normalized["content_hash"] = component_hash(normalized)
     normalized["published_at"] = now_text()
     normalized["updated_at"] = now_text()
     with STORE.lock:
@@ -358,3 +372,30 @@ def get_component_version(component_id: str) -> str:
         return str(component_definition(component_id).get("version", "1.0.0"))
     except RuntimeError:
         return "unknown"
+
+
+@router.get("/{component_id}/revocation-impact")
+def component_revocation_impact(component_id: str) -> dict:
+    get_component(component_id)
+    from app.services.component_dependencies import impact
+    return impact(component_id)
+
+
+@router.post("/{component_id}/revoke")
+def revoke_component(component_id: str, payload: dict) -> dict:
+    from app.services.component_dependencies import impact
+    reason = str(payload.get("reason") or "").strip()
+    if len(reason) < 5:
+        raise HTTPException(status_code=422, detail={"code": "REVOCATION_REASON_REQUIRED", "message": "安全撤销必须填写至少 5 个字符的明确原因。"})
+    with STORE.lock:
+        get_component(component_id)
+        affected = impact(component_id)
+        if payload.get("expected_impact_hash") != affected["impact_hash"]:
+            raise HTTPException(status_code=409, detail={"code": "REVOCATION_IMPACT_CHANGED", "message": "请先查看最新受影响范围并明确确认。", "impact": affected})
+        revocation = {**affected, "reason": reason, "revoked_at": now_text()}
+        STORE.system_config.setdefault("component_revocations", {})[component_id] = revocation
+        if component_id in STORE.custom_components:
+            STORE.custom_components[component_id]["status"] = "revoked"
+            STORE.custom_components[component_id]["revocation"] = deepcopy(revocation)
+        STORE.save_runtime()
+    return {"status": "revoked", **revocation}

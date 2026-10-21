@@ -193,7 +193,7 @@ export function Step5ReviewPublish({
       <Card title="发布诊断" className="section-gap">
         <Descriptions size="small" column={4} items={[
           { key: 'inferred', label: '诊断问题类型', children: String(diagnosis.inferred_problem_type || draft.advanced.component_spec?.model_problem_type || '-') },
-          { key: 'recommended', label: '推荐求解器', children: String(diagnosis.recommended_solver || 'HiGHS') },
+          { key: 'recommended', label: '推荐求解器', children: ['QP', 'MIQP'].includes(inferredProblemType) ? '原生求解未支持' : String(diagnosis.recommended_solver || 'HiGHS') },
           { key: 'functions', label: '函数资产数量', children: functionAssetsUsed.length },
           { key: 'linearization', label: '线性化策略', children: linearizationStrategy.length ? linearizationStrategy.map(item => <Tag key={String(item)}>{String(item)}</Tag>) : '-' },
         ]} />

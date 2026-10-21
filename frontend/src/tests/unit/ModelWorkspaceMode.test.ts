@@ -70,6 +70,19 @@ describe('asset workspace transformations', () => {
     expect(draft.advanced.ui_metadata).not.toHaveProperty('supersedes_model_id');
   });
 
+  test.each(['version', 'clone'] as const)('%s clears completed update controls without changing source audit', mode => {
+    const context = { source_model_id: 'MODEL-OLD', idempotency_key: 'OLD' };
+    const original = asset({ status: 'published', ui_metadata: { function_update: context, component_update: context },
+      model_draft: { ...asset().model_draft, advanced: { ui_metadata: { function_update: context, component_update: context, description: '保留业务说明' } } } });
+    const draft = assetToWorkspaceDraft(original, mode);
+    expect(draft.advanced.ui_metadata).not.toHaveProperty('component_update');
+    expect(draft.advanced.ui_metadata).not.toHaveProperty('function_update');
+    expect(draft.advanced.ui_metadata?.description).toBe('保留业务说明');
+    expect(original.ui_metadata).toEqual(expect.objectContaining({ component_update: context }));
+    const editing = assetToWorkspaceDraft(original, 'edit');
+    expect(editing.advanced.ui_metadata?.component_update).toEqual(context);
+  });
+
   test('version preserves model code and records its superseded source', () => {
     const draft = assetToWorkspaceDraft(asset({ status: 'published' }), 'version');
     expect(draft.basic_info.model_code).toBe('model_a');

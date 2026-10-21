@@ -51,11 +51,13 @@ LOGGER = logging.getLogger(__name__)
 
 
 class ModelService:
-    def create_model(self, model: ModelPackage, *, inherited_dependencies: dict | None = None) -> ModelView:
+    def create_model(self, model: ModelPackage, *, inherited_dependencies: dict | None = None, inherited_components: dict | None = None) -> ModelView:
+        model = model_version_service.with_update_contexts(model, model)
         model = model.model_copy(update={
             "ui_metadata": {key: value for key, value in (model.ui_metadata or {}).items() if key not in {"managed_default_template", "managed_template_version"}},
             "function_dependencies": deepcopy(inherited_dependencies or {}),
-            "test_task_id": None, "last_test_parameters": {},
+            "component_dependencies": deepcopy(inherited_components or {}),
+            "test_task_id": None, "last_test_parameters": {}, "last_test_solver_config": {},
             "status": "developing",
             "is_active_version": False,
             "published_by": None,
@@ -98,7 +100,7 @@ class ModelService:
             from app.services.function_dependencies import dependency_ids, dependency_snapshots
             dependency_snapshots(source, require_pinned=bool(source.published_at))
             inherited = {key: value for key, value in source.function_dependencies.items() if key in dependency_ids(package)}
-            return self.create_model(package, inherited_dependencies=inherited)
+            return self.create_model(package, inherited_dependencies=inherited, inherited_components=deepcopy(source.component_dependencies))
 
     def get_model(self, model_id: str) -> ModelView:
         with STORE.lock:
@@ -116,6 +118,7 @@ class ModelService:
 
     def _update_model_locked(self, model_id: str, model: ModelPackage) -> ModelView:
         existing = self.get_model(model_id)
+        model = model_version_service.with_update_contexts(model, existing)
         # Version is the identity prepared when this asset was created, rather
         # than a default in an older editor's incomplete PUT payload.
         draft = deepcopy(model.model_draft or {})
@@ -126,7 +129,7 @@ class ModelService:
         if existing.status in IMMUTABLE_MODEL_STATUSES or existing.published_at:
             raise HTTPException(status_code=409, detail="Online and historical model versions are immutable; create a new version before editing")
         from app.services.function_dependencies import dependency_ids
-        model = model.model_copy(update={"function_dependencies": {key: deepcopy(value) for key, value in existing.function_dependencies.items() if key in dependency_ids(model)}, "last_test_parameters": deepcopy(existing.last_test_parameters), "test_task_id": existing.test_task_id})
+        model = model.model_copy(update={"function_dependencies": {key: deepcopy(value) for key, value in existing.function_dependencies.items() if key in dependency_ids(model)}, "component_dependencies": deepcopy(existing.component_dependencies), "last_test_parameters": deepcopy(existing.last_test_parameters), "last_test_solver_config": deepcopy(existing.last_test_solver_config), "test_task_id": existing.test_task_id})
         model = self._normalize_component_model(model)
         model = self._normalize_generic_formula_model(model)
         model = self._apply_generalized_top_level_fields(model)
@@ -149,7 +152,7 @@ class ModelService:
     def _publish_model_locked(self, model_id: str) -> ModelView:
         model = self.get_model(model_id)
         from app.services.function_dependencies import assert_dependencies_current
-        context = (model.ui_metadata or {}).get("function_update") or {}
+        context = (model.ui_metadata or {}).get("function_update") or (model.ui_metadata or {}).get("component_update") or {}
         if context and not model.published_at:
             active = [row for row in STORE.models.values() if row.model_family_id == model.model_family_id and row.is_active_version]
             if active and active[0].id != context.get("source_model_id"):
@@ -207,6 +210,8 @@ class ModelService:
             except HTTPException:
                 raise
         assert_dependencies_current(model)
+        from app.services.component_dependencies import validate_manifest, component_refs
+        validate_manifest(model.component_dependencies, component_refs(model))
         if model.tested_model_id and model.tested_model_id != model.id:
             raise HTTPException(status_code=409, detail={"code": "MODEL_TEST_MISMATCH", "message": "测试资产与发布资产不一致，请重新测试当前模型。"})
         if not model.tested_model_id or not model.tested_content_hash:
@@ -410,7 +415,7 @@ class ModelService:
             for key, value in (copied.ui_metadata or {}).items()
             if key not in {
                 "supersedes_model_id", "model_family_id", "publish_info", "version_info",
-                "managed_default_template", "managed_template_version", "function_update",
+                "managed_default_template", "managed_template_version", "function_update", "component_update",
             }
         }
         copied.template_id = new_code
@@ -427,7 +432,7 @@ class ModelService:
         draft_advanced_component = ((copied.model_draft or {}).get("advanced") or {}).get("component_spec")
         if isinstance(draft_advanced_component, dict):
             self._replace_model_code(draft_advanced_component, new_code)
-        return self.create_model(copied, inherited_dependencies=deepcopy(model.function_dependencies))
+        return self.create_model(copied, inherited_dependencies=deepcopy(model.function_dependencies), inherited_components=deepcopy(model.component_dependencies))
 
     def find_model_by_code(self, model_code: str) -> ModelView:
         return self.resolve_model(model_code=model_code)
@@ -678,9 +683,11 @@ class ModelService:
                 "id", "status", "model_family_id", "supersedes_model_id", "is_active_version",
                 "scenario_id",
                 "published_by", "published_at", "tested_at", "created_at", "updated_at",
-                "validation_warnings", "dry_run_result", "content_hash", "tested_content_hash", "tested_model_id", "test_task_id", "last_test_parameters",
+                "validation_warnings", "dry_run_result", "content_hash", "tested_content_hash", "tested_model_id", "test_task_id", "last_test_parameters", "last_test_solver_config",
             },
         )
+        if not payload.get("component_dependencies"):
+            payload.pop("component_dependencies", None)
         metadata = deepcopy(payload.get("ui_metadata") or {})
         for key in ("publish_info", "test_result", "version_info"):
             metadata.pop(key, None)
@@ -841,19 +848,24 @@ class ModelService:
     def run_model_test_case(self, model_id: str, test_case: dict[str, Any]) -> ModelView:
         model = self.get_model(model_id)
         source_hash = self._content_hash(model)
-        from app.services.function_dependencies import capture_dependencies
-        model = model.model_copy(update={"function_dependencies": capture_dependencies(model)})
-        params = test_case.get("parameters") if "parameters" in test_case else test_case
+        from app.services.component_dependencies import prepare_model_dependencies
+        model = prepare_model_dependencies(model)
+        from app.solvers.run_settings import validate_run_settings
+        settings = validate_run_settings(test_case.get("solver_config") or {})
+        params = test_case.get("parameters") if "parameters" in test_case or "solver_config" in test_case else test_case
         if not isinstance(params, dict) or not params:
             params = self._default_test_parameters(model)
         if not isinstance(params, dict) or not params:
             raise HTTPException(status_code=422, detail={"message": "test_case.parameters is required", "errors": [{"field": "test_case.parameters", "error": "missing"}]})
-        dry_run_result = self._dry_run_model(model, test_parameters=params, run_solver=True)
+        from app.schemas.solve import SolveRequest
+        from app.services.job_service import job_service
+        job_service._prepare_request(SolveRequest(model_id=model_id, parameters=params, solver_config=settings), testing_model=model)
+        dry_run_result = self._dry_run_model(model, test_parameters=params, run_solver=True, solver_config=settings)
         if dry_run_result["structure_check"]["status"] != "passed" or dry_run_result["solver_check"]["status"] != "passed":
             raise HTTPException(status_code=422, detail={"message": "模型测试用例执行失败", **dry_run_result})
         content_hash = self._content_hash(ModelPackage.model_validate(model.model_dump()))
         next_status = model.status if model.status == "published" else "trial"
-        updated = model.model_copy(update={"status": next_status, "content_hash": content_hash, "tested_content_hash": content_hash, "tested_model_id": model.id, "updated_at": now_text(), "tested_at": now_text(), "last_test_parameters": deepcopy(params), "dry_run_result": dry_run_result, "validation_warnings": dry_run_result["solver_check"].get("warnings", [])})
+        updated = model.model_copy(update={"status": next_status, "content_hash": content_hash, "tested_content_hash": content_hash, "tested_model_id": model.id, "updated_at": now_text(), "tested_at": now_text(), "last_test_parameters": deepcopy(params), "last_test_solver_config": deepcopy(settings), "test_task_id": None, "dry_run_result": dry_run_result, "validation_warnings": dry_run_result["solver_check"].get("warnings", [])})
         with STORE.lock:
             if self._content_hash(self.get_model(model_id)) != source_hash:
                 raise HTTPException(status_code=409, detail={"code": "MODEL_TEST_OUTDATED", "message": "Model changed during test; test the current content."})
@@ -867,7 +879,8 @@ class ModelService:
         from app.services.function_dependencies import capture_dependencies
         from app.services.job_service import job_service
         model = self.get_model(model_id)
-        model = model.model_copy(update={"function_dependencies": capture_dependencies(model)})
+        from app.services.component_dependencies import prepare_model_dependencies
+        model = prepare_model_dependencies(model)
         parameters = test_case.get("parameters") or self._default_test_parameters(model)
         from app.solvers.run_settings import validate_run_settings
         settings = validate_run_settings(test_case.get("solver_config") or {})
@@ -891,7 +904,7 @@ class ModelService:
         model = self.get_model(task.request.model_id)
         if self._content_hash(model) != context["source_hash"]:
             raise RuntimeError("MODEL_TEST_OUTDATED: 模型在测试期间发生修改，请测试当前版本。")
-        model = model.model_copy(update={"function_dependencies": context["dependencies"],
+        model = model.model_copy(update={"function_dependencies": context["dependencies"], "component_dependencies": context["component_dependencies"],
             "solver": task.result.get("solver_name") or task.request.solver,
             "problem_type": task.result.get("problem_type") or model.problem_type,
             "model_problem_type": task.result.get("problem_type") or model.model_problem_type})
@@ -901,13 +914,14 @@ class ModelService:
             "status": "published" if model.status == "published" else "trial",
             "content_hash": content_hash, "tested_content_hash": content_hash,
             "tested_model_id": model.id, "tested_at": now_text(), "updated_at": now_text(),
-            "test_task_id": task.id, "last_test_parameters": deepcopy(task.request.parameters),
+            "test_task_id": task.id, "last_test_parameters": deepcopy(task.request.parameters), "last_test_solver_config": deepcopy(task.request.solver_config),
             "solver": task.result.get("solver_name") or task.request.solver,
             "problem_type": task.result.get("problem_type") or model.problem_type,
             "model_problem_type": task.result.get("problem_type") or model.model_problem_type,
             "dry_run_result": {"structure_check": {"status": "passed", "errors": []}, "solver_check": {
                 "status": "passed", "warnings": [], "objective_value": task.objective_value,
                 "problem_type": task.result.get("problem_type"), "solver_status": task.result.get("termination_condition"),
+                "evidence": deepcopy(task.result.get("solution_evidence")), "execution_environment": deepcopy(task.trace.get("execution_environment")),
                 "solver": task.result.get("solver_name") or task.request.solver,
             }},
         })
@@ -1000,8 +1014,16 @@ class ModelService:
                     errors.append(objective_mode_error)
                 if not model.mathematical_expansion:
                     errors.append({"field": "mathematical_expansion", "error": "数学展开未生成", "suggestion": "请从 Model Draft 重新生成数学展开"})
-                errors.extend(self._validate_component_library_references(component_spec))
-                errors.extend(self._validate_component_dependency_integrity(component_spec))
+                if model.component_dependencies:
+                    from app.services.component_dependencies import validate_manifest, component_refs
+                    assets = validate_manifest(model.component_dependencies, component_refs(model))
+                    catalog = {key: entry["definition"] for key, entry in assets.items()}
+                    for definition in catalog.values():
+                        result = validate_component_definition(definition, dependency_catalog=catalog)
+                        errors.extend(result["errors"])
+                else:
+                    errors.extend(self._validate_component_library_references(component_spec))
+                    errors.extend(self._validate_component_dependency_integrity(component_spec))
             errors.extend(self._validate_generic_formula_compile_status(generic_spec))
             if not is_component_based and not is_template_backed and not generic_spec:
                 errors.append({"field": "generic_spec", "error": "generic_spec is required before publish"})
@@ -1355,7 +1377,7 @@ class ModelService:
             "dry_run_status": (dry_run_result or {}).get("structure_check", {}).get("status"),
         }
 
-    def _dry_run_model(self, model: ModelPackage | ModelView, *, test_parameters: dict[str, Any] | None = None, run_solver: bool = False) -> dict[str, Any]:
+    def _dry_run_model(self, model: ModelPackage | ModelView, *, test_parameters: dict[str, Any] | None = None, run_solver: bool = False, solver_config: dict[str, Any] | None = None) -> dict[str, Any]:
         result: dict[str, Any] = {
             "structure_check": {"status": "passed", "errors": []},
             "solver_check": {"status": "skipped", "warnings": []},
@@ -1389,6 +1411,8 @@ class ModelService:
                 from app.services.function_dependencies import dependency_snapshots
                 if model.function_dependencies:
                     dry_parameters["_function_asset_snapshots"] = dependency_snapshots(model)
+                if model.component_dependencies:
+                    dry_parameters["_component_dependencies"] = deepcopy(model.component_dependencies)
                 self._fill_component_dry_parameters(dry_parameters, component_spec)
                 self._normalize_component_dry_parameters(dry_parameters, str(component_spec.get("model_code") or semantic.get("model_code") or ""))
                 from app.services.time_dimension_service import normalize_runtime_time_dimension, resolve_time_dimension_config
@@ -1424,10 +1448,28 @@ class ModelService:
                 pyomo_model, _ = GenericLinearBuilder().build(dry_spec)
             if run_solver:
                 problem_type = solver_router.infer_problem_type_from_model(pyomo_model)
-                solver_result = solver_router.solve(pyomo_model, problem_type=problem_type, requested_solver=None)
+                from app.solvers.run_settings import apply_initial_values
+                options = solver_config or {}
+                from app.schemas.solve import SolveRequest
+                observed = SolveRequest(parameters=test_parameters or {}, payload=dry_parameters, solver_config=options,
+                    time_limit_seconds=options.get("time_limit", 300), mip_gap=options.get("mip_gap", .001), thread_num=options.get("thread_num"))
+                apply_initial_values(pyomo_model, options)
+                solver_result = solver_router.solve(pyomo_model, problem_type=problem_type, requested_solver=None,
+                    time_limit_seconds=observed.time_limit_seconds, mip_gap=observed.mip_gap, threads=observed.thread_num,
+                    nlp_tolerance=options.get("nlp_tolerance", options.get("tol")), max_iter=options.get("max_iter"), acceptable_tol=options.get("acceptable_tol"))
                 if solver_result.status not in {"optimal", "local_optimal", "feasible"}:
                     raise RuntimeError(solver_result.message or f"solver returned {solver_result.status}")
                 result["solver_check"] = {"status": "passed", "warnings": [], "objective_value": solver_result.objective_value, "solver_status": solver_result.status, "problem_type": problem_type}
+                from app.schemas.solve import SolveRequest
+                from app.services.execution_environment import execution_environment
+                from app.services.solution_evidence import solution_evidence
+                observed.solver = solver_result.solver_name or "HiGHS"
+                evidence_semantic = {**deepcopy(model.semantic_spec or {}), "component_spec": deepcopy(component_spec)}
+                settings = {"backend": observed.solver, "problem_type": problem_type, "mip_gap": observed.mip_gap,
+                    "time_limit_seconds": observed.time_limit_seconds, "thread_num": observed.thread_num, "presolve": observed.presolve,
+                    "nlp_tolerance": options.get("nlp_tolerance", options.get("tol")), "max_iter": options.get("max_iter"), "acceptable_tol": options.get("acceptable_tol"), "initial_values": deepcopy(options.get("initial_values") or {})}
+                result["solver_check"]["evidence"] = solution_evidence(pyomo_model, solver_result, evidence_semantic, dry_parameters, settings)
+                result["solver_check"]["execution_environment"] = execution_environment(observed, observed.solver)
         except Exception as exc:
             function_component_index = self._first_function_mapping_component_index(component_spec) if is_component_based else None
             field = (
@@ -1882,7 +1924,9 @@ class ModelService:
         with STORE.lock:
             for model_id, model in list(STORE.models.items()):
                 if self._is_managed_default(model) and model_id not in existing_model_ids and not model.function_dependencies:
-                    model = model.model_copy(update={"function_dependencies": capture_dependencies(model.model_copy(update={"published_at": None}))})
+                    from app.services.component_dependencies import prepare_model_dependencies
+                    captured = prepare_model_dependencies(model.model_copy(update={"published_at": None}))
+                    model = model.model_copy(update={"function_dependencies": captured.function_dependencies, "component_dependencies": captured.component_dependencies})
                     STORE.models[model_id] = model
                 if self._is_managed_default(model) and STORE.template_status.get(f"model:{model_id}") == "offline":
                     STORE.models[model_id] = model.model_copy(update={"status": "offline", "is_active_version": False})

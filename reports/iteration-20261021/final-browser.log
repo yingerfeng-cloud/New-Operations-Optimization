@@ -1,0 +1,49 @@
+
+Running 2 tests using 1 worker
+
+(node:49208) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  1 src/tests/e2e/cloud_review_iteration.spec.ts:9:1 › iteration: selective component update survives lost response, refresh and newer revision (58.5s)
+  ✘  2 src/tests/e2e/cloud_review_iteration.spec.ts:85:1 › iteration: function update shows physical changes with declared units (29.8s)
+
+
+  1) src/tests/e2e/cloud_review_iteration.spec.ts:85:1 › iteration: function update shows physical changes with declared units 
+
+    Error: expect(locator).toBeVisible() failed
+
+    Locator: getByTestId('update-business-comparison').getByRole('row').filter({ hasText: 'level[0]' }).getByRole('cell', { name: 'MW', exact: true })
+    Expected: visible
+    Timeout: 15000ms
+    Error: element(s) not found
+
+    Call log:
+      - Expect "toBeVisible" with timeout 15000ms
+      - waiting for getByTestId('update-business-comparison').getByRole('row').filter({ hasText: 'level[0]' }).getByRole('cell', { name: 'MW', exact: true })
+
+
+      102 |   const comparison = page.getByTestId('update-business-comparison');
+      103 |   const physical = comparison.getByRole('row').filter({ hasText: 'level[0]' });
+    > 104 |   await expect(physical.getByRole('cell', { name: 'MW', exact: true })).toBeVisible();
+          |                                                                         ^
+      105 |   await expect(physical.getByRole('cell', { name: '20', exact: true })).toBeVisible();
+      106 |   await expect(physical.getByRole('cell', { name: '10', exact: true })).toHaveCount(2);
+      107 |   await expect(page.getByRole('button', { name: '应用更新', exact: true })).toBeEnabled();
+        at /Users/joiefu/Project/OPTIFORGE/frontend/src/tests/e2e/cloud_review_iteration.spec.ts:104:73
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/cloud-review/cloud_review_iteration-ite-1e304-changes-with-declared-units/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/cloud-review/cloud_review_iteration-ite-1e304-changes-with-declared-units/error-context.md
+
+    attachment #3: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/cloud-review/cloud_review_iteration-ite-1e304-changes-with-declared-units/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/cloud-review/cloud_review_iteration-ite-1e304-changes-with-declared-units/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  1 failed
+    src/tests/e2e/cloud_review_iteration.spec.ts:85:1 › iteration: function update shows physical changes with declared units 
+  1 passed (1.5m)

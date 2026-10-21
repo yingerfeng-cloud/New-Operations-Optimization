@@ -33,6 +33,15 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
       - run: npm ci
         working-directory: frontend
+      - name: Detailed dependency audit on target Node
+        run: node scripts/audit_frontend_dependencies.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: dependency-audit-${{ github.run_id }}
+          path: reports/dependency-audit-ci/
+          if-no-files-found: error
+          retention-days: 14
       - run: npm run typecheck
         working-directory: frontend
       - run: npm run build
@@ -61,24 +70,8 @@ jobs:
         working-directory: frontend
       - run: npm run build
         working-directory: frontend
-      - name: Contract regression
-        run: >-
-          python -m pytest -q
-          tests/test_model_publish_revision_consistency.py
-          tests/test_model_creation_validation.py
-          tests/test_component_builder_e2e.py
-          tests/test_model_time_dimension_contract.py
-          tests/test_runtime_horizon_policy.py
-          tests/test_model_dimension_normalization.py
-          tests/test_model_set_reference_validation.py
-          tests/test_hydro_p0_closure.py
-          tests/test_hydro_pwl2d_performance.py
-          tests/test_cascade_hydro_dispatch_v1.py
-          tests/test_component_based_hydro_model.py
-          tests/test_component_advanced_formula_a3.py
-          tests/test_component_formula_contract_final.py
-          tests/test_react_frontend_hosting.py
-          tests/test_screenshot_fixture_contract.py
+      - name: Complete default contract regression (includes iteration contracts)
+        run: python -m pytest -q
       - name: Audit fixed component formulas
         run: python scripts/audit_component_formulas.py --output reports/component_formula_audit.json
       - name: Upload component formula audit
@@ -117,6 +110,57 @@ jobs:
           path: |
             frontend/playwright-report/
             frontend/test-results/frontend-mock/
+
+  iteration-live:
+    name: Iteration API Solver Browser
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13.5'
+      - run: pip install -r requirements.txt
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.17.0'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+        working-directory: frontend
+      - run: npx playwright install --with-deps chromium
+        working-directory: frontend
+      - name: Start isolated real stack
+        env:
+          OPTIFORGE_RUNTIME_STORE: ${{ runner.temp }}/iteration/runtime.json
+          OPTIFORGE_AGENT_SKILLS_DIR: ${{ runner.temp }}/iteration/skills
+          OPTIFORGE_STACK_LOG_DIR: ${{ runner.temp }}/iteration/logs
+          OPTIFORGE_SYNC_JOBS: 'false'
+        run: |
+          mkdir -p "${{ runner.temp }}/iteration"
+          cp -R agent_skills "${{ runner.temp }}/iteration/skills"
+          bash start.sh --api-port 18033 --frontend-port 5181 --no-browser
+      - name: Real API and HiGHS browser acceptance
+        env:
+          OPTIFORGE_REVIEW_URL: http://127.0.0.1:5181
+          PW_CHANNEL: chromium
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx playwright test -c playwright.cloud-review.config.ts cloud_review_iteration.spec.ts | tee ../reports/iteration-live-browser.log
+        working-directory: frontend
+      - name: Stop isolated stack
+        if: always()
+        run: bash stop.sh --api-port 18033 --frontend-port 5181
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: iteration-live-${{ github.run_id }}
+          path: |
+            reports/iteration-live-browser.log
+            ${{ runner.temp }}/iteration/logs/
+          if-no-files-found: ignore
+          retention-days: 14
 
   delivery-package:
     name: Delivery Package Self Check

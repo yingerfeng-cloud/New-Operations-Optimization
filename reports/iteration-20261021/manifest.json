@@ -1,0 +1,100 @@
+{
+  "baseline": "46cc8a2bd8d2dda6b996f840eebf27ff7162ed91",
+  "attachment_sha256": "a0d0f9eec10674fb7694aa1e88f041561ebe3f81227357fe17e3f3009d5676b3",
+  "branch": "codex/iteration-dependency-closure",
+  "first_batch_commit": "ec4264ae6cdb9cd509a45d4f86e3a3763029b914",
+  "app_source_hash": "b3a5dba6b18b1afa8d6fe373e5b88823da6529255296296afef5f125b9c2b6a3",
+  "all_seven_live_tasks_match_current_app_sources": true,
+  "protected_user_files_and_config_unchanged": true,
+  "lock_sha256": "027e4be6fa4971c94b4a3898c5fa733dacc11bb6c78c2666871bf8e67894cbcd",
+  "dataset": "synthetic; not customer data",
+  "execution_scope": {
+    "backend_default": {
+      "passed": 709,
+      "skipped": 5,
+      "log": "final-backend-verified.log"
+    },
+    "latest_targeted_after_coordinate_display_fix": {
+      "passed": 51,
+      "log": "final-acceptance-contracts.log"
+    },
+    "frontend_node24": {
+      "passed": 485,
+      "files": 88
+    },
+    "frontend_node22_17_0": {
+      "passed": 485,
+      "files": 88,
+      "platform": "Linux arm64 container; not cloud CI"
+    },
+    "final_real_browser": {
+      "passed": 2,
+      "log": "final-browser-verified.log"
+    },
+    "audit_node22_23_2": 0,
+    "audit_node22_17_0": 0
+  },
+  "not_executed_this_iteration": [
+    "new remote CI run (no push)",
+    "production deployment",
+    "customer business data",
+    "real paid LLM",
+    "full application Docker delivery rebuild",
+    "original environment restoration",
+    "capacity and long-term performance",
+    "Windows product runtime certification"
+  ],
+  "artifacts_sha256": {
+    "audit-after-metadata.json": "517523a37b233fe8cf1b150855995a807e8e34610aa1511bbb4679a7c58eb816",
+    "audit-after.json": "ecc822d80d0fc42a16388ff47395d4b9cc5287a42662c3f57a69e4c5e6af088b",
+    "audit-before-metadata.json": "e56f119549dd8ff3edbf4598cb2ff272d7ee2274f6680cf63c989cd0a3f5f2b4",
+    "audit-before.json": "811c953ae12ac9c6cd8ddcfcd0dd71bf3efffea42a5868cd2927b95362b462af",
+    "audit-ci-node22-metadata.json": "eb43084fed4a313431fb9c7a3b7cdc03caf9028bb39ff66cc4783e3b49416b47",
+    "audit-ci-node22.json": "ecc822d80d0fc42a16388ff47395d4b9cc5287a42662c3f57a69e4c5e6af088b",
+    "audit-local-node24.log": "327c0d141352872f06a83d6133e0a6178249c261e00339bcfacfe42027d9153c",
+    "audit-package-changes.json": "1b6b8a066f80070ea47cbb276738b61f8058e0bb5a27738abb78fdc1003e0728",
+    "batch1-backend-final.log": "a836629aec9113cccad97a0d67c0ba07e9e62e452e060cb6dc49a29f9392b0d1",
+    "batch1-backend-full.log": "f05f09924744b28d6653833bfba45c6d0f9a1a0cc5f8df851dfd6530ec2cc47b",
+    "batch1-browser.log": "766e335dc9abc48cbf4c7b160ad20ec0b63267857f52996c63bbe41b2ccded28",
+    "batch1-build.log": "8dcb755ddbf9bd8066d9100cf4df87369da6b9005a67e6269ff3c13f9ca66cd7",
+    "batch1-contracts.log": "350cea225bfc46a5c050c8cc95476baa219c06ce987a4a5c44fcdbed590e300f",
+    "batch1-final-targeted.log": "12f08fa58f4e60a71eb1ef2afe1e35a8bf690615af72603a70bfb834fb4c91bc",
+    "batch1-focused.log": "01dd7f940998564d24ba5000a1310fabdb0bb47066b3a86fc97ef9dad046f81b",
+    "batch1-frontend-targeted.log": "d709c56e79423fcf116ec75aff34f21b4aaef84783deb1dd7af477fc77df479a",
+    "batch1-initial.log": "ce7f87995947c9b18c08bb5b2a28a22553532bd60e66fa40190d9da9a3d61403",
+    "batch1-test-matrix.log": "ac6b2228ce08e4a0278220f2dc2032d3d2b65c1ba79bcf8d096023417a493fcb",
+    "batch1-typecheck.log": "fb79a6d4617d7c017f566420ac217a33d8902927f1aeca361869d5dca9422ee5",
+    "batch2-backend-full.log": "9026ec1606d552b81a678f81f9a46405bd4cea634f13778292a851fdd4fca26e",
+    "batch2-browser.log": "9e72829f925241679f3ca96b45d72c67a56488f8f825d45e493f7432c512bdf6",
+    "batch2-build.log": "410357195ab31c0c98e157fc6fdf6c610f271ad6d2a5ec53ef4ad3ab3fb97e21",
+    "batch2-expanded.log": "76f380ea65094d766a2de0ce9e192e031174af87cd3698400d3bc8c7d6f6ce75",
+    "batch2-focused.log": "0c5f63c4f2113854a7ecb045ef560587c30aadef2a83829b8cf0f56a92037682",
+    "batch2-frontend-full.log": "a535a6268fe98c3c79fd440a57889db946664066536209af3fb49f7caf5fb3bc",
+    "batch2-frontend-targeted.log": "36b287c37f6a563b0c979c639072e78758cca56c90808dc537fb0f259992b6be",
+    "batch2-integration-initial.log": "4eeed8ce89a07d9cb4030baacb89d0f88f495b6df71def2e802694515ae52f2c",
+    "batch2-npm-ci.log": "8f58bf5f0347f858f2399f668e40441a7ace3731d447081124e736b5a58ab197",
+    "batch2-test-matrix.log": "5f589a3055f3b1b0bcf6324b3f0eed684c23dc9a750472844f31deaf2fb55a32",
+    "batch2-typecheck-final.log": "fb79a6d4617d7c017f566420ac217a33d8902927f1aeca361869d5dca9422ee5",
+    "batch2-typecheck.log": "618dc20f077bfc8e22496ab913fb98818d24baf26dffff3a55746e8da500c87d",
+    "dependency-impact-evidence.json": "8bb6f370b68d58246e913b79a1bcc53d983fddb1550b3a3960996205143c7bce",
+    "final-acceptance-contracts.log": "dc7ff7d23b18428ec363ed2b0a7a732db7f6033e77b6872341a74de02043b02e",
+    "final-backend-full.log": "cfea4b09fc9ef36a6d14df5f9627d65adf090ff452c12d934df39d5b04b60911",
+    "final-backend-verified.log": "666908e6313479cc239eb55666487474ea9bd783c1740f4e641fb8dfca840e61",
+    "final-browser-verified.log": "484c86b7f8e590d8a528c82d7aed7b5555b4ba4a33016e618e806a5194b09068",
+    "final-browser.log": "7749a9b12354a2f313f8e0f0a4d6e3ae83822f43555302eac2c6194917269859",
+    "final-frontend-targeted.log": "0a810a88cb4de32395fea14d26d13ce313d663dc7f43613ed00c88a75c9e37a4",
+    "final-key-contracts.log": "fbc12f4b4f39c32d8f15e0210d092aeeed23d96d23b917eb88f1a3f31163d41a",
+    "final-source-delta.json": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+    "final-test-matrix.log": "5f589a3055f3b1b0bcf6324b3f0eed684c23dc9a750472844f31deaf2fb55a32",
+    "final-typecheck.log": "fb79a6d4617d7c017f566420ac217a33d8902927f1aeca361869d5dca9422ee5",
+    "live-acceptance.json": "11f0957683de6036ec629b2b2e03a4ac35c8b1206ee4850459bd00818e5c3ba3",
+    "node22-build.log": "a3e62ac4239d0f5b27abbb7e2b7283d8862b4d128f118df475849ba248f8eadf",
+    "node22-ci.log": "76502a9528efa3db03ffa6aa5ba95c47b26048c5c762973dda535040f69ccea7",
+    "node22-final-build.log": "38850408e7c83e1af1df932d1252e00af599c75ae5d6ede41981899643ebca51",
+    "node22-final-targeted.log": "c694ced5868f536420ce789dc0060aa12b3dd7e9c2bf8b004f20d4c925e9610a",
+    "node22-receipt.json": "7ccff6066c8f4b55fe93ca3ad640374cc38c28f83c62ddef3b61cccc6ce796ce",
+    "node22-unit.log": "0b0f147c9621df505fe9eb324197c7bafca3dcdf109ec3ced1c44779fcbaa1ed",
+    "patch-install.log": "6e6947a846c78dc17eda218e906b2cfee5bb5270babb2cfa4b49aa75dc55d448",
+    "source-hashes.json": "c58fd86835cf29e5f3c5c3e53da8444f389bd44939ecb05883b3374699194635"
+  }
+}

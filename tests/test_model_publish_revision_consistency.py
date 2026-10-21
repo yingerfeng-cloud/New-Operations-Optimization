@@ -11,14 +11,26 @@ from app.storage.memory_store import STORE
 from tests.test_model_skill_invocation import minimal_dispatch_payload
 
 
-def _create_model(*, version: str = "v1.0"):
+def _lifecycle_payload():
+    # Required business inputs are supplied explicitly. Lifecycle tests must not
+    # rely on the former synchronous-only injection of example values.
     payload = minimal_dispatch_payload()
+    payload["parameters"] = {
+        "load_forecast": {"T1": 100, "T2": 120, "T3": 90},
+        "fuel_cost": {"U1": 10, "U2": 20},
+        "unit_max_output": {"U1": 80, "U2": 100},
+    }
+    return payload
+
+
+def _create_model(*, version: str = "v1.0"):
+    payload = _lifecycle_payload()
     payload["version"] = version
     return model_service.create_model(ModelPackage.model_validate(payload))
 
 
 def test_new_model_status_is_system_managed_and_always_starts_developing() -> None:
-    payload = minimal_dispatch_payload()
+    payload = _lifecycle_payload()
     payload.update({
         "status": "published",
         "is_active_version": True,
@@ -49,6 +61,8 @@ def test_publish_requires_current_trial_revision_and_trial_is_immutable() -> Non
     assert tested.status == "trial"
     assert tested.tested_model_id == model.id
     assert tested.tested_content_hash == tested.content_hash
+    # U1 supplies 80 in each period; U2 supplies 20+40+10.
+    assert tested.dry_run_result["solver_check"]["objective_value"] == pytest.approx(3800)
 
     changed_payload = ModelPackage.model_validate(tested.model_dump())
     changed_payload.name = f"{tested.name}-changed"
@@ -170,7 +184,7 @@ def test_versions_use_family_maximum_and_reject_duplicate_family_version() -> No
 
 
 def test_publish_persists_formula_published_revision_without_losing_applied_baseline() -> None:
-    payload = minimal_dispatch_payload()
+    payload = _lifecycle_payload()
     payload["model_draft"] = {
         "formulas": [{
             "formula_id": "versioned-objective",

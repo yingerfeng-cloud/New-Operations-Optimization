@@ -1,0 +1,9 @@
+{
+  "observed_at": "2026-10-21T03:31:59.957Z",
+  "node": "v24.19.0",
+  "npm": "11.17.0",
+  "command": "npm audit --json --package-lock-only",
+  "exit_status": 0,
+  "lock_sha256": "027e4be6fa4971c94b4a3898c5fa733dacc11bb6c78c2666871bf8e67894cbcd",
+  "stderr": ""
+}

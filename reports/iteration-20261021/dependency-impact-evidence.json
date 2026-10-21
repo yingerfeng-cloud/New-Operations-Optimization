@@ -1,0 +1,19 @@
+{
+  "scope": "static source/build observation, not exploitation testing",
+  "lock_sha256": "027e4be6fa4971c94b4a3898c5fa733dacc11bb6c78c2666871bf8e67894cbcd",
+  "built_files_checked": 58,
+  "literal_hits": {
+    "follow-redirects": [],
+    "__open-in-editor": [],
+    "sensitiveHeaders": []
+  },
+  "axios_version": "1.20.0",
+  "axios_browser_entry": {
+    "./dist/node/axios.cjs": "./dist/browser/axios.cjs",
+    "./lib/adapters/http.js": "./lib/helpers/null.js",
+    "./lib/platform/node/index.js": "./lib/platform/browser/index.js",
+    "./lib/platform/node/classes/Buffer.js": "./lib/helpers/null.js",
+    "./lib/platform/node/classes/FormData.js": "./lib/helpers/null.js"
+  },
+  "direct_vite_dev_dependency": "^7.3.7"
+}

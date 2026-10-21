@@ -1,4 +1,4 @@
-import { Alert, Button, Card, Descriptions, Empty, Progress, Space, Table, Tabs, Tag, Timeline } from 'antd';
+import { Alert, Button, Card, Descriptions, Empty, Progress, Space, Table, Tabs, Tag, Timeline, Typography } from 'antd';
 import { useEffect, useMemo, useState } from 'react';
 import { LazyEChart } from '../../components/LazyEChart';
 import { JsonViewer } from '../../components/JsonViewer';
@@ -272,7 +272,7 @@ export function SolverProgressPanel({ task }: { task?: SolveTask }) {
         <div><span>{isLpIteration ? '最终目标值' : '当前最好解'}</span><strong>{numericText(latest.incumbent_objective)}</strong></div>
         <div><span>{isLpIteration ? '累计迭代次数' : '理论最优界'}</span><strong>{numericText(isLpIteration ? latest.iteration_count : latest.best_bound)}</strong></div>
         <div><span>{isLpIteration ? '求解算法' : '当前最优间隙'}</span><strong>{isLpIteration ? (latest.algorithm || '-') : gapText(latest.gap)}</strong></div>
-        <div><span>{isLpIteration ? '实际问题类型' : '搜索节点'}</span><strong>{isLpIteration ? 'LP / QP' : numericText(latest.node_count)}</strong></div>
+        <div><span>{isLpIteration ? '实际问题类型' : '搜索节点'}</span><strong>{isLpIteration ? 'LP' : numericText(latest.node_count)}</strong></div>
         <div><span>求解时间</span><strong>{elapsedText(latest.elapsed_seconds)}</strong></div>
       </div>
       {chartPoints.length >= 2 ? (
@@ -295,6 +295,25 @@ export function SolverProgressPanel({ task }: { task?: SolveTask }) {
   );
 }
 
+export function ExecutionEnvironmentPanel({ task }: { task?: SolveTask }) {
+  const environment = task?.trace?.execution_environment as Record<string, unknown> | undefined;
+  const identity = environment?.identity as Record<string, unknown> | undefined;
+  const solver = identity?.solver as Record<string, unknown> | undefined;
+  const boundary = (task?.trace?.replay_boundary || task?.trace?.retry_boundary) as Record<string, unknown> | undefined;
+  return <Card size="small" title="实际执行环境与重放边界" className="section-gap" data-testid="execution-environment">
+    {boundary && <Alert type="info" title={String(boundary.message)} />}
+    {environment ? <><Descriptions size="small" column={2} items={[
+      { key: 'commit', label: '平台提交', children: text(environment.platform_commit) },
+      { key: 'source', label: '实际代码 hash', children: text(identity?.platform_source_hash) },
+      { key: 'image', label: '镜像 digest', children: identity?.image_digest === 'unknown' ? '未知（当前进程无法可信取得）' : text(identity?.image_digest) },
+      { key: 'solver', label: '实际求解器版本', children: `${text(solver?.name)} · ${text(solver?.version)}` },
+      { key: 'python', label: 'Python / 系统', children: `${text(identity?.python)} · ${text(identity?.system)} · ${text(identity?.machine)}` },
+      { key: 'dirty', label: '产品源码有未提交修改', children: text(environment.working_tree_modified) },
+    ]} /><Typography.Paragraph>环境清单记录实际编译器、内置实现、适配器、依赖及数值设置。当前内核重算保留历史输入和原结果；原环境未恢复时不能称为严格历史复现。</Typography.Paragraph><details><summary>查看完整执行清单</summary><JsonViewer value={environment} /></details></>
+      : <Typography.Text>该任务尚未记录可核实的执行环境，不能据此宣称原环境历史复现。</Typography.Text>}
+  </Card>;
+}
+
 export function TaskInputPanel({ task }: { task?: SolveTask }) {
   const trace = task?.trace || {};
   const parameters = (task?.runtime_parameters || task?.parameters || trace.runtime_parameters || {}) as Record<string, unknown>;
@@ -306,6 +325,7 @@ export function TaskInputPanel({ task }: { task?: SolveTask }) {
       { key: 'horizon', label: 'horizon', children: text(horizon) }, { key: 'interval', label: '时间粒度', children: text(task?.interval_minutes || trace.interval_minutes) },
       { key: 'source', label: '数据来源', children: text(task?.data_source || trace.data_source || '手工录入') }, { key: 'submitted', label: '提交时间', children: task?.created_at || '-' },
     ]} />
+    <ExecutionEnvironmentPanel task={task} />
     <Card size="small" title="业务参数" className="section-gap"><Table size="small" pagination={false} rowKey="__row_key" dataSource={rowsFromObject(parameters)} columns={[{ title: '参数', dataIndex: 'key' }, { title: '规模', dataIndex: 'value', render: value => Array.isArray(value) ? `${value.length} 项` : typeof value === 'object' && value ? `${Object.keys(value).length} 项` : '-' }, { title: '值 / 预览', dataIndex: 'value', render: value => <JsonViewer value={value} /> }]} /></Card>
     {Array.isArray(task?.attempt_history) && task.attempt_history.length > 0 && <Card size="small" title="历史尝试（冻结请求与结果）" className="section-gap"><JsonViewer value={task.attempt_history} /></Card>}
     {Boolean(task?.advanced_config || trace.advanced_config) && <Card size="small" title="高级配置" className="section-gap"><JsonViewer value={task?.advanced_config || trace.advanced_config} /></Card>}</>

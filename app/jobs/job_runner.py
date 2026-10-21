@@ -64,6 +64,8 @@ class JobRunner:
                 self._update(task, status="VALIDATING", progress=15)
                 validate_started = time.monotonic()
                 self._log(task, "INFO", "参数校验开始")
+                from app.services.execution_environment import execution_environment
+                task.trace["execution_environment"] = execution_environment(task.request)
                 runtime = dict(task.request.payload or {})
                 semantic_spec = runtime.get("semantic_spec") or {}
                 model_code = semantic_spec.get("model_code") or runtime.get("model_code")
@@ -113,6 +115,7 @@ class JobRunner:
                         requested_solver = declared_solver
                 route = solver_router.route(problem_type, requested_solver)
                 task.request.solver = str(route.get("selected_solver") or requested_solver or route.get("recommended_solver") or "auto")
+                task.trace["execution_environment"] = execution_environment(task.request, route.get("selected_solver"))
                 if not route["ok"]:
                     raise SolverRouteError(route)
                 self._initialize_solver_progress(
@@ -201,6 +204,7 @@ class JobRunner:
                         "nlp_tolerance": self._optional_float(task.request.solver_config, "nlp_tolerance", "tol"),
                         "max_iter": self._optional_int(task.request.solver_config, "max_iter"),
                         "acceptable_tol": self._optional_float(task.request.solver_config, "acceptable_tol"),
+                        "initial_values": deepcopy(task.request.solver_config.get("initial_values") or {}),
                     },
                     "objective_value": solver_result.objective_value,
                     "solve_time": solver_result.solve_time,
@@ -218,6 +222,9 @@ class JobRunner:
                     **formatted,
                 }
                 explanation_request = runtime.get("_explanation_request") if isinstance(runtime.get("_explanation_request"), dict) else {}
+                from app.services.solution_evidence import solution_evidence
+                result["execution_environment"] = deepcopy(task.trace["execution_environment"])
+                result["solution_evidence"] = solution_evidence(model, solver_result, semantic_spec, runtime, result["solver_config"], result.get("metrics"))
                 result = result_post_processor.process(
                     result=result,
                     model=runtime.get("_result_context") or {"semantic_spec": semantic_spec, "id": task.request.model_id, "name": task.request.model, "scene": task.request.scene},
@@ -283,6 +290,12 @@ class JobRunner:
             except Exception as diagnostic_error:
                 diagnosis = []
                 task.trace["diagnostic_error"] = type(diagnostic_error).__name__
+            from fastapi import HTTPException
+            if isinstance(exc, HTTPException):
+                task.trace["execution_error"] = deepcopy(exc.detail)
+                task.result = {"status": "FAILED", "diagnostic": deepcopy(exc.detail), "trace": task.trace}
+                self._finish(task, status="FAILED", error=str(exc.detail))
+                return
             if isinstance(exc, SolverRouteError):
                 task.result = {"status": "FAILED", "solver_route_error": exc.payload, "trace": task.trace, "logs": task.logs, "run_metrics": task.run_metrics}
                 self._finish(task, status="FAILED", error=str(exc.payload))

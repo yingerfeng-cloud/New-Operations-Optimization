@@ -1,0 +1,100 @@
+bringing up nodes...
+bringing up nodes...
+
+........................................................................ [ 10%]
+........................................................................ [ 20%]
+........................................................................ [ 30%]
+......F................................................................. [ 41%]
+.............................s..ss.s..............................s..... [ 51%]
+........................................................................ [ 61%]
+........................................................................ [ 71%]
+........................................................................ [ 82%]
+.......................................................................F [ 92%]
+.F...................................................                    [100%]
+=================================== FAILURES ===================================
+___________ test_component_update_keeps_unselected_function_revision ___________
+[gw1] darwin -- Python 3.12.14 /Users/joiefu/Project/OPTIFORGE/.venv-mac/bin/python
+
+client = <tests.conftest.ManagedTestClient object at 0x10c7eb590>
+
+    def test_component_update_keeps_unselected_function_revision(client):
+        c1 = component(client)
+        fid = 'iter_f_' + uuid4().hex[:8]
+        assert client.post('/api/function-assets', json={"function_id": fid, "name": fid, "points": [[0, 0], [100, 100]], "solve_strategy": "segment_binary", "status": "published"}).status_code == 200
+        a = model(client, c1)
+        package = client.get(f'/api/models/{a}').json()
+        spec = package['component_spec']
+        spec['variables'].append({"name": "cost", "indices": ["time"], "lower_bound": 0})
+        spec['components'].append({"type": "function_mapping_component", "function_asset_id": fid,
+            "x": "output[t]", "y": "cost[t]", "indices": [{"set": "time", "alias": "t"}], "solve_strategy": "segment_binary"})
+        spec['objective']['terms'][0]['expression'] = 'sum(cost[t] for t in time)'
+        package['semantic_spec']['component_spec'] = deepcopy(spec)
+        package['semantic_spec']['variables'].append({"code": "cost", "dimension": ["time"]})
+        package['model_draft'] = {}
+        assert client.put(f'/api/models/{a}', json=package).status_code == 200
+        test_publish(client, a)
+        assert client.post(f'/api/function-assets/{fid}', json={}).status_code != 200
+        assert client.put(f'/api/function-assets/{fid}', json={"points": [[0, 0], [100, 400]]}).status_code == 200
+        c2 = component(client, 1.2, c1)
+        updated = candidate(client, a, {c1: c2})
+        asset = client.get(f'/api/models/{updated}').json()
+        assert asset['function_dependencies'][fid]['revision'] == 1
+>       assert asset['dry_run_result']['solver_check']['objective_value'] == pytest.approx(24)
+E       assert 72.0 == 24 ± 2.4e-05
+E         
+E         comparison failed
+E         Obtained: 72.0
+E         Expected: 24 ± 2.4e-05
+
+tests/test_iteration_component_bindings.py:180: AssertionError
+___________ test_occupied_port_is_rejected_without_process_inventory ___________
+[gw0] darwin -- Python 3.12.14 /Users/joiefu/Project/OPTIFORGE/.venv-mac/bin/python
+
+tmp_path = PosixPath('/private/var/folders/c7/2hr808j95834qjhmhfxzqwtm0000gn/T/pytest-of-joiefu/pytest-493/popen-gw0/test_occupied_port_is_rejected0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x111190140>
+
+    def test_occupied_port_is_rejected_without_process_inventory(tmp_path, monkeypatch):
+        module = lifecycle()
+        stub = tmp_path / 'lsof'
+        stub.write_text('#!/bin/sh\nexit 0\n')
+        stub.chmod(0o700)
+        monkeypatch.setenv('PATH', str(tmp_path))
+        with socket.socket() as occupied:
+>           occupied.bind(('127.0.0.1', 0))
+E           PermissionError: [Errno 1] Operation not permitted
+
+tests/test_stack_lifecycle.py:24: PermissionError
+__________ test_failed_start_probe_preserves_existing_identity_files ___________
+[gw0] darwin -- Python 3.12.14 /Users/joiefu/Project/OPTIFORGE/.venv-mac/bin/python
+
+tmp_path = PosixPath('/private/var/folders/c7/2hr808j95834qjhmhfxzqwtm0000gn/T/pytest-of-joiefu/pytest-493/popen-gw0/test_failed_start_probe_preser0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x10d08de80>
+
+    def test_failed_start_probe_preserves_existing_identity_files(tmp_path, monkeypatch):
+        import argparse
+        module = lifecycle()
+        monkeypatch.setattr(module, 'LOGS', tmp_path)
+        monkeypatch.setattr(module, 'STATE', tmp_path / '.react-stack-state.json')
+        module.STATE.write_text('original-state')
+        pid_file = tmp_path / '.react-stack-api.pid'
+        pid_file.write_text('original-pid')
+        with socket.socket() as occupied:
+>           occupied.bind(('127.0.0.1', 0))
+E           PermissionError: [Errno 1] Operation not permitted
+
+tests/test_stack_lifecycle.py:39: PermissionError
+=============================== warnings summary ===============================
+.venv-mac/lib/python3.12/site-packages/fastapi/testclient.py:1
+.venv-mac/lib/python3.12/site-packages/fastapi/testclient.py:1
+.venv-mac/lib/python3.12/site-packages/fastapi/testclient.py:1
+.venv-mac/lib/python3.12/site-packages/fastapi/testclient.py:1
+.venv-mac/lib/python3.12/site-packages/fastapi/testclient.py:1
+  /Users/joiefu/Project/OPTIFORGE/.venv-mac/lib/python3.12/site-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+    from starlette.testclient import TestClient as TestClient  # noqa
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/test_iteration_component_bindings.py::test_component_update_keeps_unselected_function_revision
+FAILED tests/test_stack_lifecycle.py::test_occupied_port_is_rejected_without_process_inventory
+FAILED tests/test_stack_lifecycle.py::test_failed_start_probe_preserves_existing_identity_files
+3 failed, 693 passed, 5 skipped, 5 warnings in 98.40s (0:01:38)

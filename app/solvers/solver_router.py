@@ -14,8 +14,8 @@ from app.solvers.nlp_adapter import NLPSolverAdapter
 PROBLEM_SOLVER_ROUTE = {
     "LP": "HiGHS",
     "MILP": "HiGHS",
-    "QP": "HiGHS",
-    "MIQP": "HiGHS",
+    "QP": None,
+    "MIQP": None,
     "NLP": "Ipopt",
     "MINLP_RESERVED": None,
 }
@@ -54,6 +54,11 @@ class SolverRouter:
                 "error_code": "MINLP_RESERVED_UNSUPPORTED",
                 "message": "当前模型被识别为 MINLP，平台当前未开放生产级 MINLP 求解。请改用线性化策略，或移除整数变量后使用 NLP。",
             }
+        if normalized_type in {"QP", "MIQP"}:
+            return {"ok": False, "status": "solver_unsupported_problem_type", "problem_type": normalized_type,
+                "recommended_solver": None, "selected_solver": requested_solver, "available": False,
+                "supported_problem_types": [], "error_code": "SOLVER_UNSUPPORTED_PROBLEM_TYPE",
+                "message": f"平台当前未开放原生 {normalized_type} 求解；类型识别或 PWL 转换不代表原生求解能力。"}
         recommended = PROBLEM_SOLVER_ROUTE.get(normalized_type)
         if not recommended and not requested_solver:
             return {
@@ -205,7 +210,7 @@ class SolverRouter:
                             "status": "nonlinear_not_linearized",
                             "problem_type": problem_type,
                             "selected_solver": route.get("selected_solver"),
-                            "recommended_solver": "QP or PWL" if degree == 2 else "NLP/MINLP reserved",
+                            "recommended_solver": None,
                             "error_code": "NONLINEAR_NOT_LINEARIZED",
                             "message": "HiGHS route rejected an objective that is not compatible with the requested problem type.",
                             "objectives": objectives,

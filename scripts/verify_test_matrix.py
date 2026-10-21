@@ -18,6 +18,7 @@ REQUIRED_UNIT_COVERAGE = {
 }
 
 REQUIRED_BACKEND_COVERAGE = {
+    "incremental binding and rank contracts": ["test_iteration_component_bindings.py", "test_iteration_parameter_rank.py", "test_iteration_provenance_comparison.py", "test_review_20261020_rules.py", "test_review_20261020_recovery.py", "test_review_math_contracts.py", "test_review_execution_contracts.py"],
     "persistence and active version resolver": ["test_runtime_persistence_and_active_versions.py"],
     "horizon": ["test_model_time_dimension_contract.py", "test_runtime_horizon_policy.py"],
     "dimension contracts": ["test_model_dimension_normalization.py", "test_model_set_reference_validation.py"],
@@ -128,10 +129,19 @@ def main() -> int:
                      ['**/cloud_review_*.spec.ts', '**/review_incremental.spec.ts', '**/review_recovery.spec.ts'], failures)
     require_snippets(ROOT / "frontend" / "playwright.cloud-review.config.ts", ["cloud_review_*.spec.ts"], failures)
     require_snippets(ROOT / "frontend" / "playwright.review.config.ts", ['review_incremental.spec.ts', 'review_recovery.spec.ts'], failures)
+    require_snippets(ROOT / "tests" / "test_reverification_component_lifecycle.py", [
+        "test_rv01_component_apply_then_ordinary_version_survives_repeated_stale_saves",
+        "test_rv01_real_formal_switch_still_rejects_stale_candidate_after_editor_save",
+        "test_rv02_revoked_model_can_select_safe_revision_test_and_publish",
+        "test_rv02_retained_indirect_revocation_and_incomplete_replacement_cannot_run",
+        "test_rv02_repair_inspection_does_not_accept_corrupt_or_client_owned_history",
+    ], failures)
+    require_snippets(ROOT / "frontend" / "src" / "tests" / "e2e" / "cloud_review_iteration.spec.ts",
+                     ["RV-01 merge blocker", "iteration RV-02:", "max_constraint_violation"], failures)
 
     require_snippets(
         ROOT / ".github" / "workflows" / "ci.yml",
-        ["npm run typecheck", "npm run build", "npm run test:unit", "python -m pytest -q", "npm run test:e2e:mock", "package.ps1", "cancel-in-progress: true"],
+        ["npm run typecheck", "npm run build", "npm run test:unit", "run: python -m pytest -q\n", "cloud_review_iteration.spec.ts", "Iteration API Solver Browser", "audit_frontend_dependencies.mjs", "npm run test:e2e:mock", "package.ps1", "cancel-in-progress: true"],
         failures,
     )
     require_snippets(

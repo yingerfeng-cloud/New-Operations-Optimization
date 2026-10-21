@@ -65,7 +65,8 @@ def parameter_input_contract(param: dict, sets: dict[str, list]) -> dict:
     while isinstance(leaf, (dict, list)) and leaf:
         leaf = next(iter(leaf.values())) if isinstance(leaf, dict) else leaf[0]
     items = validation.get("items") or {}
-    leaf_type = param.get("value_type") or validation.get("item_type") or (items.get("type") if isinstance(items, dict) else None)
+    leaf_type = param.get("value_type") or param.get("leaf_type") or validation.get("leaf_type") or validation.get("item_type") or (items.get("type") if isinstance(items, dict) else None)
+    explicit_leaf_type = bool(leaf_type)
     if not leaf_type:
         leaf_type = "boolean" if isinstance(leaf, bool) else "string" if isinstance(leaf, str) else "number"
     if formats == ["string"] or formats == ["boolean"]:
@@ -75,7 +76,11 @@ def parameter_input_contract(param: dict, sets: dict[str, list]) -> dict:
         ("轴顺序：" + " → ".join(dimensions)) if dimensions else "标量",
         "数组逐轴按声明集合顺序；映射逐轴按业务键匹配" if dimensions else "",
     ]))
-    return {"type": formats[0], "allowed_formats": formats, "value_type": leaf_type, "axis_order": dimensions,
+    coordinate_type = str(param.get("coordinate_type") or validation.get("coordinate_type") or "scalar").lower()
+    if param.get("value_type") in {"array", "dict", "object"}:
+        coordinate_type = "dict" if param["value_type"] == "object" else param["value_type"]
+        leaf_type = param.get("leaf_type") or validation.get("leaf_type") or "number"
+    return {"type": formats[0], "allowed_formats": formats, "value_type": leaf_type, "explicit_value_type": explicit_leaf_type, "coordinate_type": coordinate_type, "axis_order": dimensions,
             "axes": axes, "format_description": description, "format_examples": examples}
 
 
@@ -95,20 +100,35 @@ def validate_parameter_input(item: dict, value: Any, supplied: dict | None = Non
 
     def check(node: Any, depth: int, location: str) -> dict | None:
         if depth >= len(axes):
-            # Array/dict parameters without declared axes still have typed leaves.
+            # Declared axes end at a coordinate, not at an arbitrary numeric leaf.
+            # Composite coordinates require an explicit contract; unindexed curve
+            # and configuration parameters keep their existing structured layout.
             if isinstance(node, (dict, list)):
+                coordinate_type = item.get("coordinate_type", "scalar")
+                if axes and (coordinate_type == "scalar" or depth == len(axes) and (
+                    coordinate_type == "array" and not isinstance(node, list)
+                    or coordinate_type in {"dict", "object"} and not isinstance(node, dict)
+                )):
+                    return {"key": key, "field": location, "error": "parameter rank mismatch", "expected": "scalar coordinate" if coordinate_type == "scalar" else coordinate_type,
+                            "actual": type(node).__name__, "message": f"参数 {location} 已到达声明的 {len(axes)} 个轴，不允许额外嵌套。"}
                 for label, child in (enumerate(node) if isinstance(node, list) else node.items()):
-                    error = check(child, depth, f"{location}[{label}]")
+                    error = check(child, depth + 1, f"{location}[{label}]")
                     if error:
                         return error
                 return None
             leaf_type = item.get("value_type")
+            if axes and depth == len(axes) and item.get("coordinate_type") in {"array", "dict", "object"}:
+                return {"key": key, "field": location, "error": "composite coordinate required", "expected": item["coordinate_type"], "actual": type(node).__name__}
             if leaf_type in {"number", "integer"} and (
                 isinstance(node, bool) or not isinstance(node, (int, float)) or not math.isfinite(node)
                 or leaf_type == "integer" and int(node) != node
             ):
                 return {"key": key, "field": location, "error": "invalid numeric value", "expected": f"finite {leaf_type}",
                         "actual": node, "message": f"参数 {location} 必须为有限数值。"}
+            if leaf_type == "json" and isinstance(node, float) and not math.isfinite(node):
+                return {"key": key, "field": location, "error": "invalid numeric value", "expected": "finite JSON number", "actual": node}
+            if leaf_type in {"boolean", "string"} and (item.get("explicit_value_type") or formats == [leaf_type]) and not isinstance(node, bool if leaf_type == "boolean" else str):
+                return {"key": key, "field": location, "error": "invalid coordinate value", "expected": leaf_type, "actual": type(node).__name__}
             return None
         axis = axes[depth]
         members = supplied.get(axis["set"], axis.get("members"))

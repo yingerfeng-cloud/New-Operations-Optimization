@@ -1,0 +1,8 @@
+
+> optiforge-platform-frontend@1.0.0 typecheck
+> tsc -b
+
+src/features/task-center/TaskPanels.tsx(312,11): error TS2304: Cannot find name 'Typography'.
+src/features/task-center/TaskPanels.tsx(312,98): error TS2304: Cannot find name 'Typography'.
+src/features/task-center/TaskPanels.tsx(313,10): error TS2304: Cannot find name 'Typography'.
+src/features/task-center/TaskPanels.tsx(313,58): error TS2304: Cannot find name 'Typography'.

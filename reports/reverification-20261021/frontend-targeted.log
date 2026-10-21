@@ -1,0 +1,13 @@
+
+> optiforge-platform-frontend@1.0.0 test:unit
+> vitest run src/tests/unit --run src/tests/unit/ModelWorkspaceMode.test.ts src/tests/unit/IterationComponentUpdates.test.tsx src/tests/unit/IterationComparison.test.tsx
+
+
+ RUN  v4.1.12 /Users/joiefu/Project/OPTIFORGE/frontend
+
+
+ Test Files  88 passed (88)
+      Tests  487 passed (487)
+   Start at  15:02:22
+   Duration  177.75s (transform 1.19s, setup 8.99s, import 7.38s, tests 320.27s, environment 14.50s)
+

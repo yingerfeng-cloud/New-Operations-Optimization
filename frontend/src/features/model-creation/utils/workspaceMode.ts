@@ -40,6 +40,16 @@ export function effectiveAssetMode(mode: ModelWorkspaceMode, asset: ModelAsset):
 
 export function assetToWorkspaceDraft(asset: ModelAsset, mode: ModelWorkspaceMode): ModelDraft {
   const source = modelAssetToDraft(asset);
+  if (mode === 'version' || mode === 'clone') {
+    const clean = (metadata: Record<string, unknown> = {}) => {
+      const next = { ...metadata };
+      delete next.function_update;
+      delete next.component_update;
+      return next;
+    };
+    source.advanced = { ...source.advanced, ui_metadata: clean(source.advanced.ui_metadata) };
+    source.semantic = { ...source.semantic, ui_metadata: clean(source.semantic.ui_metadata) };
+  }
   if (mode === 'clone') {
     const identity = createBlankDraft();
     return {

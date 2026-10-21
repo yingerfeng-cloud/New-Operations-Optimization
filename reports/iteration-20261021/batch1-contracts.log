@@ -1,0 +1,70 @@
+bringing up nodes...
+bringing up nodes...
+
+.........................................F.............F.............    [100%]
+=================================== FAILURES ===================================
+______ test_hydro_published_objective_matches_independent_accounting[900] ______
+[gw1] darwin -- Python 3.12.14 /Users/joiefu/Project/OPTIFORGE/.venv-mac/bin/python
+
+client = <tests.conftest.ManagedTestClient object at 0x10c9289e0>, seconds = 900
+
+    @pytest.mark.parametrize("seconds", [900, 3600])
+    def test_hydro_published_objective_matches_independent_accounting(client, seconds):
+        copied = client.post("/api/models/MODEL-POWER-CASCADE-HYDRO-DISPATCH/copy").json()
+        params = deepcopy(get_template("cascade_hydro_dispatch")["sample_runtime_parameters"])
+        params.update(time_step_seconds=seconds, ramp_smoothing_enabled=False)
+        copied["parameters"] = params
+        if seconds == 3600:
+            for source in (copied, copied["semantic_spec"], copied["component_spec"]):
+                source.setdefault("ui_metadata", {}).setdefault("time_dimension", {})["interval_minutes"] = 60
+        updated = client.put(f"/api/models/{copied['id']}", json=copied)
+        assert updated.status_code == 200, updated.text
+        test_and_publish_model(client, copied["id"], params)
+        response = client.post(f"/api/models/{copied['id']}/invoke", json={"parameters": params, "options": {"mode": "sync", "explain": False}})
+        assert response.status_code == 200, response.text
+        body = response.json()
+>       values = body["variable_values"]
+                 ^^^^^^^^^^^^^^^^^^^^^^^
+E       KeyError: 'variable_values'
+
+tests/test_review_math_contracts.py:69: KeyError
+_____ test_hydro_published_objective_matches_independent_accounting[3600] ______
+[gw1] darwin -- Python 3.12.14 /Users/joiefu/Project/OPTIFORGE/.venv-mac/bin/python
+
+client = <tests.conftest.ManagedTestClient object at 0x109ff6870>
+seconds = 3600
+
+    @pytest.mark.parametrize("seconds", [900, 3600])
+    def test_hydro_published_objective_matches_independent_accounting(client, seconds):
+        copied = client.post("/api/models/MODEL-POWER-CASCADE-HYDRO-DISPATCH/copy").json()
+        params = deepcopy(get_template("cascade_hydro_dispatch")["sample_runtime_parameters"])
+        params.update(time_step_seconds=seconds, ramp_smoothing_enabled=False)
+        copied["parameters"] = params
+        if seconds == 3600:
+            for source in (copied, copied["semantic_spec"], copied["component_spec"]):
+                source.setdefault("ui_metadata", {}).setdefault("time_dimension", {})["interval_minutes"] = 60
+        updated = client.put(f"/api/models/{copied['id']}", json=copied)
+        assert updated.status_code == 200, updated.text
+        test_and_publish_model(client, copied["id"], params)
+        response = client.post(f"/api/models/{copied['id']}/invoke", json={"parameters": params, "options": {"mode": "sync", "explain": False}})
+        assert response.status_code == 200, response.text
+        body = response.json()
+>       values = body["variable_values"]
+                 ^^^^^^^^^^^^^^^^^^^^^^^
+E       KeyError: 'variable_values'
+
+tests/test_review_math_contracts.py:69: KeyError
+=============================== warnings summary ===============================
+.venv-mac/lib/python3.12/site-packages/fastapi/testclient.py:1
+.venv-mac/lib/python3.12/site-packages/fastapi/testclient.py:1
+.venv-mac/lib/python3.12/site-packages/fastapi/testclient.py:1
+.venv-mac/lib/python3.12/site-packages/fastapi/testclient.py:1
+.venv-mac/lib/python3.12/site-packages/fastapi/testclient.py:1
+  /Users/joiefu/Project/OPTIFORGE/.venv-mac/lib/python3.12/site-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+    from starlette.testclient import TestClient as TestClient  # noqa
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/test_review_math_contracts.py::test_hydro_published_objective_matches_independent_accounting[900]
+FAILED tests/test_review_math_contracts.py::test_hydro_published_objective_matches_independent_accounting[3600]
+2 failed, 67 passed, 5 warnings in 45.31s

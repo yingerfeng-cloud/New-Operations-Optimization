@@ -23,7 +23,7 @@ def dependency_ids(model: Any) -> set[str]:
                 elif key not in {"function_dependencies", "_function_asset_snapshots"}:
                     visit(item)
 
-    for value in (model.component_spec, model.semantic_spec, model.parameters, model.model_draft):
+    for value in (model.component_spec, model.semantic_spec, model.parameters, model.model_draft, model.component_dependencies):
         visit(value)
     return ids
 

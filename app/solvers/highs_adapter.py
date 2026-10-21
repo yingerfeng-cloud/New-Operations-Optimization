@@ -166,7 +166,7 @@ class HiGHSAdapter:
             callback({
                 "kind": "monitoring_started",
                 "search_mode": "LP_ITERATION",
-                "message": "该模型实际为连续 LP/QP；完成后将展示 HiGHS 的真实算法与迭代统计。",
+                "message": "该模型实际为连续 LP；完成后将展示 HiGHS 的真实算法与迭代统计。",
             })
             return {"mode": "LP_ITERATION", "raw_solver": raw_solver, "callback_status": str(status)}
         except Exception as exc:

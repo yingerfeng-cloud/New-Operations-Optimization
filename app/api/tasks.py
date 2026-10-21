@@ -35,8 +35,8 @@ def retry_task(task_id: str) -> TaskView:
 
 
 @router.post("/tasks/{task_id}/replay", response_model=TaskView)
-def replay_task(task_id: str) -> TaskView:
-    return job_service.replay_task(task_id)
+def replay_task(task_id: str, body: dict | None = None) -> TaskView:
+    return job_service.replay_task(task_id, (body or {}).get("mode", "current_kernel"))
 
 
 @router.post("/tasks/{task_id}/recalculate", response_model=TaskView)

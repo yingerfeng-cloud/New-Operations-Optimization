@@ -296,6 +296,7 @@ function RuntimeConfigPanel({ apiBase, solverDesc, solverData }: { apiBase: stri
           <Descriptions.Item label="HiGHS">{`${solverData?.highs?.available ? '可用' : '不可用'} / ${solverData?.highs?.version || '-'}`}</Descriptions.Item>
           <Descriptions.Item label="Ipopt">{`${solverData?.ipopt?.available ? '可用' : '不可用'} / ${solverData?.ipopt?.path || '-'} / ${solverData?.ipopt?.version || solverData?.ipopt?.message || '-'}`}</Descriptions.Item>
           <Descriptions.Item label="运行方式">Pyomo + highspy + optional Ipopt executable</Descriptions.Item>
+          <Descriptions.Item label="能力边界">LP/MILP → HiGHS；连续 NLP → 可用的 Ipopt。原生 QP/MIQP、生产 MINLP 未支持。</Descriptions.Item>
           <Descriptions.Item label="NLP 文档">docs/nlp-solver.md</Descriptions.Item>
         </Descriptions>
       </Card>
@@ -372,6 +373,7 @@ export function SettingsPage({ variant = 'settings' }: SettingsPageProps) {
             <Descriptions.Item label="默认求解器">{data?.health?.solver || 'HiGHS'}</Descriptions.Item>
             <Descriptions.Item label="运行方式">{solverDesc}</Descriptions.Item>
             <Descriptions.Item label="线性规划">LP / MILP</Descriptions.Item>
+            <Descriptions.Item label="未开放能力">原生 QP / MIQP、生产 MINLP（识别与 PWL 转换不等于原生支持）</Descriptions.Item>
             <Descriptions.Item label="运行状态">{solverStatus === 'ok' ? '可用' : solverStatus === 'checking' ? '检查中' : '不可用或待确认'}</Descriptions.Item>
             <Descriptions.Item label="HiGHS 状态">{solverData?.highs?.available ? '可用' : '不可用'}</Descriptions.Item>
             <Descriptions.Item label="HiGHS 版本">{solverData?.highs?.version || '-'}</Descriptions.Item>

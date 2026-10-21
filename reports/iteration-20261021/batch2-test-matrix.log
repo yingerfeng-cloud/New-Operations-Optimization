@@ -1,0 +1,6 @@
+TEST_MATRIX_OK
+- complete frontend unit suite: 88 files
+- classified E2E inventory: 20 mock / 4 controlled real / 9 dedicated live specs
+- complete backend pytest inventory: 123 files
+- visual evidence: 19 screenshots + README
+- covered gates: runtime workspace, model interaction, persistence, horizon, hydro, PWL, Mock/Real E2E, CI, packaging
