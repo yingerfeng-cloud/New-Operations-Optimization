@@ -1,3 +1,4 @@
+import { ContextNote } from '../../components/ContextNote';
 import { Alert, Button, Card, Select, Space, Table, Typography, message } from 'antd';
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
@@ -52,17 +53,17 @@ export function FunctionUpdatesPanel({ model, onApplied }: { model: ModelAsset; 
   } });
   const tested = candidate.data;
   const canApply = task.data?.status === 'SUCCESS' && tested?.tested_model_id === tested?.id && tested?.tested_content_hash === tested?.content_hash && tested?.status === 'trial';
-  return <Space orientation="vertical" style={{ width: '100%' }}>
-    <Alert type="info" showIcon title="按模型版本绑定函数修订" description="只替换选中的依赖；未选择的函数保留原修订。测试通过后应用更新，平台发布新模型版本并切换正式入口。固定模型 ID 和既有固定 Skill 保留原绑定。" />
+  return <Space className="dependency-updates-panel" orientation="vertical" style={{ width: '100%' }}>
+    <ContextNote collapsible title="按模型版本绑定函数修订" description="只替换选中的依赖；未选择的函数保留原修订。测试通过后应用更新，平台发布新模型版本并切换正式入口。固定模型 ID 和既有固定 Skill 保留原绑定。" />
     <QueryState query={updates} title="函数依赖">
-      <Table<FunctionUpdateRow> rowKey="function_id" size="small" pagination={false} dataSource={updates.data?.dependencies || []} columns={[
-        { title: '函数', render: (_, row) => <Button type="link" onClick={() => nav('/functions')}>{row.name} ({row.function_id})</Button> },
-        { title: '使用修订', render: (_, row) => row.binding ? `r${row.binding.revision}` : '未固定，需迁移' },
-        { title: '可用修订', render: (_, row) => <Select aria-label={`${row.function_id} 目标修订`} style={{ width: 220 }} allowClear placeholder={`最新 r${row.latest_revision}；保留当前`} disabled={!!pending}
+      <Table<FunctionUpdateRow> className="dependency-updates-table" tableLayout="fixed" scroll={{ x: 660 }} rowKey="function_id" size="small" pagination={false} dataSource={updates.data?.dependencies || []} columns={[
+        { title: '函数', width: 200, render: (_, row) => <Button className="dependency-asset-link" type="link" onClick={() => nav('/functions')}><span className="dependency-asset-name">{row.name}</span><span className="dependency-asset-id">{row.function_id}</span></Button> },
+        { title: '使用修订', width: 96, render: (_, row) => row.binding ? `r${row.binding.revision}` : '未固定，需迁移' },
+        { title: '可用修订', width: 188, render: (_, row) => <Select aria-label={`${row.function_id} 目标修订`} style={{ width: '100%' }} allowClear placeholder={`最新 r${row.latest_revision}；保留当前`} disabled={!!pending}
           value={revisions[row.function_id]} onChange={value => setRevisions(current => { const next = { ...current }; if (value) next[row.function_id] = value; else delete next[row.function_id]; return next; })}
           options={row.versions.filter(item => item.revision !== row.binding?.revision).map(item => ({ value: item.revision, label: `r${item.revision}${item.diff?.requires_model_edit ? '（需完整模型编辑）' : ''}`, disabled: item.diff?.requires_model_edit }))} /> },
-        { title: '已用 hash', render: (_, row) => <Typography.Text code>{row.binding?.content_hash?.slice(0, 12) || '未知'}</Typography.Text> },
-      ]} expandable={{ expandedRowRender: row => {
+        { title: '已用 hash', width: 136, render: (_, row) => <Typography.Text code>{row.binding?.content_hash?.slice(0, 12) || '未知'}</Typography.Text> },
+      ]} expandable={{ columnWidth: 40, expandedRowRender: row => {
         const revision = row.versions.find(item => item.revision === revisions[row.function_id]) || row.versions.at(-1);
         const diff = revision?.diff;
         return diff ? <div><Typography.Paragraph>{diff.message}</Typography.Paragraph><Table size="small" pagination={false} rowKey="field" dataSource={[

@@ -1,4 +1,5 @@
 data/runtime_store.json
+.DS_Store
 data/runtime_store.local.json
 data/runtime_store_test_*.json
 docker-data/

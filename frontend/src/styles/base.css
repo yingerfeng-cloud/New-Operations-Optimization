@@ -4,9 +4,9 @@
 
 body {
   margin: 0;
-  background: linear-gradient(135deg, #eef4fb 0%, #f6f9fd 48%, #edf5ff 100%);
-  color: #17233d;
-  font-family: Inter, "PingFang SC", "Microsoft YaHei", sans-serif;
+  background: var(--proto-bg);
+  color: var(--proto-text);
+  font-family: var(--font-ui);
 }
 
 button {

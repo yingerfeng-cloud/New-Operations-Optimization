@@ -1,0 +1,69 @@
+{
+  "date": "2026-10-25",
+  "frontend": "formal production build; no preview adapter",
+  "browser": "Codex browser tools, real local FastAPI, isolated runtime store",
+  "realSolve": {
+    "taskId": "OPT-8C0370F648",
+    "status": "SUCCESS",
+    "solver": "HiGHS",
+    "objective": 160300,
+    "gap": 0
+  },
+  "templateClone": {
+    "modelId": "MODEL-4C50E314",
+    "testTaskId": "OPT-55BF44CF45",
+    "testStatus": "SUCCESS",
+    "lifecycle": "trial"
+  },
+  "serviceDebug": {
+    "taskId": "OPT-6B5FC58C51",
+    "modelId": "MODEL-POWER-ECONOMIC-DISPATCH",
+    "status": "SUCCESS",
+    "termination": "optimal",
+    "solver": "HiGHS",
+    "objective": 160300
+  },
+  "resultTabs": {
+    "tabs": 6,
+    "kpiMaxXDeltaPx": 0,
+    "kpiMaxWidthDeltaPx": 0
+  },
+  "formulaDialog": {
+    "width1626": {
+      "top": 78.703125,
+      "bottom": 797.296875,
+      "footerBottom": 776.296875
+    },
+    "width1280": {
+      "top": 54.703125,
+      "bottom": 821.296875,
+      "footerBottom": 800.296875
+    },
+    "previewCollapsedHeightPx": 36,
+    "compileNoticeCollapsedHeightPx": 38,
+    "previewKeyboardToggle": true,
+    "compileNoteKeyboardToggle": true,
+    "footerVisibleWithBothExpanded": true,
+    "unsavedChangesGuard": true
+  },
+  "header": {
+    "modelTitleUnique": true,
+    "helpOpens": true,
+    "helpEscapeCloses": true,
+    "solverLabel": "默认求解器",
+    "solverEnvironmentNavigation": true
+  },
+  "configuration": {
+    "apiAddress": "http://127.0.0.1:8110",
+    "matchesActualSameOrigin": true
+  },
+  "consoleErrors": [],
+  "notExecuted": {
+    "finalPublishUiConfirmation": "Blocked by automatic approval review; dialog cancelled; no alternate publish attempted.",
+    "realNlp": "Ipopt unavailable",
+    "externalLlm": "disabled",
+    "slowSuite": "not run",
+    "powerShellPackaging": "PowerShell not installed",
+    "completePlaywrightSuite": "not run; real browser flows exercised through Codex browser tools"
+  }
+}

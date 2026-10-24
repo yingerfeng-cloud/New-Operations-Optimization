@@ -1,0 +1,263 @@
+{
+  "date": "2026-10-25",
+  "removed": [
+    {
+      "path": "prototypes",
+      "bytes": 172610185
+    },
+    {
+      "path": "docs/visual-acceptance/porcelain-ui-2026-10-24",
+      "bytes": 20888635
+    },
+    {
+      "path": "frontend/test-results",
+      "bytes": 45058133
+    },
+    {
+      "path": "frontend/playwright-report-real-backend",
+      "bytes": 56260447
+    },
+    {
+      "path": "reports/review_20261020_local",
+      "bytes": 172623286
+    },
+    {
+      "path": "session-visualizations/experience-review",
+      "bytes": 89513
+    },
+    {
+      "path": "session-visualizations/ui-notices",
+      "bytes": 193434
+    },
+    {
+      "path": "__pycache__",
+      "bytes": 2543
+    },
+    {
+      "path": ".DS_Store",
+      "bytes": 14340
+    },
+    {
+      "path": "artifacts/.DS_Store",
+      "bytes": 6148
+    },
+    {
+      "path": "artifacts/delivery/.DS_Store",
+      "bytes": 6148
+    },
+    {
+      "path": "app/__pycache__",
+      "bytes": 239749
+    },
+    {
+      "path": "app/.DS_Store",
+      "bytes": 10244
+    },
+    {
+      "path": "app/model_components/__pycache__",
+      "bytes": 244156
+    },
+    {
+      "path": "app/explain/__pycache__",
+      "bytes": 83224
+    },
+    {
+      "path": "app/builders/__pycache__",
+      "bytes": 115545
+    },
+    {
+      "path": "app/solvers/__pycache__",
+      "bytes": 50721
+    },
+    {
+      "path": "app/agent/__pycache__",
+      "bytes": 284809
+    },
+    {
+      "path": "app/agent/v3/__pycache__",
+      "bytes": 109086
+    },
+    {
+      "path": "app/agent/v3/skills/__pycache__",
+      "bytes": 12397
+    },
+    {
+      "path": "app/schemas/__pycache__",
+      "bytes": 65460
+    },
+    {
+      "path": "app/storage/__pycache__",
+      "bytes": 38539
+    },
+    {
+      "path": "app/components/__pycache__",
+      "bytes": 7858
+    },
+    {
+      "path": "app/semantic/__pycache__",
+      "bytes": 59540
+    },
+    {
+      "path": "app/api/__pycache__",
+      "bytes": 116198
+    },
+    {
+      "path": "app/templates/__pycache__",
+      "bytes": 121661
+    },
+    {
+      "path": "app/jobs/__pycache__",
+      "bytes": 49856
+    },
+    {
+      "path": "app/explainers/__pycache__",
+      "bytes": 67894
+    },
+    {
+      "path": "app/services/__pycache__",
+      "bytes": 782195
+    },
+    {
+      "path": "app/formulas/__pycache__",
+      "bytes": 89861
+    },
+    {
+      "path": "app/diagnosis/__pycache__",
+      "bytes": 13187
+    },
+    {
+      "path": "frontend/.DS_Store",
+      "bytes": 8196
+    },
+    {
+      "path": "frontend/src/styles/.DS_Store",
+      "bytes": 6148
+    },
+    {
+      "path": "tests/__pycache__",
+      "bytes": 2678951
+    },
+    {
+      "path": "tests/.DS_Store",
+      "bytes": 6148
+    },
+    {
+      "path": "tests/agent_eval/__pycache__",
+      "bytes": 6489
+    },
+    {
+      "path": "docs/.DS_Store",
+      "bytes": 8196
+    },
+    {
+      "path": "docs/visual-acceptance/.DS_Store",
+      "bytes": 6148
+    },
+    {
+      "path": "scripts/__pycache__",
+      "bytes": 30112
+    },
+    {
+      "path": "agent_skills/.DS_Store",
+      "bytes": 12292
+    },
+    {
+      "path": "agent_skills/economic_dispatch/__pycache__",
+      "bytes": 1249
+    },
+    {
+      "path": "reports/.DS_Store",
+      "bytes": 10244
+    },
+    {
+      "path": "frontend/tsconfig.app.tsbuildinfo",
+      "bytes": 13953
+    },
+    {
+      "path": "frontend/tsconfig.node.tsbuildinfo",
+      "bytes": 46133
+    },
+    {
+      "path": "session-temp/optiforge-ui-final-production-build.log",
+      "bytes": 4973
+    },
+    {
+      "path": "session-temp/optiforge-ui-final-backend-tests.log",
+      "bytes": 3967
+    },
+    {
+      "path": "session-temp/optiforge-ui-final-header-final-tests.log",
+      "bytes": 364
+    },
+    {
+      "path": "session-temp/optiforge-ui-final-header-tests.log",
+      "bytes": 1469
+    },
+    {
+      "path": "session-temp/optiforge-ui-acceptance-20261025",
+      "bytes": 1949693
+    },
+    {
+      "path": "session-temp/optiforge-ui-final-build.log",
+      "bytes": 4973
+    },
+    {
+      "path": "session-temp/optiforge-preview-5188.pid",
+      "bytes": 5
+    },
+    {
+      "path": "session-temp/optiforge-ui-final-unit.log",
+      "bytes": 317
+    },
+    {
+      "path": "session-temp/optiforge-ui-final-typecheck.log",
+      "bytes": 57
+    },
+    {
+      "path": "session-temp/optiforge-preview-5188.log",
+      "bytes": 13664
+    },
+    {
+      "path": "session-temp/optiforge-ui-acceptance-backend.log",
+      "bytes": 143327
+    },
+    {
+      "path": "session-temp/optiforge-ui-final-backend-socket-tests.log",
+      "bytes": 902
+    },
+    {
+      "path": "session-temp/optiforge-ui-final-unit-after-cleanup.log",
+      "bytes": 316
+    },
+    {
+      "path": "session-temp/optiforge-ui-final-header-slot-tests.log",
+      "bytes": 323
+    },
+    {
+      "path": "frontend/node_modules/.vite",
+      "bytes": 56980034
+    },
+    {
+      "path": "frontend/node_modules/.vite-temp",
+      "bytes": 0
+    },
+    {
+      "path": "frontend/tsconfig.app.tsbuildinfo",
+      "bytes": 13953
+    },
+    {
+      "path": "frontend/tsconfig.node.tsbuildinfo",
+      "bytes": 46133
+    }
+  ],
+  "removed_bytes": 532313721,
+  "retained": [
+    "frontend/dist",
+    "frontend/node_modules",
+    ".venv-mac",
+    "data",
+    "docker-data",
+    "docs/exports",
+    "docs/visual-acceptance/porcelain-final-2026-10-25"
+  ]
+}

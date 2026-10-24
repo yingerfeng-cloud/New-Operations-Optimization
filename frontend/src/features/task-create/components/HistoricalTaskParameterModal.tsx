@@ -1,3 +1,4 @@
+import { ContextNote } from '../../../components/ContextNote';
 import { Alert, Descriptions, Modal, Radio, Table } from 'antd';
 import { useQuery } from '@tanstack/react-query';
 import { useEffect, useMemo, useState } from 'react';
@@ -21,6 +22,6 @@ export function HistoricalTaskParameterModal({ open, modelId, modelFamily, curre
     <Radio.Group className="section-gap-tight" value={mode} onChange={event => setMode(event.target.value)} options={[{ label: '仅填充当前空值', value: 'fill-empty' }, { label: '覆盖当前参数', value: 'overwrite' }]} />
     {selected && <Descriptions className="section-gap-tight" size="small" bordered column={2} items={[{ key: 'time', label: '任务时间', children: selected.finished_at || selected.created_at }, { key: 'solver', label: '求解器', children: selected.solver || '—' }, { key: 'horizon', label: '历史 horizon', children: historicalHorizon || '—' }, { key: 'count', label: '可读取参数', children: Object.keys(extractHistoricalParameters(selected)).length }]} />}
     {incompatible && <Alert className="section-gap-tight" type="error" showIcon title="horizon 不兼容" description={`当前为 ${currentHorizon} 点，历史任务为 ${historicalHorizon} 点；请重新选择兼容任务。`} />}
-    {!rows.length && !tasks.isPending && <Alert type="info" showIcon title="没有可复用的同模型成功任务" />}
+    {!rows.length && !tasks.isPending && <ContextNote title="没有可复用的同模型成功任务" />}
   </Modal>;
 }

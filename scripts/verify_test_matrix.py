@@ -50,7 +50,7 @@ REQUIRED_DELIVERY_FILES = [
     "server.py",
     "frontend/package.json",
     "frontend/src/main.tsx",
-    "docs/visual-acceptance/ui-special-iteration/README.md",
+    "docs/visual-acceptance/porcelain-final-2026-10-25/README.md",
 ]
 
 
@@ -85,7 +85,7 @@ def main() -> int:
         if spec.name.startswith('cloud_review_')
         or spec.name in {'review_incremental.spec.ts', 'review_recovery.spec.ts'}
     }
-    visual_dir = ROOT / "docs" / "visual-acceptance" / "ui-special-iteration"
+    visual_dir = ROOT / "docs" / "visual-acceptance" / "porcelain-final-2026-10-25"
     if not unit_files or not e2e_files or not backend_files:
         failures.append("one or more test suites are empty")
 
@@ -98,12 +98,13 @@ def main() -> int:
         failures.append(f"delivery files missing: {', '.join(missing_delivery)}")
 
     required_visuals = {
-        "task-step2-1440.png", "task-step2-390.png", "task-error-drawer-390.png",
-        "task-batch-paste-1440.png", "task-fullscreen-matrix-1440.png",
-        "model-step2-1440.png", "model-step3-1440.png", "model-inspection-drawer-1440.png",
-        "model-precise-issue-drawer-1440.png", "model-precise-field-highlight-1440.png",
-        "model-focus-editor-1440.png", "model-focus-exit-restored-1440.png",
-        *{f"responsive-{width}-model-step2.png" for width in (390, 768, 1024, 1366, 1440, 1920)},
+        "template-dialog-official.png", "real-solve-success.png", "real-result-report.png",
+        "service-debug-success.png", "task-runtime-1626.png",
+        *{f"formula-dialog-{width}.png" for width in (1280, 1626)},
+        *{f"{page}-{width}.png" for page in (
+            "home", "scenarios", "models", "model-create", "tasks", "results",
+            "components", "functions", "services", "skills", "runtime", "settings", "agents",
+        ) for width in (1280, 1626)},
     }
     missing_visuals = sorted(name for name in required_visuals if not (visual_dir / name).is_file())
     if missing_visuals:

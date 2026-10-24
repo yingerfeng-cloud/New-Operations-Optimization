@@ -32,7 +32,10 @@ vi.mock('../../api/systemConfig', () => ({
   getSystemConfig: async () => ({ dictionaries: { business_scenarios: [] } }),
 }));
 
-function Location() { return <div data-testid="location">{useLocation().pathname}</div>; }
+function Location() {
+  const location = useLocation();
+  return <div data-testid="location">{location.pathname}{location.search}</div>;
+}
 
 test('dashboard renders React platform entries', async () => {
   renderWithQueryClient(
@@ -54,4 +57,23 @@ test('dashboard renders React platform entries', async () => {
   expect(screen.getByText('最近任务')).toBeInTheDocument();
   expect((await screen.findAllByText('< 1 ms')).length).toBeGreaterThan(0);
   expect(screen.getByText('求解能力摘要')).toBeInTheDocument();
+});
+
+test('compact recent entries retain task details and prefilled task creation', async () => {
+  renderWithQueryClient(
+    <MemoryRouter>
+      <DashboardPage /><Location />
+    </MemoryRouter>,
+  );
+
+  const task = await screen.findByRole('button', { name: /模型一.*T-1/ });
+  expect(within(task).getByText('HiGHS')).toBeInTheDocument();
+  fireEvent.click(task);
+  expect(screen.getByTestId('location')).toHaveTextContent('/tasks?task=T-1');
+
+  fireEvent.click(screen.getByRole('button', { name: /模型一.*发起任务/ }));
+  expect(screen.getByTestId('location')).toHaveTextContent('/tasks?create=1&model=m1&scene=');
+
+  fireEvent.click(screen.getByRole('button', { name: '全部模型' }));
+  expect(screen.getByTestId('location')).toHaveTextContent('/models');
 });

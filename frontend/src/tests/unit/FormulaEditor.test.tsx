@@ -156,6 +156,37 @@ test('empty formula cannot be applied', () => {
   expect(screen.getByText('表达式不能为空')).toBeInTheDocument();
 });
 
+test('compile explanation is optional while the compilation requirement stays visible', () => {
+  render(<FormulaEditor value={existingFormula()} symbols={symbols} />);
+  const message = screen.getByText('请先执行权威编译');
+  const details = message.closest('details')!;
+  const explanation = screen.getByText('当前公式尚未编译，或公式、作用域、符号和时间契约变化后编译产物已过期。');
+  expect(message).toBeVisible();
+  expect(explanation).not.toBeVisible();
+  expect(screen.getByRole('button', { name: '应用公式' })).toBeDisabled();
+  fireEvent.click(details.querySelector('summary')!);
+  expect(explanation).toBeVisible();
+  fireEvent.click(details.querySelector('summary')!);
+  expect(explanation).not.toBeVisible();
+  expect(screen.getByRole('button', { name: '应用公式' })).toBeDisabled();
+});
+
+test('readable preview can reveal the complete formula without changing the editor', () => {
+  const expression = Array(8).fill('p_grid[time] + load[time]').join(' + ');
+  render(<FormulaEditor value={existingFormula({ kind: 'objective', dsl_formula: expression })} symbols={symbols} />);
+  const details = screen.getByText('可读预览').closest('details')!;
+  const fullPreview = details.querySelector('.formula-preview-expanded')!;
+  const summaryPreview = details.querySelector('.formula-preview-expression')!;
+  expect(fullPreview).not.toBeVisible();
+  expect(summaryPreview).toBeVisible();
+  fireEvent.click(details.querySelector('summary')!);
+  expect(fullPreview).toBeVisible();
+  expect(fullPreview.textContent).toBe(summaryPreview.textContent);
+  expect(EditorView.findFromDOM(screen.getByLabelText('公式表达式'))!.state.doc.toString()).toBe(expression);
+  fireEvent.click(details.querySelector('summary')!);
+  expect(fullPreview).not.toBeVisible();
+});
+
 test('uses the professional code editor and supports focus mode', () => {
   render(<FormulaEditor symbols={symbols} />);
   expect(screen.getByTestId('formula-code-editor')).toBeInTheDocument();

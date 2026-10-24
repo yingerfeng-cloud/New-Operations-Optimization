@@ -1,5 +1,6 @@
 import { Alert } from 'antd';
 import type { ReactNode } from 'react';
+import { ContextNote } from '../../../components/ContextNote';
 
 export function ParameterNotice({
   title,
@@ -12,5 +13,7 @@ export function ParameterNotice({
   type?: 'info' | 'warning';
   className?: string;
 }) {
-  return <Alert className={`parameter-notice${className ? ` ${className}` : ''}`} showIcon type={type} title={title} description={description} />;
+  const classes = `parameter-notice${className ? ` ${className}` : ''}`;
+  if (type === 'info') return <ContextNote className={classes} title={title} description={description} />;
+  return <Alert className={classes} showIcon type={type} title={title} description={description} />;
 }

@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 import { Header } from './Header';
 import { Sidebar } from './Sidebar';
+import { PageHeaderSlotsProvider } from '../../components/PageHeader/slots';
 
 const COLLAPSE_KEY = 'optiforge.sidebar.collapsed';
 
@@ -32,7 +33,7 @@ export function MainLayout() {
   };
 
   return (
-    <div className={`app-shell app${collapsed && !mobile ? ' app-sidebar-collapsed' : ''}${mobile ? ' app-mobile' : ''}`}>
+    <PageHeaderSlotsProvider><div className={`app-shell app${collapsed && !mobile ? ' app-sidebar-collapsed' : ''}${mobile ? ' app-mobile' : ''}`}>
       {!mobile && <Sidebar collapsed={collapsed} />}
       <main className={`main${isAgentWorkbench ? ' main-agent-workbench' : ''}`}>
         <Header
@@ -58,6 +59,6 @@ export function MainLayout() {
       >
         <Sidebar mobile onNavigate={() => setDrawerOpen(false)} />
       </Drawer>
-    </div>
+    </div></PageHeaderSlotsProvider>
   );
 }

@@ -152,7 +152,7 @@ test('contract failure blocks and retry recovers', async ({ page }) => {
   await expect(page.getByRole('button', { name: '下一步' })).toBeEnabled();
 });
 
-test('runtime workspace groups fields, navigates issues and edits a matrix in focus mode', async ({ page }) => {
+test('runtime workspace groups fields, navigates issues and edits a matrix in focus mode', async ({ page }, testInfo) => {
   await setup(page);
   await selectModel(page, '运行数据工作台模型');
   await expect(page.getByRole('button', { name: /基础参数/ })).toBeVisible();
@@ -167,7 +167,7 @@ test('runtime workspace groups fields, navigates issues and edits a matrix in fo
   await page.getByRole('button', { name: '聚焦编辑' }).click();
   await expect(page.getByText('机组限值 · 聚焦矩阵编辑')).toBeVisible();
   await page.setViewportSize({ width: 1440, height: 900 });
-  await page.screenshot({ path: '../docs/visual-acceptance/ui-special-iteration/task-fullscreen-matrix-1440.png' });
+  await page.screenshot({ path: testInfo.outputPath('task-fullscreen-matrix-1440.png') });
   await page.getByRole('button', { name: '粘贴矩形数据' }).click();
   await page.getByLabel('机组限值批量输入').fill('1\t2\n3\t4');
   await page.getByRole('button', { name: '确认导入' }).click();

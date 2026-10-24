@@ -1,3 +1,4 @@
+import { ContextNote } from '../../../components/ContextNote';
 import { effective1dStrategy } from '../utils/functionStrategy';
 import { Alert, Button, Card, Descriptions, Empty, Form, Input, Modal, Popover, Select, Space, Table, Tag, Tooltip, Typography, message } from 'antd';
 import { useEffect, useState } from 'react';
@@ -311,10 +312,8 @@ export function Step3MathExpansion({ draft, onChange }: { draft: ModelDraft; onC
   const nonlinearSummary = nonlinearMessageGroups.map(item => `${item.messageText}${item.count > 1 ? `（${item.count} 处）` : ''}`).join('；');
   const nonlinearDetails = <div className="model-diagnostic-details">{nonlinearMessageGroups.map(item => <div key={item.messageText}><span>{item.messageText}</span>{item.count > 1 && <Tag>{item.count} 处</Tag>}</div>)}</div>;
   const formulaStatusGuide = (
-    <Alert
-      className="section-gap compact-step-note formula-status-guide"
-      type="info"
-      showIcon
+    <ContextNote collapsible
+      className="section-gap formula-status-guide"
       title="公式状态说明"
       description="“待校验”表示尚未完成后端权威编译，不代表公式有问题；只有检测到决策变量之间相乘、变量除法、幂或一般非线性函数时，才会显示非线性风险或需确认。普通的参数 × 变量成本项仍属于线性表达。"
     />
@@ -738,9 +737,7 @@ export function Step3MathExpansion({ draft, onChange }: { draft: ModelDraft; onC
 
   if (draft.basic_info.builder_mode !== 'generic_linear') return (
     <>
-      <Alert
-        className="compact-step-note"
-        type="info"
+      <ContextNote collapsible
         title={draft.basic_info.builder_mode === 'template_based' ? '模板数学展开' : '组件化数学展开'}
         description={draft.basic_info.builder_mode === 'template_based'
           ? '约束和目标项来自内置模板资产；可继续添加自定义公式或保存为新的草稿资产。'
@@ -840,10 +837,8 @@ export function Step3MathExpansion({ draft, onChange }: { draft: ModelDraft; onC
               }}
             />
           </Form.Item>
-          <Alert
-            className="section-gap compact-step-note function-mapping-strategy-alert"
-            type="info"
-            showIcon
+          <ContextNote collapsible
+            className="section-gap"
             title="求解策略说明"
             description={(
               <div className="function-mapping-strategy-hints">
@@ -957,31 +952,28 @@ export function Step3MathExpansion({ draft, onChange }: { draft: ModelDraft; onC
   return (
     <>
       {modalContextHolder}
-      <Card className="section-gap" title="目标编译策略" size="small">
-        <Space wrap align="start">
-          <div>
+      <Card className="section-gap objective-compile-strategy" title="目标编译策略" size="small">
+        <div className="objective-compile-layout">
+          <div className="objective-compile-field">
             <Typography.Text type="secondary">目标模式</Typography.Text>
             <Select
               aria-label="目标模式"
               value={draft.objective?.mode || (draft.objective?.type === 'weighted_sum' ? 'weighted_sum' : 'single')}
-              style={{ width: 160, display: 'block' }}
               options={[{ value: 'single', label: 'single 单目标' }, { value: 'weighted_sum', label: 'weighted_sum 加权和' }]}
               onChange={mode => onChange({ ...draft, objective: { ...(draft.objective || {}), mode, type: mode }, advanced: { ...draft.advanced, generic_spec: undefined } })}
             />
           </div>
-          <div>
+          <div className="objective-compile-field">
             <Typography.Text type="secondary">全局方向</Typography.Text>
             <Select
               aria-label="全局目标方向"
               value={draft.objective?.global_direction || (draft.objective?.sense === 'maximize' ? 'maximize' : 'minimize')}
-              style={{ width: 160, display: 'block' }}
               options={[{ value: 'minimize', label: 'minimize' }, { value: 'maximize', label: 'maximize' }]}
               onChange={global_direction => onChange({ ...draft, objective: { ...(draft.objective || {}), global_direction, sense: global_direction }, advanced: { ...draft.advanced, generic_spec: undefined } })}
             />
           </div>
-          <Alert
-            type="info"
-            showIcon
+          <ContextNote
+            className="objective-compile-normalization"
             title="方向归一化"
             description={draft.formulas.filter(item => item.kind === 'objective' && (item.solve_participation || 'solve_active') === 'solve_active').map(item => {
               const global = draft.objective?.global_direction || (draft.objective?.sense === 'maximize' ? 'maximize' : 'minimize');
@@ -991,9 +983,9 @@ export function Step3MathExpansion({ draft, onChange }: { draft: ModelDraft; onC
               return `${sign < 0 ? '-' : '+'}${String(weight ?? '未填')} × ${item.name}（${item.objective_direction || '方向未填'}）`;
             }).join('；') || '尚未配置参与求解的目标'}
           />
-        </Space>
+        </div>
       </Card>
-      <div className="model-section-anchor" data-section-key="mapping">
+      <div className="model-section-anchor math-expansion-actions" data-section-key="mapping">
         <Space wrap>
           <Button type="primary" onClick={() => setEditing(newFormula('constraint'))}>新增约束公式</Button>
           <Button onClick={() => setEditing(newFormula('objective'))}>新增目标函数</Button>

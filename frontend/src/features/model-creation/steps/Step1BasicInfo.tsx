@@ -65,6 +65,13 @@ export function Step1BasicInfo({
   const problemTypeReady = objectiveCount > 0 && draft.semantic.variables.length > 0 && hasConstraintDefinition;
   const inferredProblemType = problemTypeReady ? inferModelProblemType(draft) : undefined;
   const isAssetMode = workspace.mode === 'edit' || workspace.mode === 'clone' || workspace.mode === 'version';
+  const isTemplateMode = workspace.mode === 'template';
+  const hasLoadedTemplate = isTemplateMode && Boolean(workspace.templateCode);
+  const creationSummary = isTemplateMode
+    ? hasLoadedTemplate
+      ? { title: '模型模板已加载', description: '已同步集合、参数、变量、组件、公式、时间维度及运行参数' }
+      : { title: '请选择模型模板', description: '选择后载入模板的模型定义，再按需修改。' }
+    : { title: '空白模型', description: '从空白结构开始，按需配置模型语义、公式和运行参数。' };
 
   return (
     <>
@@ -75,7 +82,7 @@ export function Step1BasicInfo({
             <Card title="创建方式" className="model-step-block" data-section-key="creation">
               <Radio.Group
                 className="creation-mode-group"
-                value={workspace.mode === 'template' ? 'template' : 'blank'}
+                value={isTemplateMode ? 'template' : 'blank'}
                 onChange={event => {
                   onModeChange(event.target.value === 'template' ? 'template' : 'new');
                 }}
@@ -85,9 +92,11 @@ export function Step1BasicInfo({
                   { value: 'blank', label: '空白创建' },
                 ]}
               />
-              <Form.Item label="模型模板" className="section-gap">
-                <Select allowClear showSearch disabled={isAssetMode} value={workspace.templateCode ?? null} placeholder="未选择" options={templates.map(t => ({ value: t.code, label: t.name }))} onChange={value => onTemplate(value || '')} />
-              </Form.Item>
+              {isTemplateMode && (
+                <Form.Item label="模型模板" className="section-gap">
+                  <Select aria-label="模型模板" allowClear showSearch value={workspace.templateCode ?? null} placeholder="请选择模型模板" options={templates.map(t => ({ value: t.code, label: t.name }))} onChange={value => onTemplate(value || '')} />
+                </Form.Item>
+              )}
             </Card>
           </Col>
           <Col xs={24} lg={8}>
@@ -162,10 +171,10 @@ export function Step1BasicInfo({
             <Descriptions.Item label="公式" span={2}>{draft.formulas.length}</Descriptions.Item>
           </Descriptions>
         ) : (
-          <div className={`model-inline-notice ${workspace.mode === 'template' ? 'model-inline-notice-success' : ''}`} role="status">
-            {workspace.mode === 'template' ? <CheckCircleFilled /> : <InfoCircleFilled />}
-            <strong>{workspace.mode === 'template' ? '后端模板已加载' : '空白模型'}</strong>
-            <span>{workspace.mode === 'template' ? '已同步集合、参数、变量、组件、公式、时间维度及运行参数' : '请选择业务场景和后端模板，或继续创建空白模型'}</span>
+          <div className={`model-inline-notice ${hasLoadedTemplate ? 'model-inline-notice-success' : ''}`} role="status">
+            {hasLoadedTemplate ? <CheckCircleFilled /> : <InfoCircleFilled />}
+            <strong>{creationSummary.title}</strong>
+            <span>{creationSummary.description}</span>
           </div>
         )}
       </Card>
@@ -173,7 +182,7 @@ export function Step1BasicInfo({
       <Card title="当前选择摘要" className="section-gap">
         <Space wrap>
           <Tag color="blue">{b.scenario || '业务场景未选择'}</Tag>
-          <Tag color={workspace.mode === 'new' ? 'gold' : 'green'}>{workspace.mode === 'new' ? '空白创建' : workspace.mode}</Tag>
+          <Tag color={workspace.mode === 'new' ? 'gold' : 'green'}>{workspace.mode === 'new' ? '空白创建' : isTemplateMode ? '从模板创建' : workspace.mode}</Tag>
           <Tag>{b.builder_mode === 'component_based' ? '组件化 Builder' : '通用线性 Builder'}</Tag>
           <Typography.Text type="secondary">编码由系统自动生成，必要时可在高级编辑中调整。</Typography.Text>
         </Space>

@@ -2,25 +2,25 @@ body,
 .main,
 .main-content,
 .main-content.content {
-  background: #f4f6f9 !important;
+  background: var(--proto-bg) !important;
 }
 
 .sidebar,
 .app-sidebar {
-  background: #10243a !important;
+  background: var(--proto-nav) !important;
   box-shadow: none !important;
 }
 
 .brand-mark,
 .sidebar .brand-mark {
-  border-radius: 6px !important;
-  background: #2166c2 !important;
+  border-radius: var(--radius-control) !important;
+  background: var(--proto-blue) !important;
   box-shadow: none !important;
 }
 
 .app-sidebar .ant-menu-item-selected,
 .nav button.active {
-  background: #173756 !important;
+  background: var(--proto-nav-2) !important;
 }
 
 .page-hero {

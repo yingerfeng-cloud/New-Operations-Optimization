@@ -1,0 +1,99 @@
+/* Explanatory copy shares one quiet treatment; warnings remain Alerts. */
+.context-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  min-width: 0;
+  max-width: 100%;
+  padding: 6px 0;
+  color: var(--proto-muted, #667085);
+  font-size: 13px;
+  line-height: 20px;
+  overflow-wrap: anywhere;
+}
+
+.context-note-icon {
+  flex: 0 0 auto;
+  margin-top: 3px;
+  color: #667085;
+  font-size: 14px;
+}
+
+.context-note-content { min-width: 0; }
+.context-note-title { color: #475467; font-weight: 500; }
+.context-note-description { display: inline; margin-inline-start: 8px; }
+
+.context-note-disclosure { display: block; padding: 0; }
+.context-note-summary {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 6px 0;
+  border-radius: 4px;
+  cursor: pointer;
+  list-style: none;
+}
+.context-note-summary::-webkit-details-marker { display: none; }
+.context-note-summary::marker { content: ''; }
+.context-note-summary:hover .context-note-title { color: #2166c2; }
+.context-note-summary:focus-visible { outline: 2px solid #2166c2; outline-offset: 3px; }
+.context-note-summary .context-note-title { min-width: 0; }
+.context-note-toggle {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 5px;
+  margin-inline-start: auto;
+  color: #667085;
+  font-size: 12px;
+  white-space: nowrap;
+}
+.context-note-toggle .anticon { font-size: 10px; }
+.context-note-collapse { display: none; }
+.context-note[open] .context-note-expand { display: none; }
+.context-note[open] .context-note-collapse { display: inline; }
+.context-note[open] .context-note-toggle .anticon { transform: rotate(90deg); }
+.context-note-details {
+  margin: 2px 0 6px 22px;
+  padding: 8px 12px;
+  border-left: 2px solid #d0d5dd;
+  background: #f8fafc;
+  line-height: 1.65;
+}
+.context-note-details > :first-child { margin-top: 0; }
+.context-note-details > :last-child { margin-bottom: 0; }
+.context-note.strategy-help,
+.context-note.point-count-notice { margin: -4px 0 8px; }
+.context-note.time-series-preview-notice { margin: 6px 0 10px; }
+
+/* Alert v6 uses section/title; keep status text readable at every width. */
+.compact-notice .ant-alert-section {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 2px 8px;
+  min-width: 0;
+}
+.compact-notice .ant-alert-title {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.5;
+}
+.compact-step-note.ant-alert-with-description .ant-alert-section,
+.compact-step-note.ant-alert-with-description .ant-alert-content { flex-wrap: wrap; gap: 2px 8px; }
+.compact-step-note .ant-alert-title,
+.compact-step-note .ant-alert-message { flex-shrink: 1; }
+.compact-notice .ant-alert-description,
+.compact-step-note .ant-alert-description {
+  white-space: normal;
+  overflow: visible;
+  overflow-wrap: anywhere;
+  text-overflow: clip;
+}
+.skill-definition-validation-alert .ant-alert-description { display: block; -webkit-line-clamp: unset; }
+
+@media (max-width: 600px) {
+  .context-note-summary { min-height: 40px; align-items: center; }
+  .context-note-summary .context-note-icon { margin-top: 0; }
+}

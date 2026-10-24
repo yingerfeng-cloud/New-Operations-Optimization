@@ -412,10 +412,75 @@ test('asset custom scenario remains visible when absent from current dictionary'
 test('creation method control changes the actual workspace mode', async () => {
   renderPage();
   await screen.findByText('新建模型');
-  fireEvent.click(screen.getByText('从模板创建'));
+  expect(screen.getByRole('radio', { name: '空白创建' })).toBeChecked();
+  expect(screen.queryByRole('combobox', { name: '模型模板' })).not.toBeInTheDocument();
+
+  fireEvent.click(screen.getByRole('radio', { name: '从模板创建' }));
   expect(await screen.findByText('从模板创建模型')).toBeInTheDocument();
   expect(useModelCreationStore.getState().workspace.mode).toBe('template');
   expect(useModelCreationStore.getState().workspace.templateCode).toBeUndefined();
+  expect(screen.getByRole('radio', { name: '从模板创建' })).toBeChecked();
+  expect(screen.getByRole('combobox', { name: '模型模板' })).toBeInTheDocument();
+  expect(screen.queryByText('模型模板已加载')).not.toBeInTheDocument();
+
+  fireEvent.click(screen.getByRole('radio', { name: '空白创建' }));
+  await screen.findByText('新建模型');
+  expect(useModelCreationStore.getState().workspace.mode).toBe('new');
+  expect(screen.queryByRole('combobox', { name: '模型模板' })).not.toBeInTheDocument();
+});
+
+test('switching from a loaded template to blank creation removes its binding and definitions', async () => {
+  renderPage(['/models/create?mode=template&template=template_a']);
+  await screen.findByText('模型模板已加载');
+  expect(screen.getByRole('combobox', { name: '模型模板' })).toBeInTheDocument();
+  expect(useModelCreationStore.getState().draft.components).toHaveLength(1);
+
+  fireEvent.click(screen.getByRole('radio', { name: '空白创建' }));
+  await screen.findByText('新建模型');
+  const state = useModelCreationStore.getState();
+  expect(state.workspace.templateCode).toBeUndefined();
+  expect(state.draft.basic_info.template_code).toBeUndefined();
+  expect(state.draft.semantic.sets).toEqual([]);
+  expect(state.draft.components).toEqual([]);
+  expect(state.draft.formulas).toEqual([]);
+  expect(screen.queryByRole('combobox', { name: '模型模板' })).not.toBeInTheDocument();
+
+  fireEvent.click(screen.getByRole('radio', { name: '从模板创建' }));
+  await screen.findByText('从模板创建模型');
+  expect(useModelCreationStore.getState().workspace.templateCode).toBeUndefined();
+  expect(screen.getByRole('combobox', { name: '模型模板' })).toBeInTheDocument();
+  expect(screen.queryByText('模型模板已加载')).not.toBeInTheDocument();
+});
+
+test('choosing a scenario before a template keeps template creation selected', async () => {
+  renderPage(['/models/create?mode=template']);
+  await screen.findByText('从模板创建模型');
+  fireEvent.mouseDown(screen.getByRole('combobox', { name: '当前场景' }));
+  fireEvent.click(await screen.findByText('日前机组组合优化'));
+
+  await waitFor(() => expect(useModelCreationStore.getState().draft.basic_info.scenario_id).toBe('day_ahead_unit_commitment'));
+  expect(useModelCreationStore.getState().workspace.mode).toBe('template');
+  expect(screen.getByRole('radio', { name: '从模板创建' })).toBeChecked();
+  expect(screen.getByRole('combobox', { name: '模型模板' })).toBeInTheDocument();
+  expect(screen.queryByText('模型模板已加载')).not.toBeInTheDocument();
+});
+
+test('cancelling a creation method switch keeps the current draft and visible controls', async () => {
+  renderPage();
+  await screen.findByText('新建模型');
+  act(() => {
+    const state = useModelCreationStore.getState();
+    state.setDraft({ ...state.draft, basic_info: { ...state.draft.basic_info, name: '保留当前草稿' } });
+  });
+
+  fireEvent.click(screen.getByRole('radio', { name: '从模板创建' }));
+  await screen.findByText('当前草稿尚未保存');
+  fireEvent.click(screen.getByRole('button', { name: '继续编辑' }));
+  await waitFor(() => expect(screen.queryByText('当前草稿尚未保存')).not.toBeInTheDocument());
+  expect(useModelCreationStore.getState().workspace.mode).toBe('new');
+  expect(useModelCreationStore.getState().draft.basic_info.name).toBe('保留当前草稿');
+  expect(screen.getByRole('radio', { name: '空白创建' })).toBeChecked();
+  expect(screen.queryByRole('combobox', { name: '模型模板' })).not.toBeInTheDocument();
 });
 
 test('editing published unit commitment opens as a new draft source', async () => {

@@ -11,7 +11,9 @@ import { getModel, getModelAssetDetail, getModels, offlineModel, publishModel, r
 import { cloneTemplate, getTemplates } from '../../api/templates';
 import { QueryState } from '../../components/QueryState';
 import { DataTable } from '../../components/DataTable';
+import { ModelTemplatePicker } from '../../features/model-center/ModelTemplatePicker';
 import { PageHeader } from '../../components/PageHeader';
+import { usePageHeaderSlots } from '../../components/PageHeader/slots';
 import { StatusTag } from '../../components/StatusTag';
 import { FilterBar, MetricCard, MetricGrid } from '../../components/WorkspaceUI';
 import {
@@ -107,21 +109,13 @@ function defaultTestParameters(model: ModelAsset, detail: Record<string, unknown
   };
 }
 
-function templateCapability(template: { code?: string; problem_type?: string; tags?: string[]; scenario?: string; description?: string }) {
-  const capability = capabilityOrFallback(template as Record<string, unknown>, template.problem_type || '-');
-  return {
-    problemType: capability.problemType,
-    solver: capability.solver,
-    functionAssets: capability.functionAssets,
-    useCase: capability.useCase,
-  };
-}
-
 export function ModelCenterPage() {
   const [modalApi, modalContextHolder] = Modal.useModal();
   const qc = useQueryClient();
   const nav = useNavigate();
   const { id } = useParams();
+  const pageHeaderSlots = usePageHeaderSlots();
+  const integratedHeader = !id && Boolean(pageHeaderSlots?.titleTarget);
   const [templateOpen, setTemplateOpen] = useState(false);
   const [template, setTemplate] = useState<string>();
   const viewId = id;
@@ -231,13 +225,17 @@ export function ModelCenterPage() {
     });
   };
 
+  const modelActions = <>{localDrafts.length > 0 && <Dropdown menu={{ items: localDrafts.map((item, index) => ({ key: String(index), label: `${item.draft.basic_info.name || '未命名草稿'} · 第 ${item.step + 1} 步` })), onClick: ({ key }) => nav(recoveryUrl(localDrafts[Number(key)])) }}><Button>恢复本机草稿</Button></Dropdown>}<Button onClick={() => setTemplateOpen(true)}>从模板克隆</Button><Button type="primary" onClick={() => nav('/models/create')}>创建模型</Button></>;
+
   return (
     <>
       {modalContextHolder}
       <PageHeader
         title="模型资产中心"
         description="模型版本管理、发布治理、模板克隆、测试运行与资产沉淀。"
-        extra={<>{localDrafts.length > 0 && <Dropdown menu={{ items: localDrafts.map((item, index) => ({ key: String(index), label: `${item.draft.basic_info.name || '未命名草稿'} · 第 ${item.step + 1} 步` })), onClick: ({ key }) => nav(recoveryUrl(localDrafts[Number(key)])) }}><Button>恢复本机草稿</Button></Dropdown>}<Button onClick={() => setTemplateOpen(true)}>从模板克隆</Button><Button type="primary" onClick={() => nav('/models/create')}>创建模型</Button></>}
+        integrated={!id}
+        shortTitle="模型资产"
+        extra={modelActions}
       />
       <MetricGrid>
         <MetricCard title="模型资产数" value={models.data === undefined ? '—' : rows.length} description="真实后端资产" tone="blue" />
@@ -245,7 +243,7 @@ export function ModelCenterPage() {
         <MetricCard title="试运行验收" value={models.data === undefined ? '—' : trialCount} description="仅按 model_id 调试" tone="purple" />
         <MetricCard title="草稿" value={models.data === undefined ? '—' : developingCount} description="可直接编辑的未发布版本" tone="amber" />
       </MetricGrid>
-      <Card className="content-card section-gap" title="模型资产列表">
+      <Card className="content-card section-gap model-asset-list" title="模型资产列表" extra={integratedHeader ? <div className="page-hero-actions model-list-actions">{modelActions}</div> : undefined}>
         <FilterBar onReset={() => setFilters({})}>
           <Input allowClear placeholder="搜索模型名称或编码" style={{ width: 220 }} value={filters.keyword} onChange={event => setFilters({ ...filters, keyword: event.target.value })} />
           <Select allowClear placeholder="建模方式" style={{ width: 160 }} value={filters.build} onChange={build => setFilters({ ...filters, build })} options={[...new Set(allRows.map(item => item.build_mode).filter(Boolean))].map(value => ({ value, label: buildModeText(value) }))} />
@@ -380,7 +378,7 @@ export function ModelCenterPage() {
         open={!!viewId}
         onClose={() => nav('/models')}
         title={(
-          <Space>
+          <Space wrap>
             {current?.name || '模型详情'}
             {current && (
               <Tooltip title={lifecycleHint(current)}>
@@ -391,7 +389,7 @@ export function ModelCenterPage() {
           </Space>
         )}
         footer={(
-          <Space style={{ width: '100%', justifyContent: 'flex-end' }}>
+          <Space wrap style={{ width: '100%', justifyContent: 'flex-end' }}>
             <Button onClick={() => nav('/models')}>关闭</Button>
             {current && <Button onClick={() => executeEditAction(current)}>{editAction(current).label}</Button>}
             {current && <Button onClick={() => test.mutate({ model: current, detail: currentAssetDetail })}>{testActionLabel(current)}</Button>}
@@ -429,36 +427,8 @@ export function ModelCenterPage() {
           />
         )}
       </Drawer>
-      <Modal title="选择内置模板" open={templateOpen} onCancel={() => setTemplateOpen(false)} onOk={() => template && clone.mutate(template)} confirmLoading={clone.isPending}>
-        <div className="form-card">
-          <Select showSearch style={{ width: '100%' }} value={template} onChange={setTemplate} options={templates.data?.map(item => ({ value: item.code, label: `${item.name} (${item.code})` }))} />
-          <div className="template-card-grid section-gap">
-            {(templates.data || []).map(item => {
-              const capability = templateCapability(item);
-              const deprecated = Boolean((item as Record<string, unknown>).deprecated);
-              const replacementCode = String((item as Record<string, unknown>).replacement_model_code || '');
-              return (
-                <Card
-                  key={item.code}
-                  size="small"
-                  className={template === item.code ? 'selected-template-card' : undefined}
-                  onClick={() => setTemplate(item.code)}
-                  title={item.name}
-                  extra={<Space>{deprecated && <Tag color="warning">已弃用</Tag>}<Tag color={String(capability.problemType).includes('MILP') ? 'purple' : 'blue'}>模型类型：{capability.problemType}</Tag></Space>}
-                >
-                  <Space orientation="vertical" size={4}>
-                    <span>求解器：{capability.solver}</span>
-                    <span>函数资产：{capability.functionAssets}</span>
-                    <span>适用场景：{capability.useCase}</span>
-                    {deprecated && replacementCode && <span className="muted">替代模型：{replacementCode}</span>}
-                    <span className="muted">{item.code}</span>
-                  </Space>
-                </Card>
-              );
-            })}
-          </div>
-          <p className="muted mt">克隆后会生成真实模型资产，可继续进入模型详情或模型创建流程完善。</p>
-        </div>
+      <Modal className="template-picker-modal" title="选择内置模板" width={520} open={templateOpen} onCancel={() => setTemplateOpen(false)} onOk={() => template && clone.mutate(template)} okButtonProps={{ disabled: !template }} confirmLoading={clone.isPending}>
+        <ModelTemplatePicker templates={templates.data || []} value={template} onChange={setTemplate} loading={templates.isLoading} />
       </Modal>
     </>
   );

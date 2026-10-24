@@ -96,6 +96,7 @@ export function ResultCenterPage() {
         </QueryState>
       </Card>
       <Drawer
+        className="result-report-drawer"
         size="large"
         open={!!id}
         onClose={() => setId(undefined)}

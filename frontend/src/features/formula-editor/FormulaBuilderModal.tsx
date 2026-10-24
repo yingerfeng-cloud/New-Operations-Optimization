@@ -1,4 +1,5 @@
 import { Alert, Button, Collapse, Empty, Form, Input, InputNumber, Modal, Radio, Select, Space, Tabs, Tag, Typography } from 'antd';
+import { RightOutlined } from '@ant-design/icons';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { FormulaCompileResult, FormulaDef } from '../../types/formula';
 import { JsonViewer } from '../../components/JsonViewer';
@@ -277,6 +278,7 @@ export function FormulaBuilder({
   const authoritativeCurrent = isAuthoritativeArtifactCurrent(formula, effectiveCompileContext);
   const formulaCode = formula.formula_id.trim();
   const formulaName = formula.name.trim();
+  const readableFormula = renderFormulaReadable(formula.dsl_formula, symbols) || '输入公式后显示预览';
   const formulaCodeValid = /^[A-Za-z0-9_][A-Za-z0-9_.-]*$/.test(formulaCode);
   const canApply = Boolean(formulaName) && formulaCodeValid && check.valid && Boolean(formula.dsl_formula.trim()) && (participation !== 'solve_active' || authoritativeCurrent);
 
@@ -467,10 +469,14 @@ export function FormulaBuilder({
               onCompile={() => { void runAuthoritativeCompile(); }}
             />
           </Form.Item>
-          <div className="formula-preview-box">
-            <Typography.Text strong>可读预览</Typography.Text>
-            <Typography.Paragraph>{renderFormulaReadable(formula.dsl_formula, symbols) || '输入公式后显示预览'}</Typography.Paragraph>
-          </div>
+          <details className="formula-preview-box">
+            <summary title="展开或收起完整公式预览">
+              <span className="formula-preview-label">可读预览</span>
+              <span className="formula-preview-expression">{readableFormula}</span>
+              <RightOutlined className="formula-preview-toggle" aria-hidden="true" />
+            </summary>
+            <div className="formula-preview-expanded">{readableFormula}</div>
+          </details>
           {!check.valid && (
             <Alert
               className="section-gap"
@@ -482,11 +488,22 @@ export function FormulaBuilder({
           )}
           {check.valid && participation === 'solve_active' && !authoritativeCurrent && (
             <Alert
-              className="section-gap"
+              className="formula-compile-notice"
               type="warning"
               showIcon
-              title="请先执行权威编译"
-              description="当前公式尚未编译，或公式、作用域、符号和时间契约变化后编译产物已过期。"
+              title={(
+                <details className="formula-compile-details">
+                  <summary>
+                    <span>请先执行权威编译</span>
+                    <span className="formula-compile-toggle" aria-hidden="true">
+                      <span className="formula-compile-expand">展开说明</span>
+                      <span className="formula-compile-collapse">收起说明</span>
+                      <RightOutlined />
+                    </span>
+                  </summary>
+                  <div className="formula-compile-description">当前公式尚未编译，或公式、作用域、符号和时间契约变化后编译产物已过期。</div>
+                </details>
+              )}
             />
           )}
           {check.warnings.length > 0 && (
@@ -599,6 +616,8 @@ export function FormulaBuilderModal({
 }) {
   return (
     <Modal
+      className="formula-editor-modal"
+      centered
       width={1120}
       open={open}
       footer={null}

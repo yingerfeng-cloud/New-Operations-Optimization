@@ -1,4 +1,5 @@
-import { Button, Card, Col, Empty, Row, Space, Tag } from 'antd';
+import { Button, Card, Empty, Space, Tag, theme } from 'antd';
+import { ArrowRightOutlined } from '@ant-design/icons';
 import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -18,6 +19,7 @@ import type { ScenarioCatalogItem } from '../../types/scenario';
 import type { SolveTask } from '../../types/task';
 import { formatDurationSeconds } from '../../utils/formatDuration';
 import { PLATFORM_TAGLINE } from '../../app/brand';
+import { taskTrendOption } from './dashboardCharts';
 
 const callable = new Set(['PUBLISHED', 'ACTIVE', 'ONLINE', 'READY']);
 const TREND_WINDOWS = [7, 14, 30] as const;
@@ -48,6 +50,7 @@ function taskScenarioName(task: SolveTask, models: ModelAsset[], scenarios: Scen
 
 export function DashboardPage() {
   const nav = useNavigate();
+  const { token } = theme.useToken();
   const [trendWindow, setTrendWindow] = useState<TrendWindow>(7);
   const refetchInterval = import.meta.env.MODE === 'test' ? false : 5000;
   const models = useQuery({ queryKey: ['models'], queryFn: getModels });
@@ -83,47 +86,20 @@ export function DashboardPage() {
   }, {});
   const scenarioData = Object.entries(scenarioCounts).sort((a, b) => b[1] - a[1]).slice(0, 6).map(([name, value]) => ({ name, value }));
   const scenarioTotal = scenarioData.reduce((sum, item) => sum + item.value, 0);
-  const scenarioPalette = ['#2b6ed2', '#27a889', '#7b72dc', '#e6a23c', '#3ba7c9', '#8595aa'];
+  const scenarioPalette = ['#466bc4', '#5aa68e', '#8e82bd', '#c6a26a', '#78a8b8', '#98a5b8'];
   const peakDay = trend.reduce((peak, day) => day.total > peak.total ? day : peak, trend[0]);
   const trendTaskCount = trend.reduce((sum, day) => sum + day.total, 0);
   const completedTrendTasks = rows.filter(task => trend.some(day => day.key === dateKey(task.created_at)) && normalizeTaskStatus(task.status) === 'SUCCESS');
   const completedDurations = completedTrendTasks.map(task => Number(task.duration_seconds)).filter(value => Number.isFinite(value) && value >= 0);
   const averageDuration = completedDurations.length ? completedDurations.reduce((sum, value) => sum + value, 0) / completedDurations.length : undefined;
-  const trendOption = {
-    color: ['#21a179', '#ef6a61', '#9aaabd', '#2057a7'],
-    grid: { top: 46, right: 50, bottom: 34, left: 38 },
-    tooltip: {
-      trigger: 'axis',
-      backgroundColor: 'rgba(11, 31, 56, .94)',
-      borderWidth: 0,
-      textStyle: { color: '#fff' },
-      formatter: (params: Array<{ axisValue: string; seriesName: string; value: number | null; marker: string }>) => {
-        const day = trend.find(item => item.label === params[0]?.axisValue);
-        if (!day) return '';
-        const lines = [`<strong>${day.label}</strong>`, `${params.find(item => item.seriesName === '成功')?.marker || ''}成功：${day.success}`, `${params.find(item => item.seriesName === '异常')?.marker || ''}异常：${day.failed}`, `${params.find(item => item.seriesName === '处理中')?.marker || ''}处理中：${day.other}`];
-        if (day.successRate !== null) lines.push(`${params.find(item => item.seriesName === '成功率')?.marker || ''}成功率：${day.successRate}%（${day.success}/${day.total}）`);
-        else lines.push('<span style="color:#a9b8ca">成功率：无任务</span>');
-        return lines.join('<br/>');
-      },
-    },
-    legend: { top: 4, right: 8, itemWidth: 10, itemHeight: 7, textStyle: { color: '#65758b', fontSize: 11 } },
-    xAxis: { type: 'category', data: trend.map(day => day.label), axisLine: { lineStyle: { color: '#dce5f0' } }, axisTick: { show: false }, axisLabel: { color: '#7a8ba1' } },
-    yAxis: [
-      { type: 'value', min: 0, max: Math.max(4, Math.ceil(Math.max(...trend.map(day => day.total), 0) * 1.25)), minInterval: 1, splitLine: { lineStyle: { color: '#eef3f8' } }, axisLabel: { color: '#7a8ba1' } },
-      { type: 'value', min: 0, max: 100, axisLabel: { formatter: '{value}%', color: '#7a8ba1' }, splitLine: { show: false } },
-    ],
-    series: [
-      { name: '成功', type: 'bar', stack: 'tasks', barMaxWidth: 22, data: trend.map(day => day.success), itemStyle: { borderRadius: [4, 4, 0, 0] } },
-      { name: '异常', type: 'bar', stack: 'tasks', barMaxWidth: 22, data: trend.map(day => day.failed), itemStyle: { borderRadius: [4, 4, 0, 0] } },
-      { name: '处理中', type: 'bar', stack: 'tasks', barMaxWidth: 22, data: trend.map(day => day.other), itemStyle: { borderRadius: [4, 4, 0, 0] } },
-      { name: '成功率', type: 'line', yAxisIndex: 1, smooth: 0.22, connectNulls: true, showSymbol: true, symbol: 'circle', symbolSize: 9, data: trend.map(day => day.successRate), lineStyle: { width: 2.5, color: '#2057a7', shadowColor: 'rgba(32, 87, 167, .18)', shadowBlur: 8 }, itemStyle: { color: '#2057a7', borderColor: '#fff', borderWidth: 2 }, emphasis: { scale: true, itemStyle: { borderWidth: 3 } } },
-    ],
-  };
+  const trendOption = taskTrendOption(trend, token.fontFamily);
   const scenarioOption = {
+    animation: false,
+    textStyle: { fontFamily: token.fontFamily },
     color: scenarioPalette,
-    title: { text: String(scenarioTotal), subtext: '任务总数', left: 'center', top: '36%', textAlign: 'center', textStyle: { color: '#173d65', fontSize: 27, fontWeight: 750 }, subtextStyle: { color: '#8492a6', fontSize: 11, lineHeight: 18 } },
-    tooltip: { trigger: 'item', formatter: '{b}<br/>{c} 个任务 · {d}%' },
-    series: [{ type: 'pie', radius: ['50%', '76%'], center: ['50%', '52%'], avoidLabelOverlap: true, itemStyle: { borderColor: '#fff', borderWidth: 3, borderRadius: 6 }, label: { show: true, position: 'inside', formatter: '{c}', color: '#fff', fontSize: 12, fontWeight: 700 }, labelLine: { show: false }, emphasis: { scaleSize: 6 }, data: scenarioData }],
+    title: { text: String(scenarioTotal), subtext: '任务总数', left: '50%', top: '35%', textAlign: 'center', textStyle: { color: token.colorText, fontSize: 24, fontWeight: 600 }, subtextStyle: { color: '#8995a8', fontSize: 11, lineHeight: 18 } },
+    tooltip: { trigger: 'item', formatter: '{b}<br/>{c} 个任务 · {d}%', backgroundColor: '#fff', borderColor: '#e5eaf2', textStyle: { color: '#53637e', fontSize: 12 }, extraCssText: 'border-radius:10px;box-shadow:0 8px 28px #20314914;' },
+    series: [{ type: 'pie', radius: ['66%', '84%'], center: ['50%', '50%'], avoidLabelOverlap: true, itemStyle: { borderColor: '#fff', borderWidth: 3, borderRadius: 4 }, label: { show: false }, labelLine: { show: false }, emphasis: { scale: false }, data: scenarioData }],
   };
 
   if (models.isLoading && tasks.isLoading) return <SectionLoading label="正在加载生产运行概况…" />;
@@ -131,52 +107,74 @@ export function DashboardPage() {
 
   return <>
     <PageHeader title="生产运筹工作台" description={`${PLATFORM_TAGLINE} 从业务场景和运行任务出发，优先处理运行中与异常任务。`} extra={<Space><Button onClick={() => nav('/scenarios')}>从业务场景开始</Button><Button type="primary" onClick={() => nav('/tasks?create=1')}>发起优化任务</Button></Space>} />
-    <MetricGrid>
-      <MetricCard title="运行中任务" value={tasks.isLoading ? '-' : running.length} description="排队、校验、建模与求解" tone="amber" onClick={() => nav('/tasks')} />
-      <MetricCard title="失败 / 无解" value={tasks.isLoading ? '-' : failed.length} description="待诊断和处理" tone={failed.length ? 'red' : 'neutral'} onClick={() => nav('/tasks')} />
-      <MetricCard title="已发布模型" value={models.isLoading ? '-' : published} description="可用于发起任务" tone="blue" onClick={() => nav('/models')} />
-      <MetricCard title="近 7 天任务" value={tasks.isLoading ? '-' : recentSevenDays.length} description={`成功率 ${successRate}`} tone="green" onClick={() => nav('/results')} />
-    </MetricGrid>
-    <Row gutter={[16, 16]} className="section-gap dashboard-operations-grid">
-      <Col xs={24} xl={16} className="dashboard-analytics-column">
-        <Card className="dashboard-chart-card dashboard-trend-card" title="任务运行态势" extra={<Space size={8}><span className="dashboard-card-hint">统计窗口</span><div className="dashboard-trend-window" role="group" aria-label="任务运行态势统计窗口">{TREND_WINDOWS.map(window => <button key={window} type="button" className={trendWindow === window ? 'active' : ''} aria-pressed={trendWindow === window} onClick={() => setTrendWindow(window)}>近 {window} 天</button>)}</div></Space>}>
-          <div className="dashboard-chart-summary">
-            <span><small>近 {trendWindow} 天任务</small><strong>{trendTaskCount}</strong></span>
-            <span><small>峰值日期</small><strong>{peakDay?.total ? `${peakDay.label} · ${peakDay.total}` : '-'}</strong></span>
-            <span><small>已完成平均耗时</small><strong>{formatDurationSeconds(averageDuration)}</strong></span>
+    <section className="dashboard-overview" aria-label="生产运行概况">
+      <MetricGrid>
+        <MetricCard title="运行中任务" value={tasks.isLoading ? '-' : running.length} description="排队、校验、建模与求解" tone="amber" onClick={() => nav('/tasks')} />
+        <MetricCard title="失败 / 无解" value={tasks.isLoading ? '-' : failed.length} description="待诊断和处理" tone={failed.length ? 'red' : 'neutral'} onClick={() => nav('/tasks')} />
+        <MetricCard title="已发布模型" value={models.isLoading ? '-' : published} description="可用于发起任务" tone="blue" onClick={() => nav('/models')} />
+        <MetricCard title="近 7 天任务" value={tasks.isLoading ? '-' : recentSevenDays.length} description={`成功率 ${successRate}`} tone="green" onClick={() => nav('/results')} />
+      </MetricGrid>
+    </section>
+    <div className="section-gap dashboard-operations-grid">
+      <Card className="dashboard-chart-card dashboard-trend-card" title={<div className="dashboard-card-heading"><span>任务运行态势</span><small>按任务创建日期统计</small></div>} extra={<Space size={8}><div className="dashboard-trend-window" role="group" aria-label="任务运行态势统计窗口">{TREND_WINDOWS.map(window => <button key={window} type="button" className={trendWindow === window ? 'active' : ''} aria-pressed={trendWindow === window} onClick={() => setTrendWindow(window)}>近 {window} 天</button>)}</div></Space>}>
+        <div className="dashboard-chart-summary">
+          <span><small>近 {trendWindow} 天任务</small><strong>{trendTaskCount}</strong></span>
+          <span><small>峰值日期</small><strong>{peakDay?.total ? `${peakDay.label} · ${peakDay.total}` : '-'}</strong></span>
+          <span><small>已完成平均耗时</small><strong>{formatDurationSeconds(averageDuration)}</strong></span>
+        </div>
+        <LazyEChart style={{ height: 248, minHeight: 248 }} option={trendOption} ariaLabel={`近 ${trendWindow} 天任务量与成功率趋势`} />
+        <p className="dashboard-chart-note">无任务日期不计算成功率</p>
+      </Card>
+      <Card className="dashboard-rail-card dashboard-tasks-card" title="最近任务" extra={<Button type="link" size="small" onClick={() => nav('/tasks')}>全部任务</Button>}>
+        {rows.length ? <>
+          <div className="dashboard-task-summary" aria-label="全部任务状态概览">
+            <span>运行中 <b>{running.length}</b></span><span>异常 <b>{failed.length}</b></span><span>成功 <b>{success.length}</b></span>
           </div>
-          <LazyEChart style={{ height: 278, minHeight: 278 }} option={trendOption} />
-        </Card>
-        <Card className="dashboard-chart-card dashboard-scene-card" title="业务场景结构" extra={<span className="dashboard-card-hint">按业务场景库统计</span>}>
-          {scenarioData.length ? <div className="dashboard-scene-layout">
-            <LazyEChart style={{ height: 230, minHeight: 230 }} option={scenarioOption} />
-            <div className="dashboard-scene-ranking">
-              <div className="dashboard-scene-ranking-head"><span>业务场景</span><span>任务 / 占比</span></div>
-              {scenarioData.map((item, index) => {
-                const percentage = scenarioTotal ? Math.round(item.value / scenarioTotal * 100) : 0;
-                return <div className="dashboard-scene-rank" key={item.name}>
-                  <div><span style={{ background: scenarioPalette[index] }} /><strong>{item.name}</strong><b>{item.value} <small>{percentage}%</small></b></div>
-                  <div className="dashboard-scene-progress"><i style={{ width: `${percentage}%`, background: scenarioPalette[index] }} /></div>
-                </div>;
-              })}
-            </div>
-          </div> : <Empty description="暂无业务场景数据" />}
-        </Card>
-      </Col>
-      <Col xs={24} xl={8} className="dashboard-activity-rail">
-        <Card className="dashboard-rail-card" title="最近任务" extra={<Button type="link" size="small" onClick={() => nav('/tasks')}>全部任务</Button>}>
-          {rows.length ? <div className="dashboard-activity-list">{rows.slice(0, 4).map(task => (
-            <button type="button" className="dashboard-activity-entry" key={task.id} title={isTaskFailed(task.status) ? failureReason(task) : String(task.scene || task.model || '')} onClick={() => nav(`/tasks?task=${task.id}`)}>
-              <span><strong>{task.model || task.id}</strong><small>{shortTime(task.started_at || task.created_at)} · {formatDurationSeconds(task.duration_seconds)}</small></span>
-              <StatusTag status={task.status} />
+          <div className="dashboard-activity-list">{rows.slice(0, 6).map(task => (
+            <button type="button" className="dashboard-activity-entry" key={task.id} title={isTaskFailed(task.status) ? failureReason(task) : String(task.scene || task.model || '')} onClick={() => nav(`/tasks?task=${encodeURIComponent(task.id)}`)}>
+              <span className="dashboard-entry-title"><strong title={task.model || task.id}>{task.model || task.id}</strong><StatusTag status={task.status} /></span>
+              <span className="dashboard-entry-meta">
+                <code title={task.id}>{task.id}</code>
+                <time>{shortTime(task.started_at || task.created_at)}</time>
+                {task.solver && <span>{task.solver}</span>}
+                <span className="dashboard-task-measure">{isTaskRunning(task.status) && Number.isFinite(task.progress) ? `进度 ${Math.round(task.progress)}%` : <>耗时 {formatDurationSeconds(task.duration_seconds)}</>}</span>
+              </span>
             </button>
-          ))}</div> : <Empty description="暂无任务数据" />}
-        </Card>
-        <Card className="dashboard-rail-card" title="最近使用模型">
-          {(models.data || []).length ? <div className="dashboard-model-list dashboard-model-list-compact">{(models.data || []).slice(0, 4).map(model => <button type="button" className="dash-entry dashboard-model-entry" key={model.id} onClick={() => nav(`/tasks?create=1&model=${encodeURIComponent(model.id)}&scene=${encodeURIComponent(model.scene || '')}`)}><span><strong>{model.name}</strong><p>{model.scene || '未标注场景'} · {model.version || '当前版本'}</p></span><Tag>发起任务</Tag></button>)}</div> : <Empty description="暂无可用模型" />}
-        </Card>
-      </Col>
-    </Row>
+          ))}</div>
+        </> : <Empty description="暂无任务数据" />}
+      </Card>
+      <Card className="dashboard-chart-card dashboard-scene-card" title="业务场景结构" extra={<span className="dashboard-card-hint">按业务场景库统计</span>}>
+        {scenarioData.length ? <div className="dashboard-scene-layout">
+          <LazyEChart style={{ height: 180, minHeight: 180 }} option={scenarioOption} ariaLabel="业务场景任务占比" />
+          <div className="dashboard-scene-ranking">
+            <div className="dashboard-scene-ranking-head"><span>业务场景</span><span>任务 / 占比</span></div>
+            {scenarioData.map((item, index) => {
+              const percentage = scenarioTotal ? Math.round(item.value / scenarioTotal * 100) : 0;
+              return <div className="dashboard-scene-rank" key={item.name}>
+                <div><span style={{ background: scenarioPalette[index] }} /><strong>{item.name}</strong><b>{item.value} <small>{percentage}%</small></b></div>
+                <div className="dashboard-scene-progress"><i style={{ width: `${percentage}%`, background: scenarioPalette[index] }} /></div>
+              </div>;
+            })}
+          </div>
+        </div> : <Empty description="暂无业务场景数据" />}
+      </Card>
+      <Card className="dashboard-rail-card dashboard-models-card" title="最近使用模型" extra={<Button type="link" size="small" onClick={() => nav('/models')}>全部模型</Button>}>
+        {(models.data || []).length ? <div className="dashboard-model-list dashboard-model-list-compact">{(models.data || []).slice(0, 5).map(model => (
+          <button type="button" className="dash-entry dashboard-model-entry" key={model.id} onClick={() => nav(`/tasks?create=1&model=${encodeURIComponent(model.id)}&scene=${encodeURIComponent(model.scene || '')}`)}>
+            <span className="dashboard-entry-main">
+              <strong title={model.name}>{model.name}</strong>
+              <span className="dashboard-model-meta">
+                <span className="dashboard-model-scene" title={model.scene || '未标注场景'}>{model.scene || '未标注场景'}</span>
+                <span>{model.version || '当前版本'}</span>
+                {model.solver && <span>{model.solver}</span>}
+                <StatusTag status={model.status} />
+              </span>
+            </span>
+            <span className="dashboard-model-action">发起任务 <ArrowRightOutlined aria-hidden /></span>
+          </button>
+        ))}</div> : <Empty description="暂无可用模型" />}
+      </Card>
+    </div>
     <Card title="求解能力摘要" className="section-gap" extra={<Button type="link" onClick={() => nav('/runtime')}>查看完整求解环境</Button>}>
       <Space wrap><Tag color={solvers.data?.highs?.available ? 'green' : 'orange'}>HiGHS：{solvers.data?.highs?.available ? '可用' : '未就绪'}</Tag><Tag color={solvers.data?.ipopt?.available ? 'green' : 'orange'}>Ipopt：{solvers.data?.ipopt?.available ? '可用' : '未配置'}</Tag><Tag>LP</Tag><Tag>MILP</Tag><Tag>PWL</Tag><Tag>McCormick</Tag><Tag>连续 NLP</Tag></Space>
     </Card>

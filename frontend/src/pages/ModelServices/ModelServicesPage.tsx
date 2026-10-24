@@ -1,3 +1,4 @@
+import { ContextNote } from '../../components/ContextNote';
 import { CopyOutlined, SearchOutlined } from '@ant-design/icons';
 import { Alert, Button, Card, Collapse, Descriptions, Form, Input, Select, Space, Table, Tabs, Tag, Typography, message } from 'antd';
 import { useEffect, useMemo, useState } from 'react';
@@ -265,12 +266,12 @@ export function ModelServicesPage() {
                   label: '在线调试',
                   children: (
                     <Form layout="vertical">
-                      <Alert type="info" title="在线调试固定当前模型 ID；对外稳定调用使用 API 示例中的 model_code，解析当时的正式版本。" />
+                      <ContextNote title="在线调试固定当前模型 ID；对外稳定调用使用 API 示例中的 model_code，解析当时的正式版本。" />
                       <Form.Item label="运行参数 JSON">
                         <Input.TextArea aria-label="运行参数 JSON" rows={8} value={debugPayload} onChange={event => setDebugPayload(event.target.value)} />
                       </Form.Item>
                       <SolverRunSettings key={selected.id} value={solverSettings} onChange={setSolverSettings} disabled={trackingActive} />
-                      <Space>
+                      <Space className="service-debug-actions" wrap>
                         <Button type="primary" disabled={trackingActive} loading={debugInvoke.isPending} onClick={() => debugInvoke.mutate()}>{trackedId ? '恢复任务' : '发起测试调用'}</Button>
                         {trackedId && terminalTask(trackedTask.data?.status) && <Button onClick={() => { writeSession(`optiforge-service-debug:${selected.id}`, undefined); setTrackedId(undefined); setDebugResult(undefined); }}>新建测试调用</Button>}
                         <Typography.Text type="secondary">提交后自动跟踪任务，可返回本页继续查看。</Typography.Text>

@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, vi } from 'vitest';
 import {
@@ -10,6 +10,7 @@ import {
   ModelSemanticPanel,
 } from '../../features/model-center/ModelAssetPanels';
 import { ModelCenterPage } from '../../pages/ModelCenter/ModelCenterPage';
+import { cloneTemplate } from '../../api/templates';
 import type { ModelAsset } from '../../types/model';
 import { renderWithQueryClient } from '../testUtils';
 
@@ -124,6 +125,7 @@ function renderPage() {
 
 beforeEach(() => {
   navigate.mockReset();
+  vi.mocked(cloneTemplate).mockClear();
   testState.routeId = 'model_001';
   testState.modelSample.status = 'published';
   testState.modelSample.published_at = '2026-06-23 12:10:00';
@@ -299,4 +301,32 @@ test('model detail follows route id changes and close returns to models', async 
   expect(await screen.findByText('模型 B')).toBeInTheDocument();
   fireEvent.click(document.querySelector('.ant-drawer-close') as HTMLButtonElement);
   expect(navigate).toHaveBeenCalledWith('/models');
+}, 30000);
+
+
+test('preserves the selected template while searching and clones only that code', async () => {
+  testState.routeId = undefined;
+  renderPage();
+  fireEvent.click(screen.getByRole('button', { name: '从模板克隆' }));
+  const dialog = await screen.findByRole('dialog');
+  const confirm = within(dialog).getByRole('button', { name: 'OK' });
+  expect(confirm).toBeDisabled();
+  expect(cloneTemplate).not.toHaveBeenCalled();
+
+  const search = within(dialog).getByRole('textbox', { name: '搜索模板名称或编码' });
+  fireEvent.change(search, { target: { value: 'day_ahead' } });
+  const select = within(dialog).getByRole('combobox', { name: '选择内置模板' });
+  if (select instanceof HTMLSelectElement) {
+    fireEvent.change(select, { target: { value: 'day_ahead_dispatch' } });
+  } else {
+    fireEvent.mouseDown(select);
+    fireEvent.click(await screen.findByText('日前调度模板 (day_ahead_dispatch)'));
+  }
+  expect(await screen.findByRole('group', { name: '已选模板：日前调度模板' })).toBeInTheDocument();
+  fireEvent.change(search, { target: { value: 'no-match' } });
+  expect(screen.getByRole('group', { name: '已选模板：日前调度模板' })).toBeInTheDocument();
+  expect(confirm).toBeEnabled();
+  fireEvent.click(confirm);
+  await waitFor(() => expect(vi.mocked(cloneTemplate).mock.calls[0]?.[0]).toBe('day_ahead_dispatch'));
+  await waitFor(() => expect(navigate).toHaveBeenCalledWith('/models/model_001'));
 }, 30000);

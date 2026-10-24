@@ -896,7 +896,65 @@ body {
 }
 
 .formula-preview-box {
-  background: #fbfdff;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: #f5f7fb;
+}
+
+.formula-preview-box > summary,
+.formula-compile-details > summary {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  cursor: pointer;
+  list-style: none;
+}
+
+.formula-preview-box > summary::-webkit-details-marker,
+.formula-compile-details > summary::-webkit-details-marker { display: none; }
+.formula-preview-box > summary::marker,
+.formula-compile-details > summary::marker { content: ''; }
+.formula-preview-box > summary:focus-visible,
+.formula-compile-details > summary:focus-visible { outline: 2px solid var(--proto-blue); outline-offset: 3px; }
+
+.formula-preview-box > summary {
+  padding: 8px 10px;
+  line-height: 20px;
+}
+
+.formula-preview-label { flex: 0 0 auto; color: var(--proto-muted); font-size: 13px; }
+.formula-preview-expression { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.formula-preview-toggle { flex: 0 0 auto; margin-left: auto; color: var(--proto-muted); font-size: 10px; }
+.formula-preview-box[open] .formula-preview-expression { display: none; }
+.formula-preview-box[open] .formula-preview-toggle { transform: rotate(90deg); }
+.formula-preview-expanded { padding: 0 10px 10px; line-height: 1.6; overflow-wrap: anywhere; white-space: pre-wrap; }
+
+.formula-compile-notice.ant-alert {
+  margin-top: 10px;
+  padding: 8px 10px;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.formula-compile-notice .ant-alert-icon { margin: 2px 0 0; font-size: 16px; }
+.formula-compile-notice .ant-alert-title { margin: 0; }
+.formula-compile-details > summary { line-height: 20px; }
+.formula-compile-toggle { display: inline-flex; align-items: center; gap: 5px; flex: 0 0 auto; margin-left: auto; color: var(--proto-muted); font-size: 12px; font-weight: 400; }
+.formula-compile-toggle .anticon { font-size: 10px; }
+.formula-compile-collapse { display: none; }
+.formula-compile-details[open] .formula-compile-expand { display: none; }
+.formula-compile-details[open] .formula-compile-collapse { display: inline; }
+.formula-compile-details[open] .formula-compile-toggle .anticon { transform: rotate(90deg); }
+.formula-compile-description {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--proto-line);
+  color: var(--proto-muted);
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 1.6;
 }
 
 .formula-builder-actions {

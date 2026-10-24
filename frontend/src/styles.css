@@ -17,3 +17,8 @@
 @import './styles/responsive.css';
 @import './styles/feedback-iteration.css';
 @import './styles/pages/agent-workbench.css';
+@import './styles/components/context-note.css';
+@import './styles/porcelain.css';
+@import './styles/components/header.css';
+@import './styles/pages/dashboard.css';
+@import './styles/components/template-picker.css';

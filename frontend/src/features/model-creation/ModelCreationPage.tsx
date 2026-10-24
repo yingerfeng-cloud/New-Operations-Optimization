@@ -430,7 +430,8 @@ export function ModelCreationPage() {
       scenario: scenario?.name || '',
       scenario_id: scenarioId,
     };
-    initializeWorkspace({ mode: 'new', sessionId: requestKey }, next);
+    const mode = workspace.mode === 'template' && !workspace.templateCode ? 'template' : 'new';
+    initializeWorkspace({ mode, sessionId: requestKey }, next);
     setWorkspace({ dirty: true });
   };
 

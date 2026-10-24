@@ -4,22 +4,20 @@
 .parameter-keyvalue-actions .parameter-toolbar { margin: 0; padding: 3px 4px; }
 .parameter-keyvalue-actions .parameter-toolbar-label { margin-right: 2px; }
 .parameter-keyvalue-actions .ant-btn-sm { min-height: 24px; height: 24px; padding-inline: 7px; }
-.parameter-notice.ant-alert,
-.parameter-notice.ant-alert-info,
-.parameter-notice.ant-alert-warning {
+.parameter-notice.ant-alert {
   width: 100%;
   min-height: 44px;
   align-items: flex-start;
   padding: 8px 12px !important;
-  border: 1px solid #b7cff3 !important;
+  border: 1px solid #f5d08a !important;
   border-radius: 8px !important;
-  background: #f0f6ff !important;
-  color: #173d65 !important;
+  background: #fffaeb !important;
+  color: #93370d !important;
 }
 .parameter-notice .ant-alert-icon {
   flex: 0 0 auto;
   margin-inline-end: 9px !important;
-  color: #2166c2 !important;
+  color: #b54708 !important;
   font-size: 15px !important;
 }
 .parameter-notice .ant-alert-content,
@@ -33,14 +31,14 @@
 .parameter-notice .ant-alert-title,
 .parameter-notice .ant-alert-message {
   margin: 0 !important;
-  color: #173d65 !important;
+  color: #93370d !important;
   font-size: 13px;
   font-weight: 700;
   line-height: 1.4;
 }
 .parameter-notice .ant-alert-description {
   margin: 0;
-  color: #49627c !important;
+  color: #7a4a24 !important;
   font-size: 12px;
   line-height: 1.45;
   overflow-wrap: anywhere;

@@ -7,9 +7,9 @@
 .panel,
 .card {
   border: 1px solid var(--proto-line) !important;
-  border-radius: 8px !important;
-  background: #fff !important;
-  box-shadow: none !important;
+  border-radius: var(--radius-md) !important;
+  background: var(--proto-panel) !important;
+  box-shadow: var(--proto-shadow) !important;
 }
 
 .ant-card-head { min-height: 44px !important; }

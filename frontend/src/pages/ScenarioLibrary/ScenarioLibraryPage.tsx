@@ -1,4 +1,4 @@
-import { Button, Card, Segmented, Space, Tag, Typography } from 'antd';
+import { Button, Card, Segmented, Tag, Typography } from 'antd';
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
@@ -77,8 +77,8 @@ export function ScenarioLibraryPage() {
             <Card
               data-testid={`scenario-card-${scenario.id}`}
               key={scenario.id}
-              className="content-card"
-              title={<Space><span>{scenario.name}</span><StatusTag status={scenario.status} /></Space>}
+              className="content-card scenario-library-card"
+              title={<div className="scenario-card-title"><span className="scenario-card-name" title={scenario.name}>{scenario.name}</span><StatusTag status={scenario.status} /></div>}
               extra={<Button size="small" onClick={() => nav(`/models/create?mode=new&scenario=${encodeURIComponent(scenario.id)}`)}>创建空白模型</Button>}
             >
               <Typography.Paragraph>{scenario.description || '暂无场景说明'}</Typography.Paragraph>

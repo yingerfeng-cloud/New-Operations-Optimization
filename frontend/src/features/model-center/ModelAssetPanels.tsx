@@ -1,3 +1,4 @@
+import { ContextNote } from '../../components/ContextNote';
 import { Alert, Card, Descriptions, Empty, Space, Table, Tag, Tooltip } from 'antd';
 import type { ReactNode } from 'react';
 import { JsonViewer } from '../../components/JsonViewer';
@@ -200,9 +201,7 @@ export function ModelBasicPanel({ model, detail = {} }: { model: ModelAsset; det
           </Descriptions>
         </Card>
       ) : (
-        <Alert
-          showIcon
-          type="info"
+        <ContextNote
           title="当前版本未开放调用"
           description={status === 'offline' ? '已下线版本仅作为历史基线保留。' : '草稿测试通过后进入试运行验收，正式发布后才开放 API Skill / Agent Skill。'}
         />
@@ -335,18 +334,14 @@ export function ModelRuntimePanel({ model, detail = {} }: { model: ModelAsset; d
   return (
     <Space orientation="vertical" size={14} style={{ width: '100%' }}>
       <Card size="small" title="运行参数 Schema">
-        {schemaSource !== 'declared' && schemaSource !== 'empty' && <Alert
-          showIcon
-          type="info"
+        {schemaSource !== 'declared' && schemaSource !== 'empty' && <ContextNote collapsible
           title="此模型未单独保存运行参数 Schema"
           description={schemaSource === 'semantic'
             ? '当前表根据模型语义中的参数定义生成；默认值来自模型的默认运行参数。后续保存版本时会固化为显式 Schema。'
             : '当前表根据默认运行参数推导，仅用于说明可传入的参数；建议在创建版本时补充名称、维度和必填规则。'}
           style={{ marginBottom: 12 }}
         />}
-        {schemaSource === 'empty' && <Alert
-          showIcon
-          type="info"
+        {schemaSource === 'empty' && <ContextNote
           title="模型尚未声明运行参数"
           description="空表表示当前模型没有可展示的运行参数 Schema，也没有默认运行参数；它不是求解报错。"
           style={{ marginBottom: 12 }}
@@ -391,7 +386,7 @@ export function ModelGovernancePanel({ model, detail = {} }: { model: ModelAsset
             { title: '状态', dataIndex: 'status', render: statusTag },
             { title: '说明', dataIndex: 'message' },
           ]} empty="暂无 dry-run 结果" />
-        ) : <Alert showIcon type="info" title="暂无 dry-run 结果" description="发布或测试运行后会展示结构检查和求解检查结果。" />}
+        ) : <ContextNote title="暂无 dry-run 结果" description="发布或测试运行后会展示结构检查和求解检查结果。" />}
       </Card>
       <Card size="small" title="版本治理">
         <Descriptions size="small" column={2}>
@@ -451,13 +446,11 @@ export function ModelDemoPanel({ model, detail = {} }: { model: ModelAsset; deta
     },
   });
   if (!capability) {
-    return <Alert showIcon type="info" title="暂无模型说明" description="请在建模流程的“基础信息 > 模型说明”中补充并保存。"/>;
+    return <ContextNote title="暂无模型说明" description="请在建模流程的“基础信息 > 模型说明”中补充并保存。"/>;
   }
   return (
     <Space orientation="vertical" size={14} style={{ width: '100%' }}>
-      <Alert
-        showIcon
-        type="info"
+      <ContextNote collapsible
         title="内容来自已保存的模型定义"
         description="模型说明在建模流程“基础信息 > 模型说明”中维护；问题类型、求解器、组件和函数资产均从当前模型资产读取，不使用前端演示硬编码。"
       />

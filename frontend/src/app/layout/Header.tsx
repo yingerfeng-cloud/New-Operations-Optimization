@@ -1,6 +1,6 @@
-import { Badge, Button, Dropdown, Popover, Segmented, Space, Tooltip } from 'antd';
+import { Button, Dropdown, Popover, Segmented, Space, Tooltip } from 'antd';
 import { useQuery } from '@tanstack/react-query';
-import { BellOutlined, CloseOutlined, MenuFoldOutlined, MenuOutlined, MenuUnfoldOutlined, PlusOutlined, SearchOutlined } from '@ant-design/icons';
+import { BellOutlined, CloseOutlined, DownOutlined, MenuFoldOutlined, MenuOutlined, MenuUnfoldOutlined, PlusOutlined, SearchOutlined } from '@ant-design/icons';
 import { lazy, Suspense, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { apiClient, unwrap } from '../../api/client';
@@ -9,6 +9,7 @@ import { isTaskFailed } from '../../features/task-center/taskStatus';
 import type { SolveTask } from '../../types/task';
 import { titleForPath } from '../navigation';
 import { useAudience } from '../audience';
+import { usePageHeaderSlots } from '../../components/PageHeader/slots';
 
 const CommandSearch = lazy(() => import('./CommandSearch').then(module => ({ default: module.CommandSearch })));
 
@@ -33,6 +34,8 @@ function readHandledTaskIds() {
 
 export function Header({ pathname, mobile = false, medium = false, sidebarCollapsed = false, onOpenMenu = () => undefined, onToggleSidebar = () => undefined }: HeaderProps) {
   const nav = useNavigate();
+  const pageHeaderSlots = usePageHeaderSlots();
+  const integratedPage = !mobile && pathname === '/models' && Boolean(pageHeaderSlots);
   const { audience, setAudience } = useAudience();
   const [searchOpen, setSearchOpen] = useState(false);
   const [taskInboxOpen, setTaskInboxOpen] = useState(false);
@@ -73,8 +76,9 @@ export function Header({ pathname, mobile = false, medium = false, sidebarCollap
   const statusText = backendOnline ? `平台在线 · ${data?.solver || 'HiGHS'}` : isError ? '平台连接异常' : isFetching ? '正在检查平台状态' : '状态待检查';
   const statusItems = [
     { key: 'backend', label: `后端服务：${backendOnline ? '在线' : '离线'}` },
-    { key: 'solver', label: `当前求解器：${data?.solver || 'HiGHS'}` },
+    { key: 'solver', label: `默认求解器：${data?.solver || 'HiGHS'}` },
     { key: 'runtime', label: `求解环境：${data?.highspy_installed === false ? '未就绪' : '已就绪'}` },
+    { key: 'runtime-details', label: '查看完整求解环境' },
   ];
   const openTask = (task?: SolveTask) => {
     setTaskInboxOpen(false);
@@ -120,29 +124,29 @@ export function Header({ pathname, mobile = false, medium = false, sidebarCollap
 
   return (
     <>
-      <header className="top-header">
+      <header className={`top-header${integratedPage ? ' header-integrated-page' : ''}`}>
         <div className="top-search-area">
           {mobile && <Button type="text" icon={<MenuOutlined />} onClick={onOpenMenu} aria-label="打开主导航" />}
           {!mobile && <Tooltip title={sidebarCollapsed ? '展开侧栏' : '折叠侧栏'}><Button className="sidebar-toggle" type="text" icon={sidebarCollapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />} onClick={onToggleSidebar} aria-label={sidebarCollapsed ? '展开侧栏' : '折叠侧栏'} /></Tooltip>}
-          {!mobile && <span className="current-page-chip">{current.label}</span>}
+          {!mobile && (integratedPage ? <div className="page-title-slot" ref={pageHeaderSlots?.setTitleTarget} /> : <span className="current-page-chip">{current.label}</span>)}
           <button className="global-search" type="button" onClick={() => setSearchOpen(true)} aria-label="打开全局搜索">
             <SearchOutlined /><span>{mobile ? '搜索' : '搜索模型、场景、任务或报告'}</span><kbd>{mobile ? '' : 'Ctrl K'}</kbd>
           </button>
         </div>
         <div className="top-actions">
-          <Space size={8}>
-            <Popover content={taskInbox} trigger="click" placement="bottomRight" open={taskInboxOpen} onOpenChange={setTaskInboxOpen}>
-              <Tooltip title={pendingFailedTasks.length ? `${pendingFailedTasks.length} 个异常任务待处理` : '任务消息'}>
-                <Badge count={pendingFailedTasks.length} size="small" overflowCount={99}>
-                  <button className={`task-inbox-trigger${pendingFailedTasks.length ? ' has-alert' : ''}`} type="button" aria-label={pendingFailedTasks.length ? `异常任务提醒，${pendingFailedTasks.length} 条` : '任务消息'}>
-                    <BellOutlined />
-                  </button>
-                </Badge>
+          <Space className="header-actions" size={12}>
+            <Popover classNames={{ root: 'task-inbox-popover' }} arrow={false} content={taskInbox} trigger="click" placement="bottomRight" open={taskInboxOpen} onOpenChange={setTaskInboxOpen}>
+              <Tooltip open={taskInboxOpen ? false : undefined} title={pendingFailedTasks.length ? `${pendingFailedTasks.length} 个异常任务待处理` : '任务消息'}>
+                <button className={`task-inbox-trigger${pendingFailedTasks.length ? ' has-alert' : ''}`} type="button" aria-expanded={taskInboxOpen} aria-label={pendingFailedTasks.length ? `异常任务提醒，${pendingFailedTasks.length} 条` : '任务消息'}>
+                  <BellOutlined aria-hidden="true" />
+                  <span className="task-inbox-label">消息</span>
+                  {pendingFailedTasks.length > 0 && <span className="task-inbox-count" aria-hidden="true">{pendingFailedTasks.length > 99 ? '99+' : pendingFailedTasks.length}</span>}
+                </button>
               </Tooltip>
             </Popover>
-            {!mobile && <Segmented aria-label="平台视图" size="small" value={audience} onChange={value => setAudience(value as 'business' | 'expert')} options={[{ label: '业务视图', value: 'business' }, { label: '专家视图', value: 'expert' }]} />}
-            {!mobile && <Dropdown menu={{ items: statusItems }} trigger={['click']}><button className={`status-pill ${backendOnline ? 'status-pill-green' : isError ? 'status-pill-red' : 'status-pill-amber'}`} type="button">{statusText}</button></Dropdown>}
-            {!mobile && <Button type="primary" icon={<PlusOutlined />} onClick={() => nav('/models/create')}>新建模型</Button>}
+            {!mobile && <Segmented className="header-view-switch" aria-label="平台视图" size="small" value={audience} onChange={value => setAudience(value as 'business' | 'expert')} options={[{ label: '业务视图', value: 'business' }, { label: '专家视图', value: 'expert' }]} />}
+            {!mobile && <Dropdown menu={{ items: statusItems, onClick: ({ key }) => { if (key === 'runtime-details') nav('/runtime'); } }} trigger={['click']}><button className={`header-platform-status status-pill ${backendOnline ? 'status-pill-green' : isError ? 'status-pill-red' : 'status-pill-amber'}`} type="button"><span>{statusText}</span><DownOutlined aria-hidden="true" /></button></Dropdown>}
+            {!mobile && <Button className="header-create-action" type="primary" icon={<PlusOutlined />} onClick={() => nav('/models/create')}>新建模型</Button>}
           </Space>
         </div>
       </header>

@@ -3,3 +3,28 @@
 .ant-table-tbody > tr > td { padding: 8px 12px !important; border-bottom: 1px solid #eaecf0 !important; }
 .ant-table-tbody > tr:hover > td { background: #f8fafc !important; }
 .ant-table-cell[align="right"] { font-variant-numeric: tabular-nums; }
+
+/* Keep dependency revisions readable inside drawers, including narrow screens. */
+.dependency-updates-panel,
+.dependency-updates-panel > .ant-space-item { min-width: 0; max-width: 100%; }
+.dependency-updates-table .ant-table-thead > tr > th { white-space: nowrap; }
+.dependency-updates-table .ant-table-cell { overflow-wrap: anywhere; }
+.dependency-updates-table .ant-table-measure-row > td { padding: 0 !important; border: 0 !important; }
+.dependency-updates-table .dependency-asset-link {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  width: 100%;
+  height: auto;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #2166c2;
+  white-space: normal;
+  text-align: left;
+}
+.dependency-asset-name,
+.dependency-asset-id { max-width: 100%; overflow-wrap: anywhere; }
+.dependency-asset-name { font-weight: 500; }
+.dependency-asset-id { color: var(--proto-muted, #667085); font-size: 12px; line-height: 1.5; }

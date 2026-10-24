@@ -1,3 +1,4 @@
+import { ContextNote } from '../../components/ContextNote';
 import { MoreOutlined } from '@ant-design/icons';
 import { Alert, Button, Card, Col, Collapse, Descriptions, Drawer, Dropdown, Form, Input, InputNumber, Row, Segmented, Select, Space, Table, Tag, Typography, Upload, message } from 'antd';
 import { useMemo, useState } from 'react';
@@ -115,10 +116,8 @@ function strategyOptions(type: FunctionAsset['function_type'], current?: string)
 function StrategyHelp({ strategy }: { strategy?: string }) {
   const raw = String(strategy || '');
   return (
-    <Alert
+    <ContextNote
       className="strategy-help"
-      type="info"
-      showIcon
       title={`${solveStrategyText(raw)} · ${raw || '未选择'}`}
       description={solveStrategyDescription(raw)}
     />
@@ -882,10 +881,7 @@ export function FunctionAssetsPage() {
                 label: '高级配置',
                 children: (
                   <>
-                <Alert
-                  className="compact-notice"
-                  type="info"
-                      showIcon
+                    <ContextNote collapsible
                       title="自定义技术标识"
                       description="函数 ID 是系统技术标识，默认自动生成；仅在需要外部 API、模型模板或组件绑定时手工修改。"
                     />
@@ -899,10 +895,8 @@ export function FunctionAssetsPage() {
               title={editingType === 'piecewise_2d' ? '二维曲面数据 points_2d' : '一维曲线数据 points'}
               extra={<Space><Button onClick={() => setManualPoints(points => [...points, { key: `point_${Date.now()}`, x: 0, y: 0, z: editingType === 'piecewise_2d' ? 0 : undefined }])}>添加点</Button><Button onClick={fillSamplePoints}>填充示例数据</Button><Button onClick={() => setManualPoints(points => [...points].sort((a, b) => Number(a.x) - Number(b.x)))}>按 x 排序</Button></Space>}
             >
-              <Alert
+              <ContextNote
                 className="point-count-notice"
-                type="info"
-                showIcon
                 title={editingType === 'piecewise_2d' ? '二维曲面至少需要 3 个点，规则网格建议至少 4 个点。' : '一维曲线至少需要 2 个点。'}
               />
               <Form.Item label="批量粘贴点">
@@ -953,9 +947,7 @@ export function FunctionAssetsPage() {
                 label: '高级配置',
                 children: (
                   <>
-                    <Alert
-                      type="info"
-                      showIcon
+                    <ContextNote collapsible
                       title="自定义技术标识"
                       description="函数 ID 是系统技术标识，默认自动生成；仅在需要外部 API、模型模板或组件绑定时手工修改。"
                     />
@@ -985,7 +977,7 @@ export function FunctionAssetsPage() {
             </Form.Item>
             <Card size="small" title="字段识别">
               {!importCsvText.trim() ? (
-                <Alert type="info" showIcon title="请上传 CSV 文件或粘贴 CSV 内容" />
+                <ContextNote title="请上传 CSV 文件或粘贴 CSV 内容" />
               ) : (
                 <>
                   <Descriptions size="small" column={3} items={[
@@ -1064,10 +1056,11 @@ export function FunctionAssetsPage() {
                 extra={<Segmented size="small" value={surfaceChartMode} onChange={value => setSurfaceChartMode(value as SurfaceChartMode)} options={[{ label: '着色曲面', value: 'surface' }, { label: '三角网格', value: 'mesh' }]} />}
                 className="surface-preview-card"
               >
-                <details className="inline-help-note">
-                  <summary><span>i</span>如何理解二维插值结果？</summary>
-                  <p>输入 x/y 后返回插值 z、命中的三角形 triangle 和插值权重 lambda。triangle 表示当前点所在的三角面片，lambda 表示该点在三个顶点上的插值权重；后端未返回时显示“当前未返回该项”。</p>
-                </details>
+                <ContextNote
+                  collapsible
+                  title="如何理解二维插值结果？"
+                  description="输入 x/y 后返回插值 z、命中的三角形 triangle 和插值权重 lambda。triangle 表示当前点所在的三角面片，lambda 表示该点在三个顶点上的插值权重；后端未返回时显示“当前未返回该项”。"
+                />
                 <LazyEChart option={surfaceChartOption(selected, preview, previewInput, surfaceChartMode)} style={{ height: 340 }} />
                 <Space className="surface-preview-toolbar" wrap>
                   <InputNumber value={previewInput.x} onChange={value => setPreviewInput(current => ({ ...current, x: Number(value) }))} addonBefore="x" />

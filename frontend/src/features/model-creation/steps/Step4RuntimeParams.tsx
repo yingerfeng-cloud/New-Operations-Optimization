@@ -1,3 +1,4 @@
+import { ContextNote } from '../../../components/ContextNote';
 import { Alert, Button, Card, Collapse, Descriptions, Input, Segmented, Select, Space, Table, Tabs, Tag, message } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { useEffect, useMemo, useState } from 'react';
@@ -264,7 +265,7 @@ export function Step4RuntimeParams({ draft, onChange }: { draft: ModelDraft; onC
               {inferModelProblemType(draft)} / {draft.basic_info.solver || 'HiGHS'}
             </Tag>
           </Space>
-          <Alert className="section-gap-tight" type="info" showIcon title="当前模型通过分段线性方式近似水电非线性特性，并由 HiGHS 按 LP/MILP 求解。" />
+          <ContextNote className="section-gap-tight"   title="当前模型通过分段线性方式近似水电非线性特性，并由 HiGHS 按 LP/MILP 求解。" />
         </Card>
       )}
       <Card size="small" title="时间维度摘要">
@@ -298,7 +299,7 @@ export function Step4RuntimeParams({ draft, onChange }: { draft: ModelDraft; onC
           />
         </Card>
       )}
-      <Alert className="compact-step-note" type="info" showIcon title="运行参数按来源分类，发布前验证必填项、默认值和示例值。" />
+      <ContextNote title="运行参数按来源分类，发布前验证必填项、默认值和示例值。" />
       {missing.length > 0 && <Alert className="section-gap compact-step-note" type="warning" showIcon title="缺少必填运行参数" description={missing.join('；')} />}
       <Card className="section-gap" title="基础参数绑定">
         <Descriptions size="small" column={5} items={groups.map(group => ({ key: group.key, label: group.label, children: rows.filter(row => row.source === group.key).length }))} />

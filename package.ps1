@@ -40,7 +40,7 @@ $RequiredPackageItems = @(
   "server.py",
   "frontend/src/main.tsx",
   "OPERATION_MANUAL.md",
-  "docs/visual-acceptance/ui-special-iteration/README.md"
+  "docs/visual-acceptance/porcelain-final-2026-10-25/README.md"
 )
 
 $LauncherPairs = @(
@@ -194,7 +194,7 @@ try {
   if ($missingFromStaging.Count -gt 0) {
     throw "Package self-check failed before compression. Missing: $($missingFromStaging -join ', ')"
   }
-  if (-not (Test-Path (Join-Path $staging "docs\visual-acceptance\ui-special-iteration\README.md"))) {
+  if (-not (Test-Path (Join-Path $staging "docs\visual-acceptance\porcelain-final-2026-10-25\README.md"))) {
     throw "UI visual acceptance evidence is missing"
   }
 

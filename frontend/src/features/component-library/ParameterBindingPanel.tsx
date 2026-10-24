@@ -1,4 +1,5 @@
-import { Alert, Table } from 'antd';
+import { ContextNote } from '../../components/ContextNote';
+import { Table } from 'antd';
 import type { ComponentDef, SchemaItem } from '../../types/component';
 
 type ParameterRow = SchemaItem & Record<string, unknown>;
@@ -26,10 +27,7 @@ export function ParameterBindingPanel({ component }: { component: ComponentDef }
   const rows = (component.parameters || []) as ParameterRow[];
   return (
     <>
-      <Alert
-        className="compact-notice"
-        showIcon
-        type="info"
+      <ContextNote collapsible
         title="这里定义组件需要哪些参数"
         description="具体模型参数的映射在建模装配时完成，组件资产不保存模型专属绑定。"
       />

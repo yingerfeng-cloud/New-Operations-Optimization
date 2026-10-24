@@ -10,7 +10,7 @@ $RequiredFiles = @(
   "requirements.txt",
   "server.py",
   "OPERATION_MANUAL.md",
-  "docs/visual-acceptance/ui-special-iteration/README.md"
+  "docs/visual-acceptance/porcelain-final-2026-10-25/README.md"
 )
 $Cases = @(
   @{ Name = "posix-and-finder"; Launchers = @("start.sh", "stop.sh", "启动OPTIFORGE.command", "停止OPTIFORGE.command") },

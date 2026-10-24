@@ -259,21 +259,6 @@
   white-space: normal;
 }
 
-.function-mapping-strategy-alert.ant-alert-with-description .ant-alert-content,
-.function-mapping-strategy-alert.ant-alert-with-description .ant-alert-section {
-  display: block;
-}
-
-.function-mapping-strategy-alert .ant-alert-message,
-.function-mapping-strategy-alert .ant-alert-title {
-  margin-bottom: 4px;
-}
-
-.function-mapping-strategy-alert .ant-alert-description {
-  overflow: visible;
-  white-space: normal;
-}
-
 .function-mapping-strategy-hints strong {
   color: var(--proto-ink, #172033);
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
@@ -639,6 +624,31 @@
   min-width: 0;
   scroll-margin-top: 126px;
 }
+
+.objective-compile-layout {
+  display: grid;
+  grid-template-columns: minmax(208px, 240px) minmax(168px, 200px) minmax(0, 1fr);
+  align-items: start;
+  gap: 20px;
+}
+
+.objective-compile-field {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.objective-compile-field > .ant-typography {
+  font-size: 13px;
+  line-height: 20px;
+}
+
+.objective-compile-field > .ant-select { width: 100%; }
+.objective-compile-layout .objective-compile-normalization { padding: 0 0 0 20px; border-inline-start: 1px solid var(--proto-line); }
+.objective-compile-normalization .context-note-content { display: grid; gap: 6px; }
+.objective-compile-normalization .context-note-title { color: var(--proto-muted); font-size: 13px; font-weight: 400; line-height: 20px; }
+.objective-compile-normalization .context-note-description { display: flex; align-items: center; min-height: 38px; margin: 0; color: var(--proto-text); font-size: 14px; line-height: 20px; }
+.math-expansion-actions { margin-top: 16px; }
 
 .formula-management-intro {
   margin: -2px 0 12px;

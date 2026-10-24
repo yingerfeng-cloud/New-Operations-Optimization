@@ -1,3 +1,4 @@
+import { ContextNote } from '../../components/ContextNote';
 import { Alert, Button, Card, Select, Space, Table, Typography, message } from 'antd';
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
@@ -42,20 +43,21 @@ export function ComponentUpdatesPanel({ model, onApplied }: { model: ModelAsset;
   const tested = candidate.data;
   const canApply = task.data?.status === 'SUCCESS' && tested?.id === pending?.candidateId && tested?.tested_model_id === tested?.id
     && tested?.tested_content_hash === tested?.content_hash && tested?.status === 'trial';
-  return <Space orientation="vertical" style={{ width: '100%' }}>
-    <Alert type="info" showIcon title="按模型版本固定组件及完整依赖" description="只更新明确选择的组件；未选择的组件、函数修订和参数绑定保持原样。普通停用不改变合法旧绑定；安全撤销会明确阻止执行。测试后更换依赖必须重测。" />
+  return <Space className="dependency-updates-panel" orientation="vertical" style={{ width: '100%' }}>
+    <ContextNote collapsible title="按模型版本固定组件及完整依赖" description="只更新明确选择的组件；未选择的组件、函数修订和参数绑定保持原样。普通停用不改变合法旧绑定；安全撤销会明确阻止执行。测试后更换依赖必须重测。" />
     <QueryState query={updates} title="组件依赖">
-      <Table<ComponentUpdateRow> rowKey="component_id" size="small" pagination={false} dataSource={updates.data?.dependencies || []} columns={[
-        { title: '组件', render: (_, row) => <Space orientation="vertical">
-          <span>{row.name} ({row.component_id})</span>
+      <Table<ComponentUpdateRow> className="dependency-updates-table" tableLayout="fixed" scroll={{ x: 700 }} rowKey="component_id" size="small" pagination={false} dataSource={updates.data?.dependencies || []} columns={[
+        { title: '组件', width: 200, render: (_, row) => <Space orientation="vertical" size={2}>
+          <span className="dependency-asset-name">{row.name}</span>
+          <span className="dependency-asset-id">{row.component_id}</span>
           {row.revocation && <Typography.Text type="danger">已安全撤销：{row.revocation.reason}。仅可查看并替换，禁止执行。</Typography.Text>}
         </Space> },
-        { title: '当前修订', render: (_, row) => `r${row.binding.revision} · ${row.binding.version}` },
-        { title: '目标修订', render: (_, row) => <Select aria-label={`${row.component_id} 组件目标修订`} style={{ width: 250 }} allowClear placeholder="保留当前修订" disabled={!!pending}
+        { title: '当前修订', width: 116, render: (_, row) => `r${row.binding.revision} · ${row.binding.version}` },
+        { title: '目标修订', width: 208, render: (_, row) => <Select aria-label={`${row.component_id} 组件目标修订`} style={{ width: '100%' }} allowClear placeholder="保留当前修订" disabled={!!pending}
           value={selections[row.component_id]} onChange={value => setSelections(current => { const next = { ...current }; if (value) next[row.component_id] = value; else delete next[row.component_id]; return next; })}
           options={row.versions.filter(item => item.component_id !== row.component_id).map(item => ({ value: item.component_id, label: `r${item.revision} · ${item.version}${item.diff.requires_model_edit ? '（需完整编辑）' : ''}`, disabled: item.diff.requires_model_edit }))} /> },
-        { title: '固定 hash', render: (_, row) => <Typography.Text code>{row.binding.content_hash.slice(0, 12)}</Typography.Text> },
-      ]} expandable={{ expandedRowRender: row => {
+        { title: '固定 hash', width: 136, render: (_, row) => <Typography.Text code>{row.binding.content_hash.slice(0, 12)}</Typography.Text> },
+      ]} expandable={{ columnWidth: 40, expandedRowRender: row => {
         const target = row.versions.find(item => item.component_id === selections[row.component_id]);
         return target ? <><Typography.Paragraph>{target.diff.message}</Typography.Paragraph><Table pagination={false} size="small" rowKey="field" dataSource={[
           { field: '约束', before: target.diff.before_constraints, after: target.diff.after_constraints },

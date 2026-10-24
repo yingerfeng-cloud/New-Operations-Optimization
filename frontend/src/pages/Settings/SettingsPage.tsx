@@ -1,3 +1,4 @@
+import { ContextNote } from '../../components/ContextNote';
 import { Alert, Button, Card, Col, Descriptions, Form, Input, InputNumber, Row, Select, Space, Switch, Table, Tag, Typography, message } from 'antd';
 import { DeleteOutlined, PlusOutlined, ReloadOutlined } from '@ant-design/icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -280,13 +281,13 @@ function LlmConfigPanel({ config }: { config?: LlmConfig }) {
 function RuntimeConfigPanel({ apiBase, solverDesc, solverData }: { apiBase: string; solverDesc: string; solverData: Awaited<ReturnType<typeof getSolverStatus>> | undefined }) {
   return (
     <Space orientation="vertical" size={16} style={{ width: '100%' }}>
-      <Alert className="compact-notice" type="info" showIcon title="部署信息为只读" description="端口、API Base URL 和生产路径由启动脚本、环境变量及部署配置决定。" />
+      <ContextNote collapsible title="部署信息为只读" description="端口、API Base URL 和生产路径由启动脚本、环境变量及部署配置决定。" />
       <Card className="content-card" title="部署入口">
         <Descriptions column={2} bordered>
           <Descriptions.Item label="API 地址">{apiBase}</Descriptions.Item>
           <Descriptions.Item label="求解器">{solverDesc}</Descriptions.Item>
           <Descriptions.Item label="React 开发入口">http://localhost:5173</Descriptions.Item>
-          <Descriptions.Item label="FastAPI 生产入口">http://localhost:8000/</Descriptions.Item>
+          <Descriptions.Item label="API 服务入口">{apiBase}</Descriptions.Item>
           <Descriptions.Item label="正式前端">frontend/</Descriptions.Item>
           <Descriptions.Item label="生产构建目录">frontend/dist</Descriptions.Item>
         </Descriptions>
@@ -305,7 +306,7 @@ function RuntimeConfigPanel({ apiBase, solverDesc, solverData }: { apiBase: stri
 }
 
 export function SettingsPage({ variant = 'settings' }: SettingsPageProps) {
-  const apiBase = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000';
+  const apiBase = import.meta.env.VITE_API_BASE_URL || window.location.origin;
   const isRuntime = variant === 'runtime';
   const [activeSection, setActiveSection] = useState<SettingsSection>('overview');
   const { data, isFetching } = useQuery({
@@ -386,7 +387,7 @@ export function SettingsPage({ variant = 'settings' }: SettingsPageProps) {
         <Card className="content-card section-gap" title="运行入口">
           <Descriptions column={2} bordered>
             <Descriptions.Item label="API 地址">{apiBase}</Descriptions.Item>
-            <Descriptions.Item label="FastAPI 生产入口">http://localhost:8000/</Descriptions.Item>
+            <Descriptions.Item label="API 服务入口">{apiBase}</Descriptions.Item>
             <Descriptions.Item label="React 开发入口">http://localhost:5173</Descriptions.Item>
             <Descriptions.Item label="正式前端">frontend/</Descriptions.Item>
             <Descriptions.Item label="生产构建目录">frontend/dist</Descriptions.Item>

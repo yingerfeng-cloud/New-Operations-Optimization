@@ -1,3 +1,4 @@
+import { ContextNote } from '../../../components/ContextNote';
 import { Alert, Button, Card, Form, Input, InputNumber, Segmented, Select, Space, Switch, Table, Tag, Typography } from 'antd';
 import { useState } from 'react';
 import type { ModelDraft, TimeDimensionConfig } from '../stores/modelCreationStore';
@@ -95,7 +96,7 @@ export function TimeDimensionConfigCard({ draft, onChange }: { draft: ModelDraft
   return (
     <Card className="section-gap" title="时间维度配置" extra={<Space><Typography.Text type="secondary">是否启用时间维度</Typography.Text><Switch aria-label="是否启用时间维度" checked={config.enabled} onChange={toggleEnabled} /></Space>}>
       {blockedMessage && <Alert className="section-gap-tight" showIcon type="error" title={blockedMessage} />}
-      {!config.enabled ? <Alert className="compact-step-note" showIcon type="info" title="非时序模型" description="模型不会生成时间集合，也不会在任务中心展示 horizon。" /> : (
+      {!config.enabled ? <ContextNote title="非时序模型" description="模型不会生成时间集合，也不会在任务中心展示 horizon。" /> : (
         <Space orientation="vertical" size={16} style={{ width: '100%' }}>
           <Form layout="vertical">
             <Space wrap align="start" size={16}>
