@@ -51,10 +51,10 @@ export function useSectionNavigation({
     activeRef.current = active;
   }, [active]);
 
-  const updateActive = useCallback((key: string) => {
+  const updateActive = useCallback((key: string, notify = true) => {
     activeRef.current = key;
     setActive(key);
-    onActiveChange?.(key);
+    if (notify) onActiveChange?.(key);
   }, [onActiveChange]);
 
   useEffect(() => {
@@ -63,12 +63,12 @@ export function useSectionNavigation({
       window.clearTimeout(navigationReleaseTimerRef.current);
       navigationReleaseTimerRef.current = undefined;
     }
-    updateActive(items[0]?.key || '');
+    updateActive(items[0]?.key || '', false);
   }, [items, resetKey, updateActive]);
 
   useEffect(() => {
     if (!scrollContainer) return undefined;
-    const onScroll = () => {
+    const syncActive = (notify: boolean) => {
       if (navigationLockRef.current) return;
       const container = document.getElementById(containerId);
       const rootTop = scrollContainer.getBoundingClientRect().top;
@@ -83,10 +83,11 @@ export function useSectionNavigation({
         const tied = visible.filter(row => Math.abs(row.target.getBoundingClientRect().top - lastTop) < 4);
         current = tied.find(row => row.item.key === activeRef.current) || current;
       }
-      if (current && current.item.key !== activeRef.current) updateActive(current.item.key);
+      if (current && current.item.key !== activeRef.current) updateActive(current.item.key, notify);
     };
+    const onScroll = () => syncActive(true);
     scrollContainer.addEventListener('scroll', onScroll, { passive: true });
-    onScroll();
+    syncActive(false);
     return () => scrollContainer.removeEventListener('scroll', onScroll);
   }, [containerId, items, scrollContainer, updateActive]);
 

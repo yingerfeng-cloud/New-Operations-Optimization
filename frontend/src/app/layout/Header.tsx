@@ -35,7 +35,7 @@ function readHandledTaskIds() {
 export function Header({ pathname, mobile = false, medium = false, sidebarCollapsed = false, onOpenMenu = () => undefined, onToggleSidebar = () => undefined }: HeaderProps) {
   const nav = useNavigate();
   const pageHeaderSlots = usePageHeaderSlots();
-  const integratedPage = !mobile && pathname === '/models' && Boolean(pageHeaderSlots);
+  const integratedPage = !mobile && Boolean(pageHeaderSlots);
   const { audience, setAudience } = useAudience();
   const [searchOpen, setSearchOpen] = useState(false);
   const [taskInboxOpen, setTaskInboxOpen] = useState(false);
@@ -128,7 +128,7 @@ export function Header({ pathname, mobile = false, medium = false, sidebarCollap
         <div className="top-search-area">
           {mobile && <Button type="text" icon={<MenuOutlined />} onClick={onOpenMenu} aria-label="打开主导航" />}
           {!mobile && <Tooltip title={sidebarCollapsed ? '展开侧栏' : '折叠侧栏'}><Button className="sidebar-toggle" type="text" icon={sidebarCollapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />} onClick={onToggleSidebar} aria-label={sidebarCollapsed ? '展开侧栏' : '折叠侧栏'} /></Tooltip>}
-          {!mobile && (integratedPage ? <div className="page-title-slot" ref={pageHeaderSlots?.setTitleTarget} /> : <span className="current-page-chip">{current.label}</span>)}
+          {!mobile && (integratedPage ? <div className="page-title-slot" ref={pageHeaderSlots?.setTitleTarget}><span className="page-title-fallback">{current.label}</span></div> : <span className="current-page-chip">{current.label}</span>)}
           <button className="global-search" type="button" onClick={() => setSearchOpen(true)} aria-label="打开全局搜索">
             <SearchOutlined /><span>{mobile ? '搜索' : '搜索模型、场景、任务或报告'}</span><kbd>{mobile ? '' : 'Ctrl K'}</kbd>
           </button>

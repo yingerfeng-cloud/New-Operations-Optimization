@@ -1,0 +1,19 @@
+{
+  "date": "2026-10-25",
+  "scrollBefore": 581.5,
+  "bundle": [
+    "/assets/index-YuZ-PJSi.js"
+  ],
+  "maxScroll": 120,
+  "scrollAfter": 0,
+  "title": "新建模型",
+  "pageChecks": 26,
+  "pageCheckFailures": 0,
+  "templateChineseSearch": true,
+  "realTemplateLoaded": "economic_dispatch",
+  "switchBackClearsTemplate": true,
+  "methodControl": "radiogroup",
+  "formRemount": false,
+  "methodPointerAndKeyboardZeroDisplacement": true,
+  "consoleErrors": []
+}

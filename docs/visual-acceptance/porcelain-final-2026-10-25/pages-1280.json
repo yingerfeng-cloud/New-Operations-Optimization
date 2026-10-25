@@ -1,553 +1,220 @@
 [
   {
+    "bodyHeroCount": 0,
     "contentOverflow": 0,
+    "contentScroll": 0,
+    "headerGap": 12,
     "headerOverflow": 0,
-    "headings": [
-      {
-        "family": "\"PingFang SC\", -apple-system, \"system-ui\", \"Helvetica Neue\", \"Microsoft YaHei\", sans-serif",
-        "size": "20px",
-        "text": "模型资产"
-      }
-    ],
-    "metricBands": [
-      {
-        "overflow": "hidden",
-        "radius": "12px"
-      }
-    ],
-    "metricTitles": [
-      {
-        "family": "\"PingFang SC\", -apple-system, \"system-ui\", \"Helvetica Neue\", \"Microsoft YaHei\", sans-serif",
-        "size": "14px",
-        "text": "模型资产数"
-      },
-      {
-        "family": "\"PingFang SC\", -apple-system, \"system-ui\", \"Helvetica Neue\", \"Microsoft YaHei\", sans-serif",
-        "size": "14px",
-        "text": "正式服务"
-      },
-      {
-        "family": "\"PingFang SC\", -apple-system, \"system-ui\", \"Helvetica Neue\", \"Microsoft YaHei\", sans-serif",
-        "size": "14px",
-        "text": "试运行验收"
-      },
-      {
-        "family": "\"PingFang SC\", -apple-system, \"system-ui\", \"Helvetica Neue\", \"Microsoft YaHei\", sans-serif",
-        "size": "14px",
-        "text": "草稿"
-      }
-    ],
-    "pageOverflow": 0,
-    "path": "/models",
-    "previewToolbar": false,
-    "viewport": [
-      1280,
-      876
-    ]
-  },
-  {
-    "contentOverflow": 0,
-    "headerOverflow": 0,
-    "headings": [
-      {
-        "family": "\"PingFang SC\", -apple-system, \"system-ui\", \"Helvetica Neue\", \"Microsoft YaHei\", sans-serif",
-        "size": "24px",
-        "text": "业务场景库"
-      }
-    ],
-    "metricBands": [],
-    "metricTitles": [
-      {
-        "family": "\"PingFang SC\", -apple-system, \"system-ui\", \"Helvetica Neue\", \"Microsoft YaHei\", sans-serif",
-        "size": "13px",
-        "text": "模型资产"
-      },
-      {
-        "family": "\"PingFang SC\", -apple-system, \"system-ui\", \"Helvetica Neue\", \"Microsoft YaHei\", sans-serif",
-        "size": "13px",
-        "text": "已发布模型"
-      },
-      {
-        "family": "\"PingFang SC\", -apple-system, \"system-ui\", \"Helvetica Neue\", \"Microsoft YaHei\", sans-serif",
-        "size": "13px",
-        "text": "试运行模型"
-      },
-      {
-        "family": "\"PingFang SC\", -apple-system, \"system-ui\", \"Helvetica Neue\", \"Microsoft YaHei\", sans-serif",
-        "size": "13px",
-        "text": "模型资产"
-      },
-      {
-        "family": "\"PingFang SC\", -apple-system, \"system-ui\", \"Helvetica Neue\", \"Microsoft YaHei\", sans-serif",
-        "size": "13px",
-        "text": "已发布模型"
-      },
-      {
-        "family": "\"PingFang SC\", -apple-system, \"system-ui\", \"Helvetica Neue\", \"Microsoft YaHei\", sans-serif",
-        "size": "13px",
-        "text": "试运行模型"
-      },
-      {
-        "family": "\"PingFang SC\", -apple-system, \"system-ui\", \"Helvetica Neue\", \"Microsoft YaHei\", sans-serif",
-        "size": "13px",
-        "text": "模型资产"
-      },
-      {
-        "family": "\"PingFang SC\", -apple-system, \"system-ui\", \"Helvetica Neue\", \"Microsoft YaHei\", sans-serif",
-        "size": "13px",
-        "text": "已发布模型"
-      },
-      {
-        "family": "\"PingFang SC\", -apple-system, \"system-ui\", \"Helvetica Neue\", \"Microsoft YaHei\", sans-serif",
-        "size": "13px",
-        "text": "试运行模型"
-      },
-      {
-        "family": "\"PingFang SC\", -apple-system, \"system-ui\", \"Helvetica Neue\", \"Microsoft YaHei\", sans-serif",
-        "size": "13px",
-        "text": "模型资产"
-      },
-      {
-        "family": "\"PingFang SC\", -apple-system, \"system-ui\", \"Helvetica Neue\", \"Microsoft YaHei\", sans-serif",
-        "size": "13px",
-        "text": "已发布模型"
-      },
-      {
-        "family": "\"PingFang SC\", -apple-system, \"system-ui\", \"Helvetica Neue\", \"Microsoft YaHei\", sans-serif",
-        "size": "13px",
-        "text": "试运行模型"
-      }
-    ],
-    "pageOverflow": 0,
-    "path": "/scenarios",
-    "previewToolbar": false,
-    "viewport": [
-      1280,
-      876
-    ]
-  },
-  {
-    "contentOverflow": 0,
-    "headerOverflow": 0,
-    "headings": [
-      {
-        "family": "\"PingFang SC\", -apple-system, \"system-ui\", \"Helvetica Neue\", \"Microsoft YaHei\", sans-serif",
-        "size": "24px",
-        "text": "Skill 服务中心"
-      }
-    ],
-    "metricBands": [
-      {
-        "overflow": "visible",
-        "radius": "12px"
-      }
-    ],
-    "metricTitles": [
-      {
-        "family": "\"PingFang SC\", -apple-system, \"system-ui\", \"Helvetica Neue\", \"Microsoft YaHei\", sans-serif",
-        "size": "14px",
-        "text": "Skill 总数"
-      },
-      {
-        "family": "\"PingFang SC\", -apple-system, \"system-ui\", \"Helvetica Neue\", \"Microsoft YaHei\", sans-serif",
-        "size": "14px",
-        "text": "已启用"
-      },
-      {
-        "family": "\"PingFang SC\", -apple-system, \"system-ui\", \"Helvetica Neue\", \"Microsoft YaHei\", sans-serif",
-        "size": "14px",
-        "text": "已停用"
-      },
-      {
-        "family": "\"PingFang SC\", -apple-system, \"system-ui\", \"Helvetica Neue\", \"Microsoft YaHei\", sans-serif",
-        "size": "14px",
-        "text": "Agent 绑定"
-      },
-      {
-        "family": "\"PingFang SC\", -apple-system, \"system-ui\", \"Helvetica Neue\", \"Microsoft YaHei\", sans-serif",
-        "size": "14px",
-        "text": "近 24h 调用"
-      },
-      {
-        "family": "\"PingFang SC\", -apple-system, \"system-ui\", \"Helvetica Neue\", \"Microsoft YaHei\", sans-serif",
-        "size": "14px",
-        "text": "近 24h 失败"
-      },
-      {
-        "family": "\"PingFang SC\", -apple-system, \"system-ui\", \"Helvetica Neue\", \"Microsoft YaHei\", sans-serif",
-        "size": "14px",
-        "text": "平均耗时 ms"
-      },
-      {
-        "family": "\"PingFang SC\", -apple-system, \"system-ui\", \"Helvetica Neue\", \"Microsoft YaHei\", sans-serif",
-        "size": "14px",
-        "text": "异常 Skill"
-      }
-    ],
-    "pageOverflow": 0,
-    "path": "/skills",
-    "previewToolbar": false,
-    "viewport": [
-      1280,
-      876
-    ]
-  },
-  {
-    "contentOverflow": 0,
-    "headerOverflow": 0,
-    "headings": [
-      {
-        "family": "\"PingFang SC\", -apple-system, \"system-ui\", \"Helvetica Neue\", \"Microsoft YaHei\", sans-serif",
-        "size": "24px",
-        "text": "函数/曲线资产中心"
-      }
-    ],
-    "metricBands": [
-      {
-        "overflow": "hidden",
-        "radius": "12px"
-      }
-    ],
-    "metricTitles": [
-      {
-        "family": "\"PingFang SC\", -apple-system, \"system-ui\", \"Helvetica Neue\", \"Microsoft YaHei\", sans-serif",
-        "size": "14px",
-        "text": "资产总数"
-      },
-      {
-        "family": "\"PingFang SC\", -apple-system, \"system-ui\", \"Helvetica Neue\", \"Microsoft YaHei\", sans-serif",
-        "size": "14px",
-        "text": "已被引用"
-      },
-      {
-        "family": "\"PingFang SC\", -apple-system, \"system-ui\", \"Helvetica Neue\", \"Microsoft YaHei\", sans-serif",
-        "size": "14px",
-        "text": "异常资产"
-      }
-    ],
-    "pageOverflow": 0,
-    "path": "/functions",
-    "previewToolbar": false,
-    "viewport": [
-      1280,
-      876
-    ]
-  },
-  {
-    "contentOverflow": 0,
-    "headerOverflow": 0,
-    "headings": [
-      {
-        "family": "\"PingFang SC\", -apple-system, \"system-ui\", \"Helvetica Neue\", \"Microsoft YaHei\", sans-serif",
-        "size": "24px",
-        "text": "组件库管理"
-      }
-    ],
-    "metricBands": [
-      {
-        "overflow": "hidden",
-        "radius": "12px"
-      }
-    ],
-    "metricTitles": [
-      {
-        "family": "\"PingFang SC\", -apple-system, \"system-ui\", \"Helvetica Neue\", \"Microsoft YaHei\", sans-serif",
-        "size": "14px",
-        "text": "组件总数"
-      },
-      {
-        "family": "\"PingFang SC\", -apple-system, \"system-ui\", \"Helvetica Neue\", \"Microsoft YaHei\", sans-serif",
-        "size": "14px",
-        "text": "已发布"
-      },
-      {
-        "family": "\"PingFang SC\", -apple-system, \"system-ui\", \"Helvetica Neue\", \"Microsoft YaHei\", sans-serif",
-        "size": "14px",
-        "text": "草稿"
-      },
-      {
-        "family": "\"PingFang SC\", -apple-system, \"system-ui\", \"Helvetica Neue\", \"Microsoft YaHei\", sans-serif",
-        "size": "14px",
-        "text": "依赖异常"
-      }
-    ],
-    "pageOverflow": 0,
-    "path": "/components",
-    "previewToolbar": false,
-    "viewport": [
-      1280,
-      876
-    ]
-  },
-  {
-    "contentOverflow": 0,
-    "headerOverflow": 0,
-    "headings": [
-      {
-        "family": "\"PingFang SC\", -apple-system, \"system-ui\", \"Helvetica Neue\", \"Microsoft YaHei\", sans-serif",
-        "size": "24px",
-        "text": "系统配置"
-      }
-    ],
-    "metricBands": [],
-    "metricTitles": [
-      {
-        "family": "\"PingFang SC\", -apple-system, \"system-ui\", \"Helvetica Neue\", \"Microsoft YaHei\", sans-serif",
-        "size": "14px",
-        "text": "在线服务"
-      },
-      {
-        "family": "\"PingFang SC\", -apple-system, \"system-ui\", \"Helvetica Neue\", \"Microsoft YaHei\", sans-serif",
-        "size": "14px",
-        "text": "需处理项"
-      },
-      {
-        "family": "\"PingFang SC\", -apple-system, \"system-ui\", \"Helvetica Neue\", \"Microsoft YaHei\", sans-serif",
-        "size": "14px",
-        "text": "API 地址"
-      }
-    ],
-    "pageOverflow": 0,
-    "path": "/settings",
-    "previewToolbar": false,
-    "viewport": [
-      1280,
-      876
-    ]
-  },
-  {
-    "contentOverflow": 0,
-    "headerOverflow": 0,
-    "headings": [
-      {
-        "family": "\"PingFang SC\", -apple-system, \"system-ui\", \"Helvetica Neue\", \"Microsoft YaHei\", sans-serif",
-        "size": "24px",
-        "text": "生产运筹工作台"
-      }
-    ],
-    "metricBands": [
-      {
-        "overflow": "hidden",
-        "radius": "12px"
-      }
-    ],
-    "metricTitles": [
-      {
-        "family": "\"PingFang SC\", -apple-system, \"system-ui\", \"Helvetica Neue\", \"Microsoft YaHei\", sans-serif",
-        "size": "14px",
-        "text": "运行中任务"
-      },
-      {
-        "family": "\"PingFang SC\", -apple-system, \"system-ui\", \"Helvetica Neue\", \"Microsoft YaHei\", sans-serif",
-        "size": "14px",
-        "text": "失败 / 无解"
-      },
-      {
-        "family": "\"PingFang SC\", -apple-system, \"system-ui\", \"Helvetica Neue\", \"Microsoft YaHei\", sans-serif",
-        "size": "14px",
-        "text": "已发布模型"
-      },
-      {
-        "family": "\"PingFang SC\", -apple-system, \"system-ui\", \"Helvetica Neue\", \"Microsoft YaHei\", sans-serif",
-        "size": "14px",
-        "text": "近 7 天任务"
-      }
-    ],
     "pageOverflow": 0,
     "path": "/",
-    "previewToolbar": false,
+    "title": "首页",
+    "titleClipped": false,
+    "titleCount": 1,
+    "titleSize": "20px",
     "viewport": [
       1280,
       876
     ]
   },
   {
+    "bodyHeroCount": 0,
     "contentOverflow": 0,
+    "contentScroll": 0,
+    "headerGap": 12,
     "headerOverflow": 0,
-    "headings": [
-      {
-        "family": "\"PingFang SC\", -apple-system, \"system-ui\", \"Helvetica Neue\", \"Microsoft YaHei\", sans-serif",
-        "size": "24px",
-        "text": "任务调度中心"
-      }
-    ],
-    "metricBands": [
-      {
-        "overflow": "hidden",
-        "radius": "12px"
-      }
-    ],
-    "metricTitles": [
-      {
-        "family": "\"PingFang SC\", -apple-system, \"system-ui\", \"Helvetica Neue\", \"Microsoft YaHei\", sans-serif",
-        "size": "14px",
-        "text": "任务总数"
-      },
-      {
-        "family": "\"PingFang SC\", -apple-system, \"system-ui\", \"Helvetica Neue\", \"Microsoft YaHei\", sans-serif",
-        "size": "14px",
-        "text": "运行中"
-      },
-      {
-        "family": "\"PingFang SC\", -apple-system, \"system-ui\", \"Helvetica Neue\", \"Microsoft YaHei\", sans-serif",
-        "size": "14px",
-        "text": "成功"
-      },
-      {
-        "family": "\"PingFang SC\", -apple-system, \"system-ui\", \"Helvetica Neue\", \"Microsoft YaHei\", sans-serif",
-        "size": "14px",
-        "text": "异常"
-      }
-    ],
+    "pageOverflow": 0,
+    "path": "/scenarios",
+    "title": "业务场景",
+    "titleClipped": false,
+    "titleCount": 1,
+    "titleSize": "20px",
+    "viewport": [
+      1280,
+      876
+    ]
+  },
+  {
+    "bodyHeroCount": 0,
+    "contentOverflow": 0,
+    "contentScroll": 0,
+    "headerGap": 12,
+    "headerOverflow": 0,
+    "pageOverflow": 0,
+    "path": "/models",
+    "title": "模型资产",
+    "titleClipped": false,
+    "titleCount": 1,
+    "titleSize": "20px",
+    "viewport": [
+      1280,
+      876
+    ]
+  },
+  {
+    "bodyHeroCount": 0,
+    "contentOverflow": 0,
+    "contentScroll": 0,
+    "headerGap": 12,
+    "headerOverflow": 0,
     "pageOverflow": 0,
     "path": "/tasks",
-    "previewToolbar": false,
+    "title": "求解任务",
+    "titleClipped": false,
+    "titleCount": 1,
+    "titleSize": "20px",
     "viewport": [
       1280,
       876
     ]
   },
   {
+    "bodyHeroCount": 0,
     "contentOverflow": 0,
+    "contentScroll": 0,
+    "headerGap": 12,
     "headerOverflow": 0,
-    "headings": [
-      {
-        "family": "\"PingFang SC\", -apple-system, \"system-ui\", \"Helvetica Neue\", \"Microsoft YaHei\", sans-serif",
-        "size": "24px",
-        "text": "结果报告库"
-      }
-    ],
-    "metricBands": [
-      {
-        "overflow": "hidden",
-        "radius": "12px"
-      }
-    ],
-    "metricTitles": [
-      {
-        "family": "\"PingFang SC\", -apple-system, \"system-ui\", \"Helvetica Neue\", \"Microsoft YaHei\", sans-serif",
-        "size": "14px",
-        "text": "归档报告"
-      },
-      {
-        "family": "\"PingFang SC\", -apple-system, \"system-ui\", \"Helvetica Neue\", \"Microsoft YaHei\", sans-serif",
-        "size": "14px",
-        "text": "模型种类"
-      },
-      {
-        "family": "\"PingFang SC\", -apple-system, \"system-ui\", \"Helvetica Neue\", \"Microsoft YaHei\", sans-serif",
-        "size": "14px",
-        "text": "最近完成"
-      }
-    ],
     "pageOverflow": 0,
     "path": "/results",
-    "previewToolbar": false,
+    "title": "结果分析",
+    "titleClipped": false,
+    "titleCount": 1,
+    "titleSize": "20px",
     "viewport": [
       1280,
       876
     ]
   },
   {
+    "bodyHeroCount": 0,
     "contentOverflow": 0,
+    "contentScroll": 0,
+    "headerGap": 12,
     "headerOverflow": 0,
-    "headings": [
-      {
-        "family": "\"PingFang SC\", -apple-system, \"system-ui\", \"Helvetica Neue\", \"Microsoft YaHei\", sans-serif",
-        "size": "24px",
-        "text": "模型服务治理与在线调用"
-      }
-    ],
-    "metricBands": [],
-    "metricTitles": [],
+    "pageOverflow": 0,
+    "path": "/components",
+    "title": "组件资产",
+    "titleClipped": false,
+    "titleCount": 1,
+    "titleSize": "20px",
+    "viewport": [
+      1280,
+      876
+    ]
+  },
+  {
+    "bodyHeroCount": 0,
+    "contentOverflow": 0,
+    "contentScroll": 0,
+    "headerGap": 12,
+    "headerOverflow": 0,
+    "pageOverflow": 0,
+    "path": "/functions",
+    "title": "函数与曲线",
+    "titleClipped": false,
+    "titleCount": 1,
+    "titleSize": "20px",
+    "viewport": [
+      1280,
+      876
+    ]
+  },
+  {
+    "bodyHeroCount": 0,
+    "contentOverflow": 0,
+    "contentScroll": 0,
+    "headerGap": 12,
+    "headerOverflow": 0,
     "pageOverflow": 0,
     "path": "/services",
-    "previewToolbar": false,
+    "title": "模型服务",
+    "titleClipped": false,
+    "titleCount": 1,
+    "titleSize": "20px",
     "viewport": [
       1280,
       876
     ]
   },
   {
+    "bodyHeroCount": 0,
     "contentOverflow": 0,
+    "contentScroll": 0,
+    "headerGap": 12,
     "headerOverflow": 0,
-    "headings": [
-      {
-        "family": "\"PingFang SC\", -apple-system, \"system-ui\", \"Helvetica Neue\", \"Microsoft YaHei\", sans-serif",
-        "size": "24px",
-        "text": "求解运行环境"
-      }
-    ],
-    "metricBands": [
-      {
-        "overflow": "hidden",
-        "radius": "12px"
-      }
-    ],
-    "metricTitles": [
-      {
-        "family": "\"PingFang SC\", -apple-system, \"system-ui\", \"Helvetica Neue\", \"Microsoft YaHei\", sans-serif",
-        "size": "14px",
-        "text": "后端 API 检查中"
-      },
-      {
-        "family": "\"PingFang SC\", -apple-system, \"system-ui\", \"Helvetica Neue\", \"Microsoft YaHei\", sans-serif",
-        "size": "14px",
-        "text": "求解器 检查中"
-      },
-      {
-        "family": "\"PingFang SC\", -apple-system, \"system-ui\", \"Helvetica Neue\", \"Microsoft YaHei\", sans-serif",
-        "size": "14px",
-        "text": "任务服务 检查中"
-      },
-      {
-        "family": "\"PingFang SC\", -apple-system, \"system-ui\", \"Helvetica Neue\", \"Microsoft YaHei\", sans-serif",
-        "size": "14px",
-        "text": "前端入口"
-      }
-    ],
+    "pageOverflow": 0,
+    "path": "/skills",
+    "title": "Skill 服务",
+    "titleClipped": false,
+    "titleCount": 1,
+    "titleSize": "20px",
+    "viewport": [
+      1280,
+      876
+    ]
+  },
+  {
+    "bodyHeroCount": 0,
+    "contentOverflow": 0,
+    "contentScroll": 0,
+    "headerGap": 12,
+    "headerOverflow": 0,
     "pageOverflow": 0,
     "path": "/runtime",
-    "previewToolbar": false,
+    "title": "求解环境",
+    "titleClipped": false,
+    "titleCount": 1,
+    "titleSize": "20px",
     "viewport": [
       1280,
       876
     ]
   },
   {
+    "bodyHeroCount": 0,
     "contentOverflow": 0,
+    "contentScroll": 0,
+    "headerGap": 12,
     "headerOverflow": 0,
-    "headings": [],
-    "metricBands": [],
-    "metricTitles": [],
+    "pageOverflow": 0,
+    "path": "/settings",
+    "title": "系统配置",
+    "titleClipped": false,
+    "titleCount": 1,
+    "titleSize": "20px",
+    "viewport": [
+      1280,
+      876
+    ]
+  },
+  {
+    "bodyHeroCount": 0,
+    "contentOverflow": 0,
+    "contentScroll": 0,
+    "headerGap": 12,
+    "headerOverflow": 0,
     "pageOverflow": 0,
     "path": "/agents",
-    "previewToolbar": false,
+    "title": "Agent 工作台",
+    "titleClipped": false,
+    "titleCount": 1,
+    "titleSize": "20px",
     "viewport": [
       1280,
       876
     ]
   },
   {
-    "contentOverflow": 24,
+    "bodyHeroCount": 0,
+    "contentOverflow": 0,
+    "contentScroll": 0,
+    "headerGap": 12,
     "headerOverflow": 0,
-    "headings": [
-      {
-        "family": "\"PingFang SC\", -apple-system, \"system-ui\", \"Helvetica Neue\", \"Microsoft YaHei\", sans-serif",
-        "size": "24px",
-        "text": "新建模型"
-      },
-      {
-        "family": "\"PingFang SC\", -apple-system, \"system-ui\", \"Helvetica Neue\", \"Microsoft YaHei\", sans-serif",
-        "size": "16px",
-        "text": "基础信息"
-      }
-    ],
-    "metricBands": [],
-    "metricTitles": [],
     "pageOverflow": 0,
     "path": "/models/create",
-    "previewToolbar": false,
+    "title": "新建模型",
+    "titleClipped": false,
+    "titleCount": 1,
+    "titleSize": "20px",
     "viewport": [
       1280,
       876

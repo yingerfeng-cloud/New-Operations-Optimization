@@ -82,6 +82,8 @@ export function Step1BasicInfo({
             <Card title="创建方式" className="model-step-block" data-section-key="creation">
               <Radio.Group
                 className="creation-mode-group"
+                role="radiogroup"
+                aria-label="创建方式"
                 value={isTemplateMode ? 'template' : 'blank'}
                 onChange={event => {
                   onModeChange(event.target.value === 'template' ? 'template' : 'new');
@@ -93,8 +95,8 @@ export function Step1BasicInfo({
                 ]}
               />
               {isTemplateMode && (
-                <Form.Item label="模型模板" className="section-gap">
-                  <Select aria-label="模型模板" allowClear showSearch value={workspace.templateCode ?? null} placeholder="请选择模型模板" options={templates.map(t => ({ value: t.code, label: t.name }))} onChange={value => onTemplate(value || '')} />
+                <Form.Item label="模型模板" layout="horizontal" className="section-gap creation-template-field">
+                  <Select aria-label="模型模板" allowClear showSearch filterOption={(input, option) => `${option?.label || ''} ${option?.value || ''}`.toLowerCase().includes(input.toLowerCase())} value={workspace.templateCode ?? null} placeholder="请选择模型模板" options={templates.map(t => ({ value: t.code, label: t.name }))} onChange={value => onTemplate(value || '')} />
                 </Form.Item>
               )}
             </Card>

@@ -73,6 +73,7 @@ export function ModelCreationPage() {
   const { id: routeModelId } = useParams();
   const [searchParams] = useSearchParams();
   const initializedKeyRef = useRef('');
+  const creationModeSwitchRef = useRef<string | undefined>(undefined);
   const [visitedThrough, setVisitedThrough] = useState(0);
   const [showAllValidation, setShowAllValidation] = useState(false);
   const [testedAsset, setTestedAsset] = useState<{ id: string; snapshot: string }>();
@@ -179,6 +180,7 @@ export function ModelCreationPage() {
     const existing = useModelCreationStore.getState().workspace;
     if (existing.initialized && existing.sessionId === requestKey) {
       initializedKeyRef.current = requestKey;
+      creationModeSwitchRef.current = undefined;
       setWorkspace({ initialized: true });
       return () => { active = false; };
     }
@@ -399,14 +401,14 @@ export function ModelCreationPage() {
   }, [currentDraftModelId, modelTestTask.data, modelTestTask.dataUpdatedAt, testSnapshot]);
 
   useEffect(() => {
-    if (!workspace.initialized || restoredSectionRef.current === workspace.generation) return;
+    if (!workspace.initialized || !mainScrollContainer || restoredSectionRef.current === workspace.generation) return;
     const section = useModelCreationStore.getState().section;
     restoredSectionRef.current = workspace.generation || '';
-    if (section && /^[a-z0-9_-]+$/i.test(section)) {
+    if (searchParams.get('resume') === '1' && section && /^[a-z0-9_-]+$/i.test(section)) {
       const timer = window.setTimeout(() => document.querySelector<HTMLElement>(`[data-section-key="${section}"]`)?.scrollIntoView?.({ block: 'start' }), 100);
       return () => window.clearTimeout(timer);
     }
-  }, [workspace.initialized, workspace.generation, step]);
+  }, [workspace.initialized, workspace.generation, step, mainScrollContainer, searchParams]);
 
   const confirmSourceSwitch = () => new Promise<boolean>(resolve => {
     if (!useModelCreationStore.getState().workspace.dirty) {
@@ -447,7 +449,20 @@ export function ModelCreationPage() {
   const handleCreationMode = async (mode: 'new' | 'template') => {
     if ((mode === 'new' && workspace.mode === 'new') || (mode === 'template' && workspace.mode === 'template')) return;
     if (!(await confirmSourceSwitch())) return;
-    nav(mode === 'template' ? '/models/create?mode=template' : '/models/create?mode=new');
+    const current = useModelCreationStore.getState().draft;
+    const scenarioId = current.basic_info.scenario_id || request.scenarioId;
+    const scenario = availableScenarios.find(item => item.id === scenarioId);
+    const next = createBlankDraft();
+    if (scenario) next.basic_info = { ...next.basic_info, scenario_id: scenario.id, scenario: scenario.name };
+    const sessionId = `${mode}:::${scenarioId || ''}`;
+    const params = new URLSearchParams({ mode });
+    if (scenarioId) params.set('scenario', scenarioId);
+    // Both methods are local choices in the same mounted form. Prepare the
+    // matching workspace before updating its shareable URL, without a loader.
+    creationModeSwitchRef.current = sessionId;
+    initializedKeyRef.current = sessionId;
+    initializeWorkspace({ mode, sessionId }, next);
+    nav(`/models/create?${params}`, { replace: true });
   };
 
   const missingSource = (resolvedMode === 'edit' || resolvedMode === 'clone' || resolvedMode === 'version') && !request.sourceModelId;
@@ -466,11 +481,13 @@ export function ModelCreationPage() {
   }
 
   const ownsCurrentDraft = workspace.initialized && workspace.sessionId === requestKey && currentDraftModelId === request.sourceModelId;
+  const changingCreationMode = workspace.initialized && creationModeSwitchRef.current === workspace.sessionId
+    && !request.sourceModelId;
   const waitingForData = request.legacySource
     || systemConfig.isPending
     || (!!request.sourceModelId && sourceModel.isPending && !ownsCurrentDraft)
     || (resolvedMode === 'template' && !!request.templateCode && templateDetail.isPending)
-    || (initializedKeyRef.current !== requestKey && !ownsCurrentDraft)
+    || (initializedKeyRef.current !== requestKey && !ownsCurrentDraft && !changingCreationMode)
     || !workspace.initialized;
   if (waitingForData) {
     return <PageLoading label={resolvedMode === 'template' ? '正在加载完整模型模板…' : request.sourceModelId ? '正在加载目标模型资产…' : '正在初始化空白工作台…'} />;
@@ -580,21 +597,8 @@ export function ModelCreationPage() {
       {sourceLeaveOpen && <DraftLeaveDialog open onSave={() => saveDraftModel(false)} onContinue={() => { setSourceLeaveOpen(false); sourceLeaveResolver.current?.(false); }} onLeave={() => { setSourceLeaveOpen(false); sourceLeaveResolver.current?.(true); }} onDiscard={() => { reset(); setSourceLeaveOpen(false); sourceLeaveResolver.current?.(true); }} />}
       <PageHeader
         title={workspaceTitles[resolvedMode]}
+        shortTitle={workspaceTitles[resolvedMode]}
         description={resolvedMode === 'version' ? '创建同一模型族的新草稿并继承选定版本；原试运行、已发布或已下线版本不会被直接覆盖。' : '当前地址定位本草稿；自动保存更新同一资产，未成功提交的内容保留本机恢复副本。'}
-        extra={(
-          <Space wrap>
-            <Dropdown
-              menu={{
-                items: [{ key: 'reset', label: '清空草稿', danger: true }],
-                onClick: ({ key }) => {
-                  if (key === 'reset') confirmReset();
-                },
-              }}
-            >
-              <Button icon={<MoreOutlined />}>更多</Button>
-            </Dropdown>
-          </Space>
-        )}
       />
 
       {!backupAvailable && <Alert type="warning" showIcon title="本机恢复存储不可用，请保持页面打开并手动保存草稿" />}
@@ -603,7 +607,7 @@ export function ModelCreationPage() {
         {(modelTestTask.error || testRecoveryError) && <Alert type="warning" showIcon title={testRecoveryError || '测试任务暂未更新，本机记录已保留'} action={<Button onClick={() => void modelTestTask.refetch()}>恢复测试记录</Button>} />}
         {modelTestTask.data?.error && <Alert type="error" title={modelTestTask.data.error} />}
       </div>}
-      <ModelBuildSummaryBar draft={draft} validation={validation} blocker={firstBlocker} visibleSectionKeys={visibleSectionKeys} dirty={workspace.dirty} currentStepTitle={stepMeta[step].title} onInspection={() => setInspectionOpen(true)} />
+      <ModelBuildSummaryBar draft={draft} validation={validation} blocker={firstBlocker} visibleSectionKeys={visibleSectionKeys} dirty={workspace.dirty} currentStepTitle={stepMeta[step].title} onInspection={() => setInspectionOpen(true)} actions={<Dropdown menu={{ items: [{ key: 'reset', label: '清空草稿', danger: true }], onClick: ({ key }) => { if (key === 'reset') confirmReset(); } }}><Button icon={<MoreOutlined />}>更多</Button></Dropdown>} />
       <ModelCreationProgress currentStep={step} visitedThrough={visibleStepLimit} steps={stepMeta} validation={validation} onChange={enterStep} />
       <StepBody
         title={stepMeta[step].title}

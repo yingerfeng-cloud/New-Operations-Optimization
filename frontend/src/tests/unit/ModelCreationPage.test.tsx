@@ -11,6 +11,7 @@ import type { ModelTemplate } from '../../types/template';
 import { renderWithQueryClient } from '../testUtils';
 
 const templateApi = vi.hoisted(() => ({
+  getTemplates: vi.fn<() => Promise<ModelTemplate[]>>(async () => []),
   getTemplateDetail: vi.fn<(code: string) => Promise<ModelTemplate>>(async (code: string) => ({
     code,
     name: code === 'template_b' ? '模板 B' : '模板 A',
@@ -24,7 +25,7 @@ const templateApi = vi.hoisted(() => ({
     },
   })),
 }));
-vi.mock('../../api/templates', () => ({ getTemplates: async () => [], getTemplateDetail: templateApi.getTemplateDetail }));
+vi.mock('../../api/templates', () => ({ getTemplates: templateApi.getTemplates, getTemplateDetail: templateApi.getTemplateDetail }));
 const systemApi = vi.hoisted(() => ({
   scenarioItems: [{ code: 'day_ahead_unit_commitment', label: '日前机组组合优化', enabled: true, sort_order: 1 }],
   getSystemConfig: vi.fn(async () => ({ dictionaries: { business_scenarios: systemApi.scenarioItems } })),
@@ -105,6 +106,7 @@ beforeEach(() => {
   modelApi.testModel.mockClear();
   modelApi.getTestTask.mockReset();
   templateApi.getTemplateDetail.mockClear();
+  templateApi.getTemplates.mockReset().mockResolvedValue([]);
   systemApi.scenarioItems = [{ code: 'day_ahead_unit_commitment', label: '日前机组组合优化', enabled: true, sort_order: 1 }];
   systemApi.getSystemConfig.mockClear();
 });
@@ -415,6 +417,8 @@ test('creation method control changes the actual workspace mode', async () => {
   expect(screen.getByRole('radio', { name: '空白创建' })).toBeChecked();
   expect(screen.queryByRole('combobox', { name: '模型模板' })).not.toBeInTheDocument();
 
+  const form = document.getElementById('model-step-content');
+  const methodGroup = screen.getByRole('radiogroup', { name: '创建方式' });
   fireEvent.click(screen.getByRole('radio', { name: '从模板创建' }));
   expect(await screen.findByText('从模板创建模型')).toBeInTheDocument();
   expect(useModelCreationStore.getState().workspace.mode).toBe('template');
@@ -422,11 +426,28 @@ test('creation method control changes the actual workspace mode', async () => {
   expect(screen.getByRole('radio', { name: '从模板创建' })).toBeChecked();
   expect(screen.getByRole('combobox', { name: '模型模板' })).toBeInTheDocument();
   expect(screen.queryByText('模型模板已加载')).not.toBeInTheDocument();
+  expect(document.getElementById('model-step-content')).toBe(form);
+  expect(screen.getByRole('radiogroup', { name: '创建方式' })).toBe(methodGroup);
 
   fireEvent.click(screen.getByRole('radio', { name: '空白创建' }));
   await screen.findByText('新建模型');
   expect(useModelCreationStore.getState().workspace.mode).toBe('new');
   expect(screen.queryByRole('combobox', { name: '模型模板' })).not.toBeInTheDocument();
+  expect(document.getElementById('model-step-content')).toBe(form);
+  expect(screen.getByRole('radiogroup', { name: '创建方式' })).toBe(methodGroup);
+});
+
+test('finds a creation template by Chinese name and loads its actual code', async () => {
+  templateApi.getTemplates.mockResolvedValue([{ code: 'economic_dispatch', name: '经济调度' } as ModelTemplate]);
+  renderPage(['/models/create?mode=template']);
+  await screen.findByText('从模板创建模型');
+  const picker = screen.getByRole('combobox', { name: '模型模板' });
+  fireEvent.mouseDown(picker);
+  fireEvent.change(picker, { target: { value: '经济' } });
+  fireEvent.click(await screen.findByText('经济调度'));
+  await screen.findByText('模型模板已加载');
+  expect(templateApi.getTemplateDetail).toHaveBeenCalledWith('economic_dispatch', expect.any(AbortSignal));
+  expect(useModelCreationStore.getState().workspace.templateCode).toBe('economic_dispatch');
 });
 
 test('switching from a loaded template to blank creation removes its binding and definitions', async () => {
@@ -435,6 +456,7 @@ test('switching from a loaded template to blank creation removes its binding and
   expect(screen.getByRole('combobox', { name: '模型模板' })).toBeInTheDocument();
   expect(useModelCreationStore.getState().draft.components).toHaveLength(1);
 
+  const form = document.getElementById('model-step-content');
   fireEvent.click(screen.getByRole('radio', { name: '空白创建' }));
   await screen.findByText('新建模型');
   const state = useModelCreationStore.getState();
@@ -444,6 +466,7 @@ test('switching from a loaded template to blank creation removes its binding and
   expect(state.draft.components).toEqual([]);
   expect(state.draft.formulas).toEqual([]);
   expect(screen.queryByRole('combobox', { name: '模型模板' })).not.toBeInTheDocument();
+  expect(document.getElementById('model-step-content')).toBe(form);
 
   fireEvent.click(screen.getByRole('radio', { name: '从模板创建' }));
   await screen.findByText('从模板创建模型');

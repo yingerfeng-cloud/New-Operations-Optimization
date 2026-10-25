@@ -20,7 +20,7 @@ test('partial semantic content and editor position recover without a second draf
   expect(useModelCreationStore.getState().workspace.sessionId).toBe('new:::');
   expect(useModelCreationStore.getState().draft.runtime_parameters.cost).toEqual([10, 20]);
   expect(listWorkspaceRecoveries()).toHaveLength(1);
-  expect(recoveryUrl(record)).toBe('/models/create?mode=new');
+  expect(recoveryUrl(record)).toBe('/models/create?mode=new&resume=1');
 });
 
 test('unsubmitted local content is isolated by source and explicit reset discards its recovery', () => {
@@ -32,7 +32,7 @@ test('unsubmitted local content is isolated by source and explicit reset discard
   state.initializeWorkspace({ mode: 'edit', sourceModelId: 'B', currentAssetId: 'B', sessionId: 'edit:B::' }, createBlankDraft());
   expect(useModelCreationStore.getState().draft.basic_info.name).toBe('');
   expect(readWorkspaceRecovery('edit:A::')!.draft.basic_info.name).toBe('A 本机修改');
-  expect(recoveryUrl(a)).toBe('/models/A/edit');
+  expect(recoveryUrl(a)).toBe('/models/A/edit?resume=1');
   useModelCreationStore.getState().reset();
   expect(readWorkspaceRecovery('edit:B::')).toBeUndefined();
   expect(readWorkspaceRecovery('edit:A::')).toBeDefined();

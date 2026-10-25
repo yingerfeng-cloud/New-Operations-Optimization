@@ -259,5 +259,112 @@
     "docker-data",
     "docs/exports",
     "docs/visual-acceptance/porcelain-final-2026-10-25"
-  ]
+  ],
+  "followup": {
+    "date": "2026-10-25",
+    "removed": [
+      {
+        "path": "session-temp/optiforge-ui-followup-20261025",
+        "bytes": 363188
+      },
+      {
+        "path": "frontend/node_modules/.vite",
+        "bytes": 24588195
+      },
+      {
+        "path": "frontend/node_modules/.vite-temp",
+        "bytes": 0
+      },
+      {
+        "path": "frontend/tsconfig.app.tsbuildinfo",
+        "bytes": 14056
+      },
+      {
+        "path": "frontend/tsconfig.node.tsbuildinfo",
+        "bytes": 46133
+      },
+      {
+        "path": "app/__pycache__",
+        "bytes": 222612
+      },
+      {
+        "path": "app/model_components/__pycache__",
+        "bytes": 242098
+      },
+      {
+        "path": "app/explain/__pycache__",
+        "bytes": 83224
+      },
+      {
+        "path": "app/builders/__pycache__",
+        "bytes": 115545
+      },
+      {
+        "path": "app/solvers/__pycache__",
+        "bytes": 47443
+      },
+      {
+        "path": "app/agent/__pycache__",
+        "bytes": 273147
+      },
+      {
+        "path": "app/agent/v3/__pycache__",
+        "bytes": 106037
+      },
+      {
+        "path": "app/agent/v3/skills/__pycache__",
+        "bytes": 11754
+      },
+      {
+        "path": "app/schemas/__pycache__",
+        "bytes": 65460
+      },
+      {
+        "path": "app/storage/__pycache__",
+        "bytes": 38539
+      },
+      {
+        "path": "app/components/__pycache__",
+        "bytes": 7858
+      },
+      {
+        "path": "app/semantic/__pycache__",
+        "bytes": 59540
+      },
+      {
+        "path": "app/api/__pycache__",
+        "bytes": 116198
+      },
+      {
+        "path": "app/templates/__pycache__",
+        "bytes": 121661
+      },
+      {
+        "path": "app/jobs/__pycache__",
+        "bytes": 48310
+      },
+      {
+        "path": "app/explainers/__pycache__",
+        "bytes": 67894
+      },
+      {
+        "path": "app/services/__pycache__",
+        "bytes": 729947
+      },
+      {
+        "path": "app/formulas/__pycache__",
+        "bytes": 89861
+      },
+      {
+        "path": "app/diagnosis/__pycache__",
+        "bytes": 13187
+      },
+      {
+        "path": "tests/__pycache__",
+        "bytes": 26198
+      }
+    ],
+    "removed_bytes": 27498085,
+    "temporaryServiceStopped": true
+  }
 }

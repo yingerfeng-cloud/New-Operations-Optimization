@@ -478,15 +478,32 @@
 }
 
 :root .creation-mode-group {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
-}
-
-:root .model-step-block[data-section-key="creation"] .creation-mode-group:only-child {
-  grid-column: 1 / -1;
+  display: inline-flex;
+  gap: 2px;
+  padding: 3px;
+  border: 1px solid var(--proto-line);
+  border-radius: 8px;
+  background: #f3f6fa;
   width: 100%;
   max-width: 480px;
+}
+
+/* Optional creation fields must not move the workspace through scroll anchoring. */
+:root .model-creation-page { overflow-anchor: none; }
+
+:root .creation-template-field .ant-form-item-row {
+  flex-flow: row nowrap;
+  align-items: center;
+}
+
+:root .creation-template-field .ant-form-item-label {
+  flex: 0 0 auto;
+  padding: 0 10px 0 0;
+}
+
+:root .creation-template-field .ant-form-item-control {
+  flex: 1;
+  min-width: 0;
 }
 
 :root .creation-mode-group .ant-radio-wrapper {
@@ -2833,18 +2850,20 @@
 }
 
 :root .creation-mode-group .ant-radio-wrapper {
-  min-height: 38px;
-  padding: 7px 10px;
-  border-color: var(--proto-line);
-  border-radius: 8px;
+  flex: 1;
+  min-height: 32px;
+  padding: 4px 12px;
+  border: 0;
+  border-radius: 5px;
   font-size: 14px;
   line-height: 20px;
+  white-space: nowrap;
 }
 
 :root .creation-mode-group .ant-radio-wrapper-checked {
   color: #466bc4;
-  border-color: #becded;
-  background: #f3f6fd;
+  background: #fff;
+  box-shadow: 0 1px 4px #20314910;
 }
 
 :root .model-inline-notice > .anticon {

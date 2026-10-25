@@ -1,0 +1,38 @@
+[
+  {
+    "checked": [
+      "blank"
+    ],
+    "groupTop": 460.59375,
+    "groupWidth": 363.71875,
+    "hasTemplate": false,
+    "label": "before",
+    "loaderCount": 0,
+    "scroll": 0,
+    "viewport": 1280
+  },
+  {
+    "checked": [
+      "template"
+    ],
+    "groupTop": 460.59375,
+    "groupWidth": 363.71875,
+    "hasTemplate": true,
+    "label": "pointer-template",
+    "loaderCount": 0,
+    "scroll": 0,
+    "viewport": 1280
+  },
+  {
+    "checked": [
+      "blank"
+    ],
+    "groupTop": 460.59375,
+    "groupWidth": 363.71875,
+    "hasTemplate": false,
+    "label": "keyboard-blank",
+    "loaderCount": 0,
+    "scroll": 0,
+    "viewport": 1280
+  }
+]

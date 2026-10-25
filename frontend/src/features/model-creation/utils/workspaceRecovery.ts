@@ -34,8 +34,8 @@ export function listWorkspaceRecoveries(): WorkspaceRecovery[] {
   return Object.values(records()).filter(valid).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
 }
 export function recoveryUrl(value: WorkspaceRecovery): string {
-  if (value.currentDraftModelId) return `/models/${encodeURIComponent(value.currentDraftModelId)}/edit`;
-  const query = new URLSearchParams({ mode: value.workspace.mode });
+  if (value.currentDraftModelId) return `/models/${encodeURIComponent(value.currentDraftModelId)}/edit?resume=1`;
+  const query = new URLSearchParams({ mode: value.workspace.mode, resume: '1' });
   if (value.workspace.sourceModelId) query.set('source', value.workspace.sourceModelId);
   if (value.workspace.templateCode) query.set('template', value.workspace.templateCode);
   const scenario = value.workspace.sessionId.split(':').at(-1);

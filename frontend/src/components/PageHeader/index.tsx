@@ -17,14 +17,21 @@ export interface PageHeaderProps {
 export function PageHeader(props: PageHeaderProps) {
   const slots = usePageHeaderSlots();
   const [helpOpen, setHelpOpen] = useState(false);
-  if (props.integrated && slots?.titleTarget) return createPortal(
+  const title = props.shortTitle || slots?.pageLabel || props.title;
+  if (props.integrated !== false && slots?.titleTarget) return <>
+    {createPortal(
     <div className="integrated-page-title">
-      <h1>{props.shortTitle || props.title}</h1>
-      {props.description && <Popover title={`${props.shortTitle || props.title}说明`} content={<p className="integrated-page-help-copy">{props.description}</p>} trigger="click" placement="bottomLeft" arrow={false} open={helpOpen} onOpenChange={setHelpOpen}>
-        <button type="button" className="integrated-page-help" aria-label={`${props.shortTitle || props.title}使用说明`} aria-expanded={helpOpen} onKeyDown={event => { if (event.key === 'Escape') setHelpOpen(false); }}><InfoCircleOutlined aria-hidden="true" /></button>
+      <h1>{title}</h1>
+      {props.description && <Popover title={`${title}说明`} content={<p className="integrated-page-help-copy">{props.description}</p>} trigger="click" placement="bottomLeft" arrow={false} open={helpOpen} onOpenChange={setHelpOpen}>
+        <button type="button" className="integrated-page-help" aria-label={`${title}使用说明`} aria-expanded={helpOpen} onKeyDown={event => { if (event.key === 'Escape') setHelpOpen(false); }}><InfoCircleOutlined aria-hidden="true" /></button>
       </Popover>}
     </div>, slots.titleTarget,
-  );
+    )}
+    {(props.extra || props.status || props.tags) && <div className="page-context-toolbar">
+      <div className="page-context-status">{props.status}{typeof props.tags === 'string' ? <Tag color="blue">{props.tags}</Tag> : props.tags}</div>
+      {props.extra && <div className="page-hero-actions">{props.extra}</div>}
+    </div>}
+  </>;
   return <DefaultPageHeader {...props} />;
 }
 

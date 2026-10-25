@@ -1,9 +1,10 @@
 import { Drawer } from 'antd';
-import { useEffect, useState } from 'react';
-import { Outlet, useLocation } from 'react-router-dom';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { Outlet, useLocation, useNavigationType } from 'react-router-dom';
 import { Header } from './Header';
 import { Sidebar } from './Sidebar';
 import { PageHeaderSlotsProvider } from '../../components/PageHeader/slots';
+import { titleForPath } from '../navigation';
 
 const COLLAPSE_KEY = 'optiforge.sidebar.collapsed';
 
@@ -19,11 +20,25 @@ function useViewport() {
 
 export function MainLayout() {
   const { pathname } = useLocation();
+  const navigationType = useNavigationType();
   const { mobile, medium } = useViewport();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [manualCollapsed, setManualCollapsed] = useState(() => localStorage.getItem(COLLAPSE_KEY) === 'true');
   const collapsed = manualCollapsed || (medium && localStorage.getItem(COLLAPSE_KEY) === null);
   const isAgentWorkbench = pathname.startsWith('/agents');
+  const contentRef = useRef<HTMLElement>(null);
+  const previousPathRef = useRef<string | undefined>(undefined);
+
+  useLayoutEffect(() => {
+    const previousPath = previousPathRef.current;
+    previousPathRef.current = pathname;
+    const savedDraftAddress = navigationType === 'REPLACE' && previousPath === '/models/create'
+      && /^\/models\/[^/]+\/edit$/.test(pathname);
+    if (previousPath === pathname || savedDraftAddress) return;
+    if (!contentRef.current) return;
+    contentRef.current.scrollTop = 0;
+    contentRef.current.scrollLeft = 0;
+  }, [pathname, navigationType]);
 
   useEffect(() => setDrawerOpen(false), [pathname]);
   const toggleCollapsed = () => {
@@ -33,7 +48,7 @@ export function MainLayout() {
   };
 
   return (
-    <PageHeaderSlotsProvider><div className={`app-shell app${collapsed && !mobile ? ' app-sidebar-collapsed' : ''}${mobile ? ' app-mobile' : ''}`}>
+    <PageHeaderSlotsProvider pageLabel={titleForPath(pathname).label}><div className={`app-shell app${collapsed && !mobile ? ' app-sidebar-collapsed' : ''}${mobile ? ' app-mobile' : ''}`}>
       {!mobile && <Sidebar collapsed={collapsed} />}
       <main className={`main${isAgentWorkbench ? ' main-agent-workbench' : ''}`}>
         <Header
@@ -44,7 +59,7 @@ export function MainLayout() {
           onOpenMenu={() => setDrawerOpen(true)}
           onToggleSidebar={toggleCollapsed}
         />
-        <section className="main-content content">
+        <section className="main-content content" ref={contentRef}>
           <div className="platform-page"><Outlet /></div>
         </section>
       </main>

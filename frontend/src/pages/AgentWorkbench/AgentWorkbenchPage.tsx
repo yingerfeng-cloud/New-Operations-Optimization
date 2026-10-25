@@ -1,4 +1,5 @@
 import { subscribeAgentEvents } from '../../api/agents';
+import { PageHeader } from '../../components/PageHeader';
 import { Alert, App as AntApp, Button, Card, Drawer, Dropdown, Empty, Input, Modal, Space, Spin, Tag, Typography } from 'antd';
 import type { MenuProps } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -574,6 +575,7 @@ export function AgentWorkbenchPage() {
 
   return (
     <div className="agent-workbench-page">
+      <PageHeader title="Agent 工作台" description="通过业务对话组织优化需求、补充参数并跟踪当前工作流。" />
       {status.isError && <Alert className="agent-service-alert" showIcon type="error" title="Agent 服务不可用" description="当前前端未能连接 Agent API，请检查统一后端服务是否以 combined 模式启动。" action={<Button size="small" onClick={() => status.refetch()}>重新检查</Button>} />}
       <div className="agent-workbench-layout">
         <Card
@@ -588,7 +590,7 @@ export function AgentWorkbenchPage() {
           className="content-card agent-chat-card"
           title={(
             <div className="agent-chat-heading">
-              <strong>Agent 工作台</strong>
+              <strong>当前会话</strong>
               <div className="agent-chat-heading-meta">
                 <span>
                   <i className={`agent-service-dot ${status.isPending || serviceState.color === 'processing' ? 'processing' : serviceState.color === 'green' ? 'success' : serviceState.color === 'error' ? 'error' : 'warning'}`} aria-hidden="true" />

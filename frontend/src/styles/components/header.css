@@ -171,16 +171,23 @@
   white-space: normal;
   line-height: 1.6;
 }
-.page-title-slot { flex: 0 0 auto; }
+.page-title-slot { flex: 0 0 auto; min-width: 0; }
+.page-title-fallback { color: var(--proto-text); font: 600 20px/28px var(--font-ui); white-space: nowrap; }
+.page-title-slot:has(.integrated-page-title) > .page-title-fallback { display: none; }
 .integrated-page-title { display: flex; align-items: center; gap: 6px; }
-.integrated-page-title h1 { margin: 0; color: var(--proto-text); font: 600 20px/28px var(--font-ui); letter-spacing: -.3px; }
+.integrated-page-title h1 { margin: 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--proto-text); font: 600 20px/28px var(--font-ui); letter-spacing: -.3px; }
 .integrated-page-help { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; padding: 0; border: 0; border-radius: 6px; color: #72839e; background: transparent; font-size: 16px; cursor: pointer; }
 .integrated-page-help:hover, .integrated-page-help[aria-expanded="true"] { color: var(--proto-blue); background: #edf2fb; }
 .integrated-page-help-copy { max-width: 320px; margin: 0; color: #64748b; font-size: 13px; line-height: 1.7; }
 :root .header-integrated-page .top-search-area { flex: 1 1 auto; gap: 12px; }
 :root .header-integrated-page .top-actions { flex: 0 0 auto; }
-:root .header-integrated-page .global-search { flex: 0 1 420px; min-width: 200px; }
+:root .header-integrated-page .global-search { flex: 0 1 420px; min-width: 120px; }
 :root .header-integrated-page .global-search > span:not(.anticon) { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 :root .header-integrated-page .global-search > kbd { flex-shrink: 0; }
 :root .model-asset-list .ant-card-head-wrapper { min-height: 56px; gap: 16px; }
 :root .model-list-actions { display: flex; align-items: center; gap: 8px; margin: 0; }
+.page-context-toolbar { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px 16px; margin: 0 0 16px; }
+.page-context-status { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; min-width: 0; }
+.page-context-status:empty { display: none; }
+.page-context-toolbar > .page-hero-actions { margin-left: auto; }
+.integrated-page-help { flex-shrink: 0; }

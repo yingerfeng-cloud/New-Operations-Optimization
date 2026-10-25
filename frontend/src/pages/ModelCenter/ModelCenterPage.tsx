@@ -115,7 +115,7 @@ export function ModelCenterPage() {
   const nav = useNavigate();
   const { id } = useParams();
   const pageHeaderSlots = usePageHeaderSlots();
-  const integratedHeader = !id && Boolean(pageHeaderSlots?.titleTarget);
+  const integratedHeader = Boolean(pageHeaderSlots?.titleTarget);
   const [templateOpen, setTemplateOpen] = useState(false);
   const [template, setTemplate] = useState<string>();
   const viewId = id;
@@ -233,9 +233,8 @@ export function ModelCenterPage() {
       <PageHeader
         title="模型资产中心"
         description="模型版本管理、发布治理、模板克隆、测试运行与资产沉淀。"
-        integrated={!id}
         shortTitle="模型资产"
-        extra={modelActions}
+        extra={integratedHeader ? undefined : modelActions}
       />
       <MetricGrid>
         <MetricCard title="模型资产数" value={models.data === undefined ? '—' : rows.length} description="真实后端资产" tone="blue" />
