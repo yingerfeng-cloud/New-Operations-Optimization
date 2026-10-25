@@ -1,5 +1,5 @@
-import { Button, Card, Empty, Space, Tag, theme } from 'antd';
-import { ArrowRightOutlined } from '@ant-design/icons';
+import { Button, Card, Empty, Space, Tag, Tooltip, theme } from 'antd';
+import { ArrowRightOutlined, InfoCircleOutlined } from '@ant-design/icons';
 import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -116,14 +116,13 @@ export function DashboardPage() {
       </MetricGrid>
     </section>
     <div className="section-gap dashboard-operations-grid">
-      <Card className="dashboard-chart-card dashboard-trend-card" title={<div className="dashboard-card-heading"><span>任务运行态势</span><small>按任务创建日期统计</small></div>} extra={<Space size={8}><div className="dashboard-trend-window" role="group" aria-label="任务运行态势统计窗口">{TREND_WINDOWS.map(window => <button key={window} type="button" className={trendWindow === window ? 'active' : ''} aria-pressed={trendWindow === window} onClick={() => setTrendWindow(window)}>近 {window} 天</button>)}</div></Space>}>
+      <Card className="dashboard-chart-card dashboard-trend-card" title={<div className="dashboard-card-heading"><span>任务运行态势</span><Tooltip trigger={['hover', 'focus']} title="按任务创建日期统计；无任务日期不计算成功率，折线保留断点。"><button type="button" className="dashboard-chart-help" aria-label="任务趋势统计说明"><InfoCircleOutlined /></button></Tooltip></div>} extra={<Space size={8}><div className="dashboard-trend-window" role="group" aria-label="任务运行态势统计窗口">{TREND_WINDOWS.map(window => <button key={window} type="button" className={trendWindow === window ? 'active' : ''} aria-pressed={trendWindow === window} onClick={() => setTrendWindow(window)}>近 {window} 天</button>)}</div></Space>}>
         <div className="dashboard-chart-summary">
-          <span><small>近 {trendWindow} 天任务</small><strong>{trendTaskCount}</strong></span>
+          <span><small>任务总量</small><strong>{trendTaskCount}</strong></span>
           <span><small>峰值日期</small><strong>{peakDay?.total ? `${peakDay.label} · ${peakDay.total}` : '-'}</strong></span>
-          <span><small>已完成平均耗时</small><strong>{formatDurationSeconds(averageDuration)}</strong></span>
+          <span><small>成功平均耗时</small><strong>{formatDurationSeconds(averageDuration)}</strong></span>
         </div>
-        <LazyEChart style={{ height: 248, minHeight: 248 }} option={trendOption} ariaLabel={`近 ${trendWindow} 天任务量与成功率趋势`} />
-        <p className="dashboard-chart-note">无任务日期不计算成功率</p>
+        <LazyEChart style={{ height: 272, minHeight: 272 }} option={trendOption} ariaLabel={`近 ${trendWindow} 天任务量与成功率趋势`} />
       </Card>
       <Card className="dashboard-rail-card dashboard-tasks-card" title="最近任务" extra={<Button type="link" size="small" onClick={() => nav('/tasks')}>全部任务</Button>}>
         {rows.length ? <>

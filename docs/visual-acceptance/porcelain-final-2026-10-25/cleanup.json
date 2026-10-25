@@ -366,5 +366,113 @@
     ],
     "removed_bytes": 27498085,
     "temporaryServiceStopped": true
+  },
+  "chart_followup": {
+    "removed": [
+      {
+        "path": "/Users/joiefu/Project/OPTIFORGE/frontend/node_modules/.vite",
+        "bytes": 24579781
+      },
+      {
+        "path": "/Users/joiefu/Project/OPTIFORGE/frontend/node_modules/.vite-temp",
+        "bytes": 0
+      },
+      {
+        "path": "/Users/joiefu/Project/OPTIFORGE/frontend/tsconfig.app.tsbuildinfo",
+        "bytes": 14099
+      },
+      {
+        "path": "/Users/joiefu/Project/OPTIFORGE/frontend/tsconfig.node.tsbuildinfo",
+        "bytes": 46133
+      },
+      {
+        "path": "/private/tmp/optiforge-chart-followup-20261025",
+        "bytes": 382033
+      },
+      {
+        "path": "/Users/joiefu/Project/OPTIFORGE/app/__pycache__",
+        "bytes": 222612
+      },
+      {
+        "path": "/Users/joiefu/Project/OPTIFORGE/app/model_components/__pycache__",
+        "bytes": 242098
+      },
+      {
+        "path": "/Users/joiefu/Project/OPTIFORGE/app/explain/__pycache__",
+        "bytes": 83224
+      },
+      {
+        "path": "/Users/joiefu/Project/OPTIFORGE/app/builders/__pycache__",
+        "bytes": 115545
+      },
+      {
+        "path": "/Users/joiefu/Project/OPTIFORGE/app/solvers/__pycache__",
+        "bytes": 47443
+      },
+      {
+        "path": "/Users/joiefu/Project/OPTIFORGE/app/agent/__pycache__",
+        "bytes": 273147
+      },
+      {
+        "path": "/Users/joiefu/Project/OPTIFORGE/app/schemas/__pycache__",
+        "bytes": 65460
+      },
+      {
+        "path": "/Users/joiefu/Project/OPTIFORGE/app/storage/__pycache__",
+        "bytes": 38539
+      },
+      {
+        "path": "/Users/joiefu/Project/OPTIFORGE/app/components/__pycache__",
+        "bytes": 7858
+      },
+      {
+        "path": "/Users/joiefu/Project/OPTIFORGE/app/semantic/__pycache__",
+        "bytes": 59540
+      },
+      {
+        "path": "/Users/joiefu/Project/OPTIFORGE/app/api/__pycache__",
+        "bytes": 116198
+      },
+      {
+        "path": "/Users/joiefu/Project/OPTIFORGE/app/templates/__pycache__",
+        "bytes": 121661
+      },
+      {
+        "path": "/Users/joiefu/Project/OPTIFORGE/app/jobs/__pycache__",
+        "bytes": 48310
+      },
+      {
+        "path": "/Users/joiefu/Project/OPTIFORGE/app/explainers/__pycache__",
+        "bytes": 67894
+      },
+      {
+        "path": "/Users/joiefu/Project/OPTIFORGE/app/services/__pycache__",
+        "bytes": 729947
+      },
+      {
+        "path": "/Users/joiefu/Project/OPTIFORGE/app/formulas/__pycache__",
+        "bytes": 89861
+      },
+      {
+        "path": "/Users/joiefu/Project/OPTIFORGE/app/diagnosis/__pycache__",
+        "bytes": 13187
+      },
+      {
+        "path": "/Users/joiefu/Project/OPTIFORGE/app/agent/v3/__pycache__",
+        "bytes": 106037
+      },
+      {
+        "path": "/Users/joiefu/Project/OPTIFORGE/app/agent/v3/skills/__pycache__",
+        "bytes": 11754
+      }
+    ],
+    "bytes": 27482361,
+    "preserved": [
+      "frontend/dist",
+      "frontend/node_modules dependencies",
+      ".venv-mac",
+      "business data",
+      "formal visual acceptance records"
+    ]
   }
 }

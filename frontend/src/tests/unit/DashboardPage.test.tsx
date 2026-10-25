@@ -77,3 +77,18 @@ test('compact recent entries retain task details and prefilled task creation', a
   fireEvent.click(screen.getByRole('button', { name: '全部模型' }));
   expect(screen.getByTestId('location')).toHaveTextContent('/models');
 });
+
+test('trend window updates the chart while the compact help keeps the date policy available', async () => {
+  renderWithQueryClient(<MemoryRouter><DashboardPage /></MemoryRouter>);
+  expect(await screen.findByText('任务总量')).toBeInTheDocument();
+  expect(screen.getByText('成功平均耗时')).toBeInTheDocument();
+  const windows = screen.getByRole('group', { name: '任务运行态势统计窗口' });
+  for (const days of [14, 30, 7]) {
+    const button = within(windows).getByRole('button', { name: `近 ${days} 天` });
+    fireEvent.click(button);
+    expect(button).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('img', { name: `近 ${days} 天任务量与成功率趋势` })).toBeInTheDocument();
+  }
+  fireEvent.focus(screen.getByRole('button', { name: '任务趋势统计说明' }));
+  expect(await screen.findByRole('tooltip')).toHaveTextContent('无任务日期不计算成功率，折线保留断点。');
+});

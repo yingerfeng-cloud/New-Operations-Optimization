@@ -19,10 +19,10 @@ export function taskTrendOption(trend: TrendDay[], fontFamily: string): EChartsO
     animation: false,
     textStyle: { fontFamily },
     color: [colors.success, colors.failed, colors.other, colors.rate],
-    grid: { top: 34, left: 40, right: 46, bottom: 32 },
+    grid: { top: 28, left: 40, right: 46, bottom: 60 },
     title: [
-      { text: '任务量', left: 0, top: 5, padding: 0, textStyle: { color: '#64728a', fontSize: 11, fontWeight: 400 } },
-      { text: '成功率', right: 0, top: 5, padding: 0, textStyle: { color: '#64728a', fontSize: 11, fontWeight: 400 } },
+      { text: '任务量（个）', left: 0, top: 0, padding: 0, textStyle: { color: '#64728a', fontSize: 12, fontWeight: 400 } },
+      { text: '成功率', right: 0, top: 0, padding: 0, textStyle: { color: '#64728a', fontSize: 12, fontWeight: 400 } },
     ],
     tooltip: {
       trigger: 'axis',
@@ -46,7 +46,7 @@ export function taskTrendOption(trend: TrendDay[], fontFamily: string): EChartsO
           + row('成功率', day.successRate === null ? '无任务' : `${day.successRate}%`, colors.rate);
       },
     },
-    legend: { top: 0, right: 86, itemWidth: 10, itemHeight: 6, itemGap: 16, textStyle: { color: '#73829a', fontSize: 11, fontFamily } },
+    legend: { bottom: 0, left: 'center', itemWidth: 12, itemHeight: 8, itemGap: 22, textStyle: { color: '#64728a', fontSize: 12, fontFamily } },
     xAxis: { type: 'category', data: dates, boundaryGap: true, axisLine: { show: false }, axisTick: { show: false }, axisLabel: { ...axisLabel, margin: 12, interval: trend.length > 14 ? 4 : trend.length > 7 ? 1 : 0, showMinLabel: true, showMaxLabel: true, hideOverlap: true } },
     yAxis: [
       { type: 'value', min: 0, max: Math.max(4, Math.ceil(Math.max(...trend.map(day => day.total), 0) * 1.2)), minInterval: 1, splitNumber: 2, axisLine: { show: false }, axisTick: { show: false }, axisLabel, splitLine: { lineStyle: { color: '#edf1f6', type: 'dashed' } } },
@@ -59,7 +59,21 @@ export function taskTrendOption(trend: TrendDay[], fontFamily: string): EChartsO
       {
         name: '成功率', type: 'line', xAxisIndex: 0, yAxisIndex: 1,
         smooth: false, connectNulls: false, showSymbol: true, symbol: 'circle', symbolSize: 4,
-        data: trend.map(day => ({ value: day.successRate, label: { show: day === lastMeasuredDay, formatter: `${day.successRate}%`, position: 'top', color: colors.rate, fontSize: 11, backgroundColor: '#ffffffed', borderRadius: 4, padding: [2, 4] } })),
+        data: trend.map(day => ({
+          value: day.successRate,
+          label: {
+            show: day === lastMeasuredDay,
+            formatter: `${day.successRate}%`,
+            // Keep percentage badges inside the plot, clear of axis titles and dates.
+            position: (day.successRate ?? 0) >= 80 ? 'bottom' : 'top',
+            distance: 8,
+            color: colors.rate,
+            fontSize: 11,
+            backgroundColor: '#ffffffed',
+            borderRadius: 4,
+            padding: [2, 4],
+          },
+        })),
         lineStyle: { width: 1.8, color: colors.rate },
         itemStyle: { color: colors.rate, borderColor: '#fff', borderWidth: 1 },
         areaStyle: { color: { type: 'linear', x: 0, y: 0, x2: 0, y2: 1, colorStops: [{ offset: 0, color: '#466bc40c' }, { offset: 1, color: '#466bc400' }] } },

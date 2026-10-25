@@ -110,3 +110,35 @@ bringing up nodes...
 
 -- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
 2 passed, 5 warnings in 3.77s
+
+
+=== Homepage chart layout follow-up (2026-10-25): targeted tests ===
+
+ RUN  v4.1.12 /Users/joiefu/Project/OPTIFORGE/frontend
+
+
+ Test Files  2 passed (2)
+      Tests  23 passed (23)
+   Start at  14:54:59
+   Duration  1.91s (transform 112ms, setup 310ms, import 610ms, tests 1.13s, environment 653ms)
+
+
+=== Homepage chart layout follow-up: production build (tail) ===
+dist/assets/templates-CN-oNRDY.js              32.55 kB │ gzip:  10.25 kB
+dist/assets/ModelCenterPage-BlnY02vU.js        48.80 kB │ gzip:  15.45 kB
+dist/assets/AgentWorkbenchPage-CYMDRkn-.js     53.18 kB │ gzip:  16.45 kB
+dist/assets/index-By18-Snb.js                  64.99 kB │ gzip:  23.15 kB
+dist/assets/index-Be_LozO0.js                  67.74 kB │ gzip:  22.09 kB
+dist/assets/FunctionAssetsPage-CXKyMLLx.js     69.48 kB │ gzip:  23.85 kB
+dist/assets/TaskCenterPage-Ct6uuTcB.js         92.41 kB │ gzip:  32.02 kB
+dist/assets/ModelCreationPage-COdL1cdx.js     191.38 kB │ gzip:  58.76 kB
+dist/assets/Table-B42XwYvK.js                 199.34 kB │ gzip:  63.42 kB
+dist/assets/FormulaBuilderModal-CAOg43OQ.js   514.85 kB │ gzip: 173.73 kB
+dist/assets/vendor-echarts-Crrd582t.js        659.84 kB │ gzip: 223.09 kB
+dist/assets/index-ZYVN4Lvf.js                 913.34 kB │ gzip: 300.34 kB
+
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 3.81s

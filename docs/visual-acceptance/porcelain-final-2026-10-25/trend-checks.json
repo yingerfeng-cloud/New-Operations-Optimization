@@ -1,0 +1,296 @@
+{
+  "checks": [
+    {
+      "asset": [
+        "/assets/index-ZYVN4Lvf.js"
+      ],
+      "cardBottomDifference": 0,
+      "cardTopDifference": 0,
+      "chart": {
+        "bottom": 638.59375,
+        "height": 272,
+        "left": 265,
+        "right": 1115,
+        "top": 366.59375,
+        "width": 850,
+        "x": 265,
+        "y": 366.59375
+      },
+      "chartLabel": "近 7 天任务量与成功率趋势",
+      "pageOverflow": 0,
+      "summary": [
+        {
+          "childOverflow": [
+            0,
+            0
+          ],
+          "overflow": 0,
+          "text": "任务总量5"
+        },
+        {
+          "childOverflow": [
+            0,
+            0
+          ],
+          "overflow": 0,
+          "text": "峰值日期10/19 · 3"
+        },
+        {
+          "childOverflow": [
+            0,
+            0
+          ],
+          "overflow": 0,
+          "text": "成功平均耗时9 s"
+        }
+      ],
+      "width": 1626
+    },
+    {
+      "asset": [
+        "/assets/index-ZYVN4Lvf.js"
+      ],
+      "cardBottomDifference": 0,
+      "cardTopDifference": 0,
+      "chart": {
+        "bottom": 638.59375,
+        "height": 272,
+        "left": 265,
+        "right": 1115,
+        "top": 366.59375,
+        "width": 850,
+        "x": 265,
+        "y": 366.59375
+      },
+      "chartLabel": "近 14 天任务量与成功率趋势",
+      "pageOverflow": 0,
+      "summary": [
+        {
+          "childOverflow": [
+            0,
+            0
+          ],
+          "overflow": 0,
+          "text": "任务总量5"
+        },
+        {
+          "childOverflow": [
+            0,
+            0
+          ],
+          "overflow": 0,
+          "text": "峰值日期10/19 · 3"
+        },
+        {
+          "childOverflow": [
+            0,
+            0
+          ],
+          "overflow": 0,
+          "text": "成功平均耗时9 s"
+        }
+      ],
+      "width": 1626
+    },
+    {
+      "asset": [
+        "/assets/index-ZYVN4Lvf.js"
+      ],
+      "cardBottomDifference": 0,
+      "cardTopDifference": 0,
+      "chart": {
+        "bottom": 638.59375,
+        "height": 272,
+        "left": 265,
+        "right": 1115,
+        "top": 366.59375,
+        "width": 850,
+        "x": 265,
+        "y": 366.59375
+      },
+      "chartLabel": "近 30 天任务量与成功率趋势",
+      "pageOverflow": 0,
+      "summary": [
+        {
+          "childOverflow": [
+            0,
+            0
+          ],
+          "overflow": 0,
+          "text": "任务总量5"
+        },
+        {
+          "childOverflow": [
+            0,
+            0
+          ],
+          "overflow": 0,
+          "text": "峰值日期10/19 · 3"
+        },
+        {
+          "childOverflow": [
+            0,
+            0
+          ],
+          "overflow": 0,
+          "text": "成功平均耗时9 s"
+        }
+      ],
+      "width": 1626
+    },
+    {
+      "asset": [
+        "/assets/index-ZYVN4Lvf.js"
+      ],
+      "cardBottomDifference": 0,
+      "cardTopDifference": 0,
+      "chart": {
+        "bottom": 638.59375,
+        "height": 272,
+        "left": 265,
+        "right": 884.328125,
+        "top": 366.59375,
+        "width": 619.328125,
+        "x": 265,
+        "y": 366.59375
+      },
+      "chartLabel": "近 7 天任务量与成功率趋势",
+      "pageOverflow": 0,
+      "summary": [
+        {
+          "childOverflow": [
+            0,
+            0
+          ],
+          "overflow": 0,
+          "text": "任务总量5"
+        },
+        {
+          "childOverflow": [
+            0,
+            0
+          ],
+          "overflow": 0,
+          "text": "峰值日期10/19 · 3"
+        },
+        {
+          "childOverflow": [
+            0,
+            0
+          ],
+          "overflow": 0,
+          "text": "成功平均耗时9 s"
+        }
+      ],
+      "width": 1280
+    },
+    {
+      "asset": [
+        "/assets/index-ZYVN4Lvf.js"
+      ],
+      "cardBottomDifference": 0,
+      "cardTopDifference": 0,
+      "chart": {
+        "bottom": 638.59375,
+        "height": 272,
+        "left": 265,
+        "right": 884.328125,
+        "top": 366.59375,
+        "width": 619.328125,
+        "x": 265,
+        "y": 366.59375
+      },
+      "chartLabel": "近 14 天任务量与成功率趋势",
+      "pageOverflow": 0,
+      "summary": [
+        {
+          "childOverflow": [
+            0,
+            0
+          ],
+          "overflow": 0,
+          "text": "任务总量5"
+        },
+        {
+          "childOverflow": [
+            0,
+            0
+          ],
+          "overflow": 0,
+          "text": "峰值日期10/19 · 3"
+        },
+        {
+          "childOverflow": [
+            0,
+            0
+          ],
+          "overflow": 0,
+          "text": "成功平均耗时9 s"
+        }
+      ],
+      "width": 1280
+    },
+    {
+      "asset": [
+        "/assets/index-ZYVN4Lvf.js"
+      ],
+      "cardBottomDifference": 0,
+      "cardTopDifference": 0,
+      "chart": {
+        "bottom": 638.59375,
+        "height": 272,
+        "left": 265,
+        "right": 884.328125,
+        "top": 366.59375,
+        "width": 619.328125,
+        "x": 265,
+        "y": 366.59375
+      },
+      "chartLabel": "近 30 天任务量与成功率趋势",
+      "pageOverflow": 0,
+      "summary": [
+        {
+          "childOverflow": [
+            0,
+            0
+          ],
+          "overflow": 0,
+          "text": "任务总量5"
+        },
+        {
+          "childOverflow": [
+            0,
+            0
+          ],
+          "overflow": 0,
+          "text": "峰值日期10/19 · 3"
+        },
+        {
+          "childOverflow": [
+            0,
+            0
+          ],
+          "overflow": 0,
+          "text": "成功平均耗时9 s"
+        }
+      ],
+      "width": 1280
+    }
+  ],
+  "additionalBrowserChecks": {
+    "legendToggle": "Success bars hidden and restored using native chart legend",
+    "tooltip": "Latest date showed 2 tasks, success 2, errors 0, processing 0, rate 100%",
+    "keyboardHelp": "Statistics policy shown on keyboard focus",
+    "zeroAndLongDuration": {
+      "viewport": [
+        1280,
+        876
+      ],
+      "duration": "1440 min 59 s",
+      "summaryOverflow": 0,
+      "screenshot": "trend-rate-0-1280.png"
+    },
+    "consoleErrors": 0,
+    "dataSource": "Disposable task records in isolated temporary runtime store; display verification only"
+  }
+}
